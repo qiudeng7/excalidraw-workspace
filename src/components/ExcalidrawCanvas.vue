@@ -56,5 +56,63 @@ onBeforeUnmount(() => {
 .canvas-host {
   width: 100%;
   height: 100%;
+  container-type: inline-size;
+}
+
+/* 工具栏以画布内部的 FixedSideContainer 为定位边界。 */
+.canvas-host :deep(.App-menu_top) {
+  grid-template-columns: 1fr 1fr;
+}
+
+.canvas-host :deep(.App-menu_top > .shapes-section) {
+  position: absolute;
+  inset-inline: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
+  justify-self: stretch;
+}
+
+.canvas-host :deep(.App-toolbar .HintViewer) {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+/* 更多工具随工具栏向上展开，避免超出画布。 */
+.canvas-host :deep(.App-toolbar__extra-tools-dropdown) {
+  top: auto;
+  bottom: calc(100% + 0.375rem);
+  margin-top: 0;
+}
+
+/* 移动版使用独立 DOM，留出底部菜单和撤销按钮的位置。 */
+.canvas-host :deep(.excalidraw--mobile .App-top-bar .App-toolbar--mobile) {
+  position: absolute;
+  inset-inline: -0.5rem;
+  width: auto;
+  bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.canvas-host :deep(.excalidraw--mobile .App-top-bar > .HintViewer) {
+  position: absolute;
+  top: auto;
+  bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
+  padding: 0;
+  margin: 0;
+}
+
+@container (max-width: 960px) {
+  .canvas-host :deep(.App-menu_top > .shapes-section) {
+    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .canvas-host :deep(.shapes-section > div) {
+    max-width: 100%;
+  }
+
+  .canvas-host :deep(.App-toolbar > .Stack_horizontal) {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 </style>
