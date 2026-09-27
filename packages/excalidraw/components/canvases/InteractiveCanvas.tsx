@@ -26,6 +26,7 @@ type InteractiveCanvasProps = {
   sceneNonce: number | undefined;
   selectionNonce: number | undefined;
   scale: number;
+  smoothCanvas?: boolean;
   appState: InteractiveCanvasAppState;
   device: Device;
   renderInteractiveSceneCallback: (
@@ -127,7 +128,7 @@ const InteractiveCanvas = (props: InteractiveCanvasProps) => {
         visibleElements: props.visibleElements,
         selectedElements: props.selectedElements,
         allElementsMap: props.allElementsMap,
-        scale: window.devicePixelRatio,
+        scale: props.scale,
         appState: props.appState,
         renderConfig: {
           remotePointerViewportCoords,
@@ -149,6 +150,7 @@ const InteractiveCanvas = (props: InteractiveCanvasProps) => {
     <canvas
       className="excalidraw__canvas interactive"
       style={{
+        imageRendering: (props.smoothCanvas || props.scale > window.devicePixelRatio) ? "auto" : undefined,
         width: props.appState.width,
         height: props.appState.height,
         cursor: props.appState.viewModeEnabled
@@ -218,6 +220,7 @@ const areEqual = (
     prevProps.selectionNonce !== nextProps.selectionNonce ||
     prevProps.sceneNonce !== nextProps.sceneNonce ||
     prevProps.scale !== nextProps.scale ||
+    prevProps.smoothCanvas !== nextProps.smoothCanvas ||
     // we need to memoize on elementsMap because they may have renewed
     // even if sceneNonce didn't change (e.g. we filter elements out based
     // on appState)

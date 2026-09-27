@@ -135,7 +135,7 @@ const frameClip = (
   );
 };
 
-type LinkIconCanvas = HTMLCanvasElement & { zoom: number };
+type LinkIconCanvas = HTMLCanvasElement & { zoom: number; pixelRatio: number };
 
 const linkIconCanvasCache: {
   regularLink: LinkIconCanvas | null;
@@ -150,6 +150,7 @@ const renderLinkIcon = (
   context: CanvasRenderingContext2D,
   appState: StaticCanvasAppState,
   elementsMap: ElementsMap,
+  pixelRatio: number,
 ) => {
   if (element.link && !appState.selectedElementIds[element.id]) {
     const [x1, y1, x2, y2] = getElementAbsoluteCoords(element, elementsMap);
@@ -170,19 +171,24 @@ const renderLinkIcon = (
 
     let linkCanvas = linkIconCanvasCache[canvasKey];
 
-    if (!linkCanvas || linkCanvas.zoom !== appState.zoom.value) {
+    if (
+      !linkCanvas ||
+      linkCanvas.zoom !== appState.zoom.value ||
+      linkCanvas.pixelRatio !== pixelRatio
+    ) {
       linkCanvas = Object.assign(document.createElement("canvas"), {
         zoom: appState.zoom.value,
+        pixelRatio,
       });
-      linkCanvas.width = width * window.devicePixelRatio * appState.zoom.value;
+      linkCanvas.width = width * pixelRatio * appState.zoom.value;
       linkCanvas.height =
-        height * window.devicePixelRatio * appState.zoom.value;
+        height * pixelRatio * appState.zoom.value;
       linkIconCanvasCache[canvasKey] = linkCanvas;
 
       const linkCanvasCacheContext = linkCanvas.getContext("2d")!;
       linkCanvasCacheContext.scale(
-        window.devicePixelRatio * appState.zoom.value,
-        window.devicePixelRatio * appState.zoom.value,
+        pixelRatio * appState.zoom.value,
+        pixelRatio * appState.zoom.value,
       );
       linkCanvasCacheContext.fillStyle = "#fff";
       linkCanvasCacheContext.fillRect(0, 0, width, height);
@@ -348,7 +354,13 @@ const _renderStaticScene = ({
         context.restore();
 
         if (!isExporting) {
-          renderLinkIcon(element, context, appState, elementsMap);
+          renderLinkIcon(
+            element,
+            context,
+            appState,
+            elementsMap,
+            renderConfig.pixelRatio ?? window.devicePixelRatio,
+          );
         }
       } catch (error: any) {
         console.error(
@@ -399,7 +411,13 @@ const _renderStaticScene = ({
             );
           }
           if (!isExporting) {
-            renderLinkIcon(element, context, appState, elementsMap);
+            renderLinkIcon(
+            element,
+            context,
+            appState,
+            elementsMap,
+            renderConfig.pixelRatio ?? window.devicePixelRatio,
+          );
           }
         };
         // - when exporting the whole canvas, we DO NOT apply clipping

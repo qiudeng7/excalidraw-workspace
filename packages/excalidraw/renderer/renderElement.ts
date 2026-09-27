@@ -138,6 +138,7 @@ export interface ExcalidrawElementWithCanvas {
   scale: number;
   angle: number;
   zoomValue: AppState["zoom"]["value"];
+  pixelRatio: number;
   canvasOffsetX: number;
   canvasOffsetY: number;
   boundTextElementVersion: number | null;
@@ -150,6 +151,7 @@ const cappedElementCanvasSize = (
   element: NonDeletedExcalidrawElement,
   elementsMap: ElementsMap,
   zoom: Zoom,
+  pixelRatio: number,
 ): {
   width: number;
   height: number;
@@ -177,8 +179,8 @@ const cappedElementCanvasSize = (
       ? distance(y1, y2)
       : element.height;
 
-  let width = elementWidth * window.devicePixelRatio + padding * 2;
-  let height = elementHeight * window.devicePixelRatio + padding * 2;
+  let width = elementWidth * pixelRatio + padding * 2;
+  let height = elementHeight * pixelRatio + padding * 2;
 
   let scale: number = zoom.value;
 
@@ -208,6 +210,7 @@ const generateElementCanvas = (
   renderConfig: StaticCanvasRenderConfig,
   appState: StaticCanvasAppState,
 ): ExcalidrawElementWithCanvas | null => {
+  const pixelRatio = renderConfig.pixelRatio ?? window.devicePixelRatio;
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d")!;
   const padding = getCanvasPadding(element);
@@ -216,6 +219,7 @@ const generateElementCanvas = (
     element,
     elementsMap,
     zoom,
+    pixelRatio,
   );
 
   if (!width || !height) {
@@ -233,12 +237,12 @@ const generateElementCanvas = (
 
     canvasOffsetX =
       element.x > x1
-        ? distance(element.x, x1) * window.devicePixelRatio * scale
+        ? distance(element.x, x1) * pixelRatio * scale
         : 0;
 
     canvasOffsetY =
       element.y > y1
-        ? distance(element.y, y1) * window.devicePixelRatio * scale
+        ? distance(element.y, y1) * pixelRatio * scale
         : 0;
 
     context.translate(canvasOffsetX, canvasOffsetY);
@@ -246,10 +250,7 @@ const generateElementCanvas = (
 
   context.save();
   context.translate(padding * scale, padding * scale);
-  context.scale(
-    window.devicePixelRatio * scale,
-    window.devicePixelRatio * scale,
-  );
+  context.scale(pixelRatio * scale, pixelRatio * scale);
 
   const rc = rough.canvas(canvas);
 
@@ -272,9 +273,9 @@ const generateElementCanvas = (
     // the arrow doesn't get clipped
     const maxDim = Math.max(distance(x1, x2), distance(y1, y2));
     boundTextCanvas.width =
-      maxDim * window.devicePixelRatio * scale + padding * scale * 10;
+      maxDim * pixelRatio * scale + padding * scale * 10;
     boundTextCanvas.height =
-      maxDim * window.devicePixelRatio * scale + padding * scale * 10;
+      maxDim * pixelRatio * scale + padding * scale * 10;
     boundTextCanvasContext.translate(
       boundTextCanvas.width / 2,
       boundTextCanvas.height / 2,
@@ -298,29 +299,29 @@ const generateElementCanvas = (
     const offsetY = (boundTextCanvas.height - canvas!.height) / 2;
     const shiftX =
       boundTextCanvas.width / 2 -
-      (boundTextCx - x1) * window.devicePixelRatio * scale -
+      (boundTextCx - x1) * pixelRatio * scale -
       offsetX -
       padding * scale;
 
     const shiftY =
       boundTextCanvas.height / 2 -
-      (boundTextCy - y1) * window.devicePixelRatio * scale -
+      (boundTextCy - y1) * pixelRatio * scale -
       offsetY -
       padding * scale;
     boundTextCanvasContext.translate(-shiftX, -shiftY);
     // Clear the bound text area
     boundTextCanvasContext.clearRect(
       -(boundTextElement.width / 2 + BOUND_TEXT_PADDING) *
-        window.devicePixelRatio *
+        pixelRatio *
         scale,
       -(boundTextElement.height / 2 + BOUND_TEXT_PADDING) *
-        window.devicePixelRatio *
+        pixelRatio *
         scale,
       (boundTextElement.width + BOUND_TEXT_PADDING * 2) *
-        window.devicePixelRatio *
+        pixelRatio *
         scale,
       (boundTextElement.height + BOUND_TEXT_PADDING * 2) *
-        window.devicePixelRatio *
+        pixelRatio *
         scale,
     );
   }
@@ -331,6 +332,7 @@ const generateElementCanvas = (
     theme: appState.theme,
     scale,
     zoomValue: zoom.value,
+    pixelRatio,
     canvasOffsetX,
     canvasOffsetY,
     boundTextElementVersion:
@@ -549,6 +551,9 @@ const generateElementWithCanvas = (
   if (
     !prevElementWithCanvas ||
     shouldRegenerateBecauseZoom ||
+    // 采样倍率或设备像素密度变化时，旧位图不能继续复用。
+    prevElementWithCanvas.pixelRatio !==
+      (renderConfig.pixelRatio ?? window.devicePixelRatio) ||
     prevElementWithCanvas.theme !== appState.theme ||
     prevElementWithCanvas.boundTextElementVersion !== boundTextElementVersion ||
     prevElementWithCanvas.imageCrop !== imageCrop ||
@@ -587,15 +592,16 @@ const drawElementFromCanvas = (
   appState: StaticCanvasAppState,
   allElementsMap: NonDeletedSceneElementsMap,
 ) => {
+  const pixelRatio = elementWithCanvas.pixelRatio;
   const element = elementWithCanvas.element;
   const padding = getCanvasPadding(element);
   const zoom = elementWithCanvas.scale;
   const [x1, y1, x2, y2] = getElementAbsoluteCoords(element, allElementsMap);
-  const cx = ((x1 + x2) / 2 + appState.scrollX) * window.devicePixelRatio;
-  const cy = ((y1 + y2) / 2 + appState.scrollY) * window.devicePixelRatio;
+  const cx = ((x1 + x2) / 2 + appState.scrollX) * pixelRatio;
+  const cy = ((y1 + y2) / 2 + appState.scrollY) * pixelRatio;
 
   context.save();
-  context.scale(1 / window.devicePixelRatio, 1 / window.devicePixelRatio);
+  context.scale(1 / pixelRatio, 1 / pixelRatio);
 
   const boundTextElement = getBoundTextElement(element, allElementsMap);
 
@@ -611,8 +617,8 @@ const drawElementFromCanvas = (
     context.translate(cx, cy);
     context.drawImage(
       elementWithCanvas.boundTextCanvas,
-      (-(x2 - x1) / 2) * window.devicePixelRatio - offsetX / zoom - padding,
-      (-(y2 - y1) / 2) * window.devicePixelRatio - offsetY / zoom - padding,
+      (-(x2 - x1) / 2) * pixelRatio - offsetX / zoom - padding,
+      (-(y2 - y1) / 2) * pixelRatio - offsetY / zoom - padding,
       elementWithCanvas.boundTextCanvas.width / zoom,
       elementWithCanvas.boundTextCanvas.height / zoom,
     );
@@ -638,9 +644,9 @@ const drawElementFromCanvas = (
 
     context.drawImage(
       elementWithCanvas.canvas!,
-      (x1 + appState.scrollX) * window.devicePixelRatio -
+      (x1 + appState.scrollX) * pixelRatio -
         (padding * elementWithCanvas.scale) / elementWithCanvas.scale,
-      (y1 + appState.scrollY) * window.devicePixelRatio -
+      (y1 + appState.scrollY) * pixelRatio -
         (padding * elementWithCanvas.scale) / elementWithCanvas.scale,
       elementWithCanvas.canvas!.width / elementWithCanvas.scale,
       elementWithCanvas.canvas!.height / elementWithCanvas.scale,
@@ -659,10 +665,10 @@ const drawElementFromCanvas = (
       context.strokeStyle = "#c92a2a";
       context.lineWidth = 3;
       context.strokeRect(
-        (coords.x + appState.scrollX) * window.devicePixelRatio,
-        (coords.y + appState.scrollY) * window.devicePixelRatio,
-        getBoundTextMaxWidth(element, textElement) * window.devicePixelRatio,
-        getBoundTextMaxHeight(element, textElement) * window.devicePixelRatio,
+        (coords.x + appState.scrollX) * pixelRatio,
+        (coords.y + appState.scrollY) * pixelRatio,
+        getBoundTextMaxWidth(element, textElement) * pixelRatio,
+        getBoundTextMaxHeight(element, textElement) * pixelRatio,
       );
     }
   }
@@ -696,6 +702,35 @@ export const renderSelectionElement = (
 };
 
 export const renderElement = (
+  ...args: Parameters<typeof renderElementInternal>
+) => {
+  const [element, , , , context, renderConfig, appState] = args;
+  const options = renderConfig.isExporting ? undefined : renderConfig.renderingOptions;
+  context.save();
+  try {
+    if (options?.smoothCache) {
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = options.highQualitySmoothing ? "high" : "low";
+    }
+    if (options?.alignPixels && !element.angle) {
+      // 只调整绘制位置，不改元素坐标。最多偏移半个画布像素。
+      const transform = context.getTransform();
+      const x = (element.x + appState.scrollX) * transform.a + transform.e;
+      const y = (element.y + appState.scrollY) * transform.d + transform.f;
+      if (transform.a && transform.d) {
+        context.translate(
+          (Math.round(x) - x) / transform.a,
+          (Math.round(y) - y) / transform.d,
+        );
+      }
+    }
+    renderElementInternal(...args);
+  } finally {
+    context.restore();
+  }
+};
+
+const renderElementInternal = (
   element: NonDeletedExcalidrawElement,
   elementsMap: RenderableElementsMap,
   allElementsMap: NonDeletedSceneElementsMap,
@@ -809,7 +844,14 @@ export const renderElement = (
       // beforehand because math helpers (such as getElementAbsoluteCoords)
       // rely on existing shapes
       ShapeCache.generateElementShape(element, renderConfig);
-      if (renderConfig.isExporting) {
+      const options = renderConfig.renderingOptions;
+      const directText = options?.directText && element.type === "text";
+      const directShape = options?.directShapes && (
+        element.type === "rectangle" || element.type === "ellipse" ||
+        element.type === "diamond" || element.type === "line" ||
+        (element.type === "arrow" && !getBoundTextElement(element, allElementsMap))
+      );
+      if (renderConfig.isExporting || directText || directShape) {
         const [x1, y1, x2, y2] = getElementAbsoluteCoords(element, elementsMap);
         const cx = (x1 + x2) / 2 + appState.scrollX;
         const cy = (y1 + y2) / 2 + appState.scrollY;
@@ -933,6 +975,7 @@ export const renderElement = (
         if (
           // do not disable smoothing during zoom as blurry shapes look better
           // on low resolution (while still zooming in) than sharp ones
+          !renderConfig.renderingOptions?.smoothCache &&
           !appState?.shouldCacheIgnoreZoom &&
           // angle is 0 -> always disable smoothing
           (!element.angle ||

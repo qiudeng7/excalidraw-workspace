@@ -54,6 +54,8 @@ const StaticCanvas = (props: StaticCanvasProps) => {
       canvas.style.height = heightString;
     }
 
+    canvas.style.imageRendering = (props.renderConfig.renderingOptions?.smoothCanvas || props.scale > window.devicePixelRatio) ? "auto" : "";
+
     const scaledWidth = props.appState.width * props.scale;
     const scaledHeight = props.appState.height * props.scale;
     // setting width/height resets the canvas even if dimensions not changed,

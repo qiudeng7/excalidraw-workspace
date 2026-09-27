@@ -1,3 +1,4 @@
+import type { CanvasRenderingOptions } from "./renderer/renderingOptions";
 import type { JSX } from "react";
 import type React from "react";
 import type {
@@ -495,6 +496,9 @@ export type OnUserFollowedPayload = {
 };
 
 export interface ExcalidrawProps {
+  /** 屏幕采样倍率，独立于场景缩放及导出分辨率。 */
+  canvasSampling?: 1 | 1.5 | 2;
+  canvasRenderingOptions?: CanvasRenderingOptions;
   onChange?: (
     elements: readonly OrderedExcalidrawElement[],
     appState: AppState,

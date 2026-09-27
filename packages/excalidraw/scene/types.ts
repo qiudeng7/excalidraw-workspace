@@ -1,3 +1,4 @@
+import type { CanvasRenderingOptions } from "../renderer/renderingOptions";
 import type { RoughCanvas } from "roughjs/bin/canvas";
 import type { Drawable } from "roughjs/bin/core";
 import type {
@@ -24,6 +25,9 @@ export type RenderableElementsMap = NonDeletedElementsMap &
   MakeBrand<"RenderableElementsMap">;
 
 export type StaticCanvasRenderConfig = {
+  /** 仅屏幕渲染传入；导出保留原有像素密度。 */
+  pixelRatio?: number;
+  renderingOptions?: CanvasRenderingOptions;
   canvasBackgroundColor: AppState["viewBackgroundColor"];
   // extra options passed to the renderer
   // ---------------------------------------------------------------------------

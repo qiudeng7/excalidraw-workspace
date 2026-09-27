@@ -1349,6 +1349,14 @@ class App extends React.Component<AppProps, AppState> {
     this.setState({ editingFrame: null });
   };
 
+  private get canvasScale() {
+    const sampling = this.props.canvasSampling;
+    return (
+      window.devicePixelRatio *
+      (sampling === 1.5 || sampling === 2 ? sampling : 1)
+    );
+  }
+
   private renderFrameNames = () => {
     if (!this.state.frameRendering.enabled || !this.state.frameRendering.name) {
       if (this.state.editingFrame) {
@@ -1363,8 +1371,8 @@ class App extends React.Component<AppProps, AppState> {
       if (
         !isElementInViewport(
           f,
-          this.canvas.width / window.devicePixelRatio,
-          this.canvas.height / window.devicePixelRatio,
+          this.canvas.width / this.canvasScale,
+          this.canvas.height / this.canvasScale,
           {
             offsetLeft: this.state.offsetLeft,
             offsetTop: this.state.offsetTop,
@@ -1735,11 +1743,13 @@ class App extends React.Component<AppProps, AppState> {
                           selectionNonce={
                             this.state.selectionElement?.versionNonce
                           }
-                          scale={window.devicePixelRatio}
+                          scale={this.canvasScale}
                           appState={this.state}
                           renderConfig={{
                             imageCache: this.imageCache,
                             isExporting: false,
+                            pixelRatio: this.canvasScale,
+                            renderingOptions: this.props.canvasRenderingOptions,
                             renderGrid: isGridModeEnabled(this),
                             canvasBackgroundColor:
                               this.state.viewBackgroundColor,
@@ -1752,13 +1762,15 @@ class App extends React.Component<AppProps, AppState> {
                         {this.state.newElement && (
                           <NewElementCanvas
                             appState={this.state}
-                            scale={window.devicePixelRatio}
+                            scale={this.canvasScale}
                             rc={this.rc}
                             elementsMap={elementsMap}
                             allElementsMap={allElementsMap}
                             renderConfig={{
                               imageCache: this.imageCache,
                               isExporting: false,
+                              pixelRatio: this.canvasScale,
+                              renderingOptions: this.props.canvasRenderingOptions,
                               renderGrid: false,
                               canvasBackgroundColor:
                                 this.state.viewBackgroundColor,
@@ -1771,6 +1783,7 @@ class App extends React.Component<AppProps, AppState> {
                           />
                         )}
                         <InteractiveCanvas
+                          smoothCanvas={this.props.canvasRenderingOptions?.smoothCanvas}
                           containerRef={this.excalidrawContainerRef}
                           canvas={this.interactiveCanvas}
                           elementsMap={elementsMap}
@@ -1781,7 +1794,7 @@ class App extends React.Component<AppProps, AppState> {
                           selectionNonce={
                             this.state.selectionElement?.versionNonce
                           }
-                          scale={window.devicePixelRatio}
+                          scale={this.canvasScale}
                           appState={this.state}
                           device={this.device}
                           renderInteractiveSceneCallback={
@@ -4127,8 +4140,8 @@ class App extends React.Component<AppProps, AppState> {
             this.flowChartCreator.pendingNodes?.length &&
             !isElementCompletelyInViewport(
               this.flowChartCreator.pendingNodes,
-              this.canvas.width / window.devicePixelRatio,
-              this.canvas.height / window.devicePixelRatio,
+              this.canvas.width / this.canvasScale,
+              this.canvas.height / this.canvasScale,
               {
                 offsetLeft: this.state.offsetLeft,
                 offsetTop: this.state.offsetTop,
@@ -4184,8 +4197,8 @@ class App extends React.Component<AppProps, AppState> {
                 nextNode &&
                 !isElementCompletelyInViewport(
                   [nextNode],
-                  this.canvas.width / window.devicePixelRatio,
-                  this.canvas.height / window.devicePixelRatio,
+                  this.canvas.width / this.canvasScale,
+                  this.canvas.height / this.canvasScale,
                   {
                     offsetLeft: this.state.offsetLeft,
                     offsetTop: this.state.offsetTop,
@@ -4634,8 +4647,8 @@ class App extends React.Component<AppProps, AppState> {
           if (
             !isElementCompletelyInViewport(
               [firstNode],
-              this.canvas.width / window.devicePixelRatio,
-              this.canvas.height / window.devicePixelRatio,
+              this.canvas.width / this.canvasScale,
+              this.canvas.height / this.canvasScale,
               {
                 offsetLeft: this.state.offsetLeft,
                 offsetTop: this.state.offsetTop,

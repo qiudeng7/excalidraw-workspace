@@ -111,6 +111,8 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
     <EditorJotaiProvider store={editorJotaiStore}>
       <InitializeApp langCode={langCode} theme={theme}>
         <App
+          canvasSampling={props.canvasSampling}
+          canvasRenderingOptions={props.canvasRenderingOptions}
           onChange={onChange}
           initialData={initialData}
           excalidrawAPI={excalidrawAPI}

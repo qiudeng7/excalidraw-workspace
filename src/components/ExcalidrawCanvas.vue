@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue'
-import { createElement } from 'react'
+import { createElement, useState } from 'react'
+import { SamplingMenu, readSampling, saveSampling, type Sampling } from './canvasSampling'
+import { RenderingOptionsMenu, readRenderingOptions, saveRenderingOptions, defaultRenderingOptions } from './canvasRenderingOptions'
 import { createRoot, type Root } from 'react-dom/client'
 import { Excalidraw, FONT_FAMILY, MainMenu } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
@@ -8,38 +10,66 @@ import '@excalidraw/excalidraw/index.css'
 const container = useTemplateRef<HTMLDivElement>('container')
 let root: Root | undefined
 
+function CanvasEditor() {
+  const [sampling, setSampling] = useState<Sampling>(readSampling)
+  const [renderingOptions, setRenderingOptions] = useState(readRenderingOptions)
+  return createElement(Excalidraw, {
+    canvasSampling: sampling,
+    canvasRenderingOptions: renderingOptions,
+    langCode: 'zh-CN',
+    theme: 'light',
+    children: createElement(
+      MainMenu,
+      null,
+      createElement(MainMenu.DefaultItems.LoadScene),
+      createElement(MainMenu.DefaultItems.SaveToActiveFile),
+      createElement(MainMenu.DefaultItems.Export),
+      createElement(MainMenu.DefaultItems.SaveAsImage),
+      createElement(MainMenu.DefaultItems.SearchMenu),
+      createElement(MainMenu.DefaultItems.Help),
+      createElement(MainMenu.DefaultItems.ClearCanvas),
+      createElement(MainMenu.Separator),
+      createElement(SamplingMenu, {
+        value: sampling,
+        onChange: (value: Sampling) => {
+          setSampling(value)
+          saveSampling(value)
+        },
+      }),
+      createElement(MainMenu.Separator),
+      createElement(RenderingOptionsMenu, {
+        value: renderingOptions,
+        onChange: (value) => {
+          setRenderingOptions(value)
+          saveRenderingOptions(value)
+        },
+        onReset: () => {
+          setSampling(1)
+          saveSampling(1)
+          setRenderingOptions({ ...defaultRenderingOptions })
+          saveRenderingOptions(defaultRenderingOptions)
+        },
+      }),
+      createElement(MainMenu.Separator),
+      createElement(MainMenu.DefaultItems.ToggleTheme),
+      createElement(MainMenu.DefaultItems.ChangeCanvasBackground),
+    ),
+    initialData: {
+      appState: {
+        currentItemFontFamily: FONT_FAMILY.Nunito,
+        currentItemRoughness: 0,
+        currentItemStrokeStyle: 'solid',
+        currentItemFillStyle: 'solid',
+        currentItemStrokeWidth: 2,
+      },
+    },
+  })
+}
+
 onMounted(() => {
   if (!container.value) return
   root = createRoot(container.value)
-  root.render(
-    createElement(Excalidraw, {
-      langCode: 'zh-CN',
-      theme: 'light',
-      children: createElement(
-        MainMenu,
-        null,
-        createElement(MainMenu.DefaultItems.LoadScene),
-        createElement(MainMenu.DefaultItems.SaveToActiveFile),
-        createElement(MainMenu.DefaultItems.Export),
-        createElement(MainMenu.DefaultItems.SaveAsImage),
-        createElement(MainMenu.DefaultItems.SearchMenu),
-        createElement(MainMenu.DefaultItems.Help),
-        createElement(MainMenu.DefaultItems.ClearCanvas),
-        createElement(MainMenu.Separator),
-        createElement(MainMenu.DefaultItems.ToggleTheme),
-        createElement(MainMenu.DefaultItems.ChangeCanvasBackground),
-      ),
-      initialData: {
-        appState: {
-          currentItemFontFamily: FONT_FAMILY.Nunito,
-          currentItemRoughness: 0,
-          currentItemStrokeStyle: 'solid',
-          currentItemFillStyle: 'solid',
-          currentItemStrokeWidth: 2,
-        },
-      },
-    }),
-  )
+  root.render(createElement(CanvasEditor))
 })
 
 onBeforeUnmount(() => {

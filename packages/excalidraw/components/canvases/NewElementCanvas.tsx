@@ -43,6 +43,7 @@ const NewElementCanvas = (props: NewElementCanvasProps) => {
     <canvas
       className="excalidraw__canvas"
       style={{
+        imageRendering: (props.renderConfig.renderingOptions?.smoothCanvas || props.scale > window.devicePixelRatio) ? "auto" : undefined,
         width: props.appState.width,
         height: props.appState.height,
       }}
