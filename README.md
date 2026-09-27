@@ -1,29 +1,37 @@
 # Vue Demo
 
-A Vue 3 + Vite + TypeScript demo with Pinia, Vue Router, and an embedded Excalidraw editor. The home page has a counter that survives navigation to the About page and resets on refresh.
+一个基于 Vue 3、Vite、TypeScript、Pinia 和 Vue Router 的 Excalidraw 画布 Demo。首页提供计数器，切换到关于页再返回时保留计数，刷新后重置。
 
-Use Node.js 22.12+ (or 24+) and pnpm 11. From the project directory:
+## 启动
+
+需要 Node.js 22.12+（或 24+）和 pnpm 11。在项目目录运行：
 
 ```sh
 pnpm install
 pnpm dev
 ```
 
-Open the local URL printed by Vite (normally http://localhost:5173).
+打开 Vite 输出的地址，通常为 http://localhost:5173。
 
 ```sh
-pnpm build   # Type-check and build into dist/
-pnpm preview # Serve the production build locally
+pnpm build   # 类型检查，并构建到 dist/
+pnpm preview # 本地预览生产构建
 ```
 
-Routes are in `src/router/index.ts`, pages in `src/views/`, and the counter store in `src/stores/counter.ts`. A production host must serve `index.html` for client-side routes such as `/about`.
+生产部署需要将 `/about`、`/draw` 等前端路由回退到 `index.html`。
 
-Open **画布** in the navigation (or `/draw`) to draw shapes, text, and freehand strokes. Use the editor menu to save to a file and reopen it. The canvas is not automatically persisted: navigating away or refreshing clears it. Excalidraw uses its default CDN for fonts, which requires network access.
+## 使用画布
 
-The Vue wrapper is `src/components/ExcalidrawCanvas.vue`; it mounts the React editor and unmounts it when leaving the page.
+点击导航中的“画布”，或访问 `/draw`，即可绘制图形、文字和自由笔画。通过编辑器菜单保存到文件，再次使用时从文件打开。画布不会自动保存，离开页面或刷新会清空未保存内容。字体使用 Excalidraw 默认 CDN，需要网络访问。
 
-New shapes use clean solid strokes (`roughness: 0`, width 2), solid fills when a fill color is chosen, and Nunito text. Existing imported elements keep their styles.
+新图形默认使用规整实线、2px 线宽，选择填充颜色后使用纯色填充；文字默认使用 Nunito。导入元素保留自己的样式。普通开口箭头的头部已缩短，菜单中的 “Excalidraw links” 外链组已移除。
 
-The open arrowhead is customized from length 25 / half-angle 20° to length 14 / half-angle 28°. This is a version-specific pnpm patch for Excalidraw 0.18.1, applied automatically by `pnpm install`; keep the patch files and `pnpm-workspace.yaml` together with the lockfile. The patch covers development and production rendering, including exports. Opening an `.excalidraw` file in an unmodified editor uses that editor's arrowhead appearance.
+普通 `Ctrl+C` 复制可编辑元素，`Ctrl+Shift+C` 复制 PNG，可粘贴到支持图片的应用。macOS 使用 Cmd 代替 Ctrl。
 
-Direct dependencies were checked against stable releases on 2026-09-27. React and its types stay on 18 because some Excalidraw transitive peers exclude React 19. TypeScript stays on 6.0.3 because the current `vue-tsc` 3.3.11 fails with TypeScript 7.0.2 (`ERR_PACKAGE_PATH_NOT_EXPORTED`). Recheck these compatibility constraints when upgrading.
+## 代码与定制
+
+- [路由](src/router/index.ts)、[页面](src/views/)和 [Pinia 计数器](src/stores/counter.ts)。
+- [Vue 包装组件](src/components/ExcalidrawCanvas.vue)：挂载 React 编辑器、设置默认样式和菜单，离开页面时卸载。
+- [补丁说明](patches/README.md)：箭头和快捷键的具体修改、自动安装机制、验证步骤及升级方式。
+
+直接依赖已于 2026-09-27 核对稳定版本。React 及其类型保留在 18，因为 Excalidraw 的部分传递依赖尚未声明支持 React 19。TypeScript 保留在 6.0.3，因为当前 `vue-tsc` 3.3.11 搭配 TypeScript 7.0.2 实测报错 `ERR_PACKAGE_PATH_NOT_EXPORTED`；升级时需重新检查兼容性。

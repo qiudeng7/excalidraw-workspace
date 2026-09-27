@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  '@excalidraw/excalidraw@0.18.1': 6c290b1d4d36e187ddd442b287a4e4e7a07f813546cc887b1cc716b25db04144
+  '@excalidraw/excalidraw@0.18.1': 4c002e065217f33d29ae472da14112fdd065895ef7d6bf4cac24a37559db71a4
 
 importers:
 
@@ -13,7 +13,7 @@ importers:
     dependencies:
       '@excalidraw/excalidraw':
         specifier: 0.18.1
-        version: 0.18.1(patch_hash=6c290b1d4d36e187ddd442b287a4e4e7a07f813546cc887b1cc716b25db04144)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        version: 0.18.1(patch_hash=4c002e065217f33d29ae472da14112fdd065895ef7d6bf4cac24a37559db71a4)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       pinia:
         specifier: ^4.0.3
         version: 4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.43(typescript@6.0.3))
@@ -1762,7 +1762,7 @@ snapshots:
 
   '@chevrotain/utils@11.0.3': {}
 
-  '@excalidraw/excalidraw@0.18.1(patch_hash=6c290b1d4d36e187ddd442b287a4e4e7a07f813546cc887b1cc716b25db04144)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@excalidraw/excalidraw@0.18.1(patch_hash=4c002e065217f33d29ae472da14112fdd065895ef7d6bf4cac24a37559db71a4)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       '@braintree/sanitize-url': 6.0.2
       '@excalidraw/laser-pointer': 1.3.1
