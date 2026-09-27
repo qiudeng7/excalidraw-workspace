@@ -1,5 +1,7 @@
 # excalidraw Demo
 
+[在线体验 Demo](https://excalidraw-demo.qiudeng.workers.dev/draw) · [GitHub 仓库](https://github.com/qiudeng7/excalidraw-demo)
+
 本项目是一次未成功的 demo 实验，下面是实验经过
 1. 使用 Vue + Vite + TypeScript + Pinia + Router 搭建 Demo，通过 React 接入 Excalidraw，使用 pnpm 管理依赖。
 2. 将默认样式调整为 Nunito 字体、规整实线和纯色填充，缩短普通箭头的头部（通过pnpm的patch机制修改excalidraw包），让它的样式看起来更正式一些，不那么手写体
