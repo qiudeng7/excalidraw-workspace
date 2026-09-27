@@ -1,0 +1,45 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/types",
+    "target": "ESNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "allowSyntheticDefaultImports": true,
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "resolveJsonModule": true,
+    "jsx": "react-jsx",
+    "emitDeclarationOnly": true,
+    "paths": {
+      "@excalidraw/excalidraw": [
+        "./index.tsx"
+      ],
+      "@excalidraw/utils": [
+        "./lib/utils/index.ts"
+      ],
+      "@excalidraw/math": [
+        "./lib/math/index.ts"
+      ],
+      "@excalidraw/excalidraw/*": [
+        "./*"
+      ],
+      "@excalidraw/utils/*": [
+        "./lib/utils/*"
+      ],
+      "@excalidraw/math/*": [
+        "./lib/math/*"
+      ]
+    },
+    "rootDir": "."
+  },
+  "exclude": [
+    "**/*.test.*",
+    "**/tests/**",
+    "types",
+    "examples",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/test-utils.ts"
+  ]
+}

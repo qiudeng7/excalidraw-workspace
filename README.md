@@ -14,7 +14,7 @@ pnpm dev
 打开 Vite 输出的地址，通常为 http://localhost:5173。
 
 ```sh
-pnpm build   # 类型检查，并构建到 dist/
+pnpm build   # 构建本地编辑器、类型检查，并构建 Demo 到 dist/
 pnpm preview # 本地预览生产构建
 ```
 
@@ -32,6 +32,8 @@ pnpm preview # 本地预览生产构建
 
 - [路由](src/router/index.ts)、[页面](src/views/)和 [Pinia 计数器](src/stores/counter.ts)。
 - [Vue 包装组件](src/components/ExcalidrawCanvas.vue)：挂载 React 编辑器、设置默认样式和菜单，离开页面时卸载。
-- [补丁说明](patches/README.md)：箭头和快捷键的具体修改、自动安装机制、验证步骤及升级方式。
+- [本地 Excalidraw 源码](packages/excalidraw/README.md)：源码来源、三个内部包的关系、定制位置、构建和升级方式。
 
-直接依赖已于 2026-09-27 核对稳定版本。React 及其类型保留在 18，因为 Excalidraw 的部分传递依赖尚未声明支持 React 19。TypeScript 保留在 6.0.3，因为当前 `vue-tsc` 3.3.11 搭配 TypeScript 7.0.2 实测报错 `ERR_PACKAGE_PATH_NOT_EXPORTED`；升级时需重新检查兼容性。
+Demo 宿主的直接依赖已于 2026-09-27 核对稳定版本。React 及其类型保留在 18，因为 Excalidraw 的部分传递依赖尚未声明支持 React 19。TypeScript 保留在 6.0.3，因为当前 `vue-tsc` 3.3.11 搭配 TypeScript 7.0.2 实测报错 `ERR_PACKAGE_PATH_NOT_EXPORTED`；升级时需重新检查兼容性。
+
+Excalidraw 已作为本仓库的本地源码包维护，使用 `workspace:*` 引用，不再应用 pnpm patch。`pnpm dev` 会先构建编辑器再启动 Vite；首次启动需等待源码构建完成。编辑器内部构建工具保留上游兼容版本，详情见 [源码维护说明](packages/excalidraw/README.md)。
