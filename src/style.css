@@ -9,7 +9,7 @@
 }
 
 body { margin: 0; }
-#app { min-height: 100dvh; display: flex; flex-direction: column; }
+#app { height: 100dvh; display: flex; flex-direction: column; }
 .app-header {
   display: flex;
   align-items: center;
@@ -23,7 +23,7 @@ body { margin: 0; }
 .app-header nav { display: flex; gap: 20px; }
 .app-header nav a { color: #686878; text-decoration: none; }
 .app-header nav a.router-link-exact-active { color: #6750a4; }
-.app-main { flex: 1; min-width: 0; }
+.app-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .page { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
 .page p { line-height: 1.7; color: #686878; }
 .demo-button {
