@@ -1,14 +1,22 @@
-import type { JSX } from "react";
 import React from "react";
-import { t } from "../i18n";
-import { KEYS } from "../keys";
-import { Dialog } from "./Dialog";
-import { getShortcutKey } from "../utils";
-import "./HelpDialog.scss";
-import { ExternalLinkIcon, GithubIcon, youtubeIcon } from "./icons";
-import { probablySupportsClipboardBlob } from "../clipboard";
-import { isDarwin, isFirefox, isWindows } from "../constants";
+
+import { isDarwin, isFirefox, isWindows } from "@excalidraw/common";
+
+import { KEYS } from "@excalidraw/common";
+
+import { actionToggleTheme } from "../actions";
 import { getShortcutFromShortcutName } from "../actions/shortcuts";
+import { probablySupportsClipboardBlob } from "../clipboard";
+import { t } from "../i18n";
+import { getShortcutKey } from "../shortcut";
+
+import { useExcalidrawActionManager } from "./App";
+import { Dialog } from "./Dialog";
+import { ExternalLinkIcon, GithubIcon, youtubeIcon } from "./icons";
+
+import "./HelpDialog.scss";
+
+import type { JSX } from "react";
 
 const Header = () => (
   <div className="HelpDialog__header">
@@ -16,7 +24,7 @@ const Header = () => (
       className="HelpDialog__btn"
       href="https://docs.excalidraw.com"
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
     >
       <div className="HelpDialog__link-icon">{ExternalLinkIcon}</div>
       {t("helpDialog.documentation")}
@@ -25,7 +33,7 @@ const Header = () => (
       className="HelpDialog__btn"
       href="https://plus.excalidraw.com/blog"
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
     >
       <div className="HelpDialog__link-icon">{ExternalLinkIcon}</div>
       {t("helpDialog.blog")}
@@ -107,7 +115,7 @@ const Shortcut = ({
     <div className="HelpDialog__shortcut">
       <div>{label}</div>
       <div className="HelpDialog__key-container">
-        {[...intersperse(splitShortcutKeys, isOr ? t("helpDialog.or") : null)]}
+        {[...intersperse(splitShortcutKeys, isOr ? t("helpDialog.or") : "")]}
       </div>
     </div>
   );
@@ -118,6 +126,7 @@ const ShortcutKey = (props: { children: React.ReactNode }) => (
 );
 
 export const HelpDialog = ({ onClose }: { onClose?: () => void }) => {
+  const actionManager = useExcalidrawActionManager();
   const handleClose = React.useCallback(() => {
     if (onClose) {
       onClose();
@@ -170,6 +179,7 @@ export const HelpDialog = ({ onClose }: { onClose?: () => void }) => {
               label={t("toolBar.text")}
               shortcuts={[KEYS.T, KEYS["8"]]}
             />
+            <Shortcut label={t("toolBar.stickynote")} shortcuts={[KEYS.N]} />
             <Shortcut label={t("toolBar.image")} shortcuts={[KEYS["9"]]} />
             <Shortcut
               label={t("toolBar.eraser")}
@@ -177,6 +187,7 @@ export const HelpDialog = ({ onClose }: { onClose?: () => void }) => {
             />
             <Shortcut label={t("toolBar.frame")} shortcuts={[KEYS.F]} />
             <Shortcut label={t("toolBar.laser")} shortcuts={[KEYS.K]} />
+            <Shortcut label={t("toolBar.bucketfill")} shortcuts={[KEYS.B]} />
             <Shortcut
               label={t("labels.eyeDropper")}
               shortcuts={[KEYS.I, "Shift+S", "Shift+G"]}
@@ -242,6 +253,11 @@ export const HelpDialog = ({ onClose }: { onClose?: () => void }) => {
               label={t("toolBar.link")}
               shortcuts={[getShortcutKey("CtrlOrCmd+K")]}
             />
+            <Shortcut
+              label={t("toolBar.convertElementType")}
+              shortcuts={["Tab", "Shift+Tab"]}
+              isOr={true}
+            />
           </ShortcutIsland>
           <ShortcutIsland
             className="HelpDialog__island--view"
@@ -291,10 +307,12 @@ export const HelpDialog = ({ onClose }: { onClose?: () => void }) => {
               label={t("labels.viewMode")}
               shortcuts={[getShortcutKey("Alt+R")]}
             />
-            <Shortcut
-              label={t("labels.toggleTheme")}
-              shortcuts={[getShortcutKey("Alt+Shift+D")]}
-            />
+            {actionManager.isActionEnabled(actionToggleTheme) && (
+              <Shortcut
+                label={t("labels.toggleTheme")}
+                shortcuts={[getShortcutKey("Alt+Shift+D")]}
+              />
+            )}
             <Shortcut
               label={t("stats.fullTitle")}
               shortcuts={[getShortcutKey("Alt+/")]}

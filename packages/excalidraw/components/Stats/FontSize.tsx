@@ -1,17 +1,25 @@
+import {
+  getBoundTextElement,
+  getBaseFontSize,
+  getBaseFontSizeUpdate,
+  redrawTextBoundingBox,
+} from "@excalidraw/element";
+import { hasBoundTextElement, isTextElement } from "@excalidraw/element";
+
 import type {
   ExcalidrawElement,
   ExcalidrawTextElement,
-} from "../../element/types";
-import StatsDragInput from "./DragInput";
-import type { DragInputCallbackType } from "./DragInput";
-import { mutateElement } from "../../element/mutateElement";
-import { getStepSizedValue } from "./utils";
+} from "@excalidraw/element/types";
+
+import type { Scene } from "@excalidraw/element";
+
 import { fontSizeIcon } from "../icons";
-import type Scene from "../../scene/Scene";
+
+import StatsDragInput from "./DragInput";
+import { getStepSizedValue } from "./utils";
+
+import type { DragInputCallbackType } from "./DragInput";
 import type { AppState } from "../../types";
-import { isTextElement, redrawTextBoundingBox } from "../../element";
-import { hasBoundTextElement } from "../../element/typeChecks";
-import { getBoundTextElement } from "../../element/textElement";
 
 interface FontSizeProps {
   element: ExcalidrawElement;
@@ -47,7 +55,9 @@ const handleFontSizeChange: DragInputCallbackType<
     if (nextValue !== undefined) {
       nextFontSize = Math.max(Math.round(nextValue), MIN_FONT_SIZE);
     } else if (origElement.type === "text") {
-      const originalFontSize = Math.round(origElement.fontSize);
+      const originalFontSize = Math.round(
+        getBaseFontSize(origElement, elementsMap),
+      );
       const changeInFontSize = Math.round(accumulatedChange);
       nextFontSize = Math.max(
         originalFontSize + changeInFontSize,
@@ -59,13 +69,14 @@ const handleFontSizeChange: DragInputCallbackType<
     }
 
     if (nextFontSize) {
-      mutateElement(latestElement, {
-        fontSize: nextFontSize,
-      });
+      scene.mutateElement(
+        latestElement,
+        getBaseFontSizeUpdate(latestElement, nextFontSize, elementsMap),
+      );
       redrawTextBoundingBox(
         latestElement,
         scene.getContainerElement(latestElement),
-        scene.getNonDeletedElementsMap(),
+        scene,
       );
     }
   }
@@ -85,7 +96,11 @@ const FontSize = ({ element, scene, appState, property }: FontSizeProps) => {
   return (
     <StatsDragInput
       label="F"
-      value={Math.round(_element.fontSize * 10) / 10}
+      value={
+        Math.round(
+          getBaseFontSize(_element, scene.getNonDeletedElementsMap()) * 10,
+        ) / 10
+      }
       elements={[_element]}
       dragInputCallback={handleFontSizeChange}
       icon={fontSizeIcon}

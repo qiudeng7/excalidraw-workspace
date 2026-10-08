@@ -1,10 +1,14 @@
-import { register } from "./register";
+import { isImageElement } from "@excalidraw/element";
+
+import { CaptureUpdateAction } from "@excalidraw/element";
+
+import type { ExcalidrawImageElement } from "@excalidraw/element/types";
+
+import { IconButton } from "../components/IconButton";
 import { cropIcon } from "../components/icons";
-import { CaptureUpdateAction } from "../store";
-import { ToolButton } from "../components/ToolButton";
 import { t } from "../i18n";
-import { isImageElement } from "../element/typeChecks";
-import type { ExcalidrawImageElement } from "../element/types";
+
+import { register } from "./register";
 
 export const actionToggleCropEditor = register({
   name: "cropEditor",
@@ -43,7 +47,7 @@ export const actionToggleCropEditor = register({
     const label = t("helpDialog.cropStart");
 
     return (
-      <ToolButton
+      <IconButton
         type="button"
         icon={cropIcon}
         title={label}

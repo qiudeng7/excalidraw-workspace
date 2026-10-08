@@ -1,14 +1,17 @@
 import React from "react";
+
+import { KEYS } from "@excalidraw/common";
+
+import { Excalidraw } from "../index";
+
+import { API } from "./helpers/api";
+import { Keyboard } from "./helpers/ui";
 import {
   mockBoundingClientRect,
   render,
   restoreOriginalGetBoundingClientRect,
   waitFor,
 } from "./test-utils";
-import { Excalidraw } from "../index";
-import { API } from "./helpers/api";
-import { Keyboard } from "./helpers/ui";
-import { KEYS } from "../keys";
 
 const { h } = window;
 
@@ -51,6 +54,59 @@ describe("appState", () => {
       expect(h.state.scrollX).toBe(WIDTH / 2 - ELEM_WIDTH / 2);
       expect(h.state.scrollY).toBe(HEIGHT / 2 - ELEM_HEIGHT / 2);
     });
+    restoreOriginalGetBoundingClientRect();
+  });
+
+  it("initialState.viewport on init takes precedence over scrollToContent", async () => {
+    mockBoundingClientRect();
+
+    await render(
+      <Excalidraw
+        initialData={{
+          elements: [
+            API.createElement({
+              type: "rectangle",
+              id: "A",
+              width: 100,
+              height: 60,
+            }),
+            API.createElement({
+              type: "rectangle",
+              id: "B",
+              x: 1000,
+              y: 500,
+              width: 200,
+              height: 100,
+            }),
+          ],
+          scrollToContent: true,
+        }}
+        initialState={{
+          viewport: {
+            target: "B",
+            fit: "scale-down",
+            lock: { scroll: true, zoom: true, overscroll: 15 },
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(h.state.width).toBe(200);
+      expect(h.state.height).toBe(100);
+      expect(h.state.scrollX).toBe(-1000);
+      expect(h.state.scrollY).toBe(-500);
+      expect(h.state.scrollConstraints).toMatchObject({
+        x: 1000,
+        y: 500,
+        width: 200,
+        height: 100,
+        lockScroll: true,
+        lockZoom: true,
+        overscroll: 15,
+      });
+    });
+
     restoreOriginalGetBoundingClientRect();
   });
 

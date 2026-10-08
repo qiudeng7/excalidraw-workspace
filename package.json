@@ -7,7 +7,13 @@
     "dev": "pnpm build:editor && vite",
     "build": "pnpm build:editor && vue-tsc -b && vite build",
     "preview": "vite preview",
-    "build:editor": "pnpm --filter @excalidraw/excalidraw build"
+    "build:editor": "pnpm --filter @excalidraw/excalidraw build",
+    "dev:worker": "wrangler dev --port 8787",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "typecheck:worker": "tsc --project tsconfig.worker.json",
+    "test:backend": "tsx --test worker/tests/*.test.ts",
+    "deploy": "pnpm build && wrangler deploy"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "workspace:*",
@@ -18,14 +24,18 @@
     "vue-router": "^5.3.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260927.1",
     "@types/node": "^26.6.3",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-vue": "^6.0.9",
     "@vue/tsconfig": "^0.9.1",
+    "miniflare": "4.20260730.0",
+    "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "vite": "^8.3.1",
-    "vue-tsc": "^3.3.11"
+    "vue-tsc": "^3.3.11",
+    "wrangler": "^4.141.0"
   },
   "packageManager": "pnpm@11.24.0"
 }

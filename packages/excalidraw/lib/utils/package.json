@@ -2,23 +2,22 @@
   "name": "@excalidraw/utils",
   "version": "0.1.2",
   "type": "module",
-  "types": "./dist/index.d.ts",
-  "main": "./index.ts",
-  "module": "./index.ts",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./index.ts"
+      "types": "./dist/src/index.d.ts"
     },
     "./*": {
-      "types": "./dist/*.d.ts",
-      "default": "./*.ts"
+      "types": "./dist/src/*.d.ts"
     }
   },
   "files": [
     "dist/*"
   ],
   "description": "Excalidraw utility functions",
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "keywords": [
     "excalidraw",
@@ -46,18 +45,17 @@
   "dependencies": {
     "@braintree/sanitize-url": "6.0.2",
     "@excalidraw/laser-pointer": "1.3.1",
-    "browser-fs-access": "0.29.1",
-    "open-color": "1.9.1",
+    "browser-fs-access": "0.38.0",
     "pako": "2.0.3",
     "perfect-freehand": "1.2.0",
     "png-chunk-text": "1.0.0",
     "png-chunks-encode": "1.0.0",
     "png-chunks-extract": "1.0.0",
-    "roughjs": "4.6.4",
-    "@excalidraw/math": "workspace:*",
-    "points-on-curve": "1.0.1"
+    "roughjs": "4.6.4"
   },
+  "devDependencies": {},
   "bugs": "https://github.com/excalidraw/excalidraw/issues",
   "repository": "https://github.com/excalidraw/excalidraw",
+  "scripts": {},
   "private": true
 }

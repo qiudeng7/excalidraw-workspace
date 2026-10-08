@@ -7,7 +7,7 @@
     "declaration": true,
     "allowSyntheticDefaultImports": true,
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "jsx": "react-jsx",
     "emitDeclarationOnly": true,
@@ -16,19 +16,46 @@
         "./index.tsx"
       ],
       "@excalidraw/utils": [
-        "./lib/utils/index.ts"
+        "./lib/utils/src/index.ts"
       ],
       "@excalidraw/math": [
-        "./lib/math/index.ts"
+        "./lib/math/src/index.ts"
       ],
       "@excalidraw/excalidraw/*": [
         "./*"
       ],
       "@excalidraw/utils/*": [
-        "./lib/utils/*"
+        "./lib/utils/src/*"
       ],
       "@excalidraw/math/*": [
-        "./lib/math/*"
+        "./lib/math/src/*"
+      ],
+      "@excalidraw/common": [
+        "./lib/common/src/index.ts"
+      ],
+      "@excalidraw/common/*": [
+        "./lib/common/src/*"
+      ],
+      "@excalidraw/element": [
+        "./lib/element/src/index.ts"
+      ],
+      "@excalidraw/element/*": [
+        "./lib/element/src/*"
+      ],
+      "@excalidraw/excalidraw/common/*": [
+        "./lib/common/src/*"
+      ],
+      "@excalidraw/excalidraw/element/*": [
+        "./lib/element/src/*"
+      ],
+      "@excalidraw/excalidraw/math/*": [
+        "./lib/math/src/*"
+      ],
+      "@excalidraw/excalidraw/utils/*": [
+        "./lib/utils/src/*"
+      ],
+      "@excalidraw/fractional-indexing": [
+        "./lib/fractional-indexing/src/index.ts"
       ]
     },
     "rootDir": "."
@@ -40,6 +67,8 @@
     "examples",
     "**/dist/**",
     "**/node_modules/**",
-    "**/test-utils.ts"
+    "**/test-utils.ts",
+    "**/__tests__/**",
+    "**/vitest.config.*"
   ]
 }

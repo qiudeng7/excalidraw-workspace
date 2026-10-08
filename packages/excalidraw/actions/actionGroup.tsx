@@ -1,29 +1,9 @@
-import { KEYS } from "../keys";
-import { t } from "../i18n";
-import { arrayToMap, getShortcutKey } from "../utils";
-import { register } from "./register";
-import { UngroupIcon, GroupIcon } from "../components/icons";
-import { newElementWith } from "../element/mutateElement";
-import { isSomeElementSelected } from "../scene";
-import {
-  getSelectedGroupIds,
-  selectGroup,
-  selectGroupsForSelectedElements,
-  getElementsInGroup,
-  addToGroup,
-  removeFromSelectedGroups,
-  isElementInGroup,
-} from "../groups";
-import { getNonDeletedElements } from "../element";
-import { randomId } from "../random";
-import { ToolButton } from "../components/ToolButton";
-import type {
-  ExcalidrawElement,
-  ExcalidrawTextElement,
-  OrderedExcalidrawElement,
-} from "../element/types";
-import type { AppClassProperties, AppState } from "../types";
-import { isBoundToContainer } from "../element/typeChecks";
+import { getNonDeletedElements } from "@excalidraw/element";
+
+import { newElementWith } from "@excalidraw/element";
+
+import { isBoundToContainer } from "@excalidraw/element";
+
 import {
   frameAndChildrenSelectedTogether,
   getElementsInResizingFrame,
@@ -32,20 +12,57 @@ import {
   groupByFrameLikes,
   removeElementsFromFrame,
   replaceAllElementsInFrame,
-} from "../frame";
-import { syncMovedIndices } from "../fractionalIndex";
-import { CaptureUpdateAction } from "../store";
+} from "@excalidraw/element";
 
-const allElementsInSameGroup = (elements: readonly ExcalidrawElement[]) => {
+import { KEYS, randomId, arrayToMap } from "@excalidraw/common";
+
+import {
+  getSelectedGroupIds,
+  selectGroup,
+  selectGroupsForSelectedElements,
+  getElementsInGroup,
+  addToGroup,
+  removeFromSelectedGroups,
+  isElementInGroup,
+} from "@excalidraw/element";
+
+import { syncMovedIndices } from "@excalidraw/element";
+
+import { CaptureUpdateAction } from "@excalidraw/element";
+
+import type {
+  ExcalidrawElement,
+  ExcalidrawTextElement,
+  OrderedExcalidrawElement,
+} from "@excalidraw/element/types";
+
+import { IconButton } from "../components/IconButton";
+import { UngroupIcon, GroupIcon } from "../components/icons";
+
+import { t } from "../i18n";
+
+import { isSomeElementSelected } from "../scene";
+
+import { getShortcutKey } from "../shortcut";
+
+import { register } from "./register";
+
+import type { AppClassProperties, UIAppState } from "../types";
+
+const allElementsInSameGroup = (
+  elements: readonly ExcalidrawElement[],
+  editingGroupId: UIAppState["editingGroupId"],
+) => {
   if (elements.length >= 2) {
-    const groupIds = elements[0].groupIds;
+    const editingGroupIndex = editingGroupId
+      ? elements[0].groupIds.indexOf(editingGroupId)
+      : -1;
+    const groupIds =
+      editingGroupIndex > -1
+        ? elements[0].groupIds.slice(0, editingGroupIndex)
+        : elements[0].groupIds;
     for (const groupId of groupIds) {
-      if (
-        elements.reduce(
-          (acc, element) => acc && isElementInGroup(element, groupId),
-          true,
-        )
-      ) {
+      if (elements.every((element) => isElementInGroup(element, groupId))) {
         return true;
       }
     }
@@ -53,19 +70,15 @@ const allElementsInSameGroup = (elements: readonly ExcalidrawElement[]) => {
   return false;
 };
 
-const enableActionGroup = (
-  elements: readonly ExcalidrawElement[],
-  appState: AppState,
-  app: AppClassProperties,
-) => {
+const enableActionGroup = (appState: UIAppState, app: AppClassProperties) => {
   const selectedElements = app.scene.getSelectedElements({
     selectedElementIds: appState.selectedElementIds,
-    includeBoundTextElement: true,
+    includeBoundTextElement: false,
   });
 
   return (
     selectedElements.length >= 2 &&
-    !allElementsInSameGroup(selectedElements) &&
+    !allElementsInSameGroup(selectedElements, appState.editingGroupId) &&
     !frameAndChildrenSelectedTogether(selectedElements)
   );
 };
@@ -76,6 +89,10 @@ export const actionGroup = register({
   icon: (appState) => <GroupIcon theme={appState.theme} />,
   trackEvent: { category: "element" },
   perform: (elements, appState, _, app) => {
+    if (!enableActionGroup(appState, app)) {
+      return false;
+    }
+
     const selectedElements = getRootElements(
       app.scene.getSelectedElements({
         selectedElementIds: appState.selectedElementIds,
@@ -181,20 +198,19 @@ export const actionGroup = register({
       captureUpdate: CaptureUpdateAction.IMMEDIATELY,
     };
   },
-  predicate: (elements, appState, _, app) =>
-    enableActionGroup(elements, appState, app),
+  predicate: (elements, appState, _, app) => enableActionGroup(appState, app),
   keyTest: (event) =>
     !event.shiftKey && event[KEYS.CTRL_OR_CMD] && event.key === KEYS.G,
   PanelComponent: ({ elements, appState, updateData, app }) => (
-    <ToolButton
-      hidden={!enableActionGroup(elements, appState, app)}
+    <IconButton
+      hidden={!enableActionGroup(appState, app)}
       type="button"
       icon={<GroupIcon theme={appState.theme} />}
       onClick={() => updateData(null)}
       title={`${t("labels.group")} — ${getShortcutKey("CtrlOrCmd+G")}`}
       aria-label={t("labels.group")}
       visible={isSomeElementSelected(getNonDeletedElements(elements), appState)}
-    ></ToolButton>
+    ></IconButton>
   ),
 });
 
@@ -264,7 +280,6 @@ export const actionUngroup = register({
             elementsMap,
           ),
           frame,
-          app,
         );
       }
     });
@@ -295,7 +310,7 @@ export const actionUngroup = register({
   predicate: (elements, appState) => getSelectedGroupIds(appState).length > 0,
 
   PanelComponent: ({ elements, appState, updateData }) => (
-    <ToolButton
+    <IconButton
       type="button"
       hidden={getSelectedGroupIds(appState).length === 0}
       icon={<UngroupIcon theme={appState.theme} />}
@@ -303,6 +318,6 @@ export const actionUngroup = register({
       title={`${t("labels.ungroup")} — ${getShortcutKey("CtrlOrCmd+Shift+G")}`}
       aria-label={t("labels.ungroup")}
       visible={isSomeElementSelected(getNonDeletedElements(elements), appState)}
-    ></ToolButton>
+    ></IconButton>
   ),
 });

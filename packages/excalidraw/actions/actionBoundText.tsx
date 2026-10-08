@@ -3,38 +3,59 @@ import {
   ROUNDNESS,
   TEXT_ALIGN,
   VERTICAL_ALIGN,
-} from "../constants";
-import { isTextElement, newElement } from "../element";
-import { mutateElement } from "../element/mutateElement";
+  arrayToMap,
+  getFontString,
+  getStrokeWidthByKey,
+  isTransparent,
+} from "@excalidraw/common";
 import {
+  getOriginalContainerHeightFromCache,
+  isBoundToContainer,
+  resetOriginalContainerCache,
+  updateOriginalContainerCache,
+} from "@excalidraw/element";
+
+import {
+  DEFAULT_BOUND_TEXT_LABEL_POSITION,
   computeBoundTextPosition,
   computeContainerDimensionForBoundText,
   getBoundTextElement,
+  normalizeStickyNoteFontSize,
   redrawTextBoundingBox,
-} from "../element/textElement";
-import {
-  getOriginalContainerHeightFromCache,
-  resetOriginalContainerCache,
-  updateOriginalContainerCache,
-} from "../element/containerCache";
+  updateStickyNoteLayout,
+} from "@excalidraw/element";
+
 import {
   hasBoundTextElement,
+  isArrowElement,
+  isStickyNoteElement,
   isTextBindableContainer,
+  isTextElement,
   isUsingAdaptiveRadius,
-} from "../element/typeChecks";
+} from "@excalidraw/element";
+
+import { measureText } from "@excalidraw/element";
+
+import { syncMovedIndices } from "@excalidraw/element";
+
+import { newElement } from "@excalidraw/element";
+
+import { CaptureUpdateAction } from "@excalidraw/element";
+
 import type {
   ExcalidrawElement,
   ExcalidrawLinearElement,
   ExcalidrawTextContainer,
   ExcalidrawTextElement,
-} from "../element/types";
-import type { AppState } from "../types";
-import type { Mutable } from "../utility-types";
-import { arrayToMap, getFontString } from "../utils";
+} from "@excalidraw/element/types";
+
+import type { Mutable } from "@excalidraw/common/utility-types";
+
+import type { Radians } from "@excalidraw/math";
+
 import { register } from "./register";
-import { syncMovedIndices } from "../fractionalIndex";
-import { CaptureUpdateAction } from "../store";
-import { measureText } from "../element/textMeasurements";
+
+import type { AppState } from "../types";
 
 export const actionUnbindText = register({
   name: "unbindText",
@@ -65,22 +86,31 @@ export const actionUnbindText = register({
           boundTextElement,
           elementsMap,
         );
-        mutateElement(boundTextElement as ExcalidrawTextElement, {
+        app.scene.mutateElement(boundTextElement as ExcalidrawTextElement, {
           containerId: null,
           width,
           height,
           text: boundTextElement.originalText,
+          baseFontSize: null,
           x,
           y,
+          labelPosition: null,
         });
-        mutateElement(element, {
+        app.scene.mutateElement(element, {
           boundElements: element.boundElements?.filter(
             (ele) => ele.id !== boundTextElement.id,
           ),
-          height: originalContainerHeight
-            ? originalContainerHeight
-            : element.height,
         });
+        if (isStickyNoteElement(element)) {
+          // an empty note sits at its base height; bound arrows follow
+          updateStickyNoteLayout(element, app.scene);
+        } else {
+          app.scene.mutateElement(element, {
+            height: originalContainerHeight
+              ? originalContainerHeight
+              : element.height,
+          });
+        }
       }
     });
     return {
@@ -138,24 +168,41 @@ export const actionBindText = register({
       textElement = selectedElements[1] as ExcalidrawTextElement;
       container = selectedElements[0] as ExcalidrawTextContainer;
     }
-    mutateElement(textElement, {
+    // a note and its label share one ink: the text the user styled wins,
+    // unless it is transparent (a note's label never is)
+    const stickyInk = isStickyNoteElement(container)
+      ? isTransparent(textElement.strokeColor)
+        ? container.strokeColor
+        : textElement.strokeColor
+      : null;
+    app.scene.mutateElement(textElement, {
       containerId: container.id,
       verticalAlign: VERTICAL_ALIGN.MIDDLE,
       textAlign: TEXT_ALIGN.CENTER,
       autoResize: true,
+      angle: (isArrowElement(container) ? 0 : container?.angle ?? 0) as Radians,
+      labelPosition: isArrowElement(container)
+        ? DEFAULT_BOUND_TEXT_LABEL_POSITION
+        : null,
+      ...(stickyInk
+        ? {
+            baseFontSize: normalizeStickyNoteFontSize(
+              textElement.baseFontSize ?? textElement.fontSize,
+            ),
+            strokeColor: stickyInk,
+          }
+        : null),
     });
-    mutateElement(container, {
+    app.scene.mutateElement(container, {
       boundElements: (container.boundElements || []).concat({
         type: "text",
         id: textElement.id,
       }),
+      // the footer paints with the note's ink
+      ...(stickyInk ? { strokeColor: stickyInk } : null),
     });
     const originalContainerHeight = container.height;
-    redrawTextBoundingBox(
-      textElement,
-      container,
-      app.scene.getNonDeletedElementsMap(),
-    );
+    redrawTextBoundingBox(textElement, container, app.scene);
     // overwritting the cache with original container height so
     // it can be restored when unbind
     updateOriginalContainerCache(container.id, originalContainerHeight);
@@ -214,8 +261,10 @@ export const actionWrapTextInContainer = register({
   trackEvent: { category: "element" },
   predicate: (elements, appState, _, app) => {
     const selectedElements = app.scene.getSelectedElements(appState);
-    const areTextElements = selectedElements.every((el) => isTextElement(el));
-    return selectedElements.length > 0 && areTextElements;
+    const someTextElements = selectedElements.some(
+      (el) => isTextElement(el) && !isBoundToContainer(el),
+    );
+    return selectedElements.length > 0 && someTextElements;
   },
   perform: (elements, appState, _, app) => {
     const selectedElements = app.scene.getSelectedElements(appState);
@@ -223,7 +272,7 @@ export const actionWrapTextInContainer = register({
     const containerIds: Mutable<AppState["selectedElementIds"]> = {};
 
     for (const textElement of selectedElements) {
-      if (isTextElement(textElement)) {
+      if (isTextElement(textElement) && !isBoundToContainer(textElement)) {
         const container = newElement({
           type: "rectangle",
           backgroundColor: appState.currentItemBackgroundColor,
@@ -235,7 +284,10 @@ export const actionWrapTextInContainer = register({
           fillStyle: appState.currentItemFillStyle,
           strokeColor: appState.currentItemStrokeColor,
           roughness: appState.currentItemRoughness,
-          strokeWidth: appState.currentItemStrokeWidth,
+          strokeWidth: getStrokeWidthByKey(
+            "rectangle",
+            appState.currentItemStrokeWidthKey,
+          ),
           strokeStyle: appState.currentItemStrokeStyle,
           roundness:
             appState.currentItemRoundness === "round"
@@ -285,27 +337,23 @@ export const actionWrapTextInContainer = register({
             }
 
             if (startBinding || endBinding) {
-              mutateElement(ele, { startBinding, endBinding }, false);
+              app.scene.mutateElement(ele, {
+                startBinding,
+                endBinding,
+              });
             }
           });
         }
 
-        mutateElement(
-          textElement,
-          {
-            containerId: container.id,
-            verticalAlign: VERTICAL_ALIGN.MIDDLE,
-            boundElements: null,
-            textAlign: TEXT_ALIGN.CENTER,
-            autoResize: true,
-          },
-          false,
-        );
-        redrawTextBoundingBox(
-          textElement,
-          container,
-          app.scene.getNonDeletedElementsMap(),
-        );
+        app.scene.mutateElement(textElement, {
+          containerId: container.id,
+          verticalAlign: VERTICAL_ALIGN.MIDDLE,
+          boundElements: null,
+          textAlign: TEXT_ALIGN.CENTER,
+          autoResize: true,
+        });
+
+        redrawTextBoundingBox(textElement, container, app.scene);
 
         updatedElements = pushContainerBelowText(
           [...updatedElements, container],

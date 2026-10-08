@@ -1,3 +1,36 @@
+import fs from "fs";
+import path from "path";
+import util from "util";
+
+import { pointFrom, type LocalPoint, type Radians } from "@excalidraw/math";
+
+import {
+  DEFAULT_VERTICAL_ALIGN,
+  ROUNDNESS,
+  assertNever,
+  getStrokeWidthByKey,
+  getUpdatedTimestamp,
+} from "@excalidraw/common";
+
+import {
+  newArrowElement,
+  newElement,
+  newEmbeddableElement,
+  newFrameElement,
+  newFreeDrawElement,
+  newIframeElement,
+  newImageElement,
+  newLinearElement,
+  newMagicFrameElement,
+  newStickyNoteElement,
+  newTextElement,
+} from "@excalidraw/element";
+
+import { isUsingAdaptiveRadius, getSelectedElements } from "@excalidraw/element";
+import { selectGroupsForSelectedElements } from "@excalidraw/element";
+
+import { FONT_SIZES } from "@excalidraw/common";
+
 import type {
   ExcalidrawElement,
   ExcalidrawGenericElement,
@@ -11,36 +44,23 @@ import type {
   ExcalidrawMagicFrameElement,
   ExcalidrawElbowArrowElement,
   ExcalidrawArrowElement,
+  ExcalidrawStickyNoteElement,
   FixedSegment,
-} from "../../element/types";
-import { newElement, newTextElement, newLinearElement } from "../../element";
-import { DEFAULT_VERTICAL_ALIGN, ROUNDNESS } from "../../constants";
+  NonDeleted,
+  NonDeletedExcalidrawElement,
+} from "@excalidraw/element/types";
+
+import type { Mutable } from "@excalidraw/common/utility-types";
+
+import { getMimeType } from "../../data/blob";
+import { createTestHook } from "../../components/App";
 import { getDefaultAppState } from "../../appState";
 import { GlobalTestState, createEvent, fireEvent, act } from "../test-utils";
-import fs from "fs";
-import util from "util";
-import path from "path";
-import { getMimeType } from "../../data/blob";
-import {
-  newArrowElement,
-  newEmbeddableElement,
-  newFrameElement,
-  newFreeDrawElement,
-  newIframeElement,
-  newImageElement,
-  newMagicFrameElement,
-} from "../../element/newElement";
-import type { AppState } from "../../types";
-import { getSelectedElements } from "../../scene/selection";
-import { isLinearElementType } from "../../element/typeChecks";
-import type { Mutable } from "../../utility-types";
-import { assertNever } from "../../utils";
-import type App from "../../components/App";
-import { createTestHook } from "../../components/App";
+
 import type { Action } from "../../actions/types";
-import { mutateElement } from "../../element/mutateElement";
-import { pointFrom, type LocalPoint, type Radians } from "@excalidraw/math";
-import { selectGroupsForSelectedElements } from "../../groups";
+import type App from "../../components/App";
+import type { AppState } from "../../types";
+
 
 const readFile = util.promisify(fs.readFile);
 // so that window.h is available when App.tsx is not imported as well.
@@ -69,7 +89,7 @@ export class API {
     });
   };
 
-  static setSelectedElements = (elements: ExcalidrawElement[], editingGroupId?: string | null) => {
+  static setSelectedElements = (elements: NonDeletedExcalidrawElement[], editingGroupId?: string | null) => {
     act(() => {
       h.setState({
         ...selectGroupsForSelectedElements(
@@ -90,10 +110,10 @@ export class API {
 
   // eslint-disable-next-line prettier/prettier
   static updateElement = <T extends ExcalidrawElement>(
-    ...args: Parameters<typeof mutateElement<T>>
+    ...args: Parameters<typeof h.app.scene.mutateElement<T>>
   ) => {
     act(() => {
-      mutateElement<T>(...args);
+      h.app.scene.mutateElement(...args);
     });
   };
 
@@ -168,6 +188,7 @@ export class API {
     frameId?: ExcalidrawElement["id"] | null;
     index?: ExcalidrawElement["index"];
     groupIds?: ExcalidrawElement["groupIds"];
+    created?: ExcalidrawElement["created"];
     // generic element props
     strokeColor?: ExcalidrawGenericElement["strokeColor"];
     backgroundColor?: ExcalidrawGenericElement["backgroundColor"];
@@ -186,10 +207,17 @@ export class API {
       ? ExcalidrawTextElement["verticalAlign"]
       : never;
     boundElements?: ExcalidrawGenericElement["boundElements"];
+    baseHeight?: T extends "stickynote"
+      ? ExcalidrawStickyNoteElement["baseHeight"]
+      : never;
     containerId?: T extends "text"
       ? ExcalidrawTextElement["containerId"]
       : never;
     points?: T extends "arrow" | "line" | "freedraw" ? readonly LocalPoint[] : never;
+    polygon?: T extends "line" ? boolean : never;
+    strokeOptions?: T extends "freedraw"
+      ? ExcalidrawFreeDrawElement["strokeOptions"]
+      : never;
     locked?: boolean;
     fileId?: T extends "image" ? string : never;
     scale?: T extends "image" ? ExcalidrawImageElement["scale"] : never;
@@ -208,19 +236,23 @@ export class API {
       : never;
     elbowed?: boolean;
     fixedSegments?: FixedSegment[] | null;
-  }): T extends "arrow" | "line"
-    ? ExcalidrawLinearElement
-    : T extends "freedraw"
-    ? ExcalidrawFreeDrawElement
-    : T extends "text"
-    ? ExcalidrawTextElement
-    : T extends "image"
-    ? ExcalidrawImageElement
-    : T extends "frame"
-    ? ExcalidrawFrameElement
-    : T extends "magicframe"
-    ? ExcalidrawMagicFrameElement
-    : ExcalidrawGenericElement => {
+  }): NonDeleted<
+    T extends "arrow" | "line"
+      ? ExcalidrawLinearElement
+      : T extends "freedraw"
+      ? ExcalidrawFreeDrawElement
+      : T extends "text"
+      ? ExcalidrawTextElement
+      : T extends "image"
+      ? ExcalidrawImageElement
+      : T extends "frame"
+      ? ExcalidrawFrameElement
+      : T extends "magicframe"
+      ? ExcalidrawMagicFrameElement
+      : T extends "stickynote"
+      ? ExcalidrawStickyNoteElement
+      : ExcalidrawGenericElement
+  > => {
     let element: Mutable<ExcalidrawElement> = null!;
 
     const appState = h?.state || getDefaultAppState();
@@ -244,11 +276,20 @@ export class API {
       frameId: rest.frameId ?? null,
       index: rest.index ?? null,
       angle: (rest.angle ?? 0) as Radians,
-      strokeColor: rest.strokeColor ?? appState.currentItemStrokeColor,
+      strokeColor:
+        rest.strokeColor ??
+        (type === "stickynote"
+          ? appState.currentItemStickynoteStrokeColor
+          : appState.currentItemStrokeColor),
       backgroundColor:
-        rest.backgroundColor ?? appState.currentItemBackgroundColor,
+        rest.backgroundColor ??
+        (type === "stickynote"
+          ? appState.currentItemStickynoteBackgroundColor
+          : appState.currentItemBackgroundColor),
       fillStyle: rest.fillStyle ?? appState.currentItemFillStyle,
-      strokeWidth: rest.strokeWidth ?? appState.currentItemStrokeWidth,
+      strokeWidth:
+        rest.strokeWidth ??
+        getStrokeWidthByKey(type, appState.currentItemStrokeWidthKey),
       strokeStyle: rest.strokeStyle ?? appState.currentItemStrokeStyle,
       roundness: (
         rest.roundness === undefined
@@ -256,15 +297,16 @@ export class API {
           : rest.roundness
       )
         ? {
-            type: isLinearElementType(type)
-              ? ROUNDNESS.PROPORTIONAL_RADIUS
-              : ROUNDNESS.ADAPTIVE_RADIUS,
+            type: isUsingAdaptiveRadius(type)
+                    ? ROUNDNESS.ADAPTIVE_RADIUS
+                    : ROUNDNESS.PROPORTIONAL_RADIUS,
           }
         : null,
       roughness: rest.roughness ?? appState.currentItemRoughness,
       opacity: rest.opacity ?? appState.currentItemOpacity,
       boundElements: rest.boundElements ?? null,
       locked: rest.locked ?? false,
+      created: rest.created === undefined ? getUpdatedTimestamp() : rest.created,
     };
     switch (type) {
       case "rectangle":
@@ -287,6 +329,15 @@ export class API {
           ...base,
         });
         break;
+      case "stickynote":
+        element = newStickyNoteElement({
+          ...base,
+          width,
+          height,
+          type,
+          baseHeight: rest.baseHeight ?? height,
+        });
+        break;
       case "text":
         const fontSize = rest.fontSize ?? appState.currentItemFontSize;
         const fontFamily = rest.fontFamily ?? appState.currentItemFontFamily;
@@ -307,6 +358,7 @@ export class API {
           type: type as "freedraw",
           simulatePressure: true,
           points: rest.points,
+          strokeOptions: rest.strokeOptions,
           ...base,
         });
         break;
@@ -333,6 +385,7 @@ export class API {
             pointFrom<LocalPoint>(0, 0),
             pointFrom<LocalPoint>(100, 100),
           ],
+          polygon: rest.polygon,
         });
         break;
       case "image":
@@ -397,7 +450,7 @@ export class API {
       text: opts?.label?.text || "sample-text",
       width: 50,
       height: 20,
-      fontSize: 16,
+      fontSize: FONT_SIZES.sm,
       containerId: rectangle.id,
       frameId:
         opts?.label?.frameId === undefined
@@ -409,12 +462,11 @@ export class API {
 
     });
 
-    mutateElement(
+    h.app.scene.mutateElement(
       rectangle,
       {
         boundElements: [{ type: "text", id: text.id }],
       },
-      false,
     );
 
     return [rectangle, text];
@@ -434,7 +486,6 @@ export class API {
 
     const text = API.createElement({
       type: "text",
-      id: "text2",
       width: 50,
       height: 20,
       containerId: arrow.id,
@@ -444,12 +495,11 @@ export class API {
           : opts?.label?.frameId ?? null,
     });
 
-    mutateElement(
+    h.app.scene.mutateElement(
       arrow,
       {
         boundElements: [{ type: "text", id: text.id }],
       },
-      false,
     );
 
     return [arrow, text];
@@ -458,7 +508,7 @@ export class API {
   static readFile = async <T extends "utf8" | null>(
     filepath: string,
     encoding?: T,
-  ): Promise<T extends "utf8" ? string : Buffer> => {
+  ): Promise<T extends "utf8" ? string : ArrayBuffer> => {
     filepath = path.isAbsolute(filepath)
       ? filepath
       : path.resolve(path.join(__dirname, "../", filepath));
@@ -472,34 +522,52 @@ export class API {
     });
   };
 
-  static drop = async (blob: Blob) => {
-    const fileDropEvent = createEvent.drop(GlobalTestState.interactiveCanvas);
-    const text = await new Promise<string>((resolve, reject) => {
-      try {
-        const reader = new FileReader();
-        reader.onload = () => {
-          resolve(reader.result as string);
-        };
-        reader.readAsText(blob);
-      } catch (error: any) {
-        reject(error);
-      }
-    });
+  static drop = async (items: ({kind: "string", value: string, type: string} | {kind: "file", file: File | Blob, type?: string })[]) => {
 
-    const files = [blob] as File[] & { item: (index: number) => File };
+    const fileDropEvent = createEvent.drop(GlobalTestState.interactiveCanvas);
+
+    const dataTransferFileItems = items.filter(i => i.kind === "file") as {kind: "file", file: File | Blob, type: string }[];
+
+    const files = dataTransferFileItems.map(item => item.file) as File[] & { item: (index: number) => File };
+    // https://developer.mozilla.org/en-US/docs/Web/API/FileList/item
     files.item = (index: number) => files[index];
 
     Object.defineProperty(fileDropEvent, "dataTransfer", {
       value: {
+        // https://developer.mozilla.org/en-US/docs/Web/API/DataTransfer/files
         files,
-        getData: (type: string) => {
-          if (type === blob.type) {
-            return text;
+        // https://developer.mozilla.org/en-US/docs/Web/API/DataTransfer/items
+        items: items.map((item, idx) => {
+          if (item.kind === "string")  {
+            return {
+              kind: "string",
+              type: item.type,
+              // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/getAsString
+              getAsString: (cb: (text: string) => any) => cb(item.value),
+            };
           }
-          return "";
+          return {
+            kind: "file",
+            type: item.type || item.file.type,
+            // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/getAsFile
+            getAsFile: () => item.file,
+          };
+        }),
+        // https://developer.mozilla.org/en-US/docs/Web/API/DataTransfer/getData
+        getData: (type: string) => {
+          return items.find((item) => item.type === "string" && item.type === type) || "";
         },
+        // https://developer.mozilla.org/en-US/docs/Web/API/DataTransfer/types
+        types: Array.from(new Set(items.map((item) => item.kind === "file" ? "Files" : item.type))),
       },
     });
+    Object.defineProperty(fileDropEvent, "clientX", {
+      value: 0,
+    });
+    Object.defineProperty(fileDropEvent, "clientY", {
+      value: 0,
+    });
+
     await fireEvent(GlobalTestState.interactiveCanvas, fileDropEvent);
   };
 

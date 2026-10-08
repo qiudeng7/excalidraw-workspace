@@ -1,6 +1,6 @@
 {
   "name": "@excalidraw/excalidraw",
-  "version": "0.18.1",
+  "version": "0.18.1-local.438d898",
   "type": "module",
   "types": "./dist/types/index.d.ts",
   "main": "./dist/prod/index.js",
@@ -18,6 +18,18 @@
       "development": "./dist/dev/index.js",
       "production": "./dist/prod/index.js",
       "default": "./dist/prod/index.js"
+    },
+    "./common/*": {
+      "types": "./dist/types/lib/common/src/*.d.ts"
+    },
+    "./element/*": {
+      "types": "./dist/types/lib/element/src/*.d.ts"
+    },
+    "./math/*": {
+      "types": "./dist/types/lib/math/src/*.d.ts"
+    },
+    "./utils/*": {
+      "types": "./dist/types/lib/utils/src/*.d.ts"
     }
   },
   "files": [
@@ -57,25 +69,29 @@
   },
   "dependencies": {
     "@braintree/sanitize-url": "6.0.2",
+    "@codemirror/commands": "^6.0.0",
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
+    "@lezer/highlight": "^1.0.0",
+    "@excalidraw/common": "workspace:*",
+    "@excalidraw/element": "workspace:*",
     "@excalidraw/laser-pointer": "1.3.1",
+    "@excalidraw/math": "workspace:*",
     "@excalidraw/mermaid-to-excalidraw": "2.2.2",
     "@excalidraw/random-username": "1.1.0",
-    "@radix-ui/react-popover": "1.1.6",
-    "@radix-ui/react-tabs": "1.0.2",
-    "browser-fs-access": "0.29.1",
+    "browser-fs-access": "0.38.0",
     "canvas-roundrect-polyfill": "0.0.1",
     "clsx": "1.1.1",
     "cross-env": "7.0.3",
     "es6-promise-pool": "2.5.0",
-    "fractional-indexing": "3.2.0",
     "fuzzy": "0.1.3",
     "image-blob-reduce": "3.0.1",
     "jotai": "2.11.0",
     "jotai-scope": "0.7.2",
-    "lodash.throttle": "4.1.1",
     "lodash.debounce": "4.0.8",
+    "lodash.throttle": "4.1.1",
     "nanoid": "3.3.3",
-    "open-color": "1.9.1",
     "pako": "2.0.3",
     "perfect-freehand": "1.2.0",
     "pica": "7.1.1",
@@ -84,11 +100,12 @@
     "png-chunks-extract": "1.0.0",
     "points-on-curve": "1.0.1",
     "pwacompat": "2.0.17",
+    "radix-ui": "1.4.3",
     "roughjs": "4.6.4",
     "sass": "1.51.0",
     "tunnel-rat": "0.1.2",
-    "@excalidraw/math": "workspace:*",
-    "@excalidraw/utils": "workspace:*"
+    "@excalidraw/utils": "workspace:*",
+    "tinycolor2": "1.6.0"
   },
   "devDependencies": {
     "@types/lodash.debounce": "4.0.8",
@@ -97,7 +114,7 @@
     "@types/resize-observer-browser": "0.1.7",
     "esbuild": "0.19.10",
     "esbuild-sass-plugin": "2.16.0",
-    "typescript": "4.9.4",
+    "typescript": "5.9.3",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@types/lodash.throttle": "^4.1.9",

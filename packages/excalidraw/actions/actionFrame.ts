@@ -1,19 +1,26 @@
-import { getCommonBounds, getNonDeletedElements } from "../element";
-import type { ExcalidrawElement } from "../element/types";
-import { addElementsToFrame, removeAllElementsFromFrame } from "../frame";
-import { getFrameChildren } from "../frame";
-import { KEYS } from "../keys";
-import type { AppClassProperties, AppState, UIAppState } from "../types";
-import { updateActiveTool } from "../utils";
-import { setCursorForShape } from "../cursor";
-import { register } from "./register";
-import { isFrameLikeElement } from "../element/typeChecks";
-import { frameToolIcon } from "../components/icons";
-import { CaptureUpdateAction } from "../store";
+import { getNonDeletedElements } from "@excalidraw/element";
+import { mutateElement } from "@excalidraw/element";
+import { newFrameElement } from "@excalidraw/element";
+import { isFrameLikeElement } from "@excalidraw/element";
+import {
+  addElementsToFrame,
+  removeAllElementsFromFrame,
+} from "@excalidraw/element";
+import { getFrameChildren } from "@excalidraw/element";
+
+import { getElementsInGroup } from "@excalidraw/element";
+
+import { getCommonBounds } from "@excalidraw/element";
+
+import { CaptureUpdateAction } from "@excalidraw/element";
+
+import type { ExcalidrawElement } from "@excalidraw/element/types";
+
 import { getSelectedElements } from "../scene";
-import { newFrameElement } from "../element/newElement";
-import { getElementsInGroup } from "../groups";
-import { mutateElement } from "../element/mutateElement";
+
+import { register } from "./register";
+
+import type { AppClassProperties, UIAppState } from "../types";
 
 const isSingleFrameSelected = (
   appState: UIAppState,
@@ -112,41 +119,7 @@ export const actionupdateFrameRendering = register({
       captureUpdate: CaptureUpdateAction.EVENTUALLY,
     };
   },
-  checked: (appState: AppState) => appState.frameRendering.enabled,
-});
-
-export const actionSetFrameAsActiveTool = register({
-  name: "setFrameAsActiveTool",
-  label: "toolBar.frame",
-  trackEvent: { category: "toolbar" },
-  icon: frameToolIcon,
-  viewMode: false,
-  perform: (elements, appState, _, app) => {
-    const nextActiveTool = updateActiveTool(appState, {
-      type: "frame",
-    });
-
-    setCursorForShape(app.interactiveCanvas, {
-      ...appState,
-      activeTool: nextActiveTool,
-    });
-
-    return {
-      elements,
-      appState: {
-        ...appState,
-        activeTool: updateActiveTool(appState, {
-          type: "frame",
-        }),
-      },
-      captureUpdate: CaptureUpdateAction.EVENTUALLY,
-    };
-  },
-  keyTest: (event) =>
-    !event[KEYS.CTRL_OR_CMD] &&
-    !event.shiftKey &&
-    !event.altKey &&
-    event.key.toLocaleLowerCase() === KEYS.F,
+  checked: (appState) => appState.frameRendering.enabled,
 });
 
 export const actionWrapSelectionInFrame = register({
@@ -163,11 +136,9 @@ export const actionWrapSelectionInFrame = register({
   },
   perform: (elements, appState, _, app) => {
     const selectedElements = getSelectedElements(elements, appState);
+    const elementsMap = app.scene.getNonDeletedElementsMap();
 
-    const [x1, y1, x2, y2] = getCommonBounds(
-      selectedElements,
-      app.scene.getNonDeletedElementsMap(),
-    );
+    const [x1, y1, x2, y2] = getCommonBounds(selectedElements, elementsMap);
     const PADDING = 16;
     const frame = newFrameElement({
       x: x1 - PADDING,
@@ -186,13 +157,9 @@ export const actionWrapSelectionInFrame = register({
       for (const elementInGroup of elementsInGroup) {
         const index = elementInGroup.groupIds.indexOf(appState.editingGroupId);
 
-        mutateElement(
-          elementInGroup,
-          {
-            groupIds: elementInGroup.groupIds.slice(0, index),
-          },
-          false,
-        );
+        mutateElement(elementInGroup, elementsMap, {
+          groupIds: elementInGroup.groupIds.slice(0, index),
+        });
       }
     }
 
@@ -200,7 +167,6 @@ export const actionWrapSelectionInFrame = register({
       [...app.scene.getElementsIncludingDeleted(), frame],
       selectedElements,
       frame,
-      appState,
     );
 
     return {

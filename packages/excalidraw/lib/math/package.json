@@ -1,24 +1,23 @@
 {
   "name": "@excalidraw/math",
-  "version": "0.1.0",
+  "version": "0.18.0",
   "type": "module",
-  "types": "./dist/index.d.ts",
-  "main": "./index.ts",
-  "module": "./index.ts",
+  "types": "./dist/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./index.ts"
+      "types": "./dist/src/index.d.ts"
     },
     "./*": {
-      "types": "./dist/*.d.ts",
-      "default": "./*.ts"
+      "types": "./dist/src/*.d.ts"
     }
   },
   "files": [
     "dist/*"
   ],
   "description": "Excalidraw math functions",
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "keywords": [
     "excalidraw",
@@ -49,5 +48,10 @@
   },
   "bugs": "https://github.com/excalidraw/excalidraw/issues",
   "repository": "https://github.com/excalidraw/excalidraw",
-  "private": true
+  "scripts": {},
+  "dependencies": {
+    "@excalidraw/common": "workspace:*"
+  },
+  "private": true,
+  "devDependencies": {}
 }

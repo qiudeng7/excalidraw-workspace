@@ -1,0 +1,14 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE settings (id INTEGER PRIMARY KEY CHECK(id = 1), registration_enabled INTEGER NOT NULL DEFAULT 1);
+INSERT INTO settings(id) VALUES(1);
+CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('admin','user')), password_hash TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE UNIQUE INDEX one_administrator ON users(role) WHERE role = 'admin';
+CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at INTEGER NOT NULL);
+CREATE INDEX sessions_expiry ON sessions(expires_at);
+CREATE TABLE workspaces (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX workspace_owner ON workspaces(user_id);
+CREATE TABLE canvases (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE, name TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0, object_key TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX canvas_workspace ON canvases(workspace_id);
+CREATE TABLE libraries (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, revision INTEGER NOT NULL DEFAULT 0, object_key TEXT, updated_at TEXT NOT NULL);
+CREATE TABLE rate_limits (key TEXT PRIMARY KEY, count INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+CREATE INDEX rate_limit_expiry ON rate_limits(expires_at);

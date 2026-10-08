@@ -49,9 +49,9 @@ export function RenderingOptionsMenu({ value, onChange, onReset }: {
   return createElement(MainMenu.ItemCustom, {
     className: 'canvas-rendering-options',
     children: createElement('fieldset', {
+      'aria-label': '渲染实验',
       style: { border: 0, padding: 0, margin: 0, width: '100%', minWidth: 0 },
     },
-    createElement('legend', { style: { fontSize: '0.8rem', opacity: 0.65, marginBottom: '0.35rem' } }, '渲染实验'),
     ...controls.map(([key, label, title]) => createElement('label', {
       key, title,
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', padding: '0.35rem 0' },

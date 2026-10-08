@@ -1,6 +1,8 @@
+import { DEFAULT_FONT_FAMILY } from "@excalidraw/common";
+
 import type { Radians } from "@excalidraw/math";
-import { DEFAULT_FONT_FAMILY } from "../../constants";
-import type { ExcalidrawElement } from "../../element/types";
+
+import type { ExcalidrawElement } from "@excalidraw/element/types";
 
 const elementBase: Omit<ExcalidrawElement, "type"> = {
   id: "vWrqOAfkind2qcm7LDAGZ",
@@ -26,6 +28,7 @@ const elementBase: Omit<ExcalidrawElement, "type"> = {
   isDeleted: false,
   boundElements: null,
   updated: 1,
+  created: null,
   link: null,
   locked: false,
 };
@@ -56,7 +59,9 @@ export const textFixture: ExcalidrawElement = {
   ...elementBase,
   type: "text",
   fontSize: 20,
+  baseFontSize: null,
   fontFamily: DEFAULT_FONT_FAMILY,
+  strokeColor: "#1e1e1e",
   text: "original text",
   originalText: "original text",
   textAlign: "left",
