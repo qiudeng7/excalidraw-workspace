@@ -3,12 +3,16 @@ import type { SaveResult } from '../../shared/contracts'
 
 interface Draft<T> { revision: number; value: T; updatedAt?: string }
 export interface OtherDraft<T> extends Draft<T> { key: string }
+// HTTP LAN previews lack randomUUID, but getRandomValues remains available.
+const newTabId = () => crypto.randomUUID?.() ?? Array.from(
+  crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0'),
+).join('')
 let tabScope: Promise<string> | undefined
 function getTabScope() {
   return tabScope ??= (async () => {
     let previous: string | null = null
     try { previous = sessionStorage.getItem('excalidraw-draft-tab') } catch { /* A fresh scope still preserves other drafts. */ }
-    let id = previous || crypto.randomUUID()
+    let id = previous || newTabId()
     if (navigator.locks) {
       const claim = (candidate: string) => new Promise<boolean>((resolve, reject) => {
         void navigator.locks.request(`excalidraw-draft-tab:${candidate}`, { ifAvailable: true }, async (lock) => {
@@ -17,10 +21,10 @@ function getTabScope() {
           if (lock) await new Promise<void>(() => {})
         }).catch(reject)
       })
-      if (!await claim(id)) { id = crypto.randomUUID(); await claim(id) }
+      if (!await claim(id)) { id = newTabId(); await claim(id) }
     } else {
       // Never risk sharing a key when this browser cannot detect cloned sessions.
-      id = crypto.randomUUID()
+      id = newTabId()
     }
     try { sessionStorage.setItem('excalidraw-draft-tab', id) } catch { /* Other drafts can be downloaded on next visit. */ }
     return id
@@ -156,6 +160,11 @@ export class PersistentResource<T> {
       if (!this.conflict) this.schedule(5000)
       throw error
     }
+  }
+  /** Explicit save also writes an unchanged snapshot, using the usual revision protection. */
+  async saveNow() {
+    this.update(this.value)
+    await this.flush()
   }
   async findOtherDrafts() { return otherDrafts<T>(this.prefix, await this.key) }
   async discardDraft() {

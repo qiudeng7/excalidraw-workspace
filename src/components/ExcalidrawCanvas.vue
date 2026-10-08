@@ -15,6 +15,40 @@ const props = defineProps<{ document: CanvasDocument; library: LibraryDocument; 
 const emit = defineEmits<{ 'save-state': [status: string] }>()
 const message = ref('')
 const loading = ref(true)
+const manualSaveMessage = ref('')
+const manualSaveFailed = ref(false)
+let manualSaving = false
+let feedbackTimer: ReturnType<typeof setTimeout> | undefined
+async function saveManually() {
+  clearTimeout(feedbackTimer)
+  if (manualSaving) { manualSaveMessage.value = '正在保存到云端…'; return }
+  manualSaveFailed.value = false
+  if (!active || container.value?.closest('[inert]')) {
+    manualSaveMessage.value = '画布正在加载，请稍候再保存'
+    feedbackTimer = setTimeout(() => { manualSaveMessage.value = '' }, 3000)
+    return
+  }
+  manualSaving = true
+  manualSaveMessage.value = '正在保存到云端…'
+  try {
+    await Promise.all([sceneResource.saveNow(), libraryResource.flush()])
+    if (active) manualSaveMessage.value = '已保存到云端'
+  } catch {
+    if (active) {
+      manualSaveFailed.value = true
+      manualSaveMessage.value = '保存失败，请查看提示并重试'
+    }
+  } finally {
+    manualSaving = false
+    if (active) feedbackTimer = setTimeout(() => { manualSaveMessage.value = '' }, 4000)
+  }
+}
+function saveShortcut(event: KeyboardEvent) {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's') return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  if (!event.repeat) void saveManually()
+}
 const hasConflict = ref(false)
 const otherDrafts = ref<{ key: string; label: string; filename: string; data: unknown }[]>([])
 const selectedOtherDraft = ref('')
@@ -84,7 +118,7 @@ function beforeUnload(event: BeforeUnloadEvent) {
 onBeforeRouteLeave(async () => {
   try { await flush(); return true } catch { return false }
 })
-defineExpose({ flush })
+defineExpose({ flush, saveManually })
 
 const container = useTemplateRef<HTMLDivElement>('container')
 const router = useRouter()
@@ -190,6 +224,7 @@ function CanvasEditor() {
 
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnload)
+  window.addEventListener('keydown', saveShortcut, true)
   await Promise.all([sceneResource.restore(), libraryResource.restore()])
   try {
     const [scenes, libraries] = await Promise.all([sceneResource.findOtherDrafts(), libraryResource.findOtherDrafts()])
@@ -208,6 +243,8 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   active = false
   window.removeEventListener('beforeunload', beforeUnload)
+  window.removeEventListener('keydown', saveShortcut, true)
+  clearTimeout(feedbackTimer)
   sceneResource.dispose()
   libraryResource.dispose()
   root?.unmount()
@@ -217,6 +254,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="canvas-editor-shell">
+    <div v-if="manualSaveMessage" class="manual-save-feedback" :class="{ failed: manualSaveFailed }" :role="manualSaveFailed ? 'alert' : 'status'">{{ manualSaveMessage }}</div>
     <div v-if="loading" class="save-notice">正在加载画布与本地草稿…</div>
     <div v-if="message" class="save-notice" role="alert">
       <span>{{ message }}</span>
@@ -236,7 +274,9 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.canvas-editor-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.canvas-editor-shell { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.manual-save-feedback { position: absolute; z-index: 30; top: 16px; left: 50%; transform: translateX(-50%); padding: 10px 16px; border: 1px solid #d9e5dc; border-radius: 10px; background: #f3faf5; color: #246139; font-size: 13px; box-shadow: 0 4px 16px #0001; pointer-events: none; max-width: calc(100% - 48px); }
+.manual-save-feedback.failed { background: #fff1f0; color: #b42318; border-color: #f3c2bc; }
 .save-notice { padding: 8px 12px; background: #fff4da; color: #634600; font-size: 13px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .save-notice button { border: 1px solid #d2bd8d; background: white; border-radius: 4px; padding: 4px 8px; cursor: pointer; }
 

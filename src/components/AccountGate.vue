@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import QuietIcon from './QuietIcon.vue'
 import type { Bootstrap, User } from '../../shared/contracts'
 import { api, ApiError } from '../lib/api'
 const props = defineProps<{ bootstrap: Bootstrap }>()
@@ -28,21 +29,46 @@ async function submit() {
 </script>
 <template>
   <section class="account-gate">
-    <form class="account-card" @submit.prevent="submit">
-      <h1>{{ title }}</h1>
-      <p v-if="bootstrap.needsSetup">欢迎。首次使用请先创建管理员，之后可在侧边栏管理注册开关。</p>
-      <p v-else>登录后，自动保存你的画布和素材库。</p>
-      <label v-if="creating">昵称<input v-model="name" autocomplete="nickname" maxlength="100" required :disabled="busy" /></label>
-      <label>邮箱<input v-model="email" type="email" autocomplete="username" maxlength="254" required :disabled="busy" /></label>
-      <label>密码<input v-model="password" type="password" :autocomplete="creating ? 'new-password' : 'current-password'" :minlength="creating ? 12 : 1" maxlength="256" required :disabled="busy" /></label>
-      <small v-if="creating">密码至少 12 位。邮箱仅用于登录，目前无需邮件验证。</small>
-      <p v-if="error" role="alert" class="error">{{ error }}</p>
-      <button class="primary" :disabled="busy">{{ busy ? '请稍候…' : title }}</button>
-      <button v-if="!bootstrap.needsSetup && bootstrap.registrationEnabled" class="switch" type="button" :disabled="busy" @click="registering = !registering; error = ''">{{ registering ? '已有账户？去登录' : '没有账户？注册' }}</button>
-      <small v-else-if="!bootstrap.needsSetup">管理员已关闭新用户注册。</small>
-    </form>
+    <div class="welcome-panel">
+      <a class="wordmark" href="/"> <span class="brand-symbol"><QuietIcon name="canvas" :size="19" /></span> 画布空间 <span class="wordmark-detail">EXCALIDRAW</span></a>
+      <div class="welcome-copy">
+        <span class="eyebrow">A SPACE FOR YOUR IDEAS</span>
+        <h2>让想法<br />有一个安静的地方。</h2>
+        <p>从一笔草图到完整的构想。<br />你的画布、素材与灵感，都在这里。</p>
+        <svg class="idea-diagram" viewBox="0 0 400 190" fill="none" aria-hidden="true">
+          <path d="M75 95h78m70 0h94" stroke="#b7bbb8" stroke-width="1.5" /><path d="m146 89 7 6-7 6m164-12 7 6-7 6" stroke="#b7bbb8" stroke-width="1.5" />
+          <rect x="15" y="65" width="60" height="60" rx="12" stroke="#b7bbb8" stroke-width="1.5" /><path d="M34 85h22M34 94h22M34 103h12" stroke="#b7bbb8" stroke-width="1.5" />
+          <rect x="156" y="57" width="75" height="75" rx="18" stroke="#323a35" stroke-width="1.5" /><path d="m178 95 10 10 20-22" stroke="#323a35" stroke-width="2" />
+          <circle cx="346" cy="95" r="29" stroke="#b7bbb8" stroke-width="1.5" />
+          <path d="M193 57V28H330v38" stroke="#d8dbd8" stroke-width="1.5" stroke-dasharray="4 5" />
+        </svg>
+      </div>
+      <span class="welcome-footer">随时回来，接着画。<span>自动保存 · 私人空间</span></span>
+    </div>
+    <div class="form-panel">
+      <form class="account-card" @submit.prevent="submit">
+        <span class="form-kicker">{{ bootstrap.needsSetup ? '首次使用' : creating ? '新的开始' : '欢迎回来' }}</span>
+        <h1>{{ title }}</h1>
+        <p v-if="bootstrap.needsSetup" class="intro">先创建管理员账户，开启你的画布空间。注册权限可在侧边栏随时调整。</p>
+        <p v-else class="intro">{{ creating ? '创建一个账户，把想法留在这里。' : '登录后，继续你的创作。' }}</p>
+        <div class="fields">
+          <label v-if="creating">昵称<input v-model="name" autocomplete="nickname" placeholder="怎么称呼你" maxlength="100" required :disabled="busy" /></label>
+          <label>邮箱<input v-model="email" type="email" autocomplete="username" placeholder="you@example.com" maxlength="254" required :disabled="busy" /></label>
+          <label>密码<input v-model="password" type="password" :placeholder="creating ? '至少 12 位' : '输入你的密码'" :autocomplete="creating ? 'new-password' : 'current-password'" :minlength="creating ? 12 : 1" maxlength="256" required :disabled="busy" /></label>
+        </div>
+        <small v-if="creating">邮箱仅用于登录，无需邮件验证。密码至少 12 位。</small>
+        <p v-if="error" role="alert" class="error">{{ error }}</p>
+        <button class="primary" :disabled="busy"><span>{{ busy ? '请稍候…' : creating ? '创建并进入' : '进入我的空间' }}</span><QuietIcon name="arrow" /></button>
+        <div class="form-bottom">
+          <template v-if="!bootstrap.needsSetup && bootstrap.registrationEnabled"><span>{{ registering ? '已经有账户？' : '第一次来到这里？' }}</span><button class="switch" type="button" :disabled="busy" @click="registering = !registering; error = ''">{{ registering ? '登录' : '创建账户' }}</button></template>
+          <small v-else-if="!bootstrap.needsSetup">管理员已关闭新用户注册。</small>
+          <small v-else>首个账户将成为此服务的管理员。</small>
+        </div>
+      </form>
+      <span class="form-footnote"><QuietIcon name="cloud" :size="14" /> 画布与素材库，自动保存到你的账户</span>
+    </div>
   </section>
 </template>
 <style scoped>
-.account-gate{flex:1;display:grid;place-items:center;padding:24px;background:#f7f7fa;overflow:auto}.account-card{box-sizing:border-box;display:flex;flex-direction:column;gap:16px;width:100%;max-width:380px;padding:30px;border:1px solid #e5e5eb;border-radius:16px;background:white;box-shadow:0 8px 32px #25253208}h1{font-size:24px;margin:0}p{margin:0;color:#686878;line-height:1.6}label{display:flex;flex-direction:column;gap:8px;font-size:14px}input{font:inherit;padding:10px;border:1px solid #d9d9e2;border-radius:7px;min-width:0}button{font:inherit;padding:11px;border-radius:8px;cursor:pointer}.primary{border:0;background:#6965db;color:white}.switch{background:none;border:0;color:#5753bd}small{color:#747480;line-height:1.5}.error{color:#b42318;font-size:14px}button:disabled{opacity:.6;cursor:wait}
+.account-gate{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;background:#fff;color:#292d2b;overflow:auto;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.welcome-panel{display:flex;flex-direction:column;padding:42px 56px;background:#f4f5f2;min-height:580px;box-sizing:border-box}.wordmark{display:flex;align-items:center;gap:10px;color:inherit;text-decoration:none;font-size:15px;font-weight:600;letter-spacing:.04em}.brand-symbol{display:grid;place-items:center;background:#2d3430;color:#fff;width:31px;height:31px;border-radius:7px}.wordmark-detail{margin-left:auto;font-size:10px;font-weight:500;letter-spacing:.16em;color:#838982}.welcome-copy{margin:auto 0;padding:56px 0 30px}.eyebrow{font-size:10px;letter-spacing:.18em;color:#899087;font-weight:600}h2{font-size:clamp(32px,3.3vw,50px);font-weight:500;line-height:1.55;letter-spacing:.05em;margin:20px 0 22px}.welcome-copy p{font-size:14px;line-height:1.95;color:#7b837b}.idea-diagram{display:block;width:100%;max-width:400px;margin-top:20px}.welcome-footer{font-size:11px;color:#858c84;display:flex;justify-content:space-between;gap:10px}.form-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 28px;box-sizing:border-box;gap:48px}.account-card{display:flex;flex-direction:column;width:100%;max-width:336px}.form-kicker{font-size:12px;color:#8a918b;letter-spacing:.08em}h1{font-size:27px;font-weight:600;letter-spacing:-.02em;margin:10px 0 12px}.intro{font-size:13px;line-height:1.8;color:#808780;margin:0 0 30px}.fields{display:flex;flex-direction:column;gap:20px}label{display:flex;flex-direction:column;gap:9px;font-size:12px;font-weight:500;color:#414942}input{font:inherit;font-size:14px;box-sizing:border-box;width:100%;height:44px;padding:0 13px;border:1px solid #dee2dc;border-radius:6px;outline:none;background:#fff;color:#292d2b;transition:border-color .15s,box-shadow .15s}input::placeholder{color:#acb1ab}input:focus{border-color:#758879;box-shadow:0 0 0 3px #75887913}small{font-size:11px;line-height:1.7;color:#8c938c;margin-top:12px}button{font:inherit;cursor:pointer}.primary{display:flex;align-items:center;justify-content:space-between;height:45px;padding:0 15px;border:0;border-radius:6px;background:#2e3931;color:white;font-size:13px;margin-top:26px}.primary:hover{background:#435346}.form-bottom{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:#929891;margin-top:24px}.form-bottom small{margin:0}.switch{padding:4px 0;background:none;border:0;color:#34473a;font-size:12px;font-weight:600}.switch:hover{text-decoration:underline}.error{color:#a73931;font-size:12px;background:#fff2ef;padding:10px 12px;border-radius:5px;margin:16px 0 0}.form-footnote{display:flex;align-items:center;gap:7px;font-size:10px;color:#a0a69f}button:disabled{opacity:.6;cursor:wait}@media(min-width:1500px){.welcome-panel{padding-inline:80px}.welcome-copy{max-width:530px}}@media(max-width:850px){.account-gate{grid-template-columns:.85fr 1fr}.welcome-panel{padding:32px}.wordmark-detail{display:none}.welcome-footer span{display:none}h2{font-size:32px}.idea-diagram{margin-top:12px}}@media(max-width:620px){.account-gate{grid-template-columns:1fr}.welcome-panel{min-height:0;padding:24px;background:white}.welcome-copy,.welcome-footer{display:none}.form-panel{padding:30px 28px 40px;justify-content:flex-start;gap:44px}.account-card{max-width:380px}.intro{margin-bottom:26px}.form-footnote{margin-top:0}}
 </style>
