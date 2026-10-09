@@ -1,81 +1,80 @@
-# excalidraw Demo
+# Excalidraw Workspace
 
-[在线体验 Demo](https://excalidraw-demo.qiudeng.workers.dev/) · [GitHub 仓库](https://github.com/qiudeng7/excalidraw-demo)
+[在线使用](https://excalidraw-demo.qiudeng.workers.dev/) · [GitHub 仓库](https://github.com/qiudeng7/excalidraw-workspace) · [Changelog](https://github.com/qiudeng7/excalidraw-workspace/releases)
 
-在线版本已接入账户、工作空间、画布和个人素材库的云端保存。
+Excalidraw Workspace 是一个开发中的在线绘图应用。使用自己的账户管理工作空间，在每个工作空间中创建多个画布，自动保存图形、文字、图片和个人素材库。它基于 Excalidraw 编辑器，默认使用更规整的线条、Nunito 字体和较短的箭头头部。
 
-本项目是一个持续定制中的 Excalidraw Demo，下面记录这次尝试的经过。
+## 开始使用
 
-1. 使用 Vue + Vite + TypeScript + Pinia + Router 搭建 Demo，通过 React 接入 Excalidraw，使用 pnpm 管理依赖。
-2. 将默认样式调整为 Nunito 字体、规整实线和纯色填充，缩短普通箭头的头部（当时通过 pnpm patch 修改 Excalidraw 包），让它的样式看起来更正式一些，不那么手写体
-3. 隐藏外链菜单，将工具栏移到底部、提示移到工具栏上方，支持 Ctrl+Shift+C 复制 PNG。
-4. 最初使用 pnpm patch 定制，后来将 Excalidraw v0.18.1 源码纳入仓库，内部 math/utils 包放到 packages/excalidraw/lib/，统一由 workspace 管理。
-5. 针对清晰度问题，加入 采样倍率、缓存平滑、文字和图形直接绘制、像素对齐等实验开关，方便比较不同渲染组合。
+打开[在线应用](https://excalidraw-demo.qiudeng.workers.dev/)，注册或登录后即可绘图。侧边栏用于切换工作空间和画布，也可创建、重命名或删除它们。个人素材库在同一账户的不同画布间共享。账户之间的数据互相隔离，画布不支持多人同时协作。
 
-清晰度调整一度没有达到我的期望，我曾放下 Excalidraw/Canvas 路线，考虑转向 HTML/SVG。后来觉得目前的分辨率可以接受，决定继续完善这个 Demo。仓库也保留这段中途放弃、又继续尝试的记录。
+首次访问尚未初始化的服务时，页面会引导创建管理员。管理员和普通用户均使用邮箱、密码登录；注册密码至少 12 位，邮箱只作为登录名，无需邮件验证。管理员可在侧边栏的“管理设置”中关闭或重新开放注册；关闭注册后，已有用户仍可登录。
 
-## 启动
+### 保存和备份
 
-需要 Node.js 22.12+（或 24+）和 pnpm 11。在项目目录运行：
+画布和素材库修改后会自动保存到服务端。`Ctrl+S`（macOS 为 `Cmd+S`）也会触发一次云端保存，并显示成功或失败反馈；不会弹出浏览器的网页保存对话框。没有新修改时也会显示保存反馈。
+
+保存失败时，页面会显示提示，并尽可能在浏览器中暂存草稿。切换画布、站内跳转或退出登录前会等待保存；失败时保留当前画布。刷新或关闭页面前，如有未保存内容会提示确认，但关闭页面不会保证完成保存，离开前请确认已保存。
+
+多个标签页修改同一份内容时，服务端会拒绝旧版本覆盖。遇到冲突可下载本地备份，或确认舍弃冲突草稿后加载云端版本。编辑器菜单也提供文件导入、导出，便于保留独立备份。
+
+图片随画布保存。单次画布或素材库保存上限为 20 MB，超出时会提示错误并保留本地草稿。字体从 Excalidraw 默认 CDN 加载，需要网络访问。
+
+### 编辑器操作
+
+新图形默认使用规整实线、2px 线宽，选择填充颜色后使用纯色填充；新文字默认使用 Nunito。导入元素保留自己的样式。编辑器包含命令面板、套索、填充桶和自动识别形状工具，工具栏位于画布底部，提示显示在工具栏上方。
+
+普通 `Ctrl+C` 复制可编辑元素，`Ctrl+Shift+C` 复制 PNG，可粘贴到支持图片的应用；macOS 使用 Cmd 代替 Ctrl。图片剪贴板需要浏览器权限和 HTTPS 或 localhost 安全上下文。
+
+菜单的“跳转”分组可前往首页和关于页；“debug”分组提供 `1×`、`1.5×`、`2×` 采样倍率和独立的 Canvas 渲染开关，用于比较显示效果。设置只保存在当前浏览器，不修改场景数据、撤销历史或导出图片尺寸。提高倍率会增加内存和渲染开销；“恢复默认渲染设置”会恢复 `1×` 并关闭所有实验开关。各开关的作用和限制见[源码维护说明](packages/excalidraw/README.md#渲染实验开关)。
+
+## 本地启动
+
+推荐 Node.js 24 LTS；最低要求 Node.js 22.13。使用 [package.json](package.json) 声明的 pnpm 11.24.0。
 
 ```sh
-pnpm install
+git clone https://github.com/qiudeng7/excalidraw-workspace.git
+cd excalidraw-workspace
+pnpm install --frozen-lockfile
 pnpm build
 pnpm db:migrate:local
 pnpm dev:worker
 ```
 
-打开 http://localhost:8787。Wrangler 在本机模拟 D1、R2 和 Worker，不需要云端数据库权限；本地数据保存在被 Git 忽略的 `.wrangler/` 中。
+打开 http://localhost:8787。首次运行会显示管理员创建页面，完成注册后进入画布。Wrangler 在本机模拟 Worker、D1 和 R2，不需要云端数据库权限；本地数据保存在被 Git 忽略的 `.wrangler/` 中，与线上数据相互独立。
 
-开发前端时保持这个终端运行，另开一个终端执行 `pnpm dev`，访问 Vite 输出的地址（通常是 http://localhost:5173）。Vite 会把 `/api` 请求代理给本地 Worker。编辑器源码变更仍需重新构建。
+开发前端时保持 Worker 运行，另开终端在仓库根目录执行：
 
 ```sh
-pnpm build            # 编辑器源码、Demo 类型检查和生产构建
-pnpm typecheck:worker # 后端类型检查
+pnpm dev
+```
+
+访问 Vite 输出的地址，通常为 http://localhost:5173。Vite 将 `/api` 请求代理至本地 Worker。`pnpm dev` 会先构建编辑器源码；修改编辑器源码后仍需重新构建，连续开发方式见[源码维护说明](packages/excalidraw/README.md#构建和开发)。
+
+```sh
+pnpm build            # 构建编辑器、检查前端类型并生成 dist/
+pnpm typecheck:worker # 检查后端类型
 pnpm test:backend     # 本地 D1/R2 集成测试，不访问线上数据
 ```
 
-## 账户与工作空间
+## 代码与维护
 
-首次访问尚未初始化的服务时，页面会引导创建管理员。管理员和普通用户都用邮箱、密码登录，密码至少 12 位；邮箱只作为登录名，不验证邮件。Cloudflare 免费方案不能向任意注册邮箱发送验证邮件，详见[邮件定价](https://developers.cloudflare.com/email-service/platform/pricing/)。
+前端使用 Vue、Vite、TypeScript、Pinia 和 Vue Router，通过 React 挂载 Excalidraw；依赖由 pnpm workspace 管理。
 
-管理员可在侧边栏的“管理员设置”中开关新用户注册，已有用户仍可登录。每个用户只能访问自己的工作空间、画布和素材库。工作空间及画布可创建、重命名、删除；删除工作空间会同时删除其中的画布。
-
-画布和素材库在修改后自动保存。保存失败时会显示提示，并尽可能在本机暂存草稿；切换画布、站内跳转或退出登录前会等待保存完成；失败时会保留当前画布。关闭或刷新页面时，若有未保存内容会提示确认。多个标签页修改同一份内容时，服务端会拒绝旧版本覆盖：可以下载本地备份，或确认舍弃冲突草稿后加载云端版本。素材库属于用户账户，可在自己的不同画布间使用。
-
-## 使用画布
-
-打开根路径 `/` 即可进入全屏画布，绘制图形、文字和自由笔画；旧地址 `/draw` 会跳转到 `/`。编辑器菜单中的“跳转”分组可前往 `/home` 首页和 `/about` 关于页，这些页面保留导航栏。
-
-画布会保存到当前账户，也可通过编辑器菜单导入、导出文件。图片随画布保存；单次画布或素材库保存限制为 20 MB，超过限制会显示错误并保留本地草稿。字体使用 Excalidraw 默认 CDN，需要网络访问。
-
-新图形默认使用规整实线、2px 线宽，选择填充颜色后使用纯色填充；文字默认使用 Nunito。导入元素保留自己的样式。普通开口箭头的头部已缩短，菜单中的 “Excalidraw links” 外链组已移除。
-
-普通 `Ctrl+C` 复制可编辑元素，`Ctrl+Shift+C` 复制 PNG，可粘贴到支持图片的应用。macOS 使用 Cmd 代替 Ctrl。
-
-菜单中 “debug” 分组的“采样倍率”可选择 `1×`（默认）、`1.5×` 或 `2×`，在设备原生像素密度基础上提高画布采样精度，并记住当前浏览器的选择。该设置不改变画布缩放或导出图片尺寸；倍率越高，内存和渲染开销越大。
-
-同一分组在采样倍率下方提供独立的渲染实验开关：缓存位图平滑、高质量平滑、文字直接绘制、简单图形直接绘制、绘制位置对齐像素，以及始终平滑显示画布。全部默认关闭，可自由组合；高质量平滑需先开启缓存位图平滑。选项自动保留，“恢复默认渲染设置”会关闭全部开关并恢复 `1×`。鼠标停留在选项上可查看作用与限制。
-
-## 代码与定制
-
-- [路由](src/router/index.ts)、[页面](src/views/)和 [Pinia 计数器](src/stores/counter.ts)。
-- [Vue 包装组件](src/components/ExcalidrawCanvas.vue)：挂载 React 编辑器、设置默认样式与菜单，接入画布和素材库保存。
-- [自动保存队列](src/lib/persistence.ts)：保存去抖、草稿恢复和冲突处理。
+- [源码维护说明](packages/excalidraw/README.md)：上游来源、内部包关系、编辑器定制位置、构建与升级方式。
+- [更新记录](https://github.com/qiudeng7/excalidraw-workspace/releases)：各版本的 Changelog，通过 Git tag 和 GitHub Release 发布。
+- [页面与路由](src/views/)及[路由定义](src/router/index.ts)：账户入口、侧边栏和画布页面。根路径 `/` 是画布，`/home` 为首页，`/about` 为关于页；旧地址 `/draw` 跳转到 `/`。
+- [编辑器包装组件](src/components/ExcalidrawCanvas.vue)：Vue 与 React 的衔接、默认样式、菜单和云端保存。
+- [自动保存队列](src/lib/persistence.ts)：保存去抖、本地草稿和冲突处理。
 - [Worker 后端](worker/index.ts)与[数据库迁移](migrations/)：账户、访问权限、工作空间、画布和素材库 API。
-- [本地 Excalidraw 源码](packages/excalidraw/README.md)：源码来源、内部包的关系、定制位置、构建和升级方式。
 
-Demo 宿主的直接依赖已于 2026-09-27 核对稳定版本。React 及其类型沿用 18，本次源码升级也针对这一版本完成适配。TypeScript 保留在 6.0.3，因为当前 `vue-tsc` 3.3.11 搭配 TypeScript 7.0.2 实测报错 `ERR_PACKAGE_PATH_NOT_EXPORTED`；升级时需重新检查兼容性。
-
-当前编辑器基线为上游 `master` 提交 [`438d898`](https://github.com/excalidraw/excalidraw/commit/438d89861f53d8a90ad566113ecac1b83761098f)（2026-09-27），包含套索、填充桶和自动识别形状的 Autoshape。这里使用的是固定提交的开发版源码，并非新的 npm 稳定版。
-
-Excalidraw 已作为本仓库的本地源码包维护，使用 `workspace:*` 引用，不再应用 pnpm patch。`pnpm dev` 会先构建编辑器再启动 Vite；首次启动需等待源码构建完成。编辑器内部构建工具保留上游兼容版本，详情见 [源码维护说明](packages/excalidraw/README.md)。
+编辑器基线为上游 `master` 提交 [`438d898`](https://github.com/excalidraw/excalidraw/commit/438d89861f53d8a90ad566113ecac1b83761098f)（2026-09-27）。这里维护的是固定提交的本地源码，通过 `workspace:*` 引用，不再使用 pnpm patch，也不是新的 npm 稳定版。
 
 ## 部署到 Cloudflare
 
-本项目使用一个 Cloudflare Worker 同时提供 API 和静态页面：D1 保存账号、会话及目录信息，私有 R2 bucket 保存画布和素材库快照。需要具有 Workers、D1 和 R2 操作权限的 Cloudflare 登录。
+一个 Cloudflare Worker 同时提供 API 和静态页面。D1 保存账户、会话、工作空间及画布目录，私有 R2 bucket 保存画布和素材库快照。部署需要有 Workers、D1 和 R2 操作权限的 Cloudflare 账户。
 
-首次部署到自己的账号：
+首次部署到自己的账户，在仓库根目录运行：
 
 ```sh
 pnpm exec wrangler login
@@ -83,7 +82,9 @@ pnpm exec wrangler d1 create excalidraw-demo
 pnpm exec wrangler r2 bucket create excalidraw-demo-data
 ```
 
-将创建结果中的数据库 ID 填入 [wrangler.jsonc](wrangler.jsonc) 的 `d1_databases[0].database_id`，同时核对账号下的 Worker、数据库及 bucket 名称。仓库中的数据库 ID 指向当前 Demo；部署到自己的账号时，必须替换为自己新建的数据库 ID。
+将创建结果中的数据库 ID 填入 [wrangler.jsonc](wrangler.jsonc) 的 `d1_databases[0].database_id`，同时核对 Worker、数据库和 bucket 名称。**仓库中的数据库 ID 指向当前在线应用；部署到自己的账户时必须替换成自己的数据库 ID。** 资源名称可以自行修改，但必须与实际创建的资源和配置一致。
+
+当前在线应用继续使用 `excalidraw-demo` Worker、D1 和 `excalidraw-demo-data` R2 bucket，产品改名未迁移这些资源，因此访问地址和已有用户数据保持原有位置。
 
 ```sh
 pnpm db:migrate:remote
@@ -91,7 +92,7 @@ pnpm typecheck:worker
 pnpm deploy
 ```
 
-部署后打开根地址，由实际使用者完成首个管理员注册。之后更新代码通常只需应用新增迁移并重新部署。静态资源来自 `dist/`，`/api/*` 交给 Worker，其余页面支持 SPA 路由回退。GitHub push 不会自动更新线上服务。云端 D1/R2 与本机模拟数据相互独立。
+部署后打开根地址，及时完成首个管理员注册。后续更新时应用新增迁移并重新部署，保留原有数据库及 bucket 绑定。静态资源来自 `dist/`，`/api/*` 交给 Worker，其余页面支持 SPA 路由回退。GitHub push 不会自动更新线上服务。
 
 ## 许可证
 

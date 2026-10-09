@@ -6,7 +6,7 @@ const route = useRoute()
 
 <template>
   <header v-if="route.name !== 'draw'" class="app-header">
-    <RouterLink class="brand" to="/home">Vue Demo</RouterLink>
+    <RouterLink class="brand" to="/home">Excalidraw Workspace</RouterLink>
     <nav aria-label="主导航">
       <RouterLink to="/home">首页</RouterLink>
       <RouterLink to="/">画布</RouterLink>
