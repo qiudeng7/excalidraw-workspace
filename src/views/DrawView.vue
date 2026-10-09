@@ -4,6 +4,7 @@ import ExcalidrawCanvas from '../components/ExcalidrawCanvas.vue'
 import AccountGate from '../components/AccountGate.vue'
 import QuietIcon from '../components/QuietIcon.vue'
 import { api } from '../lib/api'
+import { cancelAppDialog, confirmDialog, promptDialog } from '../lib/dialogs'
 import type { Bootstrap, User, Workspace, CanvasMeta, CanvasDocument, LibraryDocument } from '../../shared/contracts'
 
 const bootstrap = ref<Bootstrap>()
@@ -149,7 +150,7 @@ async function selectCanvas(id: string) {
   await run(async () => { await flush(); await loadCanvas(id) })
 }
 async function createWorkspace() {
-  const name = window.prompt('工作空间名称', '新的工作空间')?.trim()
+  const name = await promptDialog({ title: '新建工作空间', label: '工作空间名称', initialValue: '新的工作空间', confirmLabel: '创建' })
   if (!name) return
   await run(async () => {
     await flush()
@@ -159,7 +160,7 @@ async function createWorkspace() {
   })
 }
 async function renameWorkspace() {
-  const name = window.prompt('重命名工作空间', currentWorkspace.value?.name)?.trim()
+  const name = await promptDialog({ title: '重命名工作空间', label: '工作空间名称', initialValue: currentWorkspace.value?.name, confirmLabel: '保存名称' })
   if (!name || name === currentWorkspace.value?.name) return
   await run(async () => {
     const { workspace } = await api<{ workspace: Workspace }>(`/api/workspaces/${workspaceId.value}`, { method: 'PATCH', body: JSON.stringify({ name }) })
@@ -167,7 +168,7 @@ async function renameWorkspace() {
   })
 }
 async function deleteWorkspace() {
-  if (!window.confirm(`删除「${currentWorkspace.value?.name}」及其中所有画布？此操作无法撤销。`)) return
+  if (!await confirmDialog({ title: '删除工作空间', message: `删除「${currentWorkspace.value?.name}」及其中所有画布？此操作无法撤销。`, confirmLabel: '删除工作空间', danger: true })) return
   await run(async () => {
     await flush()
     await api(`/api/workspaces/${workspaceId.value}`, { method: 'DELETE' })
@@ -178,7 +179,7 @@ async function deleteWorkspace() {
   })
 }
 async function createCanvas() {
-  const name = window.prompt('画布名称', '未命名画布')?.trim()
+  const name = await promptDialog({ title: '新建画布', label: '画布名称', initialValue: '未命名画布', confirmLabel: '创建' })
   if (!name) return
   await run(async () => {
     await flush()
@@ -188,7 +189,7 @@ async function createCanvas() {
   })
 }
 async function renameCanvas(canvas: CanvasMeta) {
-  const name = window.prompt('重命名画布', canvas.name)?.trim()
+  const name = await promptDialog({ title: '重命名画布', label: '画布名称', initialValue: canvas.name, confirmLabel: '保存名称' })
   if (!name || name === canvas.name) return
   await run(async () => {
     await flush()
@@ -198,7 +199,7 @@ async function renameCanvas(canvas: CanvasMeta) {
   })
 }
 async function deleteCanvas(canvas: CanvasMeta) {
-  if (!window.confirm(`删除画布「${canvas.name}」？此操作无法撤销。`)) return
+  if (!await confirmDialog({ title: '删除画布', message: `删除画布「${canvas.name}」？此操作无法撤销。`, confirmLabel: '删除画布', danger: true })) return
   await run(async () => {
     await flush()
     await api(`/api/canvases/${canvas.id}`, { method: 'DELETE' })
@@ -245,6 +246,7 @@ onMounted(() => {
   window.document.addEventListener('keydown', escapeWorkspaceMenu)
 })
 onBeforeUnmount(() => {
+  cancelAppDialog()
   window.document.removeEventListener('pointerdown', dismissWorkspaceMenu)
   window.document.removeEventListener('keydown', escapeWorkspaceMenu)
 })

@@ -260,7 +260,7 @@ export const LibraryDropdownMenuButton: React.FC<{
           onSuccess={(data) =>
             onPublishLibSuccess(data, libraryItemsData.libraryItems)
           }
-          onError={(error) => window.alert(error)}
+          onError={(error) => setAppState({ errorMessage: error.message })}
           updateItemsInStorage={() =>
             library.setLibrary(libraryItemsData.libraryItems)
           }

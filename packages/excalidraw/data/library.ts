@@ -73,6 +73,11 @@ const onLibraryUpdateEmitter = new Emitter<
   [update: LibraryUpdate, libraryItems: LibraryItems]
 >();
 
+export const libraryImportConfirmationAtom = atom<{
+  message: string;
+  complete: (confirmed: boolean) => void;
+} | null>(null);
+
 export type LibraryAdatapterSource = "load" | "save";
 
 export interface LibraryPersistenceAdapter {
@@ -247,6 +252,7 @@ class Library {
 
   /** call on excalidraw instance unmount */
   destroy = () => {
+    editorJotaiStore.get(libraryImportConfirmationAtom)?.complete(false);
     this.updateQueue = [];
     this.currLibraryItems = [];
     editorJotaiStore.set(libraryItemSvgsCache, new Map());
@@ -318,14 +324,26 @@ class Library {
           } else {
             nextItems = restoreLibraryItems(source, defaultStatus);
           }
-          if (
+          if (this.app.unmounted) {
+            throw new AbortError();
+          }
+          const confirmed =
             !prompt ||
-            window.confirm(
-              t("alerts.confirmAddLibrary", {
-                numShapes: nextItems.length,
-              }),
-            )
-          ) {
+            (await new Promise<boolean>((complete) => {
+              this.app.updateEditorAtom(libraryImportConfirmationAtom, {
+                message: t("alerts.confirmAddLibrary", {
+                  numShapes: nextItems.length,
+                }),
+                complete: (confirmed) => {
+                  editorJotaiStore.set(libraryImportConfirmationAtom, null);
+                  if (!this.app.unmounted) {
+                    this.app.triggerRender();
+                  }
+                  complete(confirmed);
+                },
+              });
+            }));
+          if (confirmed) {
             if (prompt) {
               // focus container if we've prompted. We focus conditionally
               // lest `props.autoFocus` is disabled (in which case we should

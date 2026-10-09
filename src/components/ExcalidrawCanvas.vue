@@ -10,6 +10,7 @@ import '@excalidraw/excalidraw/index.css'
 import type { ExcalidrawProps, ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types'
 import type { CanvasDocument, CanvasScene, LibraryDocument } from '../../shared/contracts'
 import { PersistentResource } from '../lib/persistence'
+import { confirmDialog, isAppDialogOpen } from '../lib/dialogs'
 
 const props = defineProps<{ document: CanvasDocument; library: LibraryDocument; userId: string }>()
 const emit = defineEmits<{ 'save-state': [status: string] }>()
@@ -47,7 +48,7 @@ function saveShortcut(event: KeyboardEvent) {
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's') return
   event.preventDefault()
   event.stopImmediatePropagation()
-  if (!event.repeat) void saveManually()
+  if (!event.repeat && !isAppDialogOpen()) void saveManually()
 }
 const hasConflict = ref(false)
 const otherDrafts = ref<{ key: string; label: string; filename: string; data: unknown }[]>([])
@@ -84,7 +85,7 @@ async function flush() {
 }
 async function retry() { try { await flush() } catch { /* The resource displays the failure. */ } }
 async function loadCloudVersion() {
-  if (!window.confirm('请先下载本地备份。继续将丢弃发生冲突的本地草稿，重新加载云端内容。确定继续？')) return
+  if (!await confirmDialog({ title: '丢弃冲突草稿', message: '请先下载本地备份。继续将丢弃发生冲突的本地草稿，重新加载云端内容。确定继续？', confirmLabel: '丢弃并加载云端', danger: true })) return
   try {
     // Keep a non-conflicting resource's pending draft intact across the reload.
     if (sceneResource.conflict) await sceneResource.discardDraft()
