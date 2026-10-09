@@ -4,38 +4,44 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm build:editor && vite",
-    "build": "pnpm build:editor && vue-tsc -b && vite build",
-    "preview": "vite preview",
+    "dev": "pnpm build:editor && nuxt dev --host 0.0.0.0",
+    "build": "pnpm build:editor && NITRO_PRESET=cloudflare-module nuxt build",
+    "preview": "nuxt preview",
     "build:editor": "pnpm --filter @excalidraw/excalidraw build",
-    "dev:worker": "wrangler dev --port 8787",
+    "dev:worker": "wrangler dev --port 8787 --var PUBLIC_ORIGIN:http://localhost:8787",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "typecheck:worker": "tsc --project tsconfig.worker.json",
     "test:backend": "tsx --test worker/tests/*.test.ts",
-    "deploy": "pnpm build && wrangler deploy"
+    "deploy": "pnpm build && wrangler deploy",
+    "build:node": "pnpm build:editor && NITRO_PRESET=node-server nuxt build",
+    "typecheck": "nuxt typecheck",
+    "postinstall": "nuxt prepare"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "workspace:*",
+    "@pinia/nuxt": "1.0.2",
+    "nuxt": "4.6.0",
     "pinia": "^4.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vue": "^3.5.43",
-    "vue-router": "^5.3.1"
+    "vue-router": "^5.4.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260927.1",
     "@types/node": "^26.6.3",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
-    "@vitejs/plugin-vue": "^6.0.9",
-    "@vue/tsconfig": "^0.9.1",
     "miniflare": "4.20260730.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
-    "vite": "^8.3.1",
+    "vite": "^8.3.4",
     "vue-tsc": "^3.3.11",
     "wrangler": "^4.141.0"
   },
-  "packageManager": "pnpm@11.24.0"
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=24"
+  }
 }

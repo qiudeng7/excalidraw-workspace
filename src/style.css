@@ -9,7 +9,7 @@
 }
 
 body { margin: 0; }
-#app { height: 100dvh; display: flex; flex-direction: column; }
+#__nuxt { height: 100dvh; display: flex; flex-direction: column; }
 .app-header {
   display: flex;
   align-items: center;

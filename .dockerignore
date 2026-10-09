@@ -1,0 +1,14 @@
+.git
+**/node_modules
+**/dist
+.nuxt
+.output
+.wrangler
+.data
+data
+coverage
+*.log
+.env
+.env.*
+.dev.vars*
+*.local

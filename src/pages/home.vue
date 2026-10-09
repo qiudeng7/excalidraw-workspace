@@ -1,13 +1,9 @@
-<script setup lang="ts">
-import { RouterLink } from 'vue-router'
-</script>
-
 <template>
   <section class="page">
     <h1>Excalidraw Workspace</h1>
     <p>用画布整理想法，在自己的工作空间中管理多个画布与素材。</p>
     <p>登录后，画布和素材库会自动保存到你的账户，也可按 Ctrl / ⌘ S 主动保存。</p>
-    <RouterLink class="workspace-link" to="/">打开我的画布 →</RouterLink>
+    <NuxtLink class="workspace-link" to="/">打开我的画布 →</NuxtLink>
   </section>
 </template>
 

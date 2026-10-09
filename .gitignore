@@ -26,3 +26,11 @@ dist-ssr
 # Cloudflare local state
 .wrangler/
 .dev.vars*
+.env
+.env.*
+!.env.example
+
+# Nuxt generated output
+.nuxt/
+.output/
+.data/

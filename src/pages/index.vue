@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import ExcalidrawCanvas from '../components/ExcalidrawCanvas.vue'
 import AccountGate from '../components/AccountGate.vue'
 import QuietIcon from '../components/QuietIcon.vue'
 import { api } from '../lib/api'
