@@ -1,3 +1,5 @@
+import { createDefaultUserSettings } from "../../shared/contracts";
+import { validateUserSettings } from "./userSettings";
 import type { CanvasScene, User } from "../../shared/contracts";
 import type { Repository, ObjectStore } from "../storage/repository";
 export interface BackendContext {
@@ -284,6 +286,56 @@ async function api(req: Request, env: Env, ctx: ExecutionContext) {
   }
   const user = await currentUser(req, env);
   if (!user) return fail(401, "UNAUTHENTICATED", "请先登录");
+  if (path === "/api/user-settings") {
+    const expectedOwner = req.headers.get("x-settings-owner");
+    if (expectedOwner && expectedOwner !== user.id)
+      return fail(
+        401,
+        "SESSION_CHANGED",
+        "登录账户已在其他页面更改，请重新登录或刷新页面",
+      );
+    if (method === "GET") {
+      const row = await env.repository.userSettings(user.id);
+      if (!row)
+        return json({
+          settings: createDefaultUserSettings(),
+          revision: 0,
+          configured: false,
+        });
+      const settings: unknown = JSON.parse(row.settingsJson);
+      if (!validateUserSettings(settings))
+        throw new Error("Invalid stored user settings");
+      return json({ settings, revision: row.revision, configured: true });
+    }
+    if (method === "PUT") {
+      const data = await body(req);
+      const revision = validRevision(data.revision);
+      if (!validateUserSettings(data.settings))
+        return fail(
+          400,
+          "INVALID_USER_SETTINGS",
+          "设置格式无效，请使用完整的受支持配置",
+        );
+      const updatedRevision = await env.repository.saveUserSettings(
+        user.id,
+        JSON.stringify(data.settings),
+        revision,
+        new Date().toISOString(),
+      );
+      if (updatedRevision === undefined)
+        return fail(
+          409,
+          "USER_SETTINGS_CONFLICT",
+          "设置已在其他页面更新，请选择使用云端设置或重新提交当前设置",
+        );
+      return json({
+        settings: data.settings,
+        revision: updatedRevision,
+        configured: true,
+      });
+    }
+    return fail(405, "METHOD_NOT_ALLOWED", "请求方法不支持");
+  }
   if (path === "/api/admin/settings") {
     if (user.role !== "admin")
       return fail(403, "FORBIDDEN", "仅管理员可以修改注册设置");
@@ -495,6 +547,13 @@ async function api(req: Request, env: Env, ctx: ExecutionContext) {
     }
   }
   if (path === "/api/library") {
+    const expectedOwner = req.headers.get("x-resource-owner");
+    if (expectedOwner && expectedOwner !== user.id)
+      return fail(
+        401,
+        "SESSION_CHANGED",
+        "登录账户已在其他页面更改，请重新登录或刷新页面",
+      );
     const row = await env.repository.library(user.id);
     if (!row) return fail(500, "LIBRARY_MISSING", "素材库未初始化");
     if (method === "GET") {

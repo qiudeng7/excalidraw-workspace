@@ -20,3 +20,14 @@ CREATE TABLE workspace_navigation (
   PRIMARY KEY(user_id,workspace_id)
 );
 INSERT INTO user_navigation(user_id) SELECT id FROM users;
+-- Old Worker versions may register users between migration and code deployment.
+CREATE TRIGGER IF NOT EXISTS initialize_user_navigation AFTER INSERT ON users
+BEGIN
+  INSERT OR IGNORE INTO user_navigation(user_id) VALUES(NEW.id);
+END;
+
+-- Append canvases created by the old Worker during the deployment transition.
+CREATE TRIGGER IF NOT EXISTS append_canvas_position AFTER INSERT ON canvases
+BEGIN
+  UPDATE canvases SET position=COALESCE((SELECT MAX(position)+1 FROM canvases WHERE workspace_id=NEW.workspace_id AND id<>NEW.id),0) WHERE id=NEW.id;
+END;

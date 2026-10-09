@@ -756,6 +756,49 @@ class App extends React.Component<AppProps, AppState> {
   lastPointerMoveEvent: PointerEvent | null = null;
   /** current frame pointer cords */
   lastPointerMoveCoords: { x: number; y: number } | null = null;
+  private optimizedArrowPointerId: number | null = null;
+  private optimizedArrowModifiers = { ctrlKey: false, metaKey: false, altKey: false };
+
+  private isOptimizedArrowDrag = () => {
+    if (!this.props.arrowBindingOptimization || this.optimizedArrowPointerId === null || this.state.multiElement || this.state.bindingPreference !== "enabled") return false;
+    const arrow = this.state.newElement || (this.state.selectedLinearElement && this.scene.getElement(this.state.selectedLinearElement.elementId));
+    if (arrow && isArrowElement(arrow) && !isElbowArrow(arrow)) {
+      if (this.state.newElement) return true;
+      const linear = this.state.selectedLinearElement!;
+      const index = linear.initialState.lastClickedPoint >= 0 ? linear.initialState.lastClickedPoint : linear.hoverPointIndex;
+      return (index === 0 || index === arrow.points.length - 1) && (linear.selectedPointsIndices?.length ?? 1) <= 1;
+    }
+    return this.state.activeTool.type === "arrow" && this.state.currentItemArrowType !== ARROW_TYPE.elbow;
+  };
+
+  private syncOptimizedArrowModifiers = (event: { ctrlKey: boolean; metaKey: boolean; altKey: boolean }) => {
+    this.optimizedArrowModifiers = { ctrlKey: event.ctrlKey, metaKey: event.metaKey, altKey: event.altKey };
+    if (!this.isOptimizedArrowDrag()) return false;
+    const active = !event.metaKey && !event.altKey;
+    // Ctrl 在本次普通箭头手势中代表内部绑定；Alt/Meta 的组合优先沿用上游。
+    flushSync(() => this.setState({
+      arrowBindingOptimizationActive: active,
+      arrowBindingInside: active && event.ctrlKey,
+      isBindingEnabled: active ? true : event[KEYS.CTRL_OR_CMD] ? this.state.bindingPreference !== "enabled" : this.state.bindingPreference === "enabled",
+    }));
+    return active;
+  };
+
+  private clearOptimizedArrowGesture = () => {
+    this.optimizedArrowPointerId = null;
+    this.setState({ arrowBindingInside: false, arrowBindingOptimizationActive: false, isBindingEnabled: this.optimizedArrowModifiers[KEYS.CTRL_OR_CMD] ? this.state.bindingPreference !== "enabled" : this.state.bindingPreference === "enabled" });
+  };
+
+  private refreshOptimizedArrowAtRest = (event: KeyboardEvent | React.KeyboardEvent) => {
+    if (!this.isOptimizedArrowDrag() || !this.state.selectedLinearElement || !this.lastPointerMoveCoords) return;
+    const last = this.lastPointerMoveEvent || this.lastPointerDownEvent?.nativeEvent;
+    if (!last) return;
+    // 键盘 modifier 改变时无需移动鼠标；重放最后的坐标，而不是旧事件的 modifier。
+    const pointer = new PointerEvent("pointermove", { clientX: last.clientX, clientY: last.clientY, pointerId: last.pointerId, pointerType: last.pointerType, buttons: 1, ctrlKey: event.ctrlKey, altKey: event.altKey, metaKey: event.metaKey, shiftKey: event.shiftKey });
+    const next = LinearElementEditor.handlePointDragging(pointer, this, this.lastPointerMoveCoords.x, this.lastPointerMoveCoords.y, this.state.selectedLinearElement);
+    if (next) this.setState(next);
+  };
+
   private lastCompletedCanvasClicks: { x: number; y: number }[] = [];
   /** previous frame pointer coords */
   previousPointerMoveCoords: { x: number; y: number } | null = null;
@@ -908,6 +951,10 @@ class App extends React.Component<AppProps, AppState> {
       objectsSnapModeEnabled,
       gridModeEnabled: gridModeEnabled ?? defaultAppState.gridModeEnabled,
       name,
+      arrowBindingOptimization: !!props.arrowBindingOptimization,
+      arrowBindingInside: false,
+      arrowBindingOptimizationActive: false,
+      shortArrowheads: !!props.shortArrowheads,
       width: this.ownerWindow.innerWidth,
       height: this.ownerWindow.innerHeight,
     };
@@ -924,6 +971,7 @@ class App extends React.Component<AppProps, AppState> {
       this,
     );
     this.scene = new Scene();
+    this.scene.arrowBindingOptimization = !!props.arrowBindingOptimization;
 
     this.canvas = this.ownerDocument.createElement("canvas");
     this.rc = rough.canvas(this.canvas);
@@ -2685,6 +2733,7 @@ class App extends React.Component<AppProps, AppState> {
                               isExporting: false,
                             pixelRatio: this.canvasScale,
                             renderingOptions: this.props.canvasRenderingOptions,
+                            shortArrowheads: !!this.props.shortArrowheads,
                               renderGrid: isGridModeEnabled(this),
                               renderLinks: this.isLinksEnabled(),
                               canvasBackgroundColor:
@@ -2712,6 +2761,7 @@ class App extends React.Component<AppProps, AppState> {
                                 isExporting: false,
                             pixelRatio: this.canvasScale,
                             renderingOptions: this.props.canvasRenderingOptions,
+                            shortArrowheads: !!this.props.shortArrowheads,
                                 renderGrid: false,
                                 canvasBackgroundColor:
                                   this.state.viewBackgroundColor,
@@ -3238,6 +3288,11 @@ class App extends React.Component<AppProps, AppState> {
         return {
           ...prevAppState,
           ...actionAppState,
+          // 初始化、导入和清空场景不能覆盖实例的用户设置或注入手势状态。
+          arrowBindingOptimization: !!this.props.arrowBindingOptimization,
+          shortArrowheads: !!this.props.shortArrowheads,
+          arrowBindingInside: this.optimizedArrowPointerId !== null && prevAppState.arrowBindingInside,
+          arrowBindingOptimizationActive: this.optimizedArrowPointerId !== null && prevAppState.arrowBindingOptimizationActive,
           // NOTE this will prevent opening context menu using an action
           // or programmatically from the host, so it will need to be
           // rewritten later
@@ -3264,6 +3319,7 @@ class App extends React.Component<AppProps, AppState> {
   // Lifecycle
 
   private onBlur = withBatchedUpdates(() => {
+    this.clearOptimizedArrowGesture();
     this.pan.setSpaceHeld(false);
     this.setState({
       isBindingEnabled: this.state.bindingPreference === "enabled",
@@ -3599,11 +3655,14 @@ class App extends React.Component<AppProps, AppState> {
    */
   private resetScene = withBatchedUpdates(
     (opts?: { resetLoadingState: boolean }) => {
+      this.clearOptimizedArrowGesture();
       this.elementRenderOverrides = new Map();
       this.elementRenderOffsets = new Map();
       this.scene.replaceAllElements([]);
       this.setState((state) => ({
         ...getDefaultAppState(),
+        arrowBindingOptimization: !!this.props.arrowBindingOptimization,
+        shortArrowheads: !!this.props.shortArrowheads,
         isLoading: opts?.resetLoadingState ? false : state.isLoading,
         theme: this.state.theme,
       }));
@@ -4319,6 +4378,11 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   componentDidUpdate(prevProps: AppProps, prevState: AppState) {
+    this.scene.arrowBindingOptimization = !!this.props.arrowBindingOptimization;
+    if (prevProps.shortArrowheads !== this.props.shortArrowheads || prevProps.arrowBindingOptimization !== this.props.arrowBindingOptimization) {
+      // 只更新实例渲染上下文；不 mutate 元素，不增加场景版本。
+      this.setState({ shortArrowheads: !!this.props.shortArrowheads, arrowBindingOptimization: !!this.props.arrowBindingOptimization });
+    }
     const renderOverridesUpdatePending = this.renderOverridesUpdatePending;
     this.renderOverridesUpdatePending = false;
     // Only a requested visual update can skip the document pipeline. Real
@@ -5206,6 +5270,7 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     if (event.type === "pointercancel") {
+      this.clearOptimizedArrowGesture();
       // the browser took the pointer over (scroll, palm rejection) — no
       // pointerup will follow, so the armed bucket fill must not commit and
       // the text tool's pending center click must not resolve either. Both
@@ -5603,6 +5668,11 @@ class App extends React.Component<AppProps, AppState> {
         return;
       }
 
+      if (event.key === KEYS.ESCAPE) this.clearOptimizedArrowGesture();
+      if (event.key === "Control" || event.key === KEYS.ALT || event.key === "Meta") {
+        this.syncOptimizedArrowModifiers(event);
+        this.refreshOptimizedArrowAtRest(event);
+      }
       // normalize `event.key` when CapsLock is pressed #2372
 
       if (
@@ -5772,7 +5842,7 @@ class App extends React.Component<AppProps, AppState> {
         } else if (getFeatureFlag("COMPLEX_BINDINGS")) {
           this.handleSkipBindMode();
         } else {
-          maybeHandleArrowPointlikeDrag({ app: this, event });
+          if (!this.isOptimizedArrowDrag()) maybeHandleArrowPointlikeDrag({ app: this, event });
         }
       }
 
@@ -5865,7 +5935,7 @@ class App extends React.Component<AppProps, AppState> {
         return;
       }
 
-      if (event[KEYS.CTRL_OR_CMD] && !event.repeat) {
+      if (event[KEYS.CTRL_OR_CMD] && !event.repeat && !this.isOptimizedArrowDrag()) {
         if (getFeatureFlag("COMPLEX_BINDINGS")) {
           this.resetDelayedBindMode();
         }
@@ -5880,7 +5950,7 @@ class App extends React.Component<AppProps, AppState> {
         // would do, with no pointermove to refresh the affordance
         this.textTool.refresh(event);
 
-        maybeHandleArrowPointlikeDrag({ app: this, event });
+        if (!this.isOptimizedArrowDrag()) maybeHandleArrowPointlikeDrag({ app: this, event });
       }
 
       if (isArrowKey(event.key)) {
@@ -6089,6 +6159,10 @@ class App extends React.Component<AppProps, AppState> {
   );
 
   private onKeyUp = withBatchedUpdates((event: KeyboardEvent) => {
+    if (event.key === "Control" || event.key === KEYS.ALT || event.key === "Meta") {
+      this.syncOptimizedArrowModifiers(event);
+      this.refreshOptimizedArrowAtRest(event);
+    }
     if (!this.isInteractionEnabled()) {
       return;
     }
@@ -6115,7 +6189,7 @@ class App extends React.Component<AppProps, AppState> {
 
     if (event.key === KEYS.ALT) {
       this.bucketFill.closeTemporaryEyeDropper();
-      maybeHandleArrowPointlikeDrag({ app: this, event });
+      if (!this.isOptimizedArrowDrag()) maybeHandleArrowPointlikeDrag({ app: this, event });
     }
 
     if (
@@ -6166,7 +6240,7 @@ class App extends React.Component<AppProps, AppState> {
         this.textTool.refresh(event);
       }
 
-      maybeHandleArrowPointlikeDrag({ app: this, event });
+      if (!this.isOptimizedArrowDrag()) maybeHandleArrowPointlikeDrag({ app: this, event });
     }
     if (isArrowKey(event.key)) {
       bindOrUnbindBindingElements(
@@ -8866,6 +8940,8 @@ class App extends React.Component<AppProps, AppState> {
     }
 
     this.lastPointerDownEvent = event;
+    this.optimizedArrowPointerId = event.pointerId;
+    this.syncOptimizedArrowModifiers(event);
 
     // we must exit before we set `cursorButton` state and `savePointer`
     // else it will send pointer state & laser pointer events in collab when
@@ -9218,6 +9294,7 @@ class App extends React.Component<AppProps, AppState> {
   private handleCanvasPointerUp = (
     event: React.PointerEvent<HTMLCanvasElement>,
   ) => {
+    this.syncOptimizedArrowModifiers(event);
     if (!this.isInteractionEnabled()) {
       if (this.isLinksEnabled() || this.isEmbedsEnabled()) {
         this.handleInteractiveContentPointerUp(event);
@@ -10215,7 +10292,7 @@ class App extends React.Component<AppProps, AppState> {
     elementType: ExcalidrawLinearElement["type"],
     pointerDownState: PointerDownState,
   ): void => {
-    if (event.ctrlKey) {
+    if (event.ctrlKey && !this.syncOptimizedArrowModifiers(event)) {
       flushSync(() => {
         this.setState({
           isBindingEnabled: this.state.bindingPreference !== "enabled",
@@ -10724,6 +10801,7 @@ class App extends React.Component<AppProps, AppState> {
     pointerDownState: PointerDownState,
   ) {
     return withBatchedUpdatesThrottled((event: PointerEvent) => {
+      this.syncOptimizedArrowModifiers(event);
       if (this.state.openDialog?.name === "elementLinkSelector") {
         return;
       }
@@ -11523,6 +11601,9 @@ class App extends React.Component<AppProps, AppState> {
     pointerDownState: PointerDownState,
   ): (event: PointerEvent) => void {
     return withBatchedUpdates((childEvent: PointerEvent) => {
+      this.syncOptimizedArrowModifiers(childEvent);
+      // 保留 pointerup 当下的内部绑定直到本次手势提交完成，再清临时状态。
+      queueMicrotask(this.clearOptimizedArrowGesture);
       const elementsMap = this.scene.getNonDeletedElementsMap();
 
       this.removePointer(childEvent);

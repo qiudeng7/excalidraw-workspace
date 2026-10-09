@@ -208,6 +208,8 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
     <EditorJotaiProvider store={editorJotaiStore}>
       <InitializeApp langCode={langCode} theme={theme}>
         <App
+          arrowBindingOptimization={props.arrowBindingOptimization}
+          shortArrowheads={props.shortArrowheads}
           canvasSampling={props.canvasSampling}
           canvasRenderingOptions={props.canvasRenderingOptions}
           onExport={onExport}

@@ -568,6 +568,11 @@ export interface AppState {
   // a drag operation (like pointer position vs bindable element) but needed
   // globally for calculating the binding strategy
   bindMode: BindMode;
+  /** 实例设置与手势状态，不写入场景 JSON。 */
+  arrowBindingOptimization: boolean;
+  arrowBindingInside: boolean;
+  arrowBindingOptimizationActive: boolean;
+  shortArrowheads: boolean;
   /** user-customized color-picker top picks (pinned via drag & drop from the
    * color picker popup). `null` means no customization (defaults, or
    * host-supplied `topPicks`, are used). Kept per picker. */
@@ -839,6 +844,8 @@ export type ElementRenderOffsets = ReadonlyMap<
 
 export interface ExcalidrawProps {
   /** 屏幕采样倍率，独立于场景缩放及导出分辨率。 */
+  arrowBindingOptimization?: boolean;
+  shortArrowheads?: boolean;
   canvasSampling?: 1 | 1.5 | 2;
   canvasRenderingOptions?: CanvasRenderingOptions;
   className?: string;

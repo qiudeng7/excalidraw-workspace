@@ -711,10 +711,10 @@ const CARDINALITY_MARKER_SIZE = 20;
 const CROWFOOT_ARROWHEAD_SIZE = 15;
 
 /** @returns number in pixels */
-export const getArrowheadSize = (arrowhead: Arrowhead): number => {
+export const getArrowheadSize = (arrowhead: Arrowhead, shortArrowheads = false): number => {
   switch (arrowhead) {
     case "arrow":
-      return 14;
+      return shortArrowheads ? 14 : 25;
     case "diamond":
     case "diamond_outline":
       return 12;
@@ -732,12 +732,12 @@ export const getArrowheadSize = (arrowhead: Arrowhead): number => {
 };
 
 /** @returns number in degrees */
-export const getArrowheadAngle = (arrowhead: Arrowhead): Degrees => {
+export const getArrowheadAngle = (arrowhead: Arrowhead, shortArrowheads = false): Degrees => {
   switch (arrowhead) {
     case "bar":
       return 90 as Degrees;
     case "arrow":
-      return 28 as Degrees;
+      return (shortArrowheads ? 28 : 20) as Degrees;
     default:
       return 25 as Degrees;
   }
@@ -749,6 +749,7 @@ export const getArrowheadPoints = (
   position: "start" | "end",
   arrowhead: Arrowhead,
   offsetMultiplier = 0,
+  shortArrowheads = false,
 ) => {
   if (arrowhead === null) {
     return null;
@@ -809,7 +810,7 @@ export const getArrowheadPoints = (
   const nx = (x2 - x1) / distance;
   const ny = (y2 - y1) / distance;
 
-  const size = getArrowheadSize(arrowhead);
+  const size = getArrowheadSize(arrowhead, shortArrowheads);
 
   let length = 0;
 
@@ -844,7 +845,7 @@ export const getArrowheadPoints = (
     return [tx, ty, diameter];
   }
 
-  const angle = getArrowheadAngle(arrowhead);
+  const angle = getArrowheadAngle(arrowhead, shortArrowheads);
 
   if (
     arrowhead === "cardinality_many" ||

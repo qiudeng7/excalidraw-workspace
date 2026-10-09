@@ -13,7 +13,7 @@ export const defaultRenderingOptions: RenderingOptions = {
 }
 const storageKey = 'excalidraw-demo:rendering-options'
 
-export function readRenderingOptions(): RenderingOptions {
+export function readLegacyRenderingOptions(): RenderingOptions {
   try {
     const stored = JSON.parse(localStorage.getItem(storageKey) || '{}')
     return Object.fromEntries(Object.keys(defaultRenderingOptions).map(key => [
@@ -21,14 +21,6 @@ export function readRenderingOptions(): RenderingOptions {
     ])) as RenderingOptions
   } catch {
     return { ...defaultRenderingOptions }
-  }
-}
-
-export function saveRenderingOptions(value: RenderingOptions) {
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(value))
-  } catch {
-    // 存储不可用时，设置在当前页面内仍然生效。
   }
 }
 
@@ -41,10 +33,11 @@ const controls: [keyof RenderingOptions, string, string][] = [
   ['smoothCanvas', '始终平滑显示画布', '在 1× 时也取消像素化显示；1.5× 和 2× 本来就使用平滑显示。'],
 ]
 
-export function RenderingOptionsMenu({ value, onChange, onReset }: {
+export function RenderingOptionsMenu({ value, onChange, onReset, disabled = false }: {
   value: RenderingOptions
   onChange: (value: RenderingOptions) => void
   onReset: () => void
+  disabled?: boolean
 }) {
   return createElement(MainMenu.ItemCustom, {
     className: 'canvas-rendering-options',
@@ -59,12 +52,12 @@ export function RenderingOptionsMenu({ value, onChange, onReset }: {
       type: 'checkbox',
       'aria-label': label,
       checked: value[key],
-      disabled: key === 'highQualitySmoothing' && !value.smoothCache,
+      disabled: disabled || (key === 'highQualitySmoothing' && !value.smoothCache),
       onChange: (event: ChangeEvent<HTMLInputElement>) => onChange({ ...value, [key]: event.target.checked }),
     }))),
     createElement('button', {
-      type: 'button', onClick: onReset,
+      type: 'button', onClick: onReset, disabled,
       style: { marginTop: '0.35rem', cursor: 'pointer', color: 'inherit', background: 'var(--island-bg-color)', border: '1px solid var(--default-border-color)', borderRadius: '4px', padding: '0.3rem 0.6rem' },
-    }, '恢复默认渲染设置')),
+    }, '恢复调试默认')),
   })
 }

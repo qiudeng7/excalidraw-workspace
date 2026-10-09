@@ -2683,6 +2683,7 @@ const pointDraggingUpdates = (
           endBindable,
           elementsMap,
           endIsDragged,
+          app.state.arrowBindingOptimization && app.state.arrowBindingOptimizationActive,
         ) || nextArrow.points[nextArrow.points.length - 1]
       : nextArrow.points[nextArrow.points.length - 1];
 
@@ -2714,6 +2715,7 @@ const pointDraggingUpdates = (
           startBindable,
           elementsMap,
           startIsDragged,
+          app.state.arrowBindingOptimization && app.state.arrowBindingOptimizationActive,
         ) || nextArrow.points[0]
       : nextArrow.points[0];
 

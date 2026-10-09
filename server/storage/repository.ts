@@ -122,7 +122,7 @@ export class Repository {
         values: [now, user.id],
       },
       {
-        sql: "INSERT INTO user_navigation(user_id) SELECT id FROM users WHERE id=?",
+        sql: "INSERT OR IGNORE INTO user_navigation(user_id) SELECT id FROM users WHERE id=?",
         values: [user.id],
       },
     ]);
@@ -357,6 +357,30 @@ export class Repository {
           user,
           revision,
         );
+  }
+  userSettings(user: string) {
+    return this.one(
+      "SELECT settings_json AS settingsJson,revision,updated_at AS updatedAt FROM user_settings WHERE user_id=?",
+      user,
+    );
+  }
+  async saveUserSettings(
+    user: string,
+    settingsJson: string,
+    revision: number,
+    now: string,
+  ) {
+    const row = await this.one(
+      "INSERT INTO user_settings(user_id,settings_json,revision,updated_at) SELECT ?,?,1,? WHERE ?=0 OR EXISTS(SELECT 1 FROM user_settings WHERE user_id=? AND revision=?) ON CONFLICT(user_id) DO UPDATE SET settings_json=excluded.settings_json,revision=user_settings.revision+1,updated_at=excluded.updated_at WHERE user_settings.revision=? RETURNING revision",
+      user,
+      settingsJson,
+      now,
+      revision,
+      user,
+      revision,
+      revision,
+    );
+    return row?.revision as number | undefined;
   }
   async objectReferenced(key: string) {
     return !!(await this.one(

@@ -84,7 +84,7 @@ export class ShapeCache {
   private static rg = new RoughGenerator();
   private static cache = new WeakMap<
     ExcalidrawElement,
-    { shape: ElementShape; theme: AppState["theme"] }
+    { shape: ElementShape; theme: AppState["theme"]; shortArrowheads: boolean }
   >();
 
   /**
@@ -94,9 +94,10 @@ export class ShapeCache {
   public static get = <T extends ExcalidrawElement>(
     element: T,
     theme: AppState["theme"] | null,
+    shortArrowheads?: boolean,
   ) => {
     const cached = ShapeCache.cache.get(element);
-    if (cached && (theme === null || cached.theme === theme)) {
+    if (cached && (theme === null || cached.theme === theme) && (shortArrowheads === undefined || cached.shortArrowheads === shortArrowheads)) {
       return cached.shape as T["type"] extends keyof ElementShapes
         ? ElementShapes[T["type"]] | undefined
         : ElementShape | undefined;
@@ -122,6 +123,7 @@ export class ShapeCache {
   >(
     element: T,
     renderConfig: {
+      shortArrowheads?: boolean;
       isExporting: boolean;
       canvasBackgroundColor: AppState["viewBackgroundColor"];
       embedsValidationStatus: EmbedsValidationStatus;
@@ -131,7 +133,7 @@ export class ShapeCache {
     // when exporting, always regenerated to guarantee the latest shape
     const cachedShape = renderConfig?.isExporting
       ? undefined
-      : ShapeCache.get(element, renderConfig ? renderConfig.theme : null);
+      : ShapeCache.get(element, renderConfig ? renderConfig.theme : null, !!renderConfig?.shortArrowheads);
 
     // `null` indicates no rc shape applicable for this element type,
     // but it's considered a valid cache value (= do not regenerate)
@@ -158,6 +160,7 @@ export class ShapeCache {
       ShapeCache.cache.set(element, {
         shape,
         theme: renderConfig?.theme || THEME.LIGHT,
+        shortArrowheads: !!renderConfig?.shortArrowheads,
       });
     }
 
@@ -377,6 +380,7 @@ const getArrowheadShapes = (
   options: Options,
   canvasBackgroundColor: string,
   isDarkMode: boolean,
+  shortArrowheads = false,
 ) => {
   if (arrowhead === null) {
     return [];
@@ -397,7 +401,7 @@ const getArrowheadShapes = (
         generator,
         options,
         strokeColor,
-        getArrowheadPoints(element, shape, position, arrowhead),
+        getArrowheadPoints(element, shape, position, arrowhead, 0, shortArrowheads),
         arrowhead === "circle_outline" ? backgroundFillColor : strokeColor,
       );
     }
@@ -479,13 +483,13 @@ const getArrowheadShapes = (
     case "cardinality_one":
       return generateArrowheadCardinalityOne(
         generator,
-        getArrowheadPoints(element, shape, position, arrowhead),
+        getArrowheadPoints(element, shape, position, arrowhead, 0, shortArrowheads),
         getArrowheadLineOptions(element, options),
       );
     case "cardinality_many":
       return generateArrowheadLinesToTip(
         generator,
-        getArrowheadPoints(element, shape, position, arrowhead),
+        getArrowheadPoints(element, shape, position, arrowhead, 0, shortArrowheads),
         getArrowheadLineOptions(element, options),
       );
     case "cardinality_one_or_many": {
@@ -569,7 +573,7 @@ const getArrowheadShapes = (
     default: {
       return generateArrowheadLinesToTip(
         generator,
-        getArrowheadPoints(element, shape, position, arrowhead),
+        getArrowheadPoints(element, shape, position, arrowhead, 0, shortArrowheads),
         getArrowheadLineOptions(element, options),
       );
     }
@@ -772,11 +776,13 @@ const _generateElementShape = (
   generator: RoughGenerator,
   {
     isExporting,
+    shortArrowheads,
     canvasBackgroundColor,
     embedsValidationStatus,
     theme,
   }: {
     isExporting: boolean;
+    shortArrowheads?: boolean;
     canvasBackgroundColor: string;
     embedsValidationStatus: EmbedsValidationStatus | null;
     theme?: AppState["theme"];
@@ -949,6 +955,7 @@ const _generateElementShape = (
             options,
             canvasBackgroundColor,
             isDarkMode,
+            shortArrowheads,
           );
           shape.push(...shapes);
         }
@@ -967,6 +974,7 @@ const _generateElementShape = (
             options,
             canvasBackgroundColor,
             isDarkMode,
+            shortArrowheads,
           );
           shape.push(...shapes);
         }

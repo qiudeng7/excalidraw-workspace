@@ -27,6 +27,7 @@ export type RenderableElementsMap = NonDeletedElementsMap &
   MakeBrand<"RenderableElementsMap">;
 
 export type StaticCanvasRenderConfig = {
+  shortArrowheads?: boolean;
   /** 仅屏幕渲染传入；导出保留原有像素密度。 */
   pixelRatio?: number;
   renderingOptions?: CanvasRenderingOptions;
@@ -49,6 +50,7 @@ export type StaticCanvasRenderConfig = {
 };
 
 export type SVGRenderConfig = {
+  shortArrowheads?: boolean;
   offsetX: number;
   offsetY: number;
   isExporting: boolean;

@@ -106,6 +106,8 @@ const hashSelectionOpts = (
 export type ExcalidrawElementsIncludingDeleted = readonly ExcalidrawElement[];
 
 export class Scene {
+  /** 实例几何上下文，不属于元素/场景 JSON。目标移动后仍保持 orbit 轮廓端点。 */
+  arrowBindingOptimization = false;
   // ---------------------------------------------------------------------------
   // instance methods/props
   // ---------------------------------------------------------------------------

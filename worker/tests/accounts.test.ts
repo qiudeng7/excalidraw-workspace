@@ -8,6 +8,8 @@ test("accounts, first administrator, owner isolation, revisions and registration
     "worker/index.ts",
     "server/services/api.ts",
     "server/services/security.ts",
+    "server/services/userSettings.ts",
+    "shared/contracts.ts",
     "server/storage/cloudflare.ts",
     "server/storage/repository.ts",
   ];

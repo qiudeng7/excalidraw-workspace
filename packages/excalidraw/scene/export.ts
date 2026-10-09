@@ -187,6 +187,7 @@ export const exportToCanvas = async (
     viewBackgroundColor,
     exportingFrame,
   }: {
+    shortArrowheads?: boolean;
     exportBackground: boolean;
     exportPadding?: number;
     viewBackgroundColor: string;
@@ -268,6 +269,7 @@ export const exportToCanvas = async (
       theme: appState.exportWithDarkMode ? THEME.DARK : THEME.LIGHT,
     },
     renderConfig: {
+      shortArrowheads: appState.shortArrowheads,
       canvasBackgroundColor: viewBackgroundColor,
       imageCache,
       renderGrid: false,
@@ -293,6 +295,7 @@ const createHTMLComment = (text: string) => {
 export const exportToSvg = async (
   elements: readonly NonDeletedExcalidrawElement[],
   appState: {
+    shortArrowheads?: boolean;
     exportBackground: boolean;
     exportPadding?: number;
     exportScale?: number;
@@ -489,6 +492,7 @@ export const exportToSvg = async (
       exportWithDarkMode,
       renderEmbeddables,
       frameRendering,
+      shortArrowheads: appState.shortArrowheads,
       canvasBackgroundColor: viewBackgroundColor,
       embedsValidationStatus: renderEmbeddables
         ? new Map(

@@ -134,6 +134,10 @@ export const getDefaultAppState = (): Omit<
     lockedMultiSelections: {},
     activeLockedId: null,
     bindMode: "orbit",
+    arrowBindingOptimization: false,
+    arrowBindingInside: false,
+    arrowBindingOptimizationActive: false,
+    shortArrowheads: false,
     boxSelectionMode: "contain",
     colorTopPicks: {
       elementStroke: null,
@@ -286,6 +290,10 @@ const APP_STATE_STORAGE_CONF = (<
   lockedMultiSelections: { browser: true, export: true, server: true },
   activeLockedId: { browser: false, export: false, server: false },
   bindMode: { browser: true, export: false, server: false },
+  arrowBindingOptimization: { browser: false, export: false, server: false },
+  arrowBindingInside: { browser: false, export: false, server: false },
+  arrowBindingOptimizationActive: { browser: false, export: false, server: false },
+  shortArrowheads: { browser: false, export: false, server: false },
   colorTopPicks: { browser: true, export: false, server: false },
   fontTopPicks: { browser: true, export: false, server: false },
 });

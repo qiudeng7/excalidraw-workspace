@@ -50,7 +50,7 @@ pnpm --filter @excalidraw/excalidraw build:watch
 
 | 定制 | 源码位置 | 行为 |
 | --- | --- | --- |
-| 普通开口箭头头部 | [lib/element/src/bounds.ts](lib/element/src/bounds.ts) 的 `getArrowheadSize`、`getArrowheadAngle` | 最大侧翼长度 25 → 14，单侧角度 20° → 28°；其他头部类型和短箭头限制保留 |
+| 普通开口箭头头部 | [lib/element/src/bounds.ts](lib/element/src/bounds.ts) 的 `getArrowheadSize`、`getArrowheadAngle` | 由实例 `shortArrowheads` 控制：开启时最大侧翼长度 14、单侧角度 28°，关闭恢复 25、20°；其他头部类型和短箭头限制保留 |
 | 复制 PNG 快捷键 | [actions/actionClipboard.tsx](actions/actionClipboard.tsx) 的 `actionCopyAsPng` | Windows/Linux 用 `Ctrl+Shift+C`，macOS 用 `Cmd+Shift+C`，排除 Alt |
 | 命令面板 | [components/LayerUI.tsx](components/LayerUI.tsx) | 挂载上游 CommandPalette 组件，为独立嵌入场景接通菜单入口及快捷键 |
 | 素材库导入与错误提示 | [data/library.ts](data/library.ts)、[ActiveConfirmDialog.tsx](components/ActiveConfirmDialog.tsx)、[LibraryMenuHeaderContent.tsx](components/LibraryMenuHeaderContent.tsx) | 导入确认使用异步编辑器弹窗，发布失败通过现有错误弹窗显示，不再调用浏览器 confirm/alert |
@@ -59,11 +59,19 @@ pnpm --filter @excalidraw/excalidraw build:watch
 
 普通 `Ctrl+C` / `Cmd+C` 仍复制可编辑元素，旧 `Shift+Alt+C` 不再复制 PNG。剪贴板图片写入仍受浏览器权限和安全上下文限制。
 
-画布、SVG 和 PNG 使用同一套箭头几何生成逻辑。但 `.excalidraw` 文件不保存这里定制的头部尺寸，交给原版编辑器打开仍按原版规则显示。
+画布、SVG、PNG 和复制 PNG 使用同一份实例短头配置。`shortArrowheads` 通过渲染上下文传入几何生成，shape 和位图缓存也按该选项区分；切换时已有箭头重绘，不改元素、连线位置或场景版本。`.excalidraw` JSON 不保存此用户设置，交给其他编辑器打开时按它自身规则显示。组件这两个功能属性默认关闭，宿主从账户配置显式传入项目默认开启值。
+
+### 连线交互优化
+
+`arrowBindingOptimization` 仅改变普通直线、曲线箭头的新建拖拽和单端点编辑。目标内部和边缘都认可真实绑定，默认使用 `orbit` 将端点停在轮廓外；拖拽未松手时按住 Ctrl 使用 `inside`，松开 Ctrl 即恢复轮廓。按下/释放 Ctrl 时使用最后坐标重算，鼠标无需移动。鼠标松手时仍按 Ctrl，则内部绑定保留；之后释放 Ctrl 不修改已完成箭头。目标的 `boundElements`、箭头的 binding/fixedPoint 和端点同时更新，移动、缩放或旋转目标仍会跟随。
+
+Alt 保持上游内部连接，Meta/Cmd 及组合键优先沿用上游规则；用户主动关闭绑定时不会强制开启。整条箭头或多个端点一起移动、多段点击绘制、折线箭头沿用上游行为。两端同一目标、嵌套/重叠元素及路径穿过其他元素不提供自动避障。极短箭头有有效轮廓交点时优先保持轮廓；无法形成外侧连线的特殊几何仍沿原规则。
+
+实现位于 [App.tsx](components/App.tsx) 的实例手势状态、[binding.ts](lib/element/src/binding.ts) 的策略和轮廓回退，以及 [linearElementEditor.ts](lib/element/src/linearElementEditor.ts) 的端点更新。pointercancel、Esc、失焦、手势结束清理临时 Ctrl 状态；初始化、导入及 resetScene 均保留宿主属性，不从场景注入用户设置。所有新增 AppState 字段的 storage 配置均关闭。
 
 账户和工作空间的输入、删除确认及冲突草稿舍弃使用宿主的 [AppDialog](../../src/components/AppDialog.vue)；刷新或关闭页面时的未保存提醒仍由浏览器提供。
 
-Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局，继续由 [Vue 包装组件](../../src/components/ExcalidrawCanvas.client.vue) 配置。采样倍率菜单由 [canvasSampling.ts](../../src/components/canvasSampling.ts) 提供，通过编辑器的 `canvasSampling` 属性传入 `1`、`1.5` 或 `2`（默认 `1`）。设置保存在当前浏览器的 localStorage，存储不可用时仍可在当前页面调整；不写入场景数据或撤销历史。
+Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局，继续由 [Vue 包装组件](../../src/components/ExcalidrawCanvas.client.vue) 配置。采样倍率菜单由 [canvasSampling.ts](../../src/components/canvasSampling.ts) 提供，通过编辑器的 `canvasSampling` 属性传入 `1`、`1.5` 或 `2`（默认 `1`）。采样与渲染设置由宿主按账户保存到后端，不再自动读取无用户归属的旧 localStorage；不写入场景数据或撤销历史。
 
 采样倍率乘以设备原生像素密度，应用于静态画布、交互层、新元素层及元素缓存；倍率变化会使元素与链接图标缓存重新生成。高倍率使用浏览器平滑缩小显示，画布 CSS 尺寸、坐标和导出分辨率保持原有语义。`2×` 的画布像素数约为 `1×` 的四倍，内存和渲染成本随之增加；元素缓存仍受上游尺寸上限限制。
 
@@ -71,7 +79,7 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 
 ## 渲染实验开关
 
-[canvasRenderingOptions.ts](../../src/components/canvasRenderingOptions.ts) 提供菜单与浏览器设置存储，通过 `canvasRenderingOptions` 属性传给编辑器。全部开关默认关闭，关闭后保持原有采样策略；“恢复默认渲染设置”还会将采样倍率恢复为 `1×`。设置不写入场景、撤销历史或导出配置。
+[canvasRenderingOptions.ts](../../src/components/canvasRenderingOptions.ts) 提供选项定义，账户菜单由宿主管理，通过 `canvasRenderingOptions` 属性传给编辑器。全部开关默认关闭，关闭后保持原有采样策略；“恢复调试默认”还会将采样倍率恢复为 `1×`。设置不写入场景、撤销历史或导出配置。
 
 | 开关 | 作用与限制 |
 | --- | --- |
@@ -94,6 +102,20 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 
 ## 验证与更新上游
 
-构建通过后，分别在 Nuxt 开发页面和本地 Worker 提供的生产页面检查（启动方式见[根目录 README](../../README.md#本地启动)）：新图形为规整线条、文字为 Nunito、箭头头部缩短；`Ctrl+C` 复制元素而 `Ctrl+Shift+C` 复制 PNG；外链菜单组隐藏，工具栏在底部且弹层向上展开。切换采样倍率后检查已有图形、新绘制图形及选择框位置，刷新页面检查设置保留；比较各倍率下复制 PNG 的尺寸，确认导出设置独立生效。修改渲染逻辑时还应比较 SVG/PNG 导出与画布外观。
+构建通过后，分别在 Nuxt 开发页面和本地 Worker 提供的生产页面检查（启动方式见[根目录 README](../../README.md#本地启动)）：新图形为规整线条、文字为 Nunito、箭头头部缩短；`Ctrl+C` 复制元素而 `Ctrl+Shift+C` 复制 PNG；外链菜单组隐藏，工具栏在底部且弹层向上展开。切换采样倍率后检查已有图形、新绘制图形及选择框位置，重登录或同账户换浏览器检查设置从服务端恢复；比较各倍率下复制 PNG 的尺寸，确认导出设置独立生效。修改渲染逻辑时还应比较 SVG/PNG 导出与画布外观。
+
+新增功能可以运行 [arrowFlags.browser.mjs](tests/arrowFlags.browser.mjs) 做独立 Chromium 检查。先执行 `pnpm build:editor`；测试会在临时目录构建页面、启动回环服务，不使用账户或后端，并阻止外部请求。Playwright 是可选测试工具，未加入产品依赖，可在独立目录安装：
+
+```sh
+mkdir -p /tmp/excalidraw-browser-tests
+printf '{"private":true}\n' > /tmp/excalidraw-browser-tests/package.json
+pnpm --dir /tmp/excalidraw-browser-tests add playwright
+pnpm --dir /tmp/excalidraw-browser-tests exec playwright install chromium
+# 回到仓库根目录执行；也可用 CHROMIUM_PATH 指定已有 Chromium。
+PLAYWRIGHT_MODULE=/tmp/excalidraw-browser-tests/node_modules/playwright/index.mjs \
+  node packages/excalidraw/tests/arrowFlags.browser.mjs
+```
+
+断言覆盖初始化、默认轮廓和静止 Ctrl 切换、内部起点连接空白、开关关闭、三点曲线单端编辑、旋转轮廓、SVG/PNG、无元素版本变化及 JSON 排除设置，以及 resetScene 保留实例设置。
 
 更新时先将目标上游版本获取到临时目录，对照 [UPSTREAM.json](UPSTREAM.json) 中的旧提交审查差异，再合入这些源码目录。保留本文列出的本地定制、构建脚本和依赖适配，更新来源记录与锁文件，重新执行构建和浏览器验证。不要用新版目录直接覆盖本地修改。

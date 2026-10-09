@@ -214,6 +214,8 @@ export const bindOrUnbindBindingElement = (
             arrow.startBinding,
             start.element,
             scene.getNonDeletedElementsMap(),
+            undefined,
+            appState.arrowBindingOptimization && appState.arrowBindingOptimizationActive,
           ) || arrow.points[0],
       });
     }
@@ -227,6 +229,8 @@ export const bindOrUnbindBindingElement = (
             arrow.endBinding,
             end.element,
             scene.getNonDeletedElementsMap(),
+            undefined,
+            appState.arrowBindingOptimization && appState.arrowBindingOptimizationActive,
           ) || arrow.points[arrow.points.length - 1],
       });
     }
@@ -628,27 +632,48 @@ export const getBindingStrategyForDraggingBindingElementEndpoints = (
     gridSize?: NullableGridSize;
   },
 ): { start: BindingStrategy; end: BindingStrategy } => {
-  if (getFeatureFlag("COMPLEX_BINDINGS")) {
-    return getBindingStrategyForDraggingBindingElementEndpoints_complex(
-      arrow,
-      draggingPoints,
-      elementsMap,
-      elements,
-      appState,
-      opts,
+  const strategy = getFeatureFlag("COMPLEX_BINDINGS")
+    ? getBindingStrategyForDraggingBindingElementEndpoints_complex(
+      arrow, draggingPoints, elementsMap, elements, appState, opts,
+    )
+    : getBindingStrategyForDraggingBindingElementEndpoints_simple(
+      arrow, draggingPoints, screenPointerX, screenPointerY,
+      elementsMap, elements, appState, opts,
     );
+  // 仅普通箭头的本次单端手势：内部命中保留真实目标，只改变绑定模式。
+  // 同一目标、嵌套/重叠和折线仍沿用上游规则，不承诺自动避障。
+  if (!appState.arrowBindingOptimization || !appState.arrowBindingOptimizationActive ||
+      !isBindingEnabled(appState) || isElbowArrow(arrow) || opts?.altKey ||
+      draggingPoints.size !== 1) return strategy;
+  const startDragged = draggingPoints.has(0);
+  const endDragged = draggingPoints.has(arrow.points.length - 1);
+  if (!startDragged && !endDragged) return strategy;
+  const current = startDragged ? strategy.start : strategy.end;
+  const opposite = startDragged ? arrow.endBinding : arrow.startBinding;
+  const target = current.element;
+  // 新箭头的另一端即使拖动端在空白处，也必须跟随本次 Ctrl 状态。
+  if (opts?.newArrow && !target && opposite) {
+    const bound = elementsMap.get(opposite.elementId) as NonDeleted<ExcalidrawBindableElement> | undefined;
+    if (bound) {
+      const other: BindingStrategy = { element: bound, mode: appState.arrowBindingInside ? "inside" : "orbit", focusPoint: getGlobalFixedPointForBindableElement(opposite.fixedPoint, bound, elementsMap) };
+      return startDragged ? { ...strategy, end: other } : { ...strategy, start: other };
+    }
   }
-
-  return getBindingStrategyForDraggingBindingElementEndpoints_simple(
-    arrow,
-    draggingPoints,
-    screenPointerX,
-    screenPointerY,
-    elementsMap,
-    elements,
-    appState,
-    opts,
-  );
+  if (!target || current.mode === null) return strategy;
+  const oppositeTarget = opposite && elementsMap.get(opposite.elementId);
+  if (oppositeTarget && (oppositeTarget.id === target.id ||
+      isBindableElementInsideOtherBindable(oppositeTarget as NonDeleted<ExcalidrawBindableElement>, target, elementsMap) ||
+      isBindableElementInsideOtherBindable(target, oppositeTarget as NonDeleted<ExcalidrawBindableElement>, elementsMap))) return strategy;
+  const mode = appState.arrowBindingInside ? "inside" : "orbit";
+  const adjusted = { ...current, mode } as BindingStrategy;
+  const result = startDragged ? { ...strategy, start: adjusted } : { ...strategy, end: adjusted };
+  // 新建时从另一端的真实绑定归一模式；strategy 保持该端不变时也不能遗漏。
+  if (opts?.newArrow && opposite && oppositeTarget) {
+    const bound = oppositeTarget as NonDeleted<ExcalidrawBindableElement>;
+    const other: BindingStrategy = { element: bound, mode, focusPoint: getGlobalFixedPointForBindableElement(opposite.fixedPoint, bound, elementsMap) };
+    return startDragged ? { ...result, end: other } : { ...result, start: other };
+  }
+  return result;
 };
 
 const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
@@ -1397,6 +1422,8 @@ export const updateBoundElements = (
             element[bindingProp],
             bindableElement,
             elementsMap,
+            undefined,
+            scene.arrowBindingOptimization,
           );
 
           if (point) {
@@ -1976,6 +2003,7 @@ export const updateBoundPoint = (
   bindableElement: ExcalidrawBindableElement,
   elementsMap: ElementsMap,
   dragging?: boolean,
+  preferOutline = false,
 ): LocalPoint | null => {
   if (
     binding == null ||
@@ -2049,6 +2077,14 @@ export const updateBoundPoint = (
         pointDistanceSq(a, otherFocusPointOrArrowPoint) -
         pointDistanceSq(b, otherFocusPointOrArrowPoint),
     )[0];
+  // 常规非重叠连接有轮廓交点时，不让上游极短箭头回退到内部。
+  if (preferOutline && outlinePoint && (!otherBindable ||
+      (otherBindable.id !== bindableElement.id && !hitElementItself({
+        element: otherBindable, point: outlinePoint, elementsMap,
+        threshold: getBindingGap(otherBindable), overrideShouldTestInside: true,
+      })))) {
+    return LinearElementEditor.createPointAt(arrow, elementsMap, outlinePoint[0], outlinePoint[1], null);
+  }
   const startHasArrowhead = arrow.startArrowhead !== null;
   const endHasArrowhead = arrow.endArrowhead !== null;
   const resolvedTarget =

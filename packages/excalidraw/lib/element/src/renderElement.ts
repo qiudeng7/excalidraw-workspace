@@ -208,6 +208,7 @@ export interface ExcalidrawElementWithCanvas {
   scale: number;
   zoomValue: AppState["zoom"]["value"];
   pixelRatio: number;
+  shortArrowheads: boolean;
   canvasOffsetX: number;
   canvasOffsetY: number;
   imageCrop: ExcalidrawImageElement["crop"] | null;
@@ -332,6 +333,7 @@ const generateElementCanvas = (
     scale,
     zoomValue: zoom.value,
     pixelRatio,
+    shortArrowheads: !!renderConfig.shortArrowheads,
     canvasOffsetX,
     canvasOffsetY,
     containingFrameOpacity:
@@ -709,6 +711,7 @@ const generateElementWithCanvas = (
     // 采样倍率或设备像素密度变化时，旧位图不能继续复用。
     prevElementWithCanvas.pixelRatio !==
       (renderConfig.pixelRatio ?? window.devicePixelRatio) ||
+    prevElementWithCanvas.shortArrowheads !== !!renderConfig.shortArrowheads ||
     prevElementWithCanvas.theme !== appState.theme ||
     prevElementWithCanvas.imageCrop !== imageCrop ||
     prevElementWithCanvas.containingFrameOpacity !== containingFrameOpacity

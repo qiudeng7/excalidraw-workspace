@@ -1,19 +1,25 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
-import { createElement, Fragment, useState } from 'react'
+import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { createElement, Fragment } from 'react'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
-import { SamplingMenu, readSampling, saveSampling, type Sampling } from './canvasSampling'
-import { RenderingOptionsMenu, readRenderingOptions, saveRenderingOptions, defaultRenderingOptions } from './canvasRenderingOptions'
+import { CanvasFlagsMenu } from './CanvasFlagsMenu'
 import { createRoot, type Root } from 'react-dom/client'
 import { Excalidraw, FONT_FAMILY, MainMenu, serializeAsJSON } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
-import type { ExcalidrawProps, ExcalidrawInitialDataState } from '@excalidraw/excalidraw/types'
-import type { CanvasDocument, CanvasScene, LibraryDocument } from '../../shared/contracts'
+import type { ExcalidrawProps, ExcalidrawInitialDataState, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
+import type { CanvasDocument, CanvasScene, LibraryDocument, UserSettings } from '../../shared/contracts'
 import { PersistentResource } from '../lib/persistence'
 import { confirmDialog, isAppDialogOpen } from '../lib/dialogs'
 
-const props = defineProps<{ document: CanvasDocument; library: LibraryDocument; userId: string }>()
-const emit = defineEmits<{ 'save-state': [status: string] }>()
+const props = defineProps<{
+  document: CanvasDocument; library: LibraryDocument; userId: string
+  userSettings: UserSettings; settingsReady: boolean; settingsStatus: string; settingsError: string; settingsConfigured: boolean; settingsConflict: boolean
+}>()
+const emit = defineEmits<{
+  'save-state': [status: string]
+  'settings-change': [settings: UserSettings]
+  'settings-retry': []; 'settings-reload': []; 'settings-use-cloud': []; 'settings-keep-local': []
+}>()
 const message = ref('')
 const loading = ref(true)
 const manualSaveMessage = ref('')
@@ -75,10 +81,10 @@ function stateChanged(error?: string) {
 }
 const sceneResource = new PersistentResource<CanvasScene>(
   `${props.userId}:canvas:${props.document.id}`, `/api/canvases/${props.document.id}`, 'scene',
-  props.document.scene, props.document.revision, stateChanged,
+  props.document.scene, props.document.revision, stateChanged, undefined, props.userId,
 )
 const libraryResource = new PersistentResource<unknown[]>(
-  `${props.userId}:library`, '/api/library', 'items', props.library.items, props.library.revision, stateChanged,
+  `${props.userId}:library`, '/api/library', 'items', props.library.items, props.library.revision, stateChanged, undefined, props.userId,
 )
 async function flush() {
   await Promise.all([sceneResource.flush(), libraryResource.flush()])
@@ -114,7 +120,7 @@ const snapshot: NonNullable<ExcalidrawProps['onChange']> = (elements, appState, 
   sceneResource.update({ elements: data.elements, appState: data.appState, files: data.files })
 }
 function beforeUnload(event: BeforeUnloadEvent) {
-  if (sceneResource.dirty || libraryResource.dirty) { event.preventDefault(); event.returnValue = '' }
+  if (sceneResource.dirty || libraryResource.dirty || ['pending', 'saving', 'error', 'conflict'].includes(props.settingsStatus)) { event.preventDefault(); event.returnValue = '' }
 }
 onBeforeRouteLeave(async () => {
   try { await flush(); return true } catch { return false }
@@ -124,13 +130,36 @@ defineExpose({ flush, saveManually })
 const container = useTemplateRef<HTMLDivElement>('container')
 const router = useRouter()
 let root: Root | undefined
+let editorApi: ExcalidrawImperativeAPI | undefined
+function toolDefaults(features = props.userSettings.features) {
+  return {
+    currentItemFontFamily: features.nunitoFont ? FONT_FAMILY.Nunito : FONT_FAMILY.Excalifont,
+    currentItemRoughness: features.formalLines ? 0 : 1,
+    currentItemStrokeStyle: 'solid' as const,
+    currentItemFillStyle: 'solid' as const,
+  }
+}
+// Apply only flags that actually changed: a debug toggle must preserve the user's selected font/style.
+watch(() => [props.userSettings.features.nunitoFont, props.userSettings.features.formalLines, props.userSettings.features.solidFill], (next, previous) => {
+  if (!editorApi || next.every((value, index) => value === previous[index])) return
+  const defaults = toolDefaults(), current = editorApi.getAppState()
+  editorApi.updateScene({ appState: {
+    currentItemFontFamily: next[0] !== previous[0] ? defaults.currentItemFontFamily : current.currentItemFontFamily,
+    currentItemRoughness: next[1] !== previous[1] ? defaults.currentItemRoughness : current.currentItemRoughness,
+    currentItemStrokeStyle: next[1] !== previous[1] ? defaults.currentItemStrokeStyle : current.currentItemStrokeStyle,
+    currentItemFillStyle: next[2] !== previous[2] ? defaults.currentItemFillStyle : current.currentItemFillStyle,
+  } })
+})
+watch(() => [props.userSettings, props.settingsReady, props.settingsStatus, props.settingsError, props.settingsConfigured, props.settingsConflict], () => {
+  root?.render(createElement(CanvasEditor))
+}, { deep: true })
 
 function CanvasEditor() {
-  const [sampling, setSampling] = useState<Sampling>(readSampling)
-  const [renderingOptions, setRenderingOptions] = useState(readRenderingOptions)
   return createElement(Excalidraw, {
-    canvasSampling: sampling,
-    canvasRenderingOptions: renderingOptions,
+    canvasSampling: props.userSettings.debug.sampling,
+    canvasRenderingOptions: props.userSettings.debug.renderingOptions,
+    arrowBindingOptimization: props.userSettings.features.edgeBinding,
+    shortArrowheads: props.userSettings.features.shortArrowheads,
     langCode: 'zh-CN',
     theme: 'light',
     children: createElement(
@@ -166,45 +195,28 @@ function CanvasEditor() {
         ),
       }),
       createElement(MainMenu.Group, {
-        title: 'debug',
+        title: 'flag',
         className: 'canvas-menu-group',
-        children: createElement(Fragment, null,
-          createElement(SamplingMenu, {
-            value: sampling,
-            onChange: (value: Sampling) => {
-              setSampling(value)
-              saveSampling(value)
-            },
-          }),
-          createElement(RenderingOptionsMenu, {
-            value: renderingOptions,
-            onChange: (value) => {
-              setRenderingOptions(value)
-              saveRenderingOptions(value)
-            },
-            onReset: () => {
-              setSampling(1)
-              saveSampling(1)
-              setRenderingOptions({ ...defaultRenderingOptions })
-              saveRenderingOptions(defaultRenderingOptions)
-            },
-          }),
-        ),
+        children: createElement(CanvasFlagsMenu, {
+          settings: props.userSettings, ready: props.settingsReady,
+          configured: props.settingsConfigured, status: props.settingsStatus, error: props.settingsError, conflict: props.settingsConflict,
+          onChange: settings => emit('settings-change', settings),
+          onRetry: () => emit('settings-retry'), onReload: () => emit('settings-reload'),
+          onUseCloud: () => emit('settings-use-cloud'), onKeepLocal: () => emit('settings-keep-local'),
+        }),
       }),
     ),
     initialData: {
       ...sceneResource.value,
       appState: {
-        currentItemFontFamily: FONT_FAMILY.Nunito,
-        currentItemRoughness: 0,
-        currentItemStrokeStyle: 'solid',
-        currentItemFillStyle: 'solid',
-        currentItemStrokeWidthKey: 'medium',
         ...sceneResource.value.appState,
+        ...toolDefaults(),
       },
       libraryItems: libraryResource.value,
     } as ExcalidrawInitialDataState,
     onInitialize: (editor) => {
+      editorApi = editor
+      editor.updateScene({ appState: toolDefaults() })
       sceneFingerprint = serializeAsJSON(editor.getSceneElements(), editor.getAppState(), editor.getFiles(), 'local')
       libraryFingerprint = JSON.stringify(libraryResource.value)
       active = true
@@ -250,6 +262,7 @@ onBeforeUnmount(() => {
   libraryResource.dispose()
   root?.unmount()
   root = undefined
+  editorApi = undefined
 })
 </script>
 
@@ -275,6 +288,8 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.canvas-host :deep(.canvas-flags){width:100%;box-sizing:border-box}.canvas-host :deep(.flag-submenu-toggle){display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 0;border:0;background:none;font:inherit;color:inherit;cursor:pointer}.canvas-host :deep(.flag-submenu-toggle span){color:var(--color-gray-60)}.canvas-host :deep(.flag-submenu-content){padding:3px 0 9px}.canvas-host :deep(.flag-feature-row){position:relative;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;font-size:12px}.canvas-host :deep(.flag-feature-row>label){display:flex;align-items:center;justify-content:space-between;gap:10px;flex:1;min-width:0}.canvas-host :deep(.flag-help){display:contents}.canvas-host :deep(.flag-help-button){display:grid;place-items:center;width:17px;height:17px;border:1px solid var(--default-border-color);border-radius:50%;background:none;color:var(--color-gray-60);font-size:11px;cursor:pointer}.canvas-host :deep(.flag-tooltip){position:absolute;top:100%;left:0;z-index:10;pointer-events:none;display:none;width:100%;padding:8px;box-sizing:border-box;border-radius:4px;background:var(--island-bg-color);border:1px solid var(--default-border-color);box-shadow:0 4px 12px #0002;color:var(--color-gray-70);font-size:11px;line-height:1.6}.canvas-host :deep(.flag-help:hover .flag-tooltip),.canvas-host :deep(.flag-help:focus-within .flag-tooltip),.canvas-host :deep(.flag-help.open .flag-tooltip){display:block}.canvas-host :deep(.flag-save-status){display:flex;flex-direction:column;gap:6px;padding-top:9px;border-top:1px solid var(--default-border-color);font-size:11px;color:var(--color-gray-60)}.canvas-host :deep(.flag-save-status small){font-size:11px;line-height:1.5}.canvas-host :deep(.flag-action){border:1px solid var(--default-border-color);border-radius:4px;background:var(--island-bg-color);color:inherit;padding:5px 7px;font:inherit;font-size:11px;text-align:left;cursor:pointer}.canvas-host :deep(.flag-conflict-actions){display:flex;gap:5px;flex-wrap:wrap}
+
 .canvas-editor-shell { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .manual-save-feedback { position: absolute; z-index: 30; top: 16px; left: 50%; transform: translateX(-50%); padding: 10px 16px; border: 1px solid #d9e5dc; border-radius: 10px; background: #f3faf5; color: #246139; font-size: 13px; box-shadow: 0 4px 16px #0001; pointer-events: none; max-width: calc(100% - 48px); }
 .manual-save-feedback.failed { background: #fff1f0; color: #b42318; border-color: #f3c2bc; }

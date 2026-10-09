@@ -59,3 +59,53 @@ export interface CanvasCatalog {
   canvases: CanvasMeta[];
   catalogRevision: number;
 }
+
+export interface UserSettings {
+  version: 1;
+  features: {
+    edgeBinding: boolean;
+    nunitoFont: boolean;
+    formalLines: boolean;
+    solidFill: boolean;
+    shortArrowheads: boolean;
+  };
+  debug: {
+    sampling: 1 | 1.5 | 2;
+    renderingOptions: {
+      smoothCache: boolean;
+      highQualitySmoothing: boolean;
+      directText: boolean;
+      directShapes: boolean;
+      alignPixels: boolean;
+      smoothCanvas: boolean;
+    };
+  };
+}
+export interface UserSettingsDocument {
+  settings: UserSettings;
+  revision: number;
+  configured: boolean;
+}
+export function createDefaultUserSettings(): UserSettings {
+  return {
+    version: 1,
+    features: {
+      edgeBinding: true,
+      nunitoFont: true,
+      formalLines: true,
+      solidFill: true,
+      shortArrowheads: true,
+    },
+    debug: {
+      sampling: 1,
+      renderingOptions: {
+        smoothCache: false,
+        highQualitySmoothing: false,
+        directText: false,
+        directShapes: false,
+        alignPixels: false,
+        smoothCanvas: false,
+      },
+    },
+  };
+}

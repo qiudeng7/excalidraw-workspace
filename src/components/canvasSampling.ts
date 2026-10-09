@@ -5,7 +5,7 @@ export type Sampling = 1 | 1.5 | 2
 const storageKey = 'excalidraw-demo:canvas-sampling'
 const normalize = (value: number): Sampling => value === 1.5 || value === 2 ? value : 1
 
-export function readSampling(): Sampling {
+export function readLegacySampling(): Sampling {
   try {
     return normalize(Number(localStorage.getItem(storageKey)))
   } catch {
@@ -13,21 +13,15 @@ export function readSampling(): Sampling {
   }
 }
 
-export function saveSampling(value: Sampling) {
-  try {
-    localStorage.setItem(storageKey, String(value))
-  } catch {
-    // 浏览器禁用存储时，当前页面仍可调整倍率。
-  }
-}
-
-export function SamplingMenu({ value, onChange }: {
+export function SamplingMenu({ value, onChange, disabled = false }: {
   value: Sampling
   onChange: (value: Sampling) => void
+  disabled?: boolean
 }) {
   const select = createElement('select', {
     'aria-label': '采样倍率',
     value,
+    disabled,
     title: '提高屏幕渲染精度，不改变画布缩放或图片导出尺寸；倍率越高，内存和渲染开销越大。',
     style: {
       marginInlineStart: 'auto',

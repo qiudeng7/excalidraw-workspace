@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onBeforeRouteLeave } from 'vue-router'
+import { createUserSettingsResource, type UserSettingsResource } from '../lib/userSettings'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import AccountGate from '../components/AccountGate.vue'
 import QuietIcon from '../components/QuietIcon.vue'
@@ -8,6 +10,26 @@ import type { Bootstrap, User, Workspace, CanvasMeta, CanvasDocument, LibraryDoc
 
 const bootstrap = ref<Bootstrap>()
 const user = ref<User | null>(null)
+const settingsResource = shallowRef<UserSettingsResource>()
+let accountGeneration = 0
+async function loadAccountSettings(account: User) {
+  const capturedGeneration = ++accountGeneration
+  settingsResource.value?.dispose()
+  const resource = createUserSettingsResource(account.id, () => accountGeneration === capturedGeneration && user.value?.id === account.id)
+  settingsResource.value = resource
+  await resource.load()
+}
+async function flushSettings() {
+  if (settingsResource.value && !await settingsResource.value.flush()) throw new Error('设置尚未同步，请在 flag 菜单处理设置提示后再退出或跳转。')
+}
+function protectUnsavedSettings(event: BeforeUnloadEvent) {
+  if (settingsResource.value && ['pending', 'saving', 'error', 'conflict'].includes(settingsResource.value.state.status)) { event.preventDefault(); event.returnValue = '' }
+}
+function disposeSettings() {
+  accountGeneration++
+  settingsResource.value?.dispose()
+  settingsResource.value = undefined
+}
 const workspaces = ref<Workspace[]>([])
 const canvases = ref<CanvasMeta[]>([])
 const workspaceId = ref('')
@@ -98,9 +120,10 @@ async function run(action: () => Promise<void>) {
 }
 async function flush() { await editor.value?.flush() }
 async function loadCanvas(id: string) {
+  const owner = user.value!.id
   const [canvasData, libraryData] = await Promise.all([
     api<{ canvas: CanvasDocument }>(`/api/canvases/${id}`),
-    api<LibraryDocument>('/api/library'),
+    api<LibraryDocument>('/api/library', { headers: { 'X-Resource-Owner': owner } }),
   ])
   library.value = libraryData
   document.value = canvasData.canvas
@@ -238,7 +261,7 @@ async function initialize() {
     if (!bootstrap.value.needsSetup) {
       const session = await api<{ user: User | null }>('/api/session')
       user.value = session.user
-      if (user.value) await loadWorkspaces()
+      if (user.value) { await loadAccountSettings(user.value); await loadWorkspaces() }
     }
   } catch (cause) { error.value = cause instanceof Error ? cause.message : '无法连接服务' }
   finally { starting.value = false }
@@ -247,6 +270,7 @@ async function authenticated(account: User) {
   user.value = account
   await run(async () => {
     bootstrap.value = await api<Bootstrap>('/api/bootstrap')
+    await loadAccountSettings(account)
     await loadWorkspaces()
   })
 }
@@ -337,9 +361,11 @@ async function deleteCanvas(canvas: CanvasMeta) {
 async function logout() {
   await run(async () => {
     await flush()
+    await flushSettings()
     await api('/api/logout', { method: 'POST', body: '{}' })
     document.value = undefined
     library.value = undefined
+    disposeSettings()
     user.value = null
     workspaces.value = []
     canvases.value = []
@@ -369,12 +395,20 @@ function closeActionMenu(event: MouseEvent) {
 }
 onMounted(() => {
   void initialize()
+  window.addEventListener('beforeunload', protectUnsavedSettings)
   window.document.addEventListener('pointerdown', dismissWorkspaceMenu)
   window.document.addEventListener('keydown', escapeWorkspaceMenu)
 })
+onBeforeRouteLeave(async () => {
+  if (!user.value) return true
+  try { await flush(); await flushSettings(); return true }
+  catch (cause) { error.value = cause instanceof Error ? cause.message : '尚未保存，暂时无法跳转。'; return false }
+})
 onBeforeUnmount(() => {
+  disposeSettings()
   cancelAppDialog()
   cancelDrag()
+  window.removeEventListener('beforeunload', protectUnsavedSettings)
   window.document.removeEventListener('pointerdown', dismissWorkspaceMenu)
   window.document.removeEventListener('keydown', escapeWorkspaceMenu)
 })
@@ -420,13 +454,16 @@ onBeforeUnmount(() => {
       <div v-if="navigationNotice" class="navigation-notice" role="status"><span>{{ navigationNotice }}</span><button class="icon-button" aria-label="关闭最近位置提示" @click="navigationNotice = ''"><QuietIcon name="close" :size="16" /></button></div>
       <div v-if="directoryStale" class="operation-error" role="alert"><span>画布列表尚未确认，目录操作已暂停。</span><button :disabled="busy" @click="run(refreshDirectory)">重新加载列表</button></div>
       <div v-if="error" class="operation-error" role="alert"><span>{{ error }}</span><button v-if="!document" :disabled="directoryLocked" @click="run(loadWorkspaces)">重新加载</button><button class="icon-button" aria-label="关闭提示" @click="error = ''"><QuietIcon name="close" :size="16" /></button></div>
-      <div v-if="document && library" class="draw-editor" :inert="busy"><ExcalidrawCanvas :key="document.id" ref="editor" :document="document" :library="library" :user-id="user.id" @save-state="saveState = $event" /></div>
+      <div v-if="settingsResource && ['unavailable', 'error', 'conflict'].includes(settingsResource.state.status)" class="settings-notice" role="alert"><span>{{ settingsResource.state.error }}</span><button v-if="!settingsResource.state.cloudConflict" @click="settingsResource.retry()">{{ settingsResource.state.ready ? '重试同步设置' : '重新读取设置' }}</button><template v-else><button @click="settingsResource.useCloud()">采用云端设置</button><button @click="settingsResource.keepLocal()">保存当前设置</button></template></div>
+      <div v-if="document && library && settingsResource" class="draw-editor" :inert="busy"><ExcalidrawCanvas :key="`${user.id}:${document.id}`" ref="editor" :document="document" :library="library" :user-id="user.id" :user-settings="settingsResource.state.settings" :settings-ready="settingsResource.state.ready" :settings-status="settingsResource.state.status" :settings-error="settingsResource.state.error" :settings-configured="settingsResource.state.configured" :settings-conflict="!!settingsResource.state.cloudConflict" @settings-change="settingsResource.update($event)" @settings-retry="settingsResource.retry()" @settings-reload="settingsResource.load()" @settings-use-cloud="settingsResource.useCloud()" @settings-keep-local="settingsResource.keepLocal()" @save-state="saveState = $event" /></div>
       <div v-else class="loading"><template v-if="busy">正在加载画布…</template><template v-else-if="!workspaces.length"><p>创建工作空间，开始整理你的画布。</p><button class="empty-create" :disabled="interactionLocked" @click="createWorkspace">新建工作空间</button></template><template v-else-if="!canvases.length"><p>这个工作空间还没有画布。</p><button class="empty-create" :disabled="directoryLocked" @click="createCanvas">新建画布</button></template><template v-else><p>暂时无法加载画布，请重试。</p><button :disabled="directoryLocked" @click="run(loadWorkspaces)">重新加载</button></template></div>
     </div>
   </section>
 </template>
 
 <style scoped>
+.settings-notice{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;background:#fff5e7;color:#786342;font-size:12px}.settings-notice span{flex:1}.settings-notice button{border:1px solid #e0d1b8;background:#fff}
+
 .drag-handle{display:grid;place-items:center;flex:none;width:18px;height:30px;padding:0!important;color:#a3ac9c;touch-action:none;cursor:grab}.drag-handle svg{width:12px;height:16px}.drag-handle:active{cursor:grabbing}.canvas-list li.dragging{opacity:.5}.canvas-list li.drop-target{box-shadow:inset 0 -2px #7d9277}.canvas-name{padding-left:5px!important}.sidebar-empty{padding:0 8px;color:#919b8a;font-size:11px}.navigation-notice{display:flex;align-items:center;gap:8px;background:#f3f5ef;padding:8px 16px;font-size:12px;color:#687660}.navigation-notice span{flex:1}.empty-create{padding:10px 18px;background:#354237;color:#fff}.empty-create:hover{background:#455545}
 
 .draw-page{--text:#303632;--muted:#8d958d;--line:#e9ece7;position:relative;flex:1;min-height:0;display:flex;overflow:hidden;background:#fff;color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.draw-content{position:relative;isolation:isolate;flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}.draw-editor{flex:1;min-height:0}.loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-size:13px;color:#7c857c}.loading-mark{width:18px;height:18px;border:2px solid #e7ece5;border-top-color:#546653;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.workspace-sidebar{box-sizing:border-box;flex:none;width:248px;display:flex;flex-direction:column;padding:0 14px;background:#f8f9f6;border-right:1px solid var(--line);z-index:20;overflow:auto}.sidebar-heading{display:flex;align-items:center;justify-content:space-between;height:68px;flex:none;padding:0 4px}.workspace-brand{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;letter-spacing:.03em}.brand-symbol{display:grid;place-items:center;width:28px;height:28px;background:#354237;color:#fff;border-radius:6px}.workspace-controls{margin-top:15px;margin-bottom:24px}.section-label,.canvas-heading{display:flex;align-items:center;justify-content:space-between;color:#727d70;font-size:11px;letter-spacing:.04em}.section-label{padding:0 8px;margin-bottom:8px}.section-label strong{font-weight:500}.workspace-picker{position:relative}.workspace-select-wrap{display:flex;align-items:center;gap:8px;box-sizing:border-box;width:100%;padding:0 11px;height:38px;border:1px solid #e1e6df;border-radius:6px;background:white;color:#707a6f;text-align:left}.workspace-select-wrap>svg{flex:none}.workspace-select-wrap>span{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px;color:#414b40}.workspace-select-wrap:hover{background:#fcfdfb;border-color:#cad4c5}.workspace-select-wrap.expanded{border-color:#8b9d88;box-shadow:0 0 0 2px #84937d12}.workspace-chevron{width:12px;height:12px;transition:transform .15s}.expanded .workspace-chevron{transform:rotate(180deg)}.workspace-options{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:37;box-sizing:border-box;margin:0;padding:4px;list-style:none;background:#fff;border:1px solid #e0e5dc;border-radius:7px;box-shadow:0 6px 24px #26302516;max-height:min(280px,calc(100dvh - 180px));overflow-y:auto;outline:none;overscroll-behavior:contain}.workspace-options li{display:flex;align-items:center;gap:8px;padding:10px 8px;border-radius:4px;color:#747f6d;font-size:12px;cursor:pointer}.workspace-options li>svg{flex:none}.workspace-options li>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#53604c}.workspace-options li.active{background:#eff3eb}.workspace-options li.chosen>span{font-weight:500;color:#34432e}.workspace-options:focus-visible li.active{box-shadow:inset 0 0 0 1px #d3dec9}.workspace-options li[aria-disabled="true"]{opacity:.5;cursor:wait}.canvas-heading{padding:0 8px;margin-bottom:7px}.count{margin-left:5px;color:#b0b7ad;font-size:10px}.canvas-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px;flex:1;min-height:110px}.canvas-list li{display:flex;align-items:center;border-radius:5px;min-height:37px;padding-right:3px;color:#7c867a}.canvas-list li:hover{background:#eff2ec}.canvas-list .selected{background:#e9eee5;color:#34432e}.canvas-name{display:flex;align-items:center;gap:9px;flex:1;min-width:0;text-align:left;padding:10px 10px!important;font-size:13px!important;background:none!important}.canvas-name svg{flex:none}.canvas-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.canvas-menu{flex:none;color:#9ca496}.action-menu{position:relative}.action-menu summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:4px;outline:none}.action-menu summary::-webkit-details-marker{display:none}.action-menu summary:hover,.action-menu[open] summary{background:#e4e9e0;color:#45513f}.action-menu summary:focus-visible{outline:2px solid #7d9277;outline-offset:1px}.action-menu[open]{z-index:35}.menu-popover{position:absolute;right:0;top:30px;min-width:158px;padding:4px;background:white;border:1px solid #e0e5dc;box-shadow:0 6px 24px #26302516;border-radius:7px;z-index:36}.menu-popover button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 8px;font-size:11px;white-space:nowrap}.menu-popover .danger{color:#a26355}.sidebar-bottom{margin-top:26px;flex:none}.admin-settings{padding:16px 0 19px;border-top:1px solid var(--line)}.admin-badge{font-size:8px;letter-spacing:.09em;color:#969f91}.registration-switch{display:flex;align-items:center;gap:8px;padding:4px 8px 0;font-size:12px;cursor:pointer}.registration-switch>span:first-child{display:flex;flex:1;flex-direction:column;gap:5px}.registration-switch small{font-size:10px;color:#7f8c77}.registration-switch input{position:absolute;opacity:0;width:1px;height:1px;clip-path:inset(50%)}.switch-track{flex:none;width:28px;height:16px;border-radius:10px;background:#d5ddcf;position:relative;pointer-events:none}.switch-track::after{content:'';position:absolute;width:12px;height:12px;top:2px;left:2px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px #0002}.registration-switch input:checked+.switch-track{background:#617a56}.registration-switch input:checked+.switch-track::after{transform:translateX(12px)}.registration-switch input:focus-visible+.switch-track{outline:2px solid #617a56;outline-offset:3px}.registration-switch input:disabled+.switch-track{opacity:.5}.account-info{display:flex;align-items:center;gap:9px;padding:17px 5px;border-top:1px solid var(--line)}.avatar{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:50%;background:#e4e9df;color:#63755a;font-size:11px;font-weight:600}.account-text{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}.account-text strong,.account-text small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.account-text strong{font-size:12px;font-weight:500}.account-text small{font-size:10px;color:#7e8975}.canvas-header{display:flex;align-items:center;gap:12px;flex:none;height:51px;box-sizing:border-box;padding:0 20px 0 13px;border-bottom:1px solid var(--line);color:#7f887b}.breadcrumb{display:flex;align-items:center;gap:10px;font-size:12px;min-width:0;flex:1}.workspace-crumb{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:200px;color:#829078}.crumb-divider{color:#ccd2c8}.document-name{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:#475340;font-weight:500}.header-right{display:flex;align-items:center;gap:18px;flex:none}.save-state{display:flex;align-items:center;gap:6px;font-size:11px;color:#7a8871}.status-dot{width:4px;height:4px;border-radius:50%;background:#c9b682}.saved .status-dot{background:#78996a}.save-button{display:flex;align-items:center;gap:6px;font-size:10px!important;color:#7b8971!important}.save-button kbd{font-family:inherit;font-size:9px;color:#b0b8a8;padding-left:5px}.icon-button{display:grid;place-items:center;width:27px;height:27px;flex:none;padding:0!important;color:#919b8a!important}.sidebar-toggle{color:#7e8b76!important}button{cursor:pointer;border:0;background:transparent;border-radius:4px;padding:6px 9px;font:inherit;color:inherit}button:hover{background:#eef1eb}button:disabled{opacity:.45;cursor:wait}button:focus-visible{outline:2px solid #7d9277;outline-offset:2px}.operation-error{padding:10px 16px;background:#fff4ee;color:#a05d4b;font-size:12px;display:flex;align-items:center;gap:8px}.operation-error span{flex:1}.sidebar-backdrop{display:none}@media(max-width:1000px){.header-right{gap:10px}.save-button kbd{display:none}.workspace-crumb{max-width:120px}}@media(max-width:760px){.workspace-sidebar{position:absolute;inset:0 auto 0 0;width:min(280px,85vw);box-shadow:8px 0 24px #0002;z-index:40}.sidebar-backdrop{display:block;position:absolute;inset:0;border:0;border-radius:0;background:#202a2345;z-index:39}.canvas-header{padding-inline:10px;height:47px;gap:8px}.workspace-crumb,.crumb-divider{display:none}.header-right{gap:6px}.save-state{max-width:90px;overflow:hidden;white-space:nowrap;font-size:9px}.save-button{padding:5px}.save-button span{display:none}.menu-popover{max-width:200px}.account-info{padding-bottom:calc(17px + env(safe-area-inset-bottom))}}
