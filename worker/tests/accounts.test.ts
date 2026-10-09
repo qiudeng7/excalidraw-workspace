@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import ts from "typescript";
 import { Miniflare } from "miniflare";
 test("accounts, first administrator, owner isolation, revisions and registration settings", async () => {
@@ -35,11 +35,17 @@ test("accounts, first administrator, owner isolation, revisions and registration
   });
   try {
     const db = await mf.getD1Database("DB");
-    const migration = await readFile(
-      new URL("../../migrations/0001_accounts.sql", import.meta.url),
-      "utf8",
-    );
-    await db.exec(migration.replace(/\n/g, " "));
+    for (const file of (
+      await readdir(new URL("../../migrations/", import.meta.url))
+    )
+      .filter((file) => file.endsWith(".sql"))
+      .sort()) {
+      const migration = await readFile(
+        new URL(`../../migrations/${file}`, import.meta.url),
+        "utf8",
+      );
+      await db.exec(migration.replace(/^--.*$/gm, "").replace(/\n/g, " "));
+    }
     const request = async (
       path: string,
       method = "GET",

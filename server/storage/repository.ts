@@ -1,4 +1,4 @@
-import type { User, CanvasMeta } from "../../shared/contracts";
+import type { User, CanvasMeta, Navigation } from "../../shared/contracts";
 export type Row = Record<string, any>;
 export interface Statement {
   sql: string;
@@ -25,9 +25,10 @@ export interface ObjectStore {
     cursor?: string;
   }>;
 }
-const wc = "id,name,created_at AS createdAt,updated_at AS updatedAt";
+const wc =
+  "id,name,catalog_revision AS catalogRevision,created_at AS createdAt,updated_at AS updatedAt";
 const cc =
-  "c.id,c.workspace_id AS workspaceId,c.name,c.revision,c.created_at AS createdAt,c.updated_at AS updatedAt";
+  "c.id,c.workspace_id AS workspaceId,c.name,c.revision,c.position,c.created_at AS createdAt,c.updated_at AS updatedAt";
 export class Repository {
   constructor(private sql: SqlDriver) {}
   private async one(sql: string, ...values: unknown[]) {
@@ -120,6 +121,10 @@ export class Repository {
         sql: "INSERT INTO libraries(user_id,updated_at) SELECT id,? FROM users WHERE id=?",
         values: [now, user.id],
       },
+      {
+        sql: "INSERT INTO user_navigation(user_id) SELECT id FROM users WHERE id=?",
+        values: [user.id],
+      },
     ]);
     return result[0]!.changes;
   }
@@ -198,26 +203,29 @@ export class Repository {
   }
   canvases(workspace: string) {
     return this.all(
-      `SELECT ${cc} FROM canvases c WHERE c.workspace_id=? ORDER BY c.created_at,c.id`,
+      `SELECT ${cc} FROM canvases c WHERE c.workspace_id=? ORDER BY c.position,c.id`,
       workspace,
     );
   }
-  createCanvas(
+  async createCanvas(
     id: string,
     workspace: string,
     user: string,
     name: string,
     now: string,
+    catalogRevision: number,
   ) {
-    return this.run(
-      "INSERT INTO canvases(id,workspace_id,name,created_at,updated_at) SELECT ?,id,?,?,? FROM workspaces WHERE id=? AND user_id=?",
-      id,
-      name,
-      now,
-      now,
-      workspace,
-      user,
-    );
+    const result = await this.sql.transaction([
+      {
+        sql: "INSERT INTO canvases(id,workspace_id,name,position,created_at,updated_at) SELECT ?,w.id,?,COALESCE((SELECT MAX(position)+1 FROM canvases WHERE workspace_id=w.id),0),?,? FROM workspaces w WHERE w.id=? AND w.user_id=? AND w.catalog_revision=?",
+        values: [id, name, now, now, workspace, user, catalogRevision],
+      },
+      {
+        sql: "UPDATE workspaces SET catalog_revision=catalog_revision+1 WHERE id=? AND user_id=? AND catalog_revision=?",
+        values: [workspace, user, catalogRevision],
+      },
+    ]);
+    return result[1]!.changes;
   }
   renameCanvas(id: string, user: string, name: string, now: string) {
     return this.run(
@@ -228,13 +236,90 @@ export class Repository {
       user,
     );
   }
-  async deleteCanvas(id: string, user: string) {
-    const r = await this.one(
-      "DELETE FROM canvases WHERE id=? AND workspace_id IN (SELECT id FROM workspaces WHERE user_id=?) RETURNING object_key",
-      id,
-      user,
-    );
-    return r?.object_key as string | null;
+  async deleteCanvas(
+    id: string,
+    user: string,
+    workspace: string,
+    catalogRevision: number,
+  ) {
+    const result = await this.sql.transaction([
+      {
+        sql: "DELETE FROM canvases WHERE id=? AND workspace_id=? AND EXISTS(SELECT 1 FROM workspaces WHERE id=? AND user_id=? AND catalog_revision=?) RETURNING object_key",
+        values: [id, workspace, workspace, user, catalogRevision],
+      },
+      {
+        sql: "UPDATE workspaces SET catalog_revision=catalog_revision+1 WHERE id=? AND user_id=? AND catalog_revision=?",
+        values: [workspace, user, catalogRevision],
+      },
+    ]);
+    return {
+      changed: result[1]!.changes,
+      objectKey: result[0]!.rows[0]?.object_key as string | null | undefined,
+    };
+  }
+  async reorderCanvases(
+    workspace: string,
+    user: string,
+    ids: string[],
+    revision: number,
+  ) {
+    const statements: Statement[] = ids.map((id, position) => ({
+      sql: "UPDATE canvases SET position=? WHERE id=? AND workspace_id=? AND EXISTS(SELECT 1 FROM workspaces WHERE id=? AND user_id=? AND catalog_revision=?)",
+      values: [position, id, workspace, workspace, user, revision],
+    }));
+    statements.push({
+      sql: "UPDATE workspaces SET catalog_revision=catalog_revision+1 WHERE id=? AND user_id=? AND catalog_revision=?",
+      values: [workspace, user, revision],
+    });
+    const result = await this.sql.transaction(statements);
+    return result[result.length - 1]!.changes;
+  }
+  async canvasCatalog(workspace: string, user: string) {
+    const result = await this.sql.transaction([
+      {
+        sql: "SELECT catalog_revision AS catalogRevision FROM workspaces WHERE id=? AND user_id=?",
+        values: [workspace, user],
+      },
+      {
+        sql: `SELECT ${cc} FROM canvases c JOIN workspaces w ON w.id=c.workspace_id WHERE w.id=? AND w.user_id=? ORDER BY c.position,c.id`,
+        values: [workspace, user],
+      },
+    ]);
+    const row = result[0]!.rows[0];
+    return row
+      ? {
+          catalogRevision: row.catalogRevision as number,
+          canvases: result[1]!.rows,
+        }
+      : null;
+  }
+  async navigation(user: string): Promise<Navigation> {
+    const result = await this.sql.transaction([
+      {
+        sql: "SELECT revision,last_workspace_id AS lastWorkspaceId,last_canvas_id AS lastCanvasId FROM user_navigation WHERE user_id=?",
+        values: [user],
+      },
+      {
+        sql: "SELECT workspace_id AS workspaceId,last_canvas_id AS lastCanvasId FROM workspace_navigation WHERE user_id=? ORDER BY workspace_id",
+        values: [user],
+      },
+    ]);
+    const row = result[0]!.rows[0];
+    if (!row) throw new Error("Navigation row missing");
+    return { ...row, workspaces: result[1]!.rows } as Navigation;
+  }
+  async recordNavigation(user: string, canvas: string, revision: number) {
+    const result = await this.sql.transaction([
+      {
+        sql: "INSERT INTO workspace_navigation(user_id,workspace_id,last_canvas_id) SELECT ?,c.workspace_id,c.id FROM canvases c JOIN workspaces w ON w.id=c.workspace_id JOIN user_navigation n ON n.user_id=w.user_id WHERE c.id=? AND w.user_id=? AND n.revision=? ON CONFLICT(user_id,workspace_id) DO UPDATE SET last_canvas_id=excluded.last_canvas_id",
+        values: [user, canvas, user, revision],
+      },
+      {
+        sql: "UPDATE user_navigation SET last_workspace_id=(SELECT workspace_id FROM canvases WHERE id=?),last_canvas_id=?,revision=revision+1 WHERE user_id=? AND revision=? AND EXISTS(SELECT 1 FROM canvases c JOIN workspaces w ON w.id=c.workspace_id WHERE c.id=? AND w.user_id=?)",
+        values: [canvas, canvas, user, revision, canvas, user],
+      },
+    ]);
+    return result[1]!.changes;
   }
   library(user: string): Promise<{
     revision: number;

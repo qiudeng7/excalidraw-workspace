@@ -297,6 +297,59 @@ async function api(req: Request, env: Env, ctx: ExecutionContext) {
     const settings = await env.repository.registration();
     return json({ registrationEnabled: !!settings?.registration_enabled });
   }
+  if (path === "/api/navigation") {
+    if (method === "GET") return json(await env.repository.navigation(user.id));
+    if (method === "PUT") {
+      const data = await body(req);
+      const revision = validRevision(data.revision);
+      if (typeof data.canvasId !== "string")
+        return fail(400, "INVALID_NAVIGATION", "请选择有效画布");
+      await canvas(env, data.canvasId, user);
+      if (
+        !(await env.repository.recordNavigation(
+          user.id,
+          data.canvasId,
+          revision,
+        ))
+      )
+        return fail(
+          409,
+          "NAVIGATION_CONFLICT",
+          "当前画布已打开，最近位置未更新，请读取最新版本",
+        );
+      return json(await env.repository.navigation(user.id));
+    }
+    return fail(405, "METHOD_NOT_ALLOWED", "请求方法不支持");
+  }
+  const orderMatch = path.match(/^\/api\/workspaces\/([^/]+)\/canvas-order$/);
+  if (orderMatch) {
+    const id = orderMatch[1]!;
+    await workspace(env, id, user);
+    if (method !== "PUT")
+      return fail(405, "METHOD_NOT_ALLOWED", "请求方法不支持");
+    const data = await body(req);
+    const revision = validRevision(data.catalogRevision);
+    const ids = data.canvasIds;
+    const catalog = await env.repository.canvasCatalog(id, user.id);
+    if (!catalog) return fail(404, "NOT_FOUND", "工作区不存在");
+    if (catalog.catalogRevision !== revision)
+      return fail(409, "CATALOG_CONFLICT", "列表已在其他页面更新，请重新排序");
+    if (
+      !Array.isArray(ids) ||
+      ids.some((id) => typeof id !== "string") ||
+      new Set(ids).size !== ids.length ||
+      ids.length !== catalog.canvases.length ||
+      ids.some((id) => !catalog.canvases.some((canvas) => canvas.id === id))
+    )
+      return fail(
+        400,
+        "INVALID_CANVAS_ORDER",
+        "画布顺序必须包含该空间所有画布且不可重复",
+      );
+    if (!(await env.repository.reorderCanvases(id, user.id, ids, revision)))
+      return fail(409, "CATALOG_CONFLICT", "列表已在其他页面更新，请重新排序");
+    return json(await env.repository.canvasCatalog(id, user.id));
+  }
   if (path === "/api/workspaces") {
     if (method === "GET")
       return json({ workspaces: await env.repository.workspaces(user.id) });
@@ -311,22 +364,35 @@ async function api(req: Request, env: Env, ctx: ExecutionContext) {
   const wsMatch = path.match(/^\/api\/workspaces\/([^/]+)(\/canvases)?$/);
   if (wsMatch) {
     const id = wsMatch[1]!;
-    await workspace(env, id, user);
+    const ws = await workspace(env, id, user);
     if (wsMatch[2]) {
       if (method === "GET")
-        return json({ canvases: await env.repository.canvases(id) });
+        return json(await env.repository.canvasCatalog(id, user.id));
       if (method === "POST") {
         const data = await body(req);
         const canvasId = crypto.randomUUID();
         const now = new Date().toISOString();
-        await env.repository.createCanvas(
+        const revision = validRevision(
+          data.catalogRevision ?? ws.catalogRevision,
+        );
+        const changed = await env.repository.createCanvas(
           canvasId,
           id,
           user.id,
           name(data.name, "未命名画布"),
           now,
+          revision,
         );
-        return json({ canvas: meta(await canvas(env, canvasId, user)) });
+        if (!changed)
+          return fail(
+            409,
+            "CATALOG_CONFLICT",
+            "列表已在其他页面更新，请重新加载",
+          );
+        return json({
+          canvas: meta(await canvas(env, canvasId, user)),
+          catalogRevision: revision + 1,
+        });
       }
     } else {
       if (method === "PATCH") {
@@ -385,9 +451,26 @@ async function api(req: Request, env: Env, ctx: ExecutionContext) {
       return json({ canvas: meta(await canvas(env, id, user)) });
     }
     if (method === "DELETE") {
-      const key = await env.repository.deleteCanvas(id, user.id);
-      if (key) ctx.waitUntil(env.objects.delete([key]));
-      return json({});
+      const ws = await workspace(env, row.workspaceId, user);
+      const data = req.body ? await body(req) : {};
+      const revision = validRevision(
+        data.catalogRevision ?? ws.catalogRevision,
+      );
+      const result = await env.repository.deleteCanvas(
+        id,
+        user.id,
+        row.workspaceId,
+        revision,
+      );
+      if (!result.changed)
+        return fail(
+          409,
+          "CATALOG_CONFLICT",
+          "列表已在其他页面更新，请重新加载",
+        );
+      if (result.objectKey)
+        ctx.waitUntil(env.objects.delete([result.objectKey]));
+      return json({ catalogRevision: revision + 1 });
     }
     if (method === "PUT") {
       const data = await body(req);
@@ -451,6 +534,11 @@ async function api(req: Request, env: Env, ctx: ExecutionContext) {
     }
   }
   return fail(404, "NOT_FOUND", "接口不存在");
+}
+function validRevision(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0)
+    return fail(400, "INVALID_REVISION", "版本号无效");
+  return value as number;
 }
 async function saveSnapshot(
   env: Env,

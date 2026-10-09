@@ -19,15 +19,22 @@ let local:
 let lastCloudflareSweep = 0;
 export default defineEventHandler(async (event) => {
   try {
-    const request = toWebRequest(event);
     const cf = event.context.cloudflare as
       | {
           env: CloudflareBindings;
+          request?: Request;
           context?: {
             waitUntil(p: Promise<unknown>): void;
           };
         }
       | undefined;
+    // Nitro 2's Cloudflare adapter buffers only POST/PUT/PATCH. Its virtual Node
+    // stream never ends for DELETE bodies; read the untouched platform request.
+    // Other methods must use the reconstructed request because Nitro consumed them.
+    const request =
+      event.method === "DELETE" && cf?.request
+        ? cf.request
+        : toWebRequest(event);
     if (cf) {
       if (!cf.env?.DB || !cf.env.DATA)
         throw new Error("Missing Cloudflare storage bindings");
