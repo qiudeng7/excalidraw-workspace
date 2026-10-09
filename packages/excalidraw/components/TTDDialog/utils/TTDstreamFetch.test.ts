@@ -22,6 +22,7 @@ function createMockStream(chunks: string[]): ReadableStream<Uint8Array> {
 
 const createContentChunkData = (delta: string): string => {
   const data: StreamChunk & { type: "content" } = { type: "content", delta };
+
   return JSON.stringify(data);
 };
 
@@ -161,6 +162,7 @@ describe("TTDStreamFetch", () => {
       const mockChunks = [createContentChunk("test"), DONE_CHUNK];
 
       const headers = new Headers();
+
       headers.set("X-Ratelimit-Limit", "100");
       headers.set("X-Ratelimit-Remaining", "95");
 
@@ -184,6 +186,7 @@ describe("TTDStreamFetch", () => {
       const mockChunks = [createContentChunk("test"), DONE_CHUNK];
 
       const headers = new Headers();
+
       headers.set("X-Ratelimit-Limit", "100");
       headers.set("X-Ratelimit-Remaining", "95");
 
@@ -224,6 +227,7 @@ describe("TTDStreamFetch", () => {
 
     it("should return specific error for 429 rate limit", async () => {
       const headers = new Headers();
+
       headers.set("X-Ratelimit-Limit", "100");
       headers.set("X-Ratelimit-Remaining", "0");
 
@@ -366,7 +370,9 @@ describe("TTDStreamFetch", () => {
       global.fetch = vi.fn().mockImplementation(() => {
         abortController.abort();
         const error = new Error("The operation was aborted");
+
         error.name = "AbortError";
+
         return Promise.reject(error);
       });
 
@@ -385,6 +391,7 @@ describe("TTDStreamFetch", () => {
       const stream = new ReadableStream({
         async pull() {
           const error = new Error("The operation was aborted");
+
           error.name = "AbortError";
           throw error;
         },

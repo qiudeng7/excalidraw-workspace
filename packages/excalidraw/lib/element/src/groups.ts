@@ -34,6 +34,7 @@ export const selectGroup = (
       if (element.groupIds.includes(groupId)) {
         acc[element.id] = true;
       }
+
       return acc;
     },
     {},
@@ -50,6 +51,7 @@ export const selectGroup = (
         editingGroupId: null,
       };
     }
+
     return appState;
   }
 
@@ -90,18 +92,23 @@ export const selectGroupsForSelectedElements = (function () {
     }
 
     const selectedGroupIds: Record<GroupId, boolean> = {};
+
     // Gather all the groups withing selected elements
     for (const selectedElement of selectedElements) {
       let groupIds = selectedElement.groupIds;
+
       if (appState.editingGroupId) {
         // handle the case where a group is nested within a group
         const indexOfEditingGroup = groupIds.indexOf(appState.editingGroupId);
+
         if (indexOfEditingGroup > -1) {
           groupIds = groupIds.slice(0, indexOfEditingGroup);
         }
       }
+
       if (groupIds.length > 0) {
         const lastSelectedGroup = groupIds[groupIds.length - 1];
+
         selectedGroupIds[lastSelectedGroup] = true;
       }
     }
@@ -126,6 +133,7 @@ export const selectGroupsForSelectedElements = (function () {
             groupElementsIndex[groupId].push(element.id);
           }
         }
+
         return acc;
       },
       {},
@@ -251,14 +259,18 @@ export const selectGroupsFromGivenElements = (
 
   for (const element of elements) {
     let groupIds = element.groupIds;
+
     if (appState.editingGroupId) {
       const indexOfEditingGroup = groupIds.indexOf(appState.editingGroupId);
+
       if (indexOfEditingGroup > -1) {
         groupIds = groupIds.slice(0, indexOfEditingGroup);
       }
     }
+
     if (groupIds.length > 0) {
       const groupId = groupIds[groupIds.length - 1];
+
       nextAppState = {
         ...nextAppState,
         ...selectGroup(groupId, nextAppState, elements),
@@ -295,11 +307,13 @@ export const getElementsInGroup = <
   groupId: string,
 ): P[] => {
   const elementsInGroup: P[] = [];
+
   for (const element of elements.values()) {
     if (isElementInGroup(element, groupId)) {
       elementsInGroup.push(element as P);
     }
   }
+
   return elementsInGroup;
 };
 
@@ -320,7 +334,9 @@ export const addToGroup = (
     : -1;
   const positionToInsert =
     positionOfEditingGroupId > -1 ? positionOfEditingGroupId : groupIds.length;
+
   groupIds.splice(positionToInsert, 0, newGroupId);
+
   return groupIds;
 };
 
@@ -336,6 +352,7 @@ export const getMaximumGroups = <
   elementsMap: ElementsMap,
 ): T[][] => {
   const groups: Map<String, T[]> = new Map<String, T[]>();
+
   elements.forEach((element: T) => {
     const groupId =
       element.groupIds.length === 0
@@ -346,9 +363,11 @@ export const getMaximumGroups = <
 
     // Include bound text if present when grouping
     const boundTextElement = getBoundTextElement(element, elementsMap);
+
     if (boundTextElement) {
       currentGroupMembers.push(boundTextElement as T);
     }
+
     groups.set(groupId, [...currentGroupMembers, element]);
   });
 
@@ -405,6 +424,7 @@ export const getNewGroupIdsForDuplication = (
     : -1;
   const endIndex =
     positionOfEditingGroupId > -1 ? positionOfEditingGroupId : groupIds.length;
+
   for (let index = 0; index < endIndex; index++) {
     copy[index] = mapper(copy[index]);
   }
@@ -462,5 +482,6 @@ export const getSelectedElementsByGroup = (
       ...(boundTextElement ? [boundTextElement] : []),
     ]);
   });
+
   return [...buckets.values()];
 };

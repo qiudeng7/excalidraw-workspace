@@ -80,12 +80,14 @@ const renderApp: TestRenderFn = async (ui, options) => {
 
   await waitFor(() => {
     const canvas = renderResult.container.querySelector("canvas.static");
+
     if (!canvas) {
       throw new Error("not initialized yet");
     }
 
     const interactiveCanvas =
       renderResult.container.querySelector("canvas.interactive");
+
     if (!interactiveCanvas) {
       throw new Error("not initialized yet");
     }
@@ -117,12 +119,14 @@ export class GlobalTestState {
    * automatically updated on each call to render()
    */
   static renderResult: RenderResult<typeof customQueries> = null!;
+
   /**
    * retrieves static canvas for currently rendered app instance
    */
   static get canvas(): HTMLCanvasElement {
     return null!;
   }
+
   /**
    * retrieves interactive canvas for currently rendered app instance
    */
@@ -138,6 +142,7 @@ const initLocalStorage = (data: ImportedDataState) => {
       JSON.stringify(data.elements),
     );
   }
+
   if (data.appState) {
     localStorage.setItem(
       STORAGE_KEYS.LOCAL_STORAGE_APP_STATE,
@@ -226,6 +231,7 @@ export const assertSelectedElements = (
   const ids = elements
     .flat()
     .map((item) => (typeof item === "string" ? item : item.id));
+
   expect(selectedElementIds.length).toBe(ids.length);
   expect(selectedElementIds).toEqual(expect.arrayContaining(ids));
 };
@@ -245,6 +251,7 @@ export const togglePopover = (label: string) => {
     observe() {}
 
     unobserve() {}
+
     disconnect() {}
   };
 
@@ -254,12 +261,14 @@ export const togglePopover = (label: string) => {
 expect.extend({
   toBeNonNaNNumber(received) {
     const pass = typeof received === "number" && !isNaN(received);
+
     if (pass) {
       return {
         message: () => `expected ${received} not to be a non-NaN number`,
         pass: true,
       };
     }
+
     return {
       message: () => `expected ${received} to be a non-NaN number`,
       pass: false,
@@ -291,12 +300,15 @@ export const getCloneByOrigId = <T extends boolean = false>(
   const clonedElement = window.h.elements?.find(
     (el) => (el as any)[ORIG_ID] === origId,
   );
+
   if (clonedElement) {
     return clonedElement;
   }
+
   if (returnNullIfNotExists !== true) {
     throw new Error(`cloned element not found for origId: ${origId}`);
   }
+
   return null as T extends true ? ExcalidrawElement | null : ExcalidrawElement;
 };
 
@@ -326,18 +338,21 @@ export const assertElements = <T extends AllPossibleKeys<ExcalidrawElement>>(
 ) => {
   const h = window.h;
 
-  const expectedElementsWithIds: (typeof expectedElements[number] & {
+  const expectedElementsWithIds: ((typeof expectedElements)[number] & {
     id: ExcalidrawElement["id"];
   })[] = expectedElements.map((el) => {
     if ("id" in el) {
       return el;
     }
+
     const actualElement = actualElements.find(
       (act) => (act as any)[ORIG_ID] === el[ORIG_ID],
     );
+
     if (actualElement) {
       return { ...el, id: actualElement.id };
     }
+
     return {
       ...el,
       id: "UNKNOWN_ID",
@@ -351,6 +366,7 @@ export const assertElements = <T extends AllPossibleKeys<ExcalidrawElement>>(
       if (el.selected) {
         acc[el.id] = true;
       }
+
       return acc;
     },
     {},
@@ -358,6 +374,7 @@ export const assertElements = <T extends AllPossibleKeys<ExcalidrawElement>>(
 
   const mappedActualElements = actualElements.map((el) => {
     const expectedElement = map_expectedElements.get(el.id);
+
     if (expectedElement) {
       const pickedAttrs: Record<string, any> = {};
 
@@ -366,6 +383,7 @@ export const assertElements = <T extends AllPossibleKeys<ExcalidrawElement>>(
           delete expectedElement.selected;
           continue;
         }
+
         pickedAttrs[key] = (el as any)[key];
       }
 
@@ -376,6 +394,7 @@ export const assertElements = <T extends AllPossibleKeys<ExcalidrawElement>>(
 
       return pickedAttrs;
     }
+
     return el;
   });
 
@@ -406,6 +425,7 @@ export const assertElements = <T extends AllPossibleKeys<ExcalidrawElement>>(
           const origEl =
             expEl &&
             actualElements.find((el) => el.id === (expEl as any)[ORIG_ID]);
+
           return expEl
             ? `${
                 exp === err.actual[index]
@@ -431,22 +451,25 @@ const stripProps = (
   deltas: Record<string, { deleted: any; inserted: any }>,
   props: string[],
 ) =>
-  Object.entries(deltas).reduce((acc, curr) => {
-    const { inserted, deleted, ...rest } = curr[1];
+  Object.entries(deltas).reduce(
+    (acc, curr) => {
+      const { inserted, deleted, ...rest } = curr[1];
 
-    for (const prop of props) {
-      delete inserted[prop];
-      delete deleted[prop];
-    }
+      for (const prop of props) {
+        delete inserted[prop];
+        delete deleted[prop];
+      }
 
-    acc[curr[0]] = {
-      inserted,
-      deleted,
-      ...rest,
-    };
+      acc[curr[0]] = {
+        inserted,
+        deleted,
+        ...rest,
+      };
 
-    return acc;
-  }, {} as Record<string, any>);
+      return acc;
+    },
+    {} as Record<string, any>,
+  );
 
 export const checkpointHistory = (history: History, name: string) => {
   expect(
@@ -480,14 +503,17 @@ export const checkpointHistory = (history: History, name: string) => {
  */
 export const trimErrorStack = (error: Error, range = 1) => {
   const stack = error.stack?.split("\n");
+
   if (stack) {
     stack.splice(1, range);
     error.stack = stack.join("\n");
   }
+
   return error;
 };
 
 export const stripIgnoredNodesFromErrorMessage = (error: Error) => {
   error.message = error.message.replace(/\s+Ignored nodes:[\s\S]+/, "");
+
   return error;
 };

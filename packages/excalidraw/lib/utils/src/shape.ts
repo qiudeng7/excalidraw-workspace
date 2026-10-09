@@ -207,6 +207,7 @@ export const getCurvePathOps = (shape: Drawable): Op[] => {
       return set.ops;
     }
   }
+
   return shape.sets[0].ops;
 };
 
@@ -231,13 +232,16 @@ export const getCurveShape = <Point extends GlobalPoint | LocalPoint>(
   for (const op of ops) {
     if (op.op === "move") {
       const p = pointFromArray<Point>(op.data);
+
       invariant(p != null, "Ops data is not a point");
       p0 = transform(p);
     }
+
     if (op.op === "bcurveTo") {
       const p1 = transform(pointFrom<Point>(op.data[0], op.data[1]));
       const p2 = transform(pointFrom<Point>(op.data[2], op.data[3]));
       const p3 = transform(pointFrom<Point>(op.data[4], op.data[5]));
+
       polycurve.push(curve<Point>(p0, p1, p2, p3));
       p0 = p3;
     }
@@ -257,6 +261,7 @@ const polylineFromPoints = <Point extends GlobalPoint | LocalPoint>(
 
   for (let i = 1; i < points.length; i++) {
     const nextPoint = points[i];
+
     polyline.push(lineSegment<Point>(previousPoint, nextPoint));
     previousPoint = nextPoint;
   }
@@ -322,6 +327,7 @@ export const getClosedCurveShape = <Point extends GlobalPoint | LocalPoint>(
 
   const points: Point[] = [];
   let odd = false;
+
   for (const operation of ops) {
     if (operation.op === "move") {
       odd = !odd;
@@ -443,6 +449,7 @@ const distanceToEllipse = <Point extends LocalPoint | GlobalPoint>(
     tx = Math.min(1, Math.max(0, ((qx * r) / q + ex) / a));
     ty = Math.min(1, Math.max(0, ((qy * r) / q + ey) / b));
     const t = Math.hypot(ty, tx);
+
     tx /= t;
     ty /= t;
   }

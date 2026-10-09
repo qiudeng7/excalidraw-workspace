@@ -133,6 +133,7 @@ export const matchKey = (
 
   // non-latin layouts fallback to code
   const code = KeyCodeMap.get(key);
+
   return Boolean(code && !isLatinChar(event.key) && event.code === code);
 };
 

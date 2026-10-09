@@ -92,6 +92,7 @@ const moveGroupTo = (
     const origElement = originalElements[i];
 
     const latestElement = elementsMap.get(origElement.id);
+
     if (!latestElement) {
       continue;
     }
@@ -166,6 +167,7 @@ const handlePositionChange: DragInputCallbackType<
       } else {
         const origElement = elementsInUnit[0]?.original;
         const latestElement = elementsInUnit[0]?.latest;
+
         if (
           origElement &&
           latestElement &&
@@ -183,6 +185,7 @@ const handlePositionChange: DragInputCallbackType<
 
           const newTopLeftX = property === "x" ? nextValue : topLeftX;
           const newTopLeftY = property === "y" ? nextValue : topLeftY;
+
           moveElement(
             newTopLeftX,
             newTopLeftY,
@@ -197,6 +200,7 @@ const handlePositionChange: DragInputCallbackType<
     }
 
     scene.triggerUpdate();
+
     return;
   }
 
@@ -238,6 +242,7 @@ const MultiPosition = ({
         // we're dealing with a group
         if (elementsInUnit.length > 1) {
           const [x1, y1] = getCommonBounds(elementsInUnit);
+
           return Math.round((property === "x" ? x1 : y1) * 100) / 100;
         }
 

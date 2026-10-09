@@ -19,13 +19,18 @@ export const assertSidebarDockButton = async <T extends boolean>(
     GlobalTestState.renderResult.container.querySelector<HTMLElement>(
       ".sidebar",
     );
+
   expect(sidebar).not.toBe(null);
   const dockButton = queryByTestId(sidebar!, "sidebar-dock");
+
   if (hasDockButton) {
     expect(dockButton).not.toBe(null);
+
     return { dockButton: dockButton!, sidebar: sidebar! } as any;
   }
+
   expect(dockButton).toBe(null);
+
   return { dockButton: null, sidebar: sidebar! } as any;
 };
 

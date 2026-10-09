@@ -28,6 +28,7 @@ export const fillCircle = (
   if (fill) {
     context.fill();
   }
+
   if (stroke) {
     context.stroke();
   }
@@ -52,11 +53,14 @@ export const snapScrollToDevicePixels = <
 ): T => {
   // device pixels per scene unit
   const devicePixels = appState.zoom.value * scale;
+
   if (!(devicePixels > 0)) {
     return appState;
   }
+
   const scrollX = Math.round(appState.scrollX * devicePixels) / devicePixels;
   const scrollY = Math.round(appState.scrollY * devicePixels) / devicePixels;
+
   return scrollX === appState.scrollX && scrollY === appState.scrollY
     ? appState
     : { ...appState, scrollX, scrollY };
@@ -145,6 +149,7 @@ export const strokeRectWithRotation_simple = (
   if (fill) {
     context.fillRect(x - cx, y - cy, width, height);
   }
+
   if (radius && context.roundRect) {
     context.beginPath();
     context.roundRect(x - cx, y - cy, width, height, radius);
@@ -153,5 +158,6 @@ export const strokeRectWithRotation_simple = (
   } else {
     context.strokeRect(x - cx, y - cy, width, height);
   }
+
   context.restore();
 };

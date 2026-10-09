@@ -90,10 +90,14 @@ export class LassoTrail extends AnimatedTrail {
 
   selectElementsFromIds = (ids: string[]) => {
     this.app.setState((prevState) => {
-      const nextSelectedElementIds = ids.reduce((acc, id) => {
-        acc[id] = true;
-        return acc;
-      }, {} as Record<ExcalidrawElement["id"], true>);
+      const nextSelectedElementIds = ids.reduce(
+        (acc, id) => {
+          acc[id] = true;
+
+          return acc;
+        },
+        {} as Record<ExcalidrawElement["id"], true>,
+      );
 
       if (this.keepPreviousSelection) {
         for (const id of Object.keys(prevState.selectedElementIds)) {
@@ -110,6 +114,7 @@ export class LassoTrail extends AnimatedTrail {
             this.app.scene.getNonDeletedElementsMap(),
             element.id,
           );
+
           for (const child of elementsInFrame) {
             delete nextSelectedElementIds[child.id];
           }
@@ -173,8 +178,10 @@ export class LassoTrail extends AnimatedTrail {
       this.canvasTranslate = currentCanvasTranslate;
       this.elementsSegments = new Map();
       const visibleElementsMap = arrayToMap(this.app.visibleElements);
+
       for (const element of this.app.visibleElements) {
         const segments = getElementLineSegments(element, visibleElementsMap);
+
         this.elementsSegments.set(element.id, segments);
       }
     }

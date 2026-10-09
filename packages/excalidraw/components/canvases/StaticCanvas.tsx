@@ -43,6 +43,7 @@ const StaticCanvas = (props: StaticCanvasProps) => {
 
   useEffect(() => {
     const wrapper = wrapperRef.current;
+
     if (!wrapper) {
       return;
     }

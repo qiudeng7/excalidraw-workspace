@@ -9,8 +9,10 @@ describe("makeNextSelectedElementIds", () => {
     const ret = makeNextSelectedElementIds(selectedElementIds, {
       selectedElementIds: prevSelectedElementIds,
     });
+
     expect(ret === selectedElementIds).toBe(expectUpdated);
   };
+
   it("should return prevState selectedElementIds if no change", () => {
     _makeNextSelectedElementIds({}, {}, false);
     _makeNextSelectedElementIds({ 1: true }, { 1: true }, false);

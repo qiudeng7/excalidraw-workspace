@@ -28,6 +28,7 @@ const sketch = (points: [number, number][]) => {
     }
   });
   const [endX, endY] = points[points.length - 1];
+
   mouse.upAt(endX, endY);
 };
 
@@ -40,19 +41,25 @@ const rectanglePath = (
 ): [number, number][] => {
   const points: [number, number][] = [];
   const step = 10;
+
   for (let i = x; i <= x + width; i += step) {
     points.push([i, y]);
   }
+
   for (let i = y; i <= y + height; i += step) {
     points.push([x + width, i]);
   }
+
   for (let i = x + width; i >= x; i -= step) {
     points.push([i, y + height]);
   }
+
   for (let i = y + height; i >= y; i -= step) {
     points.push([x, i]);
   }
+
   points.push([x, y]);
+
   return points;
 };
 
@@ -62,12 +69,14 @@ const seg = (
   steps: number,
 ): [number, number][] => {
   const points: [number, number][] = [];
+
   for (let i = 0; i <= steps; i++) {
     points.push([
       from[0] + ((to[0] - from[0]) * i) / steps,
       from[1] + ((to[1] - from[1]) * i) / steps,
     ]);
   }
+
   return points;
 };
 
@@ -90,6 +99,7 @@ const arrowPath = (
     y2 -
       headLength * (uy * Math.cos(headAngle) + sign * ux * Math.sin(headAngle)),
   ];
+
   return [
     ...seg([x1, y1], tip, 20),
     ...seg(tip, arm(1), 8),
@@ -105,9 +115,11 @@ const circlePath = (
   radius: number,
 ): [number, number][] => {
   const points: [number, number][] = [];
+
   for (let a = 0; a <= Math.PI * 2 + 0.1; a += 0.15) {
     points.push([cx + Math.cos(a) * radius, cy + Math.sin(a) * radius]);
   }
+
   return points;
 };
 
@@ -163,11 +175,13 @@ describe("autoshape tool", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([start, end]);
 
     sketch(arrowPath(160, 160, 390, 290));
 
     const arrow = h.elements.find((element) => element.type === "arrow");
+
     assert(isArrowElement(arrow));
 
     expect(h.state.selectedLinearElement).toBeNull();
@@ -200,11 +214,13 @@ describe("autoshape tool", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([start, end]);
 
     sketch(seg([205, 205], [395, 395], 30));
 
     const arrow = h.elements.find((element) => element.type === "arrow");
+
     assert(isArrowElement(arrow));
 
     expect(arrow.startBinding?.elementId).toBe(start.id);
@@ -228,12 +244,14 @@ describe("autoshape tool", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([start, end]);
 
     // starts and ends deep inside the shapes
     sketch(seg([150, 150], [450, 450], 30));
 
     const arrow = h.elements.find((element) => element.type === "arrow");
+
     assert(isArrowElement(arrow));
 
     expect(arrow.startBinding?.mode).toBe("orbit");
@@ -241,6 +259,7 @@ describe("autoshape tool", () => {
 
     // the endpoints were pulled out of the shape interiors onto the outlines
     const [endDx, endDy] = arrow.points[arrow.points.length - 1];
+
     expect(arrow.x).toBeGreaterThan(200);
     expect(arrow.y).toBeGreaterThan(200);
     expect(arrow.x + endDx).toBeLessThan(400);
@@ -255,11 +274,13 @@ describe("autoshape tool", () => {
       width: 500,
       height: 500,
     });
+
     API.setElements([container]);
 
     sketch(arrowPath(150, 300, 400, 300));
 
     const arrow = h.elements.find((element) => element.type === "arrow");
+
     assert(isArrowElement(arrow));
 
     expect(arrow.startBinding?.mode).toBe("inside");
@@ -277,6 +298,7 @@ describe("autoshape tool", () => {
       width: 500,
       height: 500,
     });
+
     API.setElements([container]);
 
     sketch(seg([150, 150], [450, 450], 30));
@@ -295,11 +317,13 @@ describe("autoshape tool", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([only]);
 
     sketch(seg([150, 150], [395, 395], 30));
 
     const arrow = h.elements.find((element) => element.type === "arrow");
+
     assert(isArrowElement(arrow));
 
     expect(arrow.startBinding?.elementId).toBe(only.id);
@@ -318,11 +342,13 @@ describe("autoshape tool", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([only]);
 
     sketch(seg([100, 100], [450, 450], 30));
 
     const arrow = h.elements.find((element) => element.type === "arrow");
+
     assert(isArrowElement(arrow));
 
     expect(arrow.startBinding).toBeNull();
@@ -330,6 +356,7 @@ describe("autoshape tool", () => {
     expect(arrow.endBinding?.mode).toBe("orbit");
     // the end was pulled back onto the outline
     const [endDx, endDy] = arrow.points[arrow.points.length - 1];
+
     expect(arrow.x + endDx).toBeLessThan(400);
     expect(arrow.y + endDy).toBeLessThan(400);
   });
@@ -380,6 +407,7 @@ describe("autoshape styles panel & selection (preview path)", () => {
       }
     });
     const [endX, endY] = points[points.length - 1];
+
     mouse.upAt(endX, endY);
   };
 
@@ -409,6 +437,7 @@ describe("autoshape styles panel & selection (preview path)", () => {
 
   it("shows no preview for lines (noise), yet still commits them on release", () => {
     const linePoints = seg([100, 100], [400, 400], 30);
+
     mouse.downAt(100, 100);
     act(() => {
       for (const [x, y] of linePoints.slice(1)) {
@@ -439,11 +468,13 @@ describe("autoshape styles panel & selection (preview path)", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([start, end]);
 
     sketchWithPreview(seg([205, 205], [395, 395], 30));
 
     const arrow = h.elements.find((element) => element.type === "arrow");
+
     assert(isArrowElement(arrow));
 
     expect(arrow.startBinding?.elementId).toBe(start.id);
@@ -467,6 +498,7 @@ describe("autoshape styles panel & selection (preview path)", () => {
       h.app.scene.getNonDeletedElementsMap(),
       h.state,
     );
+
     expect(targetElements).toEqual([]);
 
     // the drawShape panel is limited to stroke color, background, fill style
@@ -477,6 +509,7 @@ describe("autoshape styles panel & selection (preview path)", () => {
       h.app.scene.getNonDeletedElementsMap(),
       h.app,
     );
+
     expect(predicates.strokeColor).toBe(true);
     expect(predicates.backgroundColor).toBe(true);
     expect(predicates.strokeStyle).toBe(true);
@@ -604,10 +637,12 @@ describe("autoshape double-click to type", () => {
     expect(h.state.activeTool.type).toBe("autoshape");
 
     const editor = await getTextEditor();
+
     updateTextEditor(editor, "hello");
     Keyboard.exitTextEditor(editor);
 
     const text = h.elements[0] as ExcalidrawTextElement;
+
     expect(h.elements).toHaveLength(1);
     expect(text.type).toBe("text");
     expect(text.containerId).toBeNull();
@@ -625,12 +660,14 @@ describe("autoshape double-click to type", () => {
       height: 100,
       backgroundColor: "transparent",
     });
+
     API.setElements([rectangle]);
 
     // interior hit far from both the stroke and the center
     mouse.doubleClickAt(140, 120);
 
     const editor = await getTextEditor();
+
     expect(h.state.editingTextElement?.containerId).toBe(rectangle.id);
 
     updateTextEditor(editor, "label");
@@ -639,6 +676,7 @@ describe("autoshape double-click to type", () => {
     const text = h.elements.find(
       (element) => element.type === "text",
     ) as ExcalidrawTextElement;
+
     expect(text.containerId).toBe(rectangle.id);
     expect(h.elements[0].boundElements).toEqual([
       { type: "text", id: text.id },
@@ -664,6 +702,7 @@ describe("autoshape double-click to type", () => {
       height: 10,
       containerId: rectangle.id,
     });
+
     API.updateElement(rectangle, {
       boundElements: [{ type: "text", id: boundText.id }],
     });
@@ -684,6 +723,7 @@ describe("autoshape double-click to type", () => {
       width: 200,
       height: 100,
     });
+
     API.setElements([rectangle]);
 
     Keyboard.withModifierKeys({ alt: true }, () => {
@@ -702,10 +742,12 @@ describe("autoshape double-click to type", () => {
       width: 200,
       height: 100,
     });
+
     API.setElements([rectangle]);
 
     mouse.doubleClickAt(150, 130);
     const editor = await getTextEditor();
+
     Keyboard.exitTextEditor(editor);
 
     expect(h.elements.filter((element) => !element.isDeleted)).toHaveLength(1);
@@ -719,6 +761,7 @@ describe("autoshape double-click to type", () => {
 
     mouse.doubleClickAt(400, 400);
     const editor = await getTextEditor();
+
     updateTextEditor(editor, "note");
     Keyboard.exitTextEditor(editor);
     expect(h.elements.filter((element) => !element.isDeleted)).toHaveLength(2);
@@ -735,6 +778,7 @@ describe("autoshape double-click to type", () => {
     mouse.doubleClickAt(200, 200);
     await getTextEditor();
     const editor = await getTextEditor();
+
     updateTextEditor(editor, "note");
 
     mouse.downAt(400, 400);
@@ -814,6 +858,7 @@ describe("autoshape compact toolbar placement", () => {
       const { container } = await render(
         <Excalidraw UIOptions={{ getFormFactor: () => formFactor }} />,
       );
+
       fireEvent.resize(window);
       await waitFor(() =>
         expect(h.app.editorInterface.formFactor).toBe(formFactor),
@@ -822,15 +867,19 @@ describe("autoshape compact toolbar placement", () => {
       const freedrawTrigger = container.querySelector(
         '[data-testid="toolbar-freedraw"]',
       )!;
+
       fireEvent.click(freedrawTrigger);
 
       const drawShapeOption = await waitFor(() => {
         const option = document.querySelector<HTMLButtonElement>(
           '.tool-popover-content [data-testid="toolbar-autoshape"]',
         );
+
         expect(option).not.toBeNull();
+
         return option!;
       });
+
       fireEvent.click(drawShapeOption);
       expect(h.state.activeTool.type).toBe("autoshape");
       expect(freedrawTrigger).toHaveAttribute("aria-pressed", "true");
@@ -838,6 +887,7 @@ describe("autoshape compact toolbar placement", () => {
       const extraToolsTrigger = container.querySelector(
         ".App-toolbar__extra-tools-trigger",
       )!;
+
       expect(extraToolsTrigger).not.toHaveClass(
         "App-toolbar__extra-tools-trigger--selected",
       );
@@ -847,9 +897,12 @@ describe("autoshape compact toolbar placement", () => {
         const menu = document.querySelector(
           ".App-toolbar__extra-tools-dropdown",
         );
+
         expect(menu).not.toBeNull();
+
         return menu!;
       });
+
       expect(
         extraTools.querySelector('[data-testid="toolbar-autoshape"]'),
       ).not.toBeNull();

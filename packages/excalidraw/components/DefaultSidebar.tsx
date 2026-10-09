@@ -30,6 +30,7 @@ const DefaultSidebarTrigger = withInternalFallback(
       React.HTMLAttributes<HTMLDivElement>,
   ) => {
     const { DefaultSidebarTriggerTunnel } = useTunnels();
+
     return (
       <DefaultSidebarTriggerTunnel.In>
         <Sidebar.Trigger
@@ -41,16 +42,19 @@ const DefaultSidebarTrigger = withInternalFallback(
     );
   },
 );
+
 DefaultSidebarTrigger.displayName = "DefaultSidebarTrigger";
 
 const DefaultTabTriggers = ({ children }: { children: React.ReactNode }) => {
   const { DefaultSidebarTabTriggersTunnel } = useTunnels();
+
   return (
     <DefaultSidebarTabTriggersTunnel.In>
       {children}
     </DefaultSidebarTabTriggersTunnel.In>
   );
 };
+
 DefaultTabTriggers.displayName = "DefaultTabTriggers";
 
 export const DefaultSidebar = Object.assign(

@@ -19,6 +19,7 @@ const WelcomeScreenMenuItemContent = ({
   children: React.ReactNode;
 }) => {
   const editorInterface = useEditorInterface();
+
   return (
     <>
       <div className="welcome-screen-menu-item__icon">{icon}</div>
@@ -29,6 +30,7 @@ const WelcomeScreenMenuItemContent = ({
     </>
   );
 };
+
 WelcomeScreenMenuItemContent.displayName = "WelcomeScreenMenuItemContent";
 
 const WelcomeScreenMenuItem = ({
@@ -57,6 +59,7 @@ const WelcomeScreenMenuItem = ({
     </button>
   );
 };
+
 WelcomeScreenMenuItem.displayName = "WelcomeScreenMenuItem";
 
 const WelcomeScreenMenuItemLink = ({
@@ -86,10 +89,12 @@ const WelcomeScreenMenuItemLink = ({
     </a>
   );
 };
+
 WelcomeScreenMenuItemLink.displayName = "WelcomeScreenMenuItemLink";
 
 const Center = ({ children }: { children?: React.ReactNode }) => {
   const { WelcomeScreenCenterTunnel } = useTunnels();
+
   return (
     <WelcomeScreenCenterTunnel.In>
       <div className="welcome-screen-center">
@@ -107,6 +112,7 @@ const Center = ({ children }: { children?: React.ReactNode }) => {
     </WelcomeScreenCenterTunnel.In>
   );
 };
+
 Center.displayName = "Center";
 
 const Logo = ({ children }: { children?: React.ReactNode }) => {
@@ -116,6 +122,7 @@ const Logo = ({ children }: { children?: React.ReactNode }) => {
     </div>
   );
 };
+
 Logo.displayName = "Logo";
 
 const Heading = ({ children }: { children: React.ReactNode }) => {
@@ -125,11 +132,13 @@ const Heading = ({ children }: { children: React.ReactNode }) => {
     </div>
   );
 };
+
 Heading.displayName = "Heading";
 
 const Menu = ({ children }: { children?: React.ReactNode }) => {
   return <div className="welcome-screen-menu">{children}</div>;
 };
+
 Menu.displayName = "Menu";
 
 const MenuItemHelp = () => {
@@ -145,6 +154,7 @@ const MenuItemHelp = () => {
     </WelcomeScreenMenuItem>
   );
 };
+
 MenuItemHelp.displayName = "MenuItemHelp";
 
 const MenuItemLoadScene = () => {
@@ -165,6 +175,7 @@ const MenuItemLoadScene = () => {
     </WelcomeScreenMenuItem>
   );
 };
+
 MenuItemLoadScene.displayName = "MenuItemLoadScene";
 
 const MenuItemLiveCollaborationTrigger = ({
@@ -173,12 +184,14 @@ const MenuItemLiveCollaborationTrigger = ({
   onSelect: () => any;
 }) => {
   const { t } = useI18n();
+
   return (
     <WelcomeScreenMenuItem shortcut={null} onSelect={onSelect} icon={usersIcon}>
       {t("labels.liveCollaboration")}
     </WelcomeScreenMenuItem>
   );
 };
+
 MenuItemLiveCollaborationTrigger.displayName =
   "MenuItemLiveCollaborationTrigger";
 

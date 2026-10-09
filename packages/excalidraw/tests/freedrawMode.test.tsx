@@ -37,6 +37,7 @@ describe("freedraw mode action", () => {
 
   it("toggling the radio updates both the selected element and the default", () => {
     const element = UI.createElement("freedraw", { x: 0, y: 0 });
+
     API.setSelectedElements([element.get()] as NonDeletedExcalidrawElement[]);
 
     fireEvent.click(screen.getByTitle("Variable"));

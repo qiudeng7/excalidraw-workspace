@@ -19,6 +19,7 @@ describe("@excalidraw/common/utils", () => {
   describe("cross-document element guards", () => {
     it("uses constructors from the target element's window", () => {
       const iframe = document.createElement("iframe");
+
       document.body.append(iframe);
 
       const iframeDocument = iframe.contentDocument!;
@@ -26,6 +27,7 @@ describe("@excalidraw/common/utils", () => {
       const textarea = iframeDocument.createElement("textarea");
       const button = iframeDocument.createElement("button");
       const toolIcon = iframeDocument.createElement("div");
+
       toolIcon.className = "ToolIcon__icon";
 
       expect(textarea).not.toBeInstanceOf(HTMLTextAreaElement);
@@ -66,6 +68,7 @@ describe("@excalidraw/common/utils", () => {
       expect(reduceToCommonValue([0])).toEqual(0);
 
       const o = {};
+
       expect(reduceToCommonValue([o, o])).toEqual(o);
 
       expect(
@@ -102,8 +105,10 @@ describe("@excalidraw/common/utils", () => {
 
         const result = mapFind(["a", "b", "c"], (value) => {
           counter++;
+
           return value === "b" ? 42 : null;
         });
+
         expect(result).toEqual(42);
         expect(counter).toBe(2);
       }
@@ -125,6 +130,7 @@ describe("@excalidraw/common/utils", () => {
 
     const runScheduledFrame = (timestamp = 16) => {
       const callbacks = [...frameCallbacks.values()];
+
       frameCallbacks.clear();
       callbacks.forEach((callback) => callback(timestamp));
     };
@@ -136,7 +142,9 @@ describe("@excalidraw/common/utils", () => {
       vi.spyOn(window, "requestAnimationFrame").mockImplementation(
         (callback) => {
           const frameId = ++nextFrameId;
+
           frameCallbacks.set(frameId, callback);
+
           return frameId;
         },
       );

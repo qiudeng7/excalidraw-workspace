@@ -7,6 +7,7 @@ export const normalizeLink = (link: string) => {
   if (!link) {
     return link;
   }
+
   return sanitizeUrl(escapeDoubleQuotes(link));
 };
 
@@ -28,7 +29,9 @@ export const toValidURL = (link: string) => {
 
   try {
     new URL(link);
-  } catch {
+  } catch (error) {
+    console.debug("Invalid link URL; using a blank page", error);
+
     // if link does not parse as URL, assume invalid and return blank page
     return "about:blank";
   }

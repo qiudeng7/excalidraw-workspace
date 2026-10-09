@@ -27,19 +27,25 @@ const arrowHandler = (
   switch (eventKey) {
     case "ArrowLeft": {
       const prevIndex = currentIndex - 1;
+
       return prevIndex < 0 ? length - 1 : prevIndex;
     }
+
     case "ArrowRight": {
       return (currentIndex + 1) % length;
     }
+
     case "ArrowDown": {
       const nextIndex = currentIndex + COLORS_PER_ROW;
+
       return nextIndex >= length ? currentIndex % COLORS_PER_ROW : nextIndex;
     }
+
     case "ArrowUp": {
       const prevIndex = currentIndex - COLORS_PER_ROW;
       const newIndex =
         prevIndex < 0 ? COLORS_PER_ROW * rows + prevIndex : prevIndex;
+
       return newIndex >= length ? undefined : newIndex;
     }
   }
@@ -78,17 +84,21 @@ const hotkeyHandler = ({
       e.shiftKey
     ) {
       const newShade = Number(e.code.slice(-1)) - 1;
+
       onChange(palette[colorObj.colorName][newShade]);
       setActiveColorPickerSection("shades");
+
       return true;
     }
   }
 
   if (["1", "2", "3", "4", "5"].includes(e.key)) {
     const c = customColors[Number(e.key) - 1];
+
     if (c) {
       onChange(customColors[Number(e.key) - 1]);
       setActiveColorPickerSection("custom");
+
       return true;
     }
   }
@@ -100,6 +110,7 @@ const hotkeyHandler = ({
     const r = Array.isArray(paletteValue)
       ? paletteValue[activeShade]
       : paletteValue;
+
     // hotkeys of excluded (hidden) or absent palette entries are dead, not
     // remapped — this keeps every other color on its usual key. Still
     // HANDLED: within the modal's keyboard scope the key is deliberately
@@ -108,10 +119,13 @@ const hotkeyHandler = ({
     if (r == null || excludedColors?.includes(r)) {
       return true;
     }
+
     onChange(r);
     setActiveColorPickerSection("baseColors");
+
     return true;
   }
+
   return false;
 };
 
@@ -155,17 +169,20 @@ export const colorPickerKeyNavHandler = ({
 
   if (event.key === KEYS.ESCAPE) {
     onEscape(event);
+
     return true;
   }
 
   // checkt using `key` to ignore combos with Alt modifier
   if (event.key === KEYS.ALT) {
     onEyeDropperToggle(true);
+
     return true;
   }
 
   if (event.key === KEYS.I) {
     onEyeDropperToggle();
+
     return true;
   }
 
@@ -186,6 +203,7 @@ export const colorPickerKeyNavHandler = ({
       if (value) {
         acc.push(key as ActiveColorPickerSectionAtomType);
       }
+
       return acc;
     }, [] as ActiveColorPickerSectionAtomType[]);
 
@@ -195,8 +213,8 @@ export const colorPickerKeyNavHandler = ({
       activeSectionIndex + indexOffset > sections.length - 1
         ? 0
         : activeSectionIndex + indexOffset < 0
-        ? sections.length - 1
-        : activeSectionIndex + indexOffset;
+          ? sections.length - 1
+          : activeSectionIndex + indexOffset;
 
     const nextSection = sections[nextSectionIndex];
 
@@ -215,6 +233,7 @@ export const colorPickerKeyNavHandler = ({
         } else if (shades === color) {
           return name;
         }
+
         return null;
       });
 
@@ -251,6 +270,7 @@ export const colorPickerKeyNavHandler = ({
 
       if (newShade !== undefined) {
         onChange(palette[colorObj.colorName][newShade]);
+
         return true;
       }
     }
@@ -271,12 +291,15 @@ export const colorPickerKeyNavHandler = ({
       // step over excluded (hidden) palette entries, continuing in the
       // arrow's direction
       let guard = 0;
+
       while (newColorIndex !== undefined && guard++ < colorNames.length) {
         const value = palette[colorNames[newColorIndex]];
         const resolved = Array.isArray(value) ? value[activeShade] : value;
+
         if (!excludedColors?.includes(resolved)) {
           break;
         }
+
         newColorIndex = arrowHandler(
           event.key,
           newColorIndex,
@@ -293,6 +316,7 @@ export const colorPickerKeyNavHandler = ({
             ? newColorNameValue[activeShade]
             : newColorNameValue,
         );
+
         return true;
       }
     }
@@ -309,7 +333,9 @@ export const colorPickerKeyNavHandler = ({
 
     if (newColorIndex !== undefined) {
       const newColor = customColors[newColorIndex];
+
       onChange(newColor);
+
       return true;
     }
   }

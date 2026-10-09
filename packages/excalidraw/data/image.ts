@@ -16,9 +16,11 @@ export const getTEXtChunk = async (
 ): Promise<{ keyword: string; text: string } | null> => {
   const chunks = decodePng(new Uint8Array(await blobToArrayBuffer(blob)));
   const metadataChunk = chunks.find((chunk) => chunk.name === "tEXt");
+
   if (metadataChunk) {
     return tEXt.decode(metadataChunk.data);
   }
+
   return null;
 };
 
@@ -40,6 +42,7 @@ export const encodePngMetadata = async ({
       }),
     ),
   );
+
   // insert metadata before last chunk (iEND)
   chunks.splice(-1, 0, metadataChunk);
 
@@ -48,9 +51,11 @@ export const encodePngMetadata = async ({
 
 export const decodePngMetadata = async (blob: Blob) => {
   const metadata = await getTEXtChunk(blob);
+
   if (metadata?.keyword === MIME_TYPES.excalidraw) {
     try {
       const encodedData = JSON.parse(metadata.text);
+
       if (!("encoded" in encodedData)) {
         // legacy, un-encoded scene JSON
         if (
@@ -59,13 +64,16 @@ export const decodePngMetadata = async (blob: Blob) => {
         ) {
           return metadata.text;
         }
+
         throw new Error("FAILED");
       }
+
       return decode(encodedData);
     } catch (error: any) {
       console.error(error);
       throw new Error("FAILED");
     }
   }
+
   throw new Error("INVALID");
 };

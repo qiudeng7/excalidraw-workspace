@@ -46,9 +46,11 @@ const getErrorMessage = (error: unknown): string => {
   if (error instanceof Error) {
     return error.message;
   }
+
   if (typeof error === "string") {
     return error;
   }
+
   if (
     error &&
     typeof error === "object" &&
@@ -57,6 +59,7 @@ const getErrorMessage = (error: unknown): string => {
   ) {
     return (error as { message: string }).message;
   }
+
   return "";
 };
 
@@ -80,6 +83,7 @@ const MermaidToExcalidraw = ({
     if (!error?.message) {
       return null;
     }
+
     return getMermaidErrorLineNumber(error.message, deferredText);
   })();
 
@@ -97,8 +101,10 @@ const MermaidToExcalidraw = ({
       try {
         if (!deferredText.trim()) {
           resetPreview({ canvasRef, setError });
+
           return;
         }
+
         const result = await convertMermaidToExcalidraw({
           canvasRef,
           data,
@@ -110,6 +116,7 @@ const MermaidToExcalidraw = ({
 
         if (!result.success) {
           const err = result.error ?? new Error("Invalid mermaid definition");
+
           setError(err);
         }
       } catch (err) {
@@ -143,12 +150,15 @@ const MermaidToExcalidraw = ({
 
     if (!shouldTryAutoFix) {
       setAutoFixCandidate(null);
+
       return;
     }
 
     const candidates = getMermaidAutoFixCandidates(sourceText, errorMessage);
+
     if (!candidates.length) {
       setAutoFixCandidate(null);
+
       return;
     }
 
@@ -166,9 +176,11 @@ const MermaidToExcalidraw = ({
 
         while (queue.length > 0 && triedCandidates < AUTO_FIX_MAX_CANDIDATES) {
           const current = queue.shift();
+
           if (!current || seen.has(current.text)) {
             continue;
           }
+
           seen.add(current.text);
           triedCandidates += 1;
 
@@ -177,19 +189,24 @@ const MermaidToExcalidraw = ({
             if (!cancelled) {
               setAutoFixCandidate(current.text);
             }
+
             return;
           } catch (candidateError) {
             if (current.depth >= AUTO_FIX_MAX_DEPTH) {
               continue;
             }
+
             const nextErrorMessage = getErrorMessage(candidateError);
+
             if (!nextErrorMessage) {
               continue;
             }
+
             const nextCandidates = getMermaidAutoFixCandidates(
               current.text,
               nextErrorMessage,
             );
+
             for (const nextCandidate of nextCandidates) {
               if (!seen.has(nextCandidate)) {
                 queue.push({
@@ -200,9 +217,13 @@ const MermaidToExcalidraw = ({
             }
           }
         }
-      } catch {
-        // ignore auto-fix probe errors
+      } catch (error) {
+        console.debug(
+          "Mermaid auto-fix probe failed; retaining the original input",
+          error,
+        );
       }
+
       if (!cancelled) {
         setAutoFixCandidate(null);
       }
@@ -227,6 +248,7 @@ const MermaidToExcalidraw = ({
     if (!autoFixCandidate) {
       return;
     }
+
     setText(autoFixCandidate);
   };
 
@@ -311,4 +333,5 @@ const MermaidToExcalidraw = ({
     </>
   );
 };
+
 export default MermaidToExcalidraw;

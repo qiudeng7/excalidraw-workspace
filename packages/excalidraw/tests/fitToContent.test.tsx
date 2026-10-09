@@ -35,6 +35,7 @@ const waitForAnimationProgress = (frames = 4) => {
             requestAnimationFrame(step);
           }
         };
+
         requestAnimationFrame(step);
       }),
   );
@@ -60,6 +61,7 @@ const waitForAnimationToStop = (maxFrames = 200) => {
             requestAnimationFrame(check);
           }
         };
+
         requestAnimationFrame(check);
       }),
   );
@@ -78,6 +80,7 @@ describe("scale-down", () => {
       x: 50,
       y: 100,
     });
+
     API.setElements([rectElement]);
 
     expect(h.state.zoom.value).toBe(1);
@@ -111,6 +114,7 @@ describe("scale-down", () => {
       x: 80,
       y: 80,
     });
+
     API.setElements([topLeft, bottomRight]);
 
     h.state.width = 10;
@@ -174,6 +178,7 @@ describe("scale-down", () => {
       x: 100,
       y: 100,
     });
+
     API.setElements([rectElement]);
 
     expect(h.state.zoom.value).toBe(1);
@@ -209,6 +214,7 @@ describe("none", () => {
       x: 1000,
       y: 1000,
     });
+
     API.setElements([rectElement]);
 
     act(() => {
@@ -237,10 +243,12 @@ describe("following a collaborator", () => {
 
   it("should stop following when navigating", async () => {
     const onUserFollow = vi.fn();
+
     await render(
       <Excalidraw userToFollow={userToFollow} onUserFollow={onUserFollow} />,
     );
     const rectElement = API.createElement({ x: 1000, y: 1000 });
+
     API.setElements([rectElement]);
 
     act(() => {
@@ -256,6 +264,7 @@ describe("following a collaborator", () => {
 
   it("should keep following when not navigating", async () => {
     const onUserFollow = vi.fn();
+
     await render(
       <Excalidraw userToFollow={userToFollow} onUserFollow={onUserFollow} />,
     );
@@ -297,6 +306,7 @@ describe("scale-down animated", () => {
       x: -100,
       y: -100,
     });
+
     API.setElements([rectElement]);
 
     act(() => {
@@ -338,6 +348,7 @@ describe("scale-down animated", () => {
       x: 100,
       y: 100,
     });
+
     API.setElements([rectElement]);
 
     expect(h.state.scrollX).toBe(0);
@@ -377,6 +388,7 @@ describe("scale-down animated", () => {
       x: -100,
       y: -100,
     });
+
     API.setElements([rectElement]);
 
     act(() => {
@@ -399,6 +411,7 @@ describe("scale-down animated", () => {
     // it should have settled on the target viewport (moved off the origin)
     const settledScrollX = h.state.scrollX;
     const settledScrollY = h.state.scrollY;
+
     expect(settledScrollX).not.toBe(0);
     expect(settledScrollY).not.toBe(0);
     expect(h.state.shouldCacheIgnoreZoom).toBe(false);

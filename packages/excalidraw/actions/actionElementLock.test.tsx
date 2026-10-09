@@ -16,6 +16,7 @@ describe("element locking", () => {
     mouse.rightClickAt(0, 0);
 
     const item = queryByTestId(UI.queryContextMenu()!, "unlockAllElements");
+
     expect(item).toBe(null);
   });
 
@@ -56,6 +57,7 @@ describe("element locking", () => {
     expect(h.elements.map((el) => el.locked)).toEqual([true, true, false]);
 
     const item = queryByTestId(UI.queryContextMenu()!, "unlockAllElements");
+
     expect(item).not.toBe(null);
 
     fireEvent.click(item!.querySelector("button")!);

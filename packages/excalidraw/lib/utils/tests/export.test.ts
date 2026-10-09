@@ -45,12 +45,14 @@ describe("exportToBlob", async () => {
           exportBackground: true,
         },
       });
+
       expect(blob?.type).toBe(MIME_TYPES.jpg);
     });
     it("should default to image/png", async () => {
       const blob = await utils.exportToBlob({
         ...diagramFactory(),
       });
+
       expect(blob?.type).toBe(MIME_TYPES.png);
     });
 
@@ -58,6 +60,7 @@ describe("exportToBlob", async () => {
       const consoleSpy = vi
         .spyOn(console, "warn")
         .mockImplementationOnce(() => void 0);
+
       await utils.exportToBlob({
         ...diagramFactory(),
         mimeType: MIME_TYPES.png,
@@ -90,6 +93,7 @@ describe("exportToSvg", () => {
       // To avoid varying snapshots
       name: "name",
     };
+
     expect(passedElements().length).toBe(3);
     expect(passedOptionsWhenDefault).toMatchSnapshot();
   });
@@ -145,6 +149,7 @@ describe("elements lacking creation metadata", () => {
     const { elements, ...rest } = diagramFactory({
       overrides: { appState: void 0 },
     });
+
     return {
       ...rest,
       elements: elements.map(
@@ -188,6 +193,7 @@ describe("elements lacking creation metadata", () => {
 
   it("exportToBlob embeds the restored scene into png metadata", async () => {
     const serializeSpy = vi.spyOn(jsonModule, "serializeAsJSON");
+
     vi.spyOn(imageModule, "encodePngMetadata").mockImplementation(
       async ({ blob }) => blob,
     );

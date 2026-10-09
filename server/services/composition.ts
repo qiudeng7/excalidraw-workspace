@@ -15,6 +15,7 @@ import { createNavigationRoutes } from "./routes/navigation";
 import { createWorkspaceRoutes } from "./routes/workspaces";
 import { createCanvasRoutes } from "./routes/canvases";
 import { createLibraryRoutes } from "./routes/library";
+
 interface RequestDependencies extends BackendContext {
   request: Request;
   authentication: Authentication;
@@ -28,6 +29,7 @@ interface RequestDependencies extends BackendContext {
   libraryRoutes: RouteHandler;
   apiRouter: ApiRouter;
 }
+
 /** Only this composition root knows Awilix. Resources are externally owned, never disposed by a request. */
 export async function dispatchRequest(
   request: Request,
@@ -37,6 +39,7 @@ export async function dispatchRequest(
     injectionMode: InjectionMode.PROXY,
     strict: true,
   });
+
   container.register({
     repository: asValue(context.repository),
     objects: asValue(context.objects),
@@ -57,6 +60,7 @@ export async function dispatchRequest(
     apiRouter: asFunction(createApiRouter).scoped(),
   });
   const scope = container.createScope();
+
   scope.register({ request: asValue(request) });
   try {
     return await scope.resolve("apiRouter").handle();

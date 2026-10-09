@@ -34,6 +34,7 @@ export const TTDDialogInput = ({
   const ref = useRef<HTMLTextAreaElement>(null);
 
   const callbackRef = useRef(onKeyboardSubmit);
+
   callbackRef.current = onKeyboardSubmit;
 
   const [editorState, setEditorState] = useState<EditorState>({
@@ -79,10 +80,13 @@ export const TTDDialogInput = ({
     if (editorState.type !== "fallback") {
       return;
     }
+
     if (!callbackRef.current) {
       return;
     }
+
     const textarea = ref.current;
+
     if (textarea) {
       const handleKeyDown = (event: KeyboardEvent) => {
         if (event[KEYS.CTRL_OR_CMD] && event.key === KEYS.ENTER) {
@@ -90,8 +94,10 @@ export const TTDDialogInput = ({
           callbackRef.current?.();
         }
       };
+
       textarea.focus();
       textarea.addEventListener(EVENT.KEYDOWN, handleKeyDown);
+
       return () => {
         textarea.removeEventListener(EVENT.KEYDOWN, handleKeyDown);
       };
@@ -100,6 +106,7 @@ export const TTDDialogInput = ({
 
   if (editorState.type === "ready") {
     const CodeMirrorEditor = editorState.component;
+
     return (
       <CodeMirrorEditor
         value={input}

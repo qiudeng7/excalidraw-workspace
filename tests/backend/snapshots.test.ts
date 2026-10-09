@@ -37,6 +37,7 @@ test("snapshot CAS failures reclaim only the newly written object", async () => 
         async saveSnapshot() {
           assert.equal(writes.length, 1, "object exists before metadata CAS");
           if (outcome === "error") throw new Error("database unavailable");
+
           return outcome === "success" ? 1 : 0;
         },
       },
@@ -52,6 +53,7 @@ test("snapshot CAS failures reclaim only the newly written object", async () => 
       2,
       {},
     );
+
     if (outcome === "success") assert.equal((await save).revision, 3);
     else if (outcome === "error")
       await assert.rejects(save, /database unavailable/);

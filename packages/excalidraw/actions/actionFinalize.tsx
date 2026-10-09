@@ -160,6 +160,7 @@ export const actionFinalize = register<FormData>({
                 isDeleted: true,
               });
             }
+
             return el;
           });
         }
@@ -173,6 +174,7 @@ export const actionFinalize = register<FormData>({
                   if (el.id === element.id) {
                     return newElementWith(el, { isDeleted: true });
                   }
+
                   return el;
                 })
               : newElements,
@@ -209,6 +211,7 @@ export const actionFinalize = register<FormData>({
 
     // clean up pending gesture even if active tool is already not drawShape
     const hadPendingSketch = app.drawShape.hasPendingGesture();
+
     if (hadPendingSketch || isDrawShapeTool) {
       app.drawShape.finalize();
       if (hadPendingSketch) {
@@ -220,6 +223,7 @@ export const actionFinalize = register<FormData>({
     }
 
     let element: NonDeleted<ExcalidrawElement> | null = null;
+
     if (appState.multiElement) {
       element = appState.multiElement;
     } else if (
@@ -236,6 +240,7 @@ export const actionFinalize = register<FormData>({
       const candidate = elementsMap.get(
         Object.keys(appState.selectedElementIds)[0],
       ) as NonDeleted<ExcalidrawLinearElement> | undefined;
+
       if (candidate) {
         element = candidate;
       }
@@ -251,6 +256,7 @@ export const actionFinalize = register<FormData>({
       ) {
         const { points } = element;
         const { lastCommittedPoint } = appState.selectedLinearElement;
+
         if (
           !lastCommittedPoint ||
           points[points.length - 1] !== lastCommittedPoint
@@ -281,6 +287,7 @@ export const actionFinalize = register<FormData>({
                 -1,
                 elementsMap,
               );
+
             bindOrUnbindBindingElement(
               element,
               draggedPoints,
@@ -302,6 +309,7 @@ export const actionFinalize = register<FormData>({
           if (el.id === element?.id) {
             return newElementWith(el, { isDeleted: true });
           }
+
           return el;
         });
       }
@@ -320,6 +328,7 @@ export const actionFinalize = register<FormData>({
               ? pointFrom(firstPoint[0], firstPoint[1])
               : p,
           );
+
           if (isLineElement(element)) {
             scene.mutateElement(element, {
               points,
@@ -341,6 +350,7 @@ export const actionFinalize = register<FormData>({
     }
 
     let activeTool: AppState["activeTool"];
+
     if (TOGGLE_TOOLS.includes(appState.activeTool.type)) {
       activeTool = updateActiveTool(appState, {
         ...(appState.activeTool.lastActiveTool || {
@@ -404,11 +414,11 @@ export const actionFinalize = register<FormData>({
         selectedElementIds: isDrawShapeTool
           ? {}
           : element && !isToolLocked && appState.activeTool.type !== "freedraw"
-          ? {
-              ...appState.selectedElementIds,
-              [element.id]: true,
-            }
-          : appState.selectedElementIds,
+            ? {
+                ...appState.selectedElementIds,
+                [element.id]: true,
+              }
+            : appState.selectedElementIds,
 
         selectedLinearElement: isDrawShapeTool ? null : selectedLinearElement,
       },

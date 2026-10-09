@@ -9,6 +9,7 @@ export const register = <
   action: T,
 ) => {
   actions = actions.concat(action);
+
   return action as T & {
     keyTest?: unknown extends T["keyTest"] ? never : T["keyTest"];
   };

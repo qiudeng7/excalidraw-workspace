@@ -17,6 +17,7 @@ mockMermaidToExcalidraw({
   mockRef: true,
   parseMermaidToExcalidraw: async (definition) => {
     const firstLine = definition.split("\n")[0];
+
     return new Promise((resolve, reject) => {
       if (firstLine === "flowchart TD") {
         resolve({
@@ -118,6 +119,7 @@ describe("Test <MermaidToExcalidraw/>", () => {
 
   it("should open mermaid popup when active tool is mermaid", async () => {
     const dialog = document.querySelector(".ttd-dialog")!;
+
     await waitFor(() => expect(dialog.querySelector("canvas")).not.toBeNull());
     expect(normalizeDialogSnapshot(dialog)).toMatchSnapshot();
   });

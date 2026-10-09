@@ -103,8 +103,7 @@ type UserListProps = {
   collaborators: Map<SocketId, UserListUserObject>;
   userToFollow: SocketId | null;
   currentUserControls?:
-    | React.ReactNode
-    | ((isMobile: boolean) => React.ReactNode);
+    React.ReactNode | ((isMobile: boolean) => React.ReactNode);
 };
 
 const collaboratorComparatorKeys = [
@@ -168,6 +167,7 @@ export const UserList = React.memo(
         const resizeObserver = new ownerWindow.ResizeObserver((entries) => {
           for (const entry of entries) {
             const { width } = entry.contentRect;
+
             updateWrapperWidth(width);
           }
         });
@@ -341,6 +341,7 @@ export const UserList = React.memo(
 
     for (const [socketId, collaborator] of prev.collaborators) {
       const nextCollaborator = next.collaborators.get(socketId);
+
       if (
         !nextCollaborator ||
         // this checks order of collaborators in the map is the same
@@ -355,6 +356,7 @@ export const UserList = React.memo(
         return false;
       }
     }
+
     return true;
   },
 );

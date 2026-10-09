@@ -47,6 +47,7 @@ const mouse = new Pointer("mouse");
 unmountComponent();
 
 const renderStaticScene = vi.spyOn(StaticScene, "renderStaticScene");
+
 beforeEach(() => {
   localStorage.clear();
   renderStaticScene.mockClear();
@@ -165,6 +166,7 @@ describe("contextMenu element", () => {
       width: 200,
       backgroundColor: "red",
     });
+
     API.setElements([rect1, rect2]);
     API.setSelectedElements([rect1]);
 
@@ -310,10 +312,12 @@ describe("contextMenu element", () => {
       clientY: 3,
     });
     const contextMenu = UI.queryContextMenu();
+
     expect(copiedStyles).toBe("{}");
     fireEvent.click(queryByText(contextMenu!, "Copy styles")!);
     expect(copiedStyles).not.toBe("{}");
     const element = JSON.parse(copiedStyles)[0];
+
     expect(element).toEqual(API.getSelectedElement());
   });
 
@@ -359,8 +363,10 @@ describe("contextMenu element", () => {
     });
 
     let contextMenu = UI.queryContextMenu();
+
     fireEvent.click(queryByText(contextMenu!, "Copy styles")!);
     const secondRect = JSON.parse(copiedStyles)[0];
+
     expect(secondRect.id).toBe(h.elements[1].id);
 
     mouse.reset();
@@ -374,6 +380,7 @@ describe("contextMenu element", () => {
     fireEvent.click(queryByText(contextMenu!, "Paste styles")!);
 
     const firstRect = API.getSelectedElement();
+
     expect(firstRect.id).toBe(h.elements[0].id);
     expect(firstRect.strokeColor).toBe("#e03131");
     expect(firstRect.backgroundColor).toBe("#a5d8ff");
@@ -395,6 +402,7 @@ describe("contextMenu element", () => {
       clientY: 3,
     });
     const contextMenu = UI.queryContextMenu();
+
     fireEvent.click(queryAllByText(contextMenu!, "Delete")[0]);
     expect(API.getSelectedElements()).toHaveLength(0);
     expect(h.elements[0].isDeleted).toBe(true);
@@ -411,10 +419,12 @@ describe("contextMenu element", () => {
       clientY: 3,
     });
     const contextMenu = UI.queryContextMenu();
+
     fireEvent.click(queryByText(contextMenu!, "Add to library")!);
 
     await waitFor(async () => {
       const libraryItems = await h.app.library.getLatestLibrary();
+
       expect(libraryItems[0].elements[0]).toEqual(h.elements[0]);
     });
   });
@@ -430,6 +440,7 @@ describe("contextMenu element", () => {
       clientY: 3,
     });
     const contextMenu = UI.queryContextMenu();
+
     fireEvent.click(queryByText(contextMenu!, "Duplicate")!);
     expect(h.elements).toHaveLength(2);
     const {
@@ -452,6 +463,7 @@ describe("contextMenu element", () => {
       versionNonce: _versionNonce1,
       ...rect2
     } = h.elements[1];
+
     expect(rect1).toEqual(rect2);
   });
 
@@ -472,6 +484,7 @@ describe("contextMenu element", () => {
     });
     const contextMenu = UI.queryContextMenu();
     const elementsBefore = h.elements;
+
     fireEvent.click(queryByText(contextMenu!, "Send backward")!);
     expect(elementsBefore[0].id).toEqual(h.elements[1].id);
     expect(elementsBefore[1].id).toEqual(h.elements[0].id);
@@ -494,6 +507,7 @@ describe("contextMenu element", () => {
     });
     const contextMenu = UI.queryContextMenu();
     const elementsBefore = h.elements;
+
     fireEvent.click(queryByText(contextMenu!, "Bring forward")!);
     expect(elementsBefore[0].id).toEqual(h.elements[1].id);
     expect(elementsBefore[1].id).toEqual(h.elements[0].id);
@@ -516,6 +530,7 @@ describe("contextMenu element", () => {
     });
     const contextMenu = UI.queryContextMenu();
     const elementsBefore = h.elements;
+
     fireEvent.click(queryByText(contextMenu!, "Send to back")!);
     expect(elementsBefore[1].id).toEqual(h.elements[0].id);
   });
@@ -537,6 +552,7 @@ describe("contextMenu element", () => {
     });
     const contextMenu = UI.queryContextMenu();
     const elementsBefore = h.elements;
+
     fireEvent.click(queryByText(contextMenu!, "Bring to front")!);
     expect(elementsBefore[0].id).toEqual(h.elements[1].id);
   });
@@ -561,8 +577,10 @@ describe("contextMenu element", () => {
       clientY: 3,
     });
     const contextMenu = UI.queryContextMenu();
+
     fireEvent.click(queryByText(contextMenu!, "Group selection")!);
     const selectedGroupIds = Object.keys(h.state.selectedGroupIds);
+
     expect(h.elements[0].groupIds).toEqual(selectedGroupIds);
     expect(h.elements[1].groupIds).toEqual(selectedGroupIds);
   });
@@ -592,10 +610,12 @@ describe("contextMenu element", () => {
     });
 
     const contextMenu = UI.queryContextMenu();
+
     expect(contextMenu).not.toBeNull();
     fireEvent.click(queryByText(contextMenu!, "Ungroup selection")!);
 
     const selectedGroupIds = Object.keys(h.state.selectedGroupIds);
+
     expect(selectedGroupIds).toHaveLength(0);
     expect(h.elements[0].groupIds).toHaveLength(0);
     expect(h.elements[1].groupIds).toHaveLength(0);
@@ -616,6 +636,7 @@ describe("contextMenu element", () => {
       fillStyle: "solid",
       groupIds: ["g1"],
     });
+
     API.setElements([rectangle1, rectangle2]);
 
     mouse.rightClickAt(50, 50);

@@ -39,10 +39,12 @@ export function centroid<Point extends GlobalPoint | LocalPoint>(
 ): Point {
   let cx = 0;
   let cy = 0;
+
   for (const [x, y] of points) {
     cx += x;
     cy += y;
   }
+
   return pointFrom<Point>(cx / points.length, cy / points.length);
 }
 
@@ -67,13 +69,16 @@ export function principalAxes<Point extends GlobalPoint | LocalPoint>(
   let m20 = 0;
   let m02 = 0;
   let m11 = 0;
+
   for (const [x, y] of points) {
     const dx = x - c[0];
     const dy = y - c[1];
+
     m20 += dx * dx;
     m02 += dy * dy;
     m11 += dx * dy;
   }
+
   m20 /= points.length;
   m02 /= points.length;
   m11 /= points.length;
@@ -87,6 +92,7 @@ export function principalAxes<Point extends GlobalPoint | LocalPoint>(
   // Eigenvector for the larger eigenvalue. When m11 is 0 the covariance is
   // already diagonal and the axes are the coordinate axes.
   let major: Vector;
+
   if (Math.abs(m11) > Number.EPSILON) {
     major = vectorNormalize(vector(majorVariance - m02, m11));
   } else {
@@ -112,9 +118,11 @@ export function principalCoords<Point extends GlobalPoint | LocalPoint>(
   scale: number = 1,
 ): PrincipalCoords[] {
   const { centroid: c, major, minor } = axes;
+
   return points.map(([x, y]) => {
     const dx = x - c[0];
     const dy = y - c[1];
+
     return [
       (dx * major[0] + dy * major[1]) * scale,
       (dx * minor[0] + dy * minor[1]) * scale,
@@ -134,10 +142,13 @@ export function orientPrincipalAxes<Point extends GlobalPoint | LocalPoint>(
   axes: PrincipalAxes<Point>,
 ): PrincipalAxes<Point> {
   const u = principalCoords(points, axes).map(([uu]) => uu);
+
   if (skewness(u) <= 0) {
     return axes;
   }
+
   const major = vectorScale(axes.major, -1);
+
   return { ...axes, major, minor: vectorNormal(major) };
 }
 
@@ -165,22 +176,28 @@ export function standardizedMoment(
 ): number {
   const n = values.length;
   let mean = 0;
+
   for (const v of values) {
     mean += v;
   }
+
   mean /= n;
 
   let variance = 0;
   let moment = 0;
+
   for (const v of values) {
     const d = v - mean;
+
     variance += d * d;
     moment += d ** order;
   }
+
   variance /= n;
   moment /= n;
 
   const sigma = Math.sqrt(variance);
+
   return sigma > Number.EPSILON ? moment / sigma ** order : 0;
 }
 

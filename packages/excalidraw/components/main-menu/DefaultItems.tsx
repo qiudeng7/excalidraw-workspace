@@ -108,6 +108,7 @@ export const LoadScene = () => {
     </DropdownMenuItem>
   );
 };
+
 LoadScene.displayName = "LoadScene";
 
 export const SaveToActiveFile = () => {
@@ -128,11 +129,13 @@ export const SaveToActiveFile = () => {
     >{`${t("buttons.save")}`}</DropdownMenuItem>
   );
 };
+
 SaveToActiveFile.displayName = "SaveToActiveFile";
 
 export const SaveAsImage = () => {
   const setAppState = useExcalidrawSetAppState();
   const { t } = useI18n();
+
   return (
     <DropdownMenuItem
       icon={ExportImageIcon}
@@ -145,6 +148,7 @@ export const SaveAsImage = () => {
     </DropdownMenuItem>
   );
 };
+
 SaveAsImage.displayName = "SaveAsImage";
 
 export const CommandPalette = (opts?: { className?: string }) => {
@@ -167,6 +171,7 @@ export const CommandPalette = (opts?: { className?: string }) => {
     </DropdownMenuItem>
   );
 };
+
 CommandPalette.displayName = "CommandPalette";
 
 export const SearchMenu = (opts?: { className?: string }) => {
@@ -188,6 +193,7 @@ export const SearchMenu = (opts?: { className?: string }) => {
     </DropdownMenuItem>
   );
 };
+
 SearchMenu.displayName = "SearchMenu";
 
 export const Help = () => {
@@ -207,6 +213,7 @@ export const Help = () => {
     </DropdownMenuItem>
   );
 };
+
 Help.displayName = "Help";
 
 export const ClearCanvas = () => {
@@ -230,6 +237,7 @@ export const ClearCanvas = () => {
     </DropdownMenuItem>
   );
 };
+
 ClearCanvas.displayName = "ClearCanvas";
 
 export const ToggleTheme = (
@@ -265,6 +273,7 @@ export const ToggleTheme = (
         onChange={(value: Theme | "system") => {
           if (appProps.onThemeChange) {
             appProps.onThemeChange(value);
+
             return;
           }
 
@@ -318,6 +327,7 @@ export const ToggleTheme = (
     </DropdownMenuItem>
   );
 };
+
 ToggleTheme.displayName = "ToggleTheme";
 
 export const ChangeCanvasBackground = () => {
@@ -332,6 +342,7 @@ export const ChangeCanvasBackground = () => {
   ) {
     return null;
   }
+
   return (
     <div style={{ marginTop: "0.75rem" }}>
       <div
@@ -350,11 +361,13 @@ export const ChangeCanvasBackground = () => {
     </div>
   );
 };
+
 ChangeCanvasBackground.displayName = "ChangeCanvasBackground";
 
 export const Export = () => {
   const { t } = useI18n();
   const setAppState = useExcalidrawSetAppState();
+
   return (
     <DropdownMenuItem
       icon={ExportIcon}
@@ -368,6 +381,7 @@ export const Export = () => {
     </DropdownMenuItem>
   );
 };
+
 Export.displayName = "Export";
 
 export const Socials = () => {
@@ -399,6 +413,7 @@ export const Socials = () => {
     </>
   );
 };
+
 Socials.displayName = "Socials";
 
 export const LiveCollaborationTrigger = ({
@@ -409,6 +424,7 @@ export const LiveCollaborationTrigger = ({
   isCollaborating: boolean;
 }) => {
   const { t } = useI18n();
+
   return (
     <DropdownMenuItem
       data-testid="collab-button"
@@ -515,6 +531,7 @@ const PreferencesToggleSnapModeItem = () => {
   const { t } = useI18n();
   const actionManager = useExcalidrawActionManager();
   const appState = useUIAppState();
+
   return (
     <DropdownMenuItemCheckbox
       checked={appState.objectsSnapModeEnabled}
@@ -533,6 +550,7 @@ const PreferencesToggleArrowBindingItem = () => {
   const { t } = useI18n();
   const actionManager = useExcalidrawActionManager();
   const appState = useUIAppState();
+
   return (
     <DropdownMenuItemCheckbox
       checked={appState.bindingPreference === "enabled"}
@@ -550,6 +568,7 @@ const PreferencesToggleMidpointSnappingItem = () => {
   const { t } = useI18n();
   const actionManager = useExcalidrawActionManager();
   const appState = useUIAppState();
+
   return (
     <DropdownMenuItemCheckbox
       checked={appState.isMidpointSnappingEnabled}
@@ -567,6 +586,7 @@ const PreferencesToggleShowHintsItem = () => {
   const { t } = useI18n();
   const appState = useUIAppState();
   const setAppState = useExcalidrawSetAppState();
+
   return (
     <DropdownMenuItemCheckbox
       checked={appState.showHints}
@@ -603,6 +623,7 @@ export const PreferencesToggleZenModeItem = () => {
   const { t } = useI18n();
   const actionManager = useExcalidrawActionManager();
   const appState = useUIAppState();
+
   return (
     <DropdownMenuItemCheckbox
       checked={appState.zenModeEnabled}
@@ -621,9 +642,11 @@ const PreferencesToggleViewModeItem = () => {
   const { t } = useI18n();
   const actionManager = useExcalidrawActionManager();
   const appState = useUIAppState();
+
   if (!actionManager.isActionEnabled(actionToggleViewMode)) {
     return null;
   }
+
   return (
     <DropdownMenuItemCheckbox
       checked={appState.viewModeEnabled}
@@ -642,6 +665,7 @@ const PreferencesToggleElementPropertiesItem = () => {
   const { t } = useI18n();
   const actionManager = useExcalidrawActionManager();
   const appState = useUIAppState();
+
   return (
     <DropdownMenuItemCheckbox
       checked={appState.stats.open}
@@ -664,6 +688,7 @@ export const Preferences = ({
   additionalItems?: React.ReactNode;
 }) => {
   const { t } = useI18n();
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSub.Trigger icon={settingsIcon}>

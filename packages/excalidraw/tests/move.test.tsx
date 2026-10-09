@@ -42,6 +42,7 @@ describe("move element", () => {
     {
       // create element
       const tool = getByToolName("rectangle");
+
       fireEvent.click(tool);
       fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
       fireEvent.pointerMove(canvas, { clientX: 60, clientY: 70 });
@@ -153,6 +154,7 @@ describe("duplicate element on move when ALT is clicked", () => {
     {
       // create element
       const tool = getByToolName("rectangle");
+
       fireEvent.click(tool);
       fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
       fireEvent.pointerMove(canvas, { clientX: 60, clientY: 70 });

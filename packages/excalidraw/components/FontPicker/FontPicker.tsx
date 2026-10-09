@@ -68,14 +68,17 @@ const getFontTopPicks = (
   topPicks: readonly FontFamilyValues[],
 ): readonly FontFamilyValues[] => {
   const picks = [...new Set(topPicks)].slice(0, FONT_TOP_PICKS_SLOTS);
+
   for (const fontFamily of DEFAULT_FONT_TOP_PICKS) {
     if (picks.length >= FONT_TOP_PICKS_SLOTS) {
       break;
     }
+
     if (!picks.includes(fontFamily)) {
       picks.push(fontFamily);
     }
   }
+
   return picks;
 };
 
@@ -105,7 +108,9 @@ const needsGlyphSample = (
   if (defaultFontFamilies.has(fontFamily)) {
     return false;
   }
+
   const icon = getFontFamilyIcon(fontFamily);
+
   return picks.some(
     (pick) => pick !== fontFamily && getTopPickFont(pick).icon === icon,
   );
@@ -147,6 +152,7 @@ const FontTopPicks = ({
           {picks.map((fontFamily, index) => {
             const font = getTopPickFont(fontFamily);
             const reorderOffset = getTopPickReorderOffset(dragState, index);
+
             return (
               <button
                 key={fontFamily}

@@ -104,12 +104,14 @@ export default function LibraryMenuItems({
 
   const filteredItems = useMemo(() => {
     const searchQuery = deburr(searchInputValue.trim().toLowerCase());
+
     if (!searchQuery) {
       return [];
     }
 
     return libraryItems.filter((item) => {
       const itemName = item.name || "";
+
       return (
         itemName.trim() && deburr(itemName.toLowerCase()).includes(searchQuery)
       );
@@ -130,6 +132,7 @@ export default function LibraryMenuItems({
     (id: LibraryItem["id"], event: React.MouseEvent) => {
       const shouldSelect = !selectedItems.includes(id);
       const orderedItems = [...unpublishedItems, ...publishedItems];
+
       if (shouldSelect) {
         if (event.shiftKey && lastSelectedItem) {
           const rangeStart = orderedItems.findIndex(
@@ -139,6 +142,7 @@ export default function LibraryMenuItems({
 
           if (rangeStart === -1 || rangeEnd === -1) {
             onSelectItems([...selectedItems, id]);
+
             return;
           }
 
@@ -154,14 +158,17 @@ export default function LibraryMenuItems({
               ) {
                 acc.push(item.id);
               }
+
               return acc;
             },
             [],
           );
+
           onSelectItems(nextSelectedIds);
         } else {
           onSelectItems([...selectedItems, id]);
         }
+
         setLastSelectedItem(id);
       } else {
         setLastSelectedItem(null);
@@ -188,6 +195,7 @@ export default function LibraryMenuItems({
   const getInsertedElements = useCallback(
     (id: string) => {
       let targetElements;
+
       if (selectedItems.includes(id)) {
         targetElements = libraryItems.filter((item) =>
           selectedItems.includes(item.id),
@@ -195,6 +203,7 @@ export default function LibraryMenuItems({
       } else {
         targetElements = libraryItems.filter((item) => item.id === id);
       }
+
       return targetElements.map((item) => {
         return {
           ...item,
@@ -219,6 +228,7 @@ export default function LibraryMenuItems({
       const data: ExcalidrawLibraryIds = {
         itemIds: selectedItems.includes(id) ? selectedItems : [id],
       };
+
       event.dataTransfer.setData(
         MIME_TYPES.excalidrawlibIds,
         JSON.stringify(data),
@@ -232,6 +242,7 @@ export default function LibraryMenuItems({
       if (!id) {
         return false;
       }
+
       return selectedItems.includes(id);
     },
     [selectedItems],
@@ -257,6 +268,7 @@ export default function LibraryMenuItems({
       : ITEMS_RENDERED_PER_BATCH;
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     // focus could be stolen by tab trigger button
     nextAnimationFrame(() => {

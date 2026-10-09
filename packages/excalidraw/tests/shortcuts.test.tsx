@@ -23,6 +23,7 @@ describe("shortcuts", () => {
       Keyboard.keyDown(KEYS.DELETE);
     });
     const confirmDialog = document.querySelector(".confirm-dialog")!;
+
     expect(confirmDialog).not.toBe(null);
 
     fireEvent.click(confirmDialog.querySelector('[aria-label="Confirm"]')!);

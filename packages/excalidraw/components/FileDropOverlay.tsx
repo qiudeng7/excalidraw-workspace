@@ -41,10 +41,12 @@ export const FileDropOverlay = () => {
       const files = Array.from(event.dataTransfer?.items ?? []).filter(
         (item) => item.kind === "file",
       );
+
       // Filenames are protected until drop, so .excalidraw.png/.svg exports
       // cannot be distinguished here. Keep the canvas visible for all images.
       if (files.some((file) => file.type.startsWith("image/"))) {
         setDragState(null);
+
         return;
       }
 
@@ -53,8 +55,8 @@ export const FileDropOverlay = () => {
         type === MIME_TYPES.excalidrawlib
           ? "library"
           : type
-          ? "scene"
-          : "unknown";
+            ? "scene"
+            : "unknown";
 
       setDragState((previous) =>
         previous?.shiftKey === event.shiftKey && previous.kind === kind
@@ -76,6 +78,7 @@ export const FileDropOverlay = () => {
         if (event.dataTransfer) {
           event.dataTransfer.dropEffect = "copy";
         }
+
         dragDepth = Math.max(1, dragDepth);
         update(event);
       }
@@ -136,8 +139,8 @@ export const FileDropOverlay = () => {
               dragState.kind === "library"
                 ? "fileDrop.importLibrary"
                 : dragState.shiftKey
-                ? "fileDrop.add"
-                : "fileDrop.replace",
+                  ? "fileDrop.add"
+                  : "fileDrop.replace",
             )}
           </div>
           <div className="file-drop-overlay__hint">

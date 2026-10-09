@@ -22,11 +22,13 @@ const { h } = window;
 // this lets a test hold the throttled calls back until it releases the frame
 const throttle = vi.hoisted(() => {
   const pending = new Set<() => void>();
+
   return {
     holding: false,
     pending,
     releaseFrame: () => {
       const frames = [...pending];
+
       pending.clear();
       frames.forEach((frame) => frame());
     },
@@ -40,27 +42,34 @@ vi.mock("../reactUtils", async (importOriginal) => {
     let run: (() => void) | null = null;
     const frame = () => {
       const pendingRun = run;
+
       run = null;
       pendingRun?.();
     };
     const ret = (event?: unknown) => {
       if (!throttle.holding) {
         batched(event);
+
         return;
       }
+
       run = () => batched(event);
       throttle.pending.add(frame);
     };
+
     ret.flush = () => {
       throttle.pending.delete(frame);
       frame();
     };
+
     ret.cancel = () => {
       throttle.pending.delete(frame);
       run = null;
     };
+
     return ret;
   };
+
   return { ...actual, withBatchedUpdatesThrottled };
 });
 
@@ -104,6 +113,7 @@ describe("wheel navigation", () => {
     });
 
     const beforeShift = getViewport();
+
     wheel({ deltaY: 40, shiftKey: true });
     expect(getViewport()).toEqual({
       ...beforeShift,
@@ -111,8 +121,10 @@ describe("wheel navigation", () => {
     });
 
     const beforeZoom = getViewport();
+
     wheel({ deltaY: -100, ctrlKey: true });
     const zoomedIn = h.state.zoom.value;
+
     expect(zoomedIn).toBeGreaterThan(beforeZoom.zoom);
     wheel({ deltaY: 100, metaKey: true });
     expect(h.state.zoom.value).toBeLessThan(zoomedIn);
@@ -135,10 +147,12 @@ describe("wheel navigation", () => {
 
       wheel({ deltaY: -100, buttons: WHEEL_BUTTON });
       const zoomedIn = h.state.zoom.value;
+
       expect(zoomedIn).toBeGreaterThan(start.zoom);
 
       wheel({ deltaY: 100, buttons: WHEEL_BUTTON });
       const zoomedOut = h.state.zoom.value;
+
       expect(zoomedOut).toBeLessThan(zoomedIn);
 
       // shift would otherwise pan horizontally
@@ -155,6 +169,7 @@ describe("wheel navigation", () => {
       // the drag-pan owns the viewport: wheel input without the button
       // held is swallowed...
       const start = getViewport();
+
       wheel({ deltaY: 40 });
       expect(getViewport()).toEqual(start);
 
@@ -166,6 +181,7 @@ describe("wheel navigation", () => {
 
       // pan released — plain wheel pans again
       const released = getViewport();
+
       wheel({ deltaY: 40 });
       expect(h.state.scrollY).toBeCloseTo(
         released.scrollY - 40 / released.zoom,
@@ -186,6 +202,7 @@ describe("wheel navigation", () => {
           GlobalTestState.interactiveCanvas,
           wheelButtonPointer,
         );
+
         return viewportCoordsToSceneCoords(wheelButtonPointer, h.state);
       };
 
@@ -197,6 +214,7 @@ describe("wheel navigation", () => {
 
       const expectGrabbedUnderCursor = (grabbed: { x: number; y: number }) => {
         const underCursor = viewportCoordsToSceneCoords(moved, h.state);
+
         expect(underCursor.x).toBeCloseTo(grabbed.x);
         expect(underCursor.y).toBeCloseTo(grabbed.y);
       };
@@ -242,6 +260,7 @@ describe("wheel navigation", () => {
         "broadcasts the final pointer using the committed pan viewport on %s",
         (ending) => {
           const onPointerUpdate = vi.fn();
+
           GlobalTestState.renderResult.rerender(
             <Excalidraw onPointerUpdate={onPointerUpdate} />,
           );
@@ -258,6 +277,7 @@ describe("wheel navigation", () => {
             clientY: 140,
             buttons: 0,
           };
+
           throttle.holding = true;
           try {
             fireEvent.pointerMove(GlobalTestState.interactiveCanvas, moved);
@@ -344,6 +364,7 @@ describe("wheel navigation", () => {
           },
         ] as const)("pans only $axis on $label", ({ modifiers, axis }) => {
           const start = getViewport();
+
           wheel({ deltaX: 10, deltaY: 40, shiftKey: true, ...modifiers });
           expect(getViewport()).toEqual({
             ...start,
@@ -368,27 +389,33 @@ describe("wheel navigation", () => {
         { label: "cmd+wheel", modifiers: { metaKey: true } },
       ])("zooms around the pointer on $label", ({ modifiers }) => {
         const pointer = { clientX: 100, clientY: 100 };
+
         fireEvent.pointerMove(GlobalTestState.interactiveCanvas, pointer);
         const scenePoint = viewportCoordsToSceneCoords(pointer, h.state);
         const start = getViewport();
+
         wheel({ deltaY: -100, ...modifiers });
         expect(h.state.zoom.value).toBeGreaterThan(start.zoom);
 
         const zoomedInPoint = viewportCoordsToSceneCoords(pointer, h.state);
+
         expect(zoomedInPoint.x).toBeCloseTo(scenePoint.x);
         expect(zoomedInPoint.y).toBeCloseTo(scenePoint.y);
 
         const zoomedIn = h.state.zoom.value;
+
         wheel({ deltaY: 100, ...modifiers });
         expect(h.state.zoom.value).toBeLessThan(zoomedIn);
 
         const zoomedOutPoint = viewportCoordsToSceneCoords(pointer, h.state);
+
         expect(zoomedOutPoint.x).toBeCloseTo(scenePoint.x);
         expect(zoomedOutPoint.y).toBeCloseTo(scenePoint.y);
       });
 
       it("keeps zooming with the wheel button held", () => {
         const start = getViewport();
+
         wheel({
           deltaY: -100,
           buttons: WHEEL_BUTTON,
@@ -401,6 +428,7 @@ describe("wheel navigation", () => {
       it("pans sideways on a horizontal-only wheel instead of zooming", () => {
         // a tilt wheel or a sideways two-finger scroll
         const start = getViewport();
+
         wheel({ deltaX: 30 });
         expect(getViewport()).toEqual({
           ...start,
@@ -428,10 +456,13 @@ describe("wheel over a frame label", () => {
       width: 80,
       height: 50,
     });
+
     API.setElements([frame]);
     const label = await waitFor(() => {
       const element = document.querySelector(`.${CLASSES.FRAME_NAME}`);
+
       expect(element).not.toBe(null);
+
       return element as HTMLElement;
     });
 
@@ -439,6 +470,7 @@ describe("wheel over a frame label", () => {
     // accepts it; a React `onWheel` on the label itself used to handle the
     // same event a second time, panning and zooming twice per tick
     const start = getViewport();
+
     fireEvent.wheel(label, { deltaY: 40 });
     expect(h.state.scrollY).toBeCloseTo(start.scrollY - 40 / start.zoom);
   });

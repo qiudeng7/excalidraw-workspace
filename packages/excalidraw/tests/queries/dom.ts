@@ -14,12 +14,16 @@ export const getTextEditor = async ({
   waitForEditor = true,
 }: { selector?: string; waitForEditor?: boolean } = {}) => {
   const error = trimErrorStack(new Error());
+
   try {
     const query = () => document.querySelector(selector) as HTMLTextAreaElement;
+
     if (waitForEditor) {
       await waitFor(() => expect(query()).not.toBe(null));
+
       return query();
     }
+
     return query();
   } catch (err: any) {
     stripIgnoredNodesFromErrorMessage(err);

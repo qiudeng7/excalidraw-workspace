@@ -24,6 +24,7 @@ export const getArrowheadForPicker = (
   arrowhead: AnyArrowhead | null | undefined,
 ): Arrowhead | null => {
   const normalizedArrowhead = normalizeArrowhead(arrowhead);
+
   if (normalizedArrowhead === null) {
     return null;
   }

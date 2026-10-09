@@ -51,6 +51,7 @@ const parseFileContents = async (blob: Blob | File): Promise<string> => {
     } else {
       contents = await new Promise((resolve) => {
         const reader = new FileReader();
+
         reader.readAsText(blob, "utf8");
         reader.onloadend = () => {
           if (reader.readyState === FileReader.DONE) {
@@ -59,6 +60,7 @@ const parseFileContents = async (blob: Blob | File): Promise<string> => {
         };
       });
     }
+
     if (blob.type === MIME_TYPES.svg) {
       try {
         return decodeSvgBase64Payload({
@@ -76,19 +78,23 @@ const parseFileContents = async (blob: Blob | File): Promise<string> => {
       }
     }
   }
+
   return contents;
 };
 
 export const getMimeType = (blob: Blob | string): string => {
   let name: string;
+
   if (typeof blob === "string") {
     name = blob;
   } else {
     if (blob.type) {
       return blob.type;
     }
+
     name = blob.name || "";
   }
+
   if (/\.(excalidraw|json)$/.test(name)) {
     return MIME_TYPES.json;
   } else if (/\.png$/.test(name)) {
@@ -100,6 +106,7 @@ export const getMimeType = (blob: Blob | string): string => {
   } else if (/\.excalidrawlib$/.test(name)) {
     return MIME_TYPES.excalidrawlib;
   }
+
   return "";
 };
 
@@ -121,6 +128,7 @@ export const isImageFileHandle = (
   handle: FileSystemFileHandle | null,
 ): handle is FileSystemFileHandle => {
   const type = getFileHandleType(handle);
+
   return type === "png" || type === "svg";
 };
 
@@ -132,6 +140,7 @@ export const isSupportedImageFile = (
   blob: Blob | null | undefined,
 ): blob is Blob & { type: ValueOf<typeof IMAGE_MIME_TYPES> } => {
   const { type } = blob || {};
+
   return isSupportedImageFileType(type);
 };
 
@@ -145,6 +154,7 @@ export const loadSceneOrLibraryFromBlob = async (
 ) => {
   const contents = await parseFileContents(blob);
   let data;
+
   try {
     try {
       data = JSON.parse(contents);
@@ -155,13 +165,16 @@ export const loadSceneOrLibraryFromBlob = async (
           "IMAGE_NOT_CONTAINS_SCENE_DATA",
         );
       }
+
       throw error;
     }
+
     if (isValidExcalidrawData(data)) {
       const elements = restoreElements(data.elements, localElements, {
         repairBindings: true,
         deleteInvisibleElements: true,
       });
+
       return {
         type: MIME_TYPES.excalidraw,
         data: {
@@ -186,11 +199,13 @@ export const loadSceneOrLibraryFromBlob = async (
         data,
       };
     }
+
     throw new Error("Error: invalid file");
   } catch (error: any) {
     if (error instanceof ImageSceneDataError) {
       throw error;
     }
+
     throw new Error("Error: invalid file");
   }
 };
@@ -209,9 +224,11 @@ export const loadFromBlob = async (
     localElements,
     fileHandle,
   );
+
   if (ret.type !== MIME_TYPES.excalidraw) {
     throw new Error("Error: invalid file");
   }
+
   return ret.data;
 };
 
@@ -220,10 +237,13 @@ export const parseLibraryJSON = (
   defaultStatus: LibraryItem["status"] = "unpublished",
 ) => {
   const data: ImportedLibraryData | undefined = JSON.parse(json);
+
   if (!isValidLibrary(data)) {
     throw new Error("Invalid library");
   }
+
   const libraryItems = data.libraryItems || data.library;
+
   return restoreLibraryItems(libraryItems, defaultStatus);
 };
 
@@ -242,12 +262,14 @@ export const canvasToBlob = async (
       if (isPromiseLike(canvas)) {
         canvas = await canvas;
       }
+
       canvas.toBlob((blob) => {
         if (!blob) {
           return reject(
             new CanvasError("Error: Canvas too big", "CANVAS_POSSIBLY_TOO_BIG"),
           );
         }
+
         resolve(blob);
       });
     } catch (error: any) {
@@ -264,9 +286,11 @@ export const generateIdFromFile = async (file: File): Promise<FileId> => {
       "SHA-1",
       await blobToArrayBuffer(file),
     );
+
     return bytesToHexString(new Uint8Array(hashBuffer)) as FileId;
   } catch (error: any) {
     console.error(error);
+
     // length 40 to align with the HEX length of SHA-1 (which is 160 bit)
     return nanoid(40) as FileId;
   }
@@ -276,10 +300,13 @@ export const generateIdFromFile = async (file: File): Promise<FileId> => {
 export const getDataURL = async (file: Blob | File): Promise<DataURL> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+
     reader.onload = () => {
       const dataURL = reader.result as DataURL;
+
       resolve(dataURL);
     };
+
     reader.onerror = (error) => reject(error);
     reader.readAsDataURL(file);
   });
@@ -302,9 +329,11 @@ export const dataURLToFile = (dataURL: DataURL, filename = "") => {
 
   const ab = new ArrayBuffer(byteString.length);
   const ia = new Uint8Array(ab);
+
   for (let i = 0; i < byteString.length; i++) {
     ia[i] = byteString.charCodeAt(i);
   }
+
   return new File([ab], filename, { type: mimeType });
 };
 
@@ -321,7 +350,11 @@ const getImageFileDimensions = async (file: File) => {
     imageSource = browserURL?.createObjectURL
       ? (objectURL = browserURL.createObjectURL(file))
       : await getDataURL(file);
-  } catch {
+  } catch (error) {
+    console.warn(
+      "Object URL creation failed; falling back to a data URL",
+      error,
+    );
     objectURL = null;
     imageSource = await getDataURL(file);
   }
@@ -345,6 +378,7 @@ const getImageFileDimensions = async (file: File) => {
         height: image.naturalHeight || image.height,
       });
     };
+
     image.onerror = (error) => {
       cleanup();
       reject(error);
@@ -358,7 +392,7 @@ export const resizeImageFile = async (
   file: File,
   opts: {
     /** undefined indicates auto */
-    outputType?: typeof MIME_TYPES["jpg"];
+    outputType?: (typeof MIME_TYPES)["jpg"];
     maxWidthOrHeight: number;
   },
 ): Promise<File> => {
@@ -396,9 +430,11 @@ export const resizeImageFile = async (
 
   if (opts.outputType) {
     const { outputType } = opts;
+
     reduce._create_blob = function (env) {
       return this.pica.toBlob(env.out_canvas, outputType, 0.8).then((blob) => {
         env.out_blob = blob;
+
         return env;
       });
     };
@@ -424,9 +460,13 @@ export const ImageURLToFile = async (
   filename: string = "",
 ): Promise<File | undefined> => {
   let response;
+
   try {
     response = await fetch(imageUrl);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Callers use the FETCH_ERROR cause to present a network-specific message.
+    console.error("Image fetch failed", error);
+
     throw new Error("Error: failed to fetch image", { cause: "FETCH_ERROR" });
   }
 
@@ -438,6 +478,7 @@ export const ImageURLToFile = async (
 
   if (blob.type && isSupportedImageFile(blob)) {
     const name = filename || blob.name || "";
+
     return new File([blob], name, { type: blob.type });
   }
 
@@ -460,9 +501,11 @@ export const getFileHandle = async (
       return handle;
     } catch (error: any) {
       console.warn(error.name, error.message);
+
       return null;
     }
   }
+
   return null;
 };
 
@@ -532,6 +575,7 @@ export const normalizeFile = async (file: File) => {
     // actual mimeType (this is an edge case, but happens - especially
     // with AI generated images)
     const mimeType = await getActualMimeTypeFromImage(file);
+
     if (mimeType && mimeType !== file.type) {
       file = createFile(file, mimeType, file.name);
     }
@@ -546,15 +590,19 @@ export const blobToArrayBuffer = (blob: Blob): Promise<ArrayBuffer> => {
   if ("arrayBuffer" in blob) {
     return blob.arrayBuffer();
   }
+
   // Safari
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
+
     reader.onload = (event) => {
       if (!event.target?.result) {
         return reject(new Error("Couldn't convert blob to ArrayBuffer"));
       }
+
       resolve(event.target.result as ArrayBuffer);
     };
+
     reader.readAsArrayBuffer(blob);
   });
 };

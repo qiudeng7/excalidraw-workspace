@@ -104,7 +104,9 @@ const getErrorLineExtension = (
   if (!errorLine || errorLine < 1 || errorLine > doc.lines) {
     return EditorView.decorations.of(Decoration.none);
   }
+
   const line = doc.line(errorLine);
+
   return EditorView.decorations.of(
     Decoration.set([errorLineDeco.range(line.from)]),
   );
@@ -116,6 +118,7 @@ const getThemeExtensions = (theme: Theme) => {
   if (theme === "dark") {
     return [darkTheme, syntaxHighlighting(darkHighlight)];
   }
+
   return [lightTheme, syntaxHighlighting(lightHighlight)];
 };
 
@@ -153,6 +156,7 @@ const CodeMirrorEditor = ({
               key: "Mod-Enter",
               run: () => {
                 onKeyboardSubmitRef.current?.();
+
                 return true;
               },
             },
@@ -191,9 +195,11 @@ const CodeMirrorEditor = ({
   // Swap theme dynamically via compartment
   useEffect(() => {
     const view = viewRef.current;
+
     if (!view) {
       return;
     }
+
     view.dispatch({
       effects: themeCompartmentRef.current.reconfigure(
         getThemeExtensions(theme),
@@ -204,9 +210,11 @@ const CodeMirrorEditor = ({
   // Update error line highlight
   useEffect(() => {
     const view = viewRef.current;
+
     if (!view) {
       return;
     }
+
     view.dispatch({
       effects: errorLineCompartmentRef.current.reconfigure(
         getErrorLineExtension(errorLine, view.state.doc),
@@ -217,10 +225,13 @@ const CodeMirrorEditor = ({
   // Sync external value changes into EditorView
   useEffect(() => {
     const view = viewRef.current;
+
     if (!view) {
       return;
     }
+
     const currentDoc = view.state.doc.toString();
+
     if (value !== currentDoc) {
       view.dispatch({
         changes: { from: 0, to: currentDoc.length, insert: value },

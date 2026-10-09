@@ -89,6 +89,7 @@ describe("secondary-button pan", () => {
     expect(h.state.contextMenu).toBe(null);
     fireEvent.contextMenu(canvas(), at(104, 102));
     const menu = h.state.contextMenu;
+
     expect(menu).not.toBe(null);
     expect(menu!.left).toBe(104 - h.state.offsetLeft);
     expect(menu!.top).toBe(102 - h.state.offsetTop);
@@ -98,6 +99,7 @@ describe("secondary-button pan", () => {
     "pauses pointer broadcasts until pan release (viewModeEnabled=%s)",
     (viewModeEnabled) => {
       const onPointerUpdate = vi.fn();
+
       GlobalTestState.renderResult.rerender(
         <Excalidraw onPointerUpdate={onPointerUpdate} />,
       );
@@ -110,6 +112,7 @@ describe("secondary-button pan", () => {
 
       // The release can be beyond the last delivered pointer move.
       const released = { ...at(150, 145), buttons: 0 };
+
       fireEvent.pointerUp(canvas(), released);
 
       expect(onPointerUpdate).toHaveBeenCalledTimes(1);
@@ -124,6 +127,7 @@ describe("secondary-button pan", () => {
       );
 
       const hovered = { ...released, clientX: 160, clientY: 155 };
+
       fireEvent.pointerMove(canvas(), hovered);
       expect(onPointerUpdate).toHaveBeenCalledTimes(2);
       expect(onPointerUpdate).toHaveBeenLastCalledWith(
@@ -140,6 +144,7 @@ describe("secondary-button pan", () => {
 
   it("does not broadcast an old pan release after a new press", () => {
     const onPointerUpdate = vi.fn();
+
     GlobalTestState.renderResult.rerender(
       <Excalidraw onPointerUpdate={onPointerUpdate} />,
     );
@@ -148,6 +153,7 @@ describe("secondary-button pan", () => {
     fireEvent.pointerMove(canvas(), at(140, 135));
 
     const nextPress = { ...at(150, 145), button: 0, buttons: 1 };
+
     try {
       // A new press cleans up the pan if its pointerup was missed.
       fireEvent.pointerDown(canvas(), nextPress);
@@ -195,6 +201,7 @@ describe("secondary-button pan", () => {
       backgroundColor: "#ffc9c9",
       fillStyle: "solid",
     });
+
     API.setElements([rectangle]);
 
     fireEvent.pointerDown(canvas(), at(30, 30));

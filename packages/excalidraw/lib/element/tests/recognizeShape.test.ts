@@ -6,6 +6,7 @@ import { recognizeShape } from "../src/convertToShape";
 let seed = 1;
 const random = () => {
   seed = (seed * 1103515245 + 12345) % 2147483648;
+
   return seed / 2147483648 - 0.5;
 };
 
@@ -18,6 +19,7 @@ const sketch = (
   points.map(([x, y]) => {
     const nx = x * scale + random() * noise;
     const ny = y * scale + random() * noise;
+
     return [
       nx * Math.cos(angle) - ny * Math.sin(angle) + 600,
       nx * Math.sin(angle) + ny * Math.cos(angle) + 600,
@@ -57,9 +59,11 @@ const diamond = (w: number, h: number) =>
 
 const ellipse = (rx: number, ry: number): [number, number][] => {
   const points: [number, number][] = [];
+
   for (let a = 0; a <= Math.PI * 2 + 0.05; a += 0.1) {
     points.push([Math.cos(a) * rx, Math.sin(a) * ry]);
   }
+
   return points;
 };
 
@@ -71,11 +75,14 @@ const smooth = (
   pts.map((_, i) => {
     let sx = 0;
     let sy = 0;
+
     for (let k = -window; k <= window; k++) {
       const [x, y] = pts[(i + k + pts.length) % pts.length];
+
       sx += x;
       sy += y;
     }
+
     return [sx / (2 * window + 1), sy / (2 * window + 1)];
   });
 
@@ -98,14 +105,17 @@ const taperedRectangle = (
 // superellipse midway between an ellipse (exponent 2) and a sharp rectangle.
 const roundedRectangle = (rx: number, ry: number): [number, number][] => {
   const points: [number, number][] = [];
+
   for (let a = 0; a <= Math.PI * 2 + 0.05; a += 0.1) {
     const cos = Math.cos(a);
     const sin = Math.sin(a);
+
     points.push([
       Math.sign(cos) * Math.sqrt(Math.abs(cos)) * rx,
       Math.sign(sin) * Math.sqrt(Math.abs(sin)) * ry,
     ]);
   }
+
   return points;
 };
 
@@ -119,6 +129,7 @@ const arrow = (length: number, headRatio: number): [number, number][] => {
     tip[0] - headLength * Math.cos(Math.PI / 6),
     tip[1] - side * headLength * Math.sin(Math.PI / 6),
   ];
+
   return [
     ...edge([-length / 2, 0], tip, 24),
     ...edge(tip, arm(1), 8),
@@ -180,6 +191,7 @@ describe("recognizeShape", () => {
 
   it("tells an arrow from a line by the points its head piles up", () => {
     const options = { angle: 0.3 };
+
     expect(recognizeShape(sketch(line(300), options), null).type).toBe("line");
     expect(recognizeShape(sketch(arrow(300, 0.3), options), null).type).toBe(
       "arrow",
@@ -229,6 +241,7 @@ describe("recognizeShape", () => {
       { length: 40 },
       (_, i) => {
         const a = (Math.PI * i) / 39;
+
         return [Math.cos(a) * 150, Math.sin(a) * 150];
       },
     );
@@ -265,10 +278,12 @@ describe("recognizeShape", () => {
   it("still reads a lazily bowed or squiggly stroke as a line", () => {
     const bowed: [number, number][] = Array.from({ length: 40 }, (_, i) => {
       const t = i / 39;
+
       return [t * 300, Math.sin(t * Math.PI) * 24];
     });
     const squiggly: [number, number][] = Array.from({ length: 40 }, (_, i) => {
       const t = i / 39;
+
       return [t * 300, Math.sin(t * Math.PI * 4) * 12];
     });
 

@@ -62,16 +62,19 @@ export async function* parseSSEStream(
       buffer += decoder.decode(value, { stream: true });
 
       const lines = buffer.split("\n");
+
       buffer = lines.pop() || "";
 
       for (const line of lines) {
         const trimmedLine = line.trim();
+
         if (!trimmedLine) {
           continue;
         }
 
         if (trimmedLine.startsWith("data: ")) {
           const data = trimmedLine.slice(6);
+
           yield data;
         }
       }
@@ -124,6 +127,7 @@ export async function TTDStreamFetch(
       }
 
       const text = await response.text();
+
       throw new RequestError({
         message: text || "Generation failed...",
         status: response.status,
@@ -157,12 +161,15 @@ export async function TTDStreamFetch(
           switch (chunk.type) {
             case "content": {
               const delta = chunk.delta;
+
               if (delta) {
                 fullResponse += delta;
                 onChunk?.(delta);
               }
+
               break;
             }
+
             case "error":
               error = new RequestError({
                 message: chunk.error.message,
@@ -215,6 +222,7 @@ export async function TTDStreamFetch(
         error: new RequestError({ message: "Request aborted", status: 499 }),
       };
     }
+
     return {
       error: new RequestError({
         message: err.message || "Request failed",

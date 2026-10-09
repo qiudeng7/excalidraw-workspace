@@ -17,9 +17,11 @@ const flushMicrotasks = async () => Promise.resolve();
 describe("AppEventBus", () => {
   it("replays once events to late callback and Promise subscribers", async () => {
     const bus = new AppEventBus<TestEvents, typeof behavior>(behavior);
+
     bus.emit("initialize", 42);
 
     const calls: number[] = [];
+
     bus.on("initialize", (value) => {
       calls.push(value);
     });
@@ -33,9 +35,11 @@ describe("AppEventBus", () => {
 
   it("does not replay stream events to late subscribers", async () => {
     const bus = new AppEventBus<TestEvents, typeof behavior>(behavior);
+
     bus.emit("pointerUp", "first");
 
     const calls: string[] = [];
+
     bus.on("pointerUp", (pointerId) => {
       calls.push(pointerId);
     });
@@ -49,9 +53,11 @@ describe("AppEventBus", () => {
 
   it("replays replay-last stream events and stays subscribed", async () => {
     const bus = new AppEventBus<TestEvents, typeof behavior>(behavior);
+
     bus.emit("viewState", 1);
 
     const calls: number[] = [];
+
     bus.on("viewState", (zoom) => {
       calls.push(zoom);
     });
@@ -65,6 +71,7 @@ describe("AppEventBus", () => {
 
   it("throws when emitting a once event twice", () => {
     const bus = new AppEventBus<TestEvents, typeof behavior>(behavior);
+
     bus.emit("initialize", 1);
 
     expect(() => {

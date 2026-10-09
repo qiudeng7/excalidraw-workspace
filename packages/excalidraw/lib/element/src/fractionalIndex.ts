@@ -70,6 +70,7 @@ export const validateFractionalIndices = (
   const elementsMap = includeBoundTextValidation ? arrayToMap(elements) : null;
 
   const indices = elements.map((x) => x.index);
+
   for (const [i, index] of indices.entries()) {
     const predecessorIndex = indices[i - 1];
     const successorIndex = indices[i + 1];
@@ -207,7 +208,11 @@ export const syncMovedIndices = (
     for (const [element, { index }] of elementsUpdates) {
       mutateElement(element, elementsMap, { index });
     }
-  } catch (e) {
+  } catch (error) {
+    console.warn(
+      "Fractional index update failed; repairing element ordering",
+      error,
+    );
     // fallback to default sync
     syncInvalidIndices(elements);
   }
@@ -340,6 +345,7 @@ const getInvalidIndicesGroups = (elements: readonly ExcalidrawElement[]) => {
 
     // set the current upperBoundIndex as the starting point
     let i = upperBoundIndex;
+
     while (++i < elements.length) {
       const candidate = elements[i]?.index;
 
@@ -359,6 +365,7 @@ const getInvalidIndicesGroups = (elements: readonly ExcalidrawElement[]) => {
 
   while (i < elements.length) {
     const current = elements[i].index;
+
     [lowerBound, lowerBoundIndex] = getLowerBound(i);
     [upperBound, upperBoundIndex] = getUpperBound(i);
 
@@ -405,7 +412,9 @@ const isValidFractionalIndex = (
   try {
     // Format validation
     validateOrderKey(index);
-  } catch {
+  } catch (error) {
+    console.debug("Invalid fractional order key", error);
+
     return false;
   }
 

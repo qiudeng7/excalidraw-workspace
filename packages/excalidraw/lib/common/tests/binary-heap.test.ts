@@ -5,9 +5,11 @@ describe("BinaryHeap", () => {
 
   const drain = (heap: BinaryHeap<number>) => {
     const out: number[] = [];
+
     while (heap.size() > 0) {
       out.push(heap.pop()!);
     }
+
     return out;
   };
 
@@ -22,6 +24,7 @@ describe("BinaryHeap", () => {
 
     it("remove() is a no-op and does not throw", () => {
       const heap = numberHeap();
+
       expect(() => heap.remove(1)).not.toThrow();
       expect(heap.size()).toBe(0);
     });
@@ -30,6 +33,7 @@ describe("BinaryHeap", () => {
   describe("push / pop", () => {
     it("tracks size as items are added and removed", () => {
       const heap = numberHeap();
+
       [3, 1, 2].forEach((n) => heap.push(n));
       expect(heap.size()).toBe(3);
 
@@ -39,6 +43,7 @@ describe("BinaryHeap", () => {
 
     it("pops a single pushed element back out", () => {
       const heap = numberHeap();
+
       heap.push(42);
       expect(heap.pop()).toBe(42);
       expect(heap.pop()).toBe(null);
@@ -46,12 +51,14 @@ describe("BinaryHeap", () => {
 
     it("always pops the smallest score first", () => {
       const heap = numberHeap();
+
       [5, 3, 8, 1, 9, 2, 7].forEach((n) => heap.push(n));
       expect(drain(heap)).toEqual([1, 2, 3, 5, 7, 8, 9]);
     });
 
     it("handles duplicate scores", () => {
       const heap = numberHeap();
+
       [4, 1, 4, 1, 2].forEach((n) => heap.push(n));
       expect(drain(heap)).toEqual([1, 1, 2, 4, 4]);
     });
@@ -60,6 +67,7 @@ describe("BinaryHeap", () => {
       const heap = numberHeap();
       // pushing in descending order forces a sift-up on every insert
       const input = Array.from({ length: 1000 }, (_, i) => 1000 - i);
+
       input.forEach((n) => heap.push(n));
       expect(drain(heap)).toEqual([...input].sort((a, b) => a - b));
     });
@@ -68,6 +76,7 @@ describe("BinaryHeap", () => {
   describe("remove", () => {
     it("removes an interior element and keeps the rest ordered", () => {
       const heap = numberHeap();
+
       [5, 3, 8, 1, 9].forEach((n) => heap.push(n));
 
       heap.remove(8);
@@ -78,6 +87,7 @@ describe("BinaryHeap", () => {
 
     it("can remove the current minimum", () => {
       const heap = numberHeap();
+
       [5, 3, 8, 1, 9].forEach((n) => heap.push(n));
 
       heap.remove(1);
@@ -96,6 +106,7 @@ describe("BinaryHeap", () => {
       const a = { id: "a", f: 10 };
       const b = { id: "b", f: 20 };
       const c = { id: "c", f: 30 };
+
       [a, b, c].forEach((node) => heap.push(node));
 
       c.f = 5;

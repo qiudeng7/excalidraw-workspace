@@ -852,6 +852,7 @@ describe("inner box-selection", () => {
       width: 50,
       height: 50,
     });
+
     API.setElements([rect1, rect2, rect3]);
     Keyboard.withModifierKeys({ ctrl: true }, () => {
       mouse.downAt(40, 40);
@@ -889,6 +890,7 @@ describe("inner box-selection", () => {
       height: 50,
       groupIds: ["A"],
     });
+
     API.setElements([rect1, rect2, rect3]);
 
     Keyboard.withModifierKeys({ ctrl: true }, () => {
@@ -937,6 +939,7 @@ describe("inner box-selection", () => {
       height: 50,
       groupIds: ["outer"],
     });
+
     API.setElements([innerRect1, innerRect2, outerRect]);
 
     Keyboard.withModifierKeys({ ctrl: true }, () => {
@@ -1052,6 +1055,7 @@ describe("inner box-selection", () => {
       height: 50,
       groupIds: ["A"],
     });
+
     API.setElements([container, boundText, rect]);
 
     Keyboard.withModifierKeys({ ctrl: true }, () => {
@@ -1092,6 +1096,7 @@ describe("inner box-selection", () => {
       height: 50,
       groupIds: ["A"],
     });
+
     API.setElements([rect1, rect2, rect3]);
     Keyboard.withModifierKeys({ ctrl: true }, () => {
       mouse.downAt(rect2.x - 20, rect2.y - 20);
@@ -1112,14 +1117,17 @@ describe("selection element", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("selection");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
+
     fireEvent.pointerDown(canvas, { clientX: 60, clientY: 100 });
 
     expect(renderInteractiveScene).toHaveBeenCalledTimes(3);
     expect(renderStaticScene).toHaveBeenCalledTimes(3);
     const selectionElement = h.state.selectionElement!;
+
     expect(selectionElement).not.toBeNull();
     expect(selectionElement.type).toEqual("selection");
     expect([selectionElement.x, selectionElement.y]).toEqual([60, 100]);
@@ -1133,9 +1141,11 @@ describe("selection element", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("selection");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
+
     fireEvent.pointerDown(canvas, { clientX: 60, clientY: 100 });
     fireEvent.pointerMove(canvas, { clientX: -1000, clientY: -1000 });
     fireEvent.pointerMove(canvas, { clientX: 150, clientY: 30 });
@@ -1143,6 +1153,7 @@ describe("selection element", () => {
     expect(renderInteractiveScene).toHaveBeenCalledTimes(5);
     expect(renderStaticScene).toHaveBeenCalledTimes(3);
     const selectionElement = h.state.selectionElement!;
+
     expect(selectionElement).not.toBeNull();
     expect(selectionElement.type).toEqual("selection");
     expect([selectionElement.x, selectionElement.y]).toEqual([60, 30]);
@@ -1156,9 +1167,11 @@ describe("selection element", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("selection");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
+
     fireEvent.pointerDown(canvas, { clientX: 60, clientY: 100 });
     fireEvent.pointerMove(canvas, { clientX: -1000, clientY: -1000 });
     fireEvent.pointerMove(canvas, { clientX: 150, clientY: 30 });
@@ -1184,9 +1197,11 @@ describe("select single element on the scene", () => {
       <Excalidraw handleKeyboardGlobally={true} />,
     );
     const canvas = container.querySelector("canvas.interactive")!;
+
     {
       // create element
       const tool = getByToolName("rectangle");
+
       fireEvent.click(tool);
       fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
       fireEvent.pointerMove(canvas, { clientX: -1000, clientY: -1000 });
@@ -1198,6 +1213,7 @@ describe("select single element on the scene", () => {
     }
 
     const tool = getByToolName("selection");
+
     fireEvent.click(tool);
     // click on a line on the rectangle
     fireEvent.pointerDown(canvas, { clientX: 45, clientY: 20 });
@@ -1217,9 +1233,11 @@ describe("select single element on the scene", () => {
       <Excalidraw handleKeyboardGlobally={true} />,
     );
     const canvas = container.querySelector("canvas.interactive")!;
+
     {
       // create element
       const tool = getByToolName("diamond");
+
       fireEvent.click(tool);
       fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
       fireEvent.pointerMove(canvas, { clientX: -1000, clientY: -1000 });
@@ -1231,6 +1249,7 @@ describe("select single element on the scene", () => {
     }
 
     const tool = getByToolName("selection");
+
     fireEvent.click(tool);
     // click on a line on the rectangle
     fireEvent.pointerDown(canvas, { clientX: 45, clientY: 20 });
@@ -1250,9 +1269,11 @@ describe("select single element on the scene", () => {
       <Excalidraw handleKeyboardGlobally={true} />,
     );
     const canvas = container.querySelector("canvas.interactive")!;
+
     {
       // create element
       const tool = getByToolName("ellipse");
+
       fireEvent.click(tool);
       fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
       fireEvent.pointerMove(canvas, { clientX: -1000, clientY: -1000 });
@@ -1264,6 +1285,7 @@ describe("select single element on the scene", () => {
     }
 
     const tool = getByToolName("selection");
+
     fireEvent.click(tool);
     // click on a line on the rectangle
     fireEvent.pointerDown(canvas, { clientX: 45, clientY: 20 });
@@ -1283,9 +1305,11 @@ describe("select single element on the scene", () => {
       <Excalidraw handleKeyboardGlobally={true} />,
     );
     const canvas = container.querySelector("canvas.interactive")!;
+
     {
       // create element
       const tool = getByToolName("arrow");
+
       fireEvent.click(tool);
       fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
       fireEvent.pointerMove(canvas, { clientX: -1000, clientY: -1000 });
@@ -1310,6 +1334,7 @@ describe("select single element on the scene", () => {
     */
 
     const tool = getByToolName("selection");
+
     fireEvent.click(tool);
     // click on a line on the arrow
     fireEvent.pointerDown(canvas, { clientX: 40, clientY: 40 });
@@ -1328,9 +1353,11 @@ describe("select single element on the scene", () => {
       <Excalidraw handleKeyboardGlobally={true} />,
     );
     const canvas = container.querySelector("canvas.interactive")!;
+
     {
       // create element
       const tool = getByToolName("line");
+
       fireEvent.click(tool);
       fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
       fireEvent.pointerMove(canvas, { clientX: -1000, clientY: -1000 });
@@ -1355,6 +1382,7 @@ describe("select single element on the scene", () => {
     */
 
     const tool = getByToolName("selection");
+
     fireEvent.click(tool);
     // click on a line on the arrow
     fireEvent.pointerDown(canvas, { clientX: 40, clientY: 40 });
@@ -1393,6 +1421,7 @@ describe("tool locking & selection", () => {
         value !== "bucketfill"
       ) {
         const element = UI.createElement(value);
+
         expect(h.state.selectedElementIds[element.id]).not.toBe(true);
       }
     }

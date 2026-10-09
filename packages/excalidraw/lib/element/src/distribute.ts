@@ -39,6 +39,7 @@ export const distributeElements = (
     .sort((a, b) => a[1][mid] - b[1][mid]);
 
   let span = 0;
+
   for (const group of groups) {
     span += group[1][extent];
   }
@@ -77,9 +78,11 @@ export const distributeElements = (
           x: element.x + translation.x,
           y: element.y + translation.y,
         });
+
         updateBoundElements(element, scene, {
           simultaneouslyUpdated: group,
         });
+
         return updatedElement;
       });
     });
@@ -105,9 +108,11 @@ export const distributeElements = (
         x: element.x + translation.x,
         y: element.y + translation.y,
       });
+
       updateBoundElements(element, scene, {
         simultaneouslyUpdated: group,
       });
+
       return updatedElement;
     });
   });

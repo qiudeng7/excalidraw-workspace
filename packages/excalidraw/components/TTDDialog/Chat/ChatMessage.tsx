@@ -39,6 +39,7 @@ export const ChatMessage: React.FC<{
 
     if (message.error && !message.lastAttemptAt) {
       setCanRetry(true);
+
       return;
     }
 
@@ -47,6 +48,7 @@ export const ChatMessage: React.FC<{
 
     if (remainingTime === 0) {
       setCanRetry(true);
+
       return;
     }
 
@@ -64,6 +66,7 @@ export const ChatMessage: React.FC<{
 
   if (message.type === "warning") {
     const customOverride = renderWarning?.(message);
+
     return (
       <div className="chat-message chat-message--system">
         <div className="chat-message__content">

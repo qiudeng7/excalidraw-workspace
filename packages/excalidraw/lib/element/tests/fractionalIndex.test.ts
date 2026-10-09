@@ -618,6 +618,7 @@ describe("sync invalid indices with array order", () => {
       const movedElements = Array.from({ length }).map(
         (_, index) => `A_${index}`,
       );
+
       // remove last element
       movedElements.pop();
 
@@ -653,6 +654,7 @@ describe("sync invalid indices with array order", () => {
       const movedElements = Array.from({ length }).map(
         (_, index) => `A_${index}`,
       );
+
       // remove first element
       movedElements.shift();
 
@@ -860,6 +862,7 @@ function test(
 
     syncedElements.forEach((synced, index) => {
       const element = elements[index];
+
       // ensure the order hasn't changed
       expect(synced.id).toBe(element.id);
 

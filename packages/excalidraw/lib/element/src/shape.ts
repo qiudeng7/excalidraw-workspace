@@ -97,11 +97,18 @@ export class ShapeCache {
     shortArrowheads?: boolean,
   ) => {
     const cached = ShapeCache.cache.get(element);
-    if (cached && (theme === null || cached.theme === theme) && (shortArrowheads === undefined || cached.shortArrowheads === shortArrowheads)) {
+
+    if (
+      cached &&
+      (theme === null || cached.theme === theme) &&
+      (shortArrowheads === undefined ||
+        cached.shortArrowheads === shortArrowheads)
+    ) {
       return cached.shape as T["type"] extends keyof ElementShapes
         ? ElementShapes[T["type"]] | undefined
         : ElementShape | undefined;
     }
+
     return undefined;
   };
 
@@ -133,7 +140,11 @@ export class ShapeCache {
     // when exporting, always regenerated to guarantee the latest shape
     const cachedShape = renderConfig?.isExporting
       ? undefined
-      : ShapeCache.get(element, renderConfig ? renderConfig.theme : null, !!renderConfig?.shortArrowheads);
+      : ShapeCache.get(
+          element,
+          renderConfig ? renderConfig.theme : null,
+          !!renderConfig?.shortArrowheads,
+        );
 
     // `null` indicates no rc shape applicable for this element type,
     // but it's considered a valid cache value (= do not regenerate)
@@ -206,8 +217,8 @@ export const generateRoughOptions = (
       element.strokeStyle === "dashed"
         ? getDashArrayDashed(element.strokeWidth)
         : element.strokeStyle === "dotted"
-        ? getDashArrayDotted(element.strokeWidth)
-        : undefined,
+          ? getDashArrayDotted(element.strokeWidth)
+          : undefined,
     // for non-solid strokes, disable multiStroke because it tends to make
     // dashes/dots overlay each other
     disableMultiStroke: element.strokeStyle !== "solid",
@@ -241,8 +252,10 @@ export const generateRoughOptions = (
       if (element.type === "ellipse") {
         options.curveFitting = 1;
       }
+
       return options;
     }
+
     case "line":
     case "freedraw": {
       if (isPathALoop(element.points)) {
@@ -252,8 +265,10 @@ export const generateRoughOptions = (
             ? undefined
             : applyDarkModeFilter(element.backgroundColor, isDarkMode);
       }
+
       return options;
     }
+
     case "arrow":
       return options;
     default: {
@@ -292,6 +307,7 @@ const modifyIframeLikeForRoughOptions = (
         : element.backgroundColor,
     };
   }
+
   return element;
 };
 
@@ -335,11 +351,13 @@ const getArrowheadLineOptions = (
   if (element.strokeStyle === "dotted") {
     // for dotted arrows caps, reduce gap to make it more legible
     const dash = getDashArrayDotted(element.strokeWidth - 1);
+
     lineOptions.strokeLineDash = [dash[0], dash[1] - 1];
   } else {
     // for solid/dashed, keep solid arrow cap
     delete lineOptions.strokeLineDash;
   }
+
   lineOptions.roughness = Math.min(1, lineOptions.roughness || 0);
 
   return lineOptions;
@@ -401,10 +419,18 @@ const getArrowheadShapes = (
         generator,
         options,
         strokeColor,
-        getArrowheadPoints(element, shape, position, arrowhead, 0, shortArrowheads),
+        getArrowheadPoints(
+          element,
+          shape,
+          position,
+          arrowhead,
+          0,
+          shortArrowheads,
+        ),
         arrowhead === "circle_outline" ? backgroundFillColor : strokeColor,
       );
     }
+
     case "triangle":
     case "triangle_outline": {
       const arrowheadPoints = getArrowheadPoints(
@@ -442,6 +468,7 @@ const getArrowheadShapes = (
         ),
       ];
     }
+
     case "diamond":
     case "diamond_outline": {
       const arrowheadPoints = getArrowheadPoints(
@@ -480,16 +507,31 @@ const getArrowheadShapes = (
         ),
       ];
     }
+
     case "cardinality_one":
       return generateArrowheadCardinalityOne(
         generator,
-        getArrowheadPoints(element, shape, position, arrowhead, 0, shortArrowheads),
+        getArrowheadPoints(
+          element,
+          shape,
+          position,
+          arrowhead,
+          0,
+          shortArrowheads,
+        ),
         getArrowheadLineOptions(element, options),
       );
     case "cardinality_many":
       return generateArrowheadLinesToTip(
         generator,
-        getArrowheadPoints(element, shape, position, arrowhead, 0, shortArrowheads),
+        getArrowheadPoints(
+          element,
+          shape,
+          position,
+          arrowhead,
+          0,
+          shortArrowheads,
+        ),
         getArrowheadLineOptions(element, options),
       );
     case "cardinality_one_or_many": {
@@ -514,6 +556,7 @@ const getArrowheadShapes = (
         ),
       ];
     }
+
     case "cardinality_exactly_one": {
       const lineOptions = getArrowheadLineOptions(element, options);
 
@@ -530,6 +573,7 @@ const getArrowheadShapes = (
         ),
       ];
     }
+
     case "cardinality_zero_or_one": {
       const lineOptions = getArrowheadLineOptions(element, options);
 
@@ -549,6 +593,7 @@ const getArrowheadShapes = (
         ),
       ];
     }
+
     case "cardinality_zero_or_many": {
       const lineOptions = getArrowheadLineOptions(element, options);
 
@@ -568,12 +613,20 @@ const getArrowheadShapes = (
         ),
       ];
     }
+
     case "bar":
     case "arrow":
     default: {
       return generateArrowheadLinesToTip(
         generator,
-        getArrowheadPoints(element, shape, position, arrowhead, 0, shortArrowheads),
+        getArrowheadPoints(
+          element,
+          shape,
+          position,
+          arrowhead,
+          0,
+          shortArrowheads,
+        ),
         getArrowheadLineOptions(element, options),
       );
     }
@@ -595,6 +648,7 @@ const freedrawFillPolygonCache = new WeakMap<
  */
 export const getFreedrawFillPolygon = (element: ExcalidrawFreeDrawElement) => {
   const cached = freedrawFillPolygonCache.get(element);
+
   if (cached?.version === element.version) {
     return cached.polygon;
   }
@@ -606,6 +660,7 @@ export const getFreedrawFillPolygon = (element: ExcalidrawFreeDrawElement) => {
     disableMultiStroke: true,
   }).sets[0].ops;
   const bezierPoints: LocalPoint[] = [];
+
   // A single curve pass consists of a move followed by cubic control points.
   for (const { data } of ops) {
     for (let i = 0; i < data.length; i += 2) {
@@ -617,6 +672,7 @@ export const getFreedrawFillPolygon = (element: ExcalidrawFreeDrawElement) => {
   const polygon = polygonFromPoints(
     pointsOnBezierCurves(bezierPoints, 0.5) as LocalPoint[],
   );
+
   freedrawFillPolygonCache.set(element, { version: element.version, polygon });
 
   return polygon;
@@ -721,6 +777,7 @@ export const generateLinearCollisionShape = (
           };
         });
     }
+
     case "freedraw": {
       const outlinePoints = getFreedrawOutlinePoints(element);
 
@@ -789,6 +846,7 @@ const _generateElementShape = (
   },
 ): ElementShape => {
   const isDarkMode = theme === THEME.DARK;
+
   switch (element.type) {
     case "rectangle":
     case "iframe":
@@ -801,6 +859,7 @@ const _generateElementShape = (
         const w = element.width;
         const h = element.height;
         const r = getCornerRadius(Math.min(w, h), element);
+
         shape = generator.path(
           `M ${r} 0 L ${w - r} 0 Q ${w} 0, ${w} ${r} L ${w} ${
             h - r
@@ -834,13 +893,16 @@ const _generateElementShape = (
           ),
         );
       }
+
       return shape;
     }
+
     case "diamond": {
       let shape: ElementShapes[typeof element.type];
 
       const [topX, topY, rightX, rightY, bottomX, bottomY, leftX, leftY] =
         getDiamondPoints(element);
+
       if (element.roundness) {
         const verticalRadius = getCornerRadius(Math.abs(topX - leftX), element);
 
@@ -854,20 +916,20 @@ const _generateElementShape = (
             rightX - verticalRadius
           } ${rightY - horizontalRadius}
             C ${rightX} ${rightY}, ${rightX} ${rightY}, ${
-            rightX - verticalRadius
-          } ${rightY + horizontalRadius}
+              rightX - verticalRadius
+            } ${rightY + horizontalRadius}
             L ${bottomX + verticalRadius} ${bottomY - horizontalRadius}
             C ${bottomX} ${bottomY}, ${bottomX} ${bottomY}, ${
-            bottomX - verticalRadius
-          } ${bottomY - horizontalRadius}
+              bottomX - verticalRadius
+            } ${bottomY - horizontalRadius}
             L ${leftX + verticalRadius} ${leftY + horizontalRadius}
             C ${leftX} ${leftY}, ${leftX} ${leftY}, ${leftX + verticalRadius} ${
-            leftY - horizontalRadius
-          }
+              leftY - horizontalRadius
+            }
             L ${topX - verticalRadius} ${topY + horizontalRadius}
             C ${topX} ${topY}, ${topX} ${topY}, ${topX + verticalRadius} ${
-            topY + horizontalRadius
-          }`,
+              topY + horizontalRadius
+            }`,
           generateRoughOptions(element, true, isDarkMode),
         );
       } else {
@@ -881,8 +943,10 @@ const _generateElementShape = (
           generateRoughOptions(element, false, isDarkMode),
         );
       }
+
       return shape;
     }
+
     case "ellipse": {
       const shape: ElementShapes[typeof element.type] = generator.ellipse(
         element.width / 2,
@@ -891,8 +955,10 @@ const _generateElementShape = (
         element.height,
         generateRoughOptions(element, false, isDarkMode),
       );
+
       return shape;
     }
+
     case "line":
     case "arrow": {
       let shape: ElementShapes[typeof element.type];
@@ -957,6 +1023,7 @@ const _generateElementShape = (
             isDarkMode,
             shortArrowheads,
           );
+
           shape.push(...shapes);
         }
 
@@ -976,11 +1043,14 @@ const _generateElementShape = (
             isDarkMode,
             shortArrowheads,
           );
+
           shape.push(...shapes);
         }
       }
+
       return shape;
     }
+
     case "freedraw": {
       // oredered in terms of z-index [background, stroke]
       const shapes: ElementShapes[typeof element.type] = [];
@@ -1001,6 +1071,7 @@ const _generateElementShape = (
 
       return shapes;
     }
+
     // sticky notes are painted directly (canvas + SVG) from
     // `getStickyNoteRenderPoints`, never through roughjs
     case "stickynote":
@@ -1009,15 +1080,18 @@ const _generateElementShape = (
     case "text":
     case "image": {
       const shape: ElementShapes[typeof element.type] = null;
+
       // we return (and cache) `null` to make sure we don't regenerate
       // `element.canvas` on rerenders
       return shape;
     }
+
     default: {
       assertNever(
         element,
         `generateElementShape(): Unimplemented type ${(element as any)?.type}`,
       );
+
       return null;
     }
   }
@@ -1028,6 +1102,7 @@ const generateElbowArrowShape = (
   radius: number,
 ) => {
   const subpoints = [] as [number, number][];
+
   for (let i = 1; i < points.length - 1; i += 1) {
     const prev = points[i - 1];
     const next = points[i + 1];
@@ -1075,6 +1150,7 @@ const generateElbowArrowShape = (
   }
 
   const d = [`M ${points[0][0]} ${points[0][1]}`];
+
   for (let i = 0; i < subpoints.length; i += 3) {
     d.push(`L ${subpoints[i][0]} ${subpoints[i][1]}`);
     d.push(
@@ -1083,6 +1159,7 @@ const generateElbowArrowShape = (
       } ${subpoints[i + 2][1]}`,
     );
   }
+
   d.push(`L ${points[points.length - 1][0]} ${points[points.length - 1][1]}`);
 
   return d.join(" ");
@@ -1134,6 +1211,7 @@ export const getElementShape = <Point extends GlobalPoint | LocalPoint>(
 
     case "freedraw": {
       const [, , , , cx, cy] = getElementAbsoluteCoords(element, elementsMap);
+
       return getFreedrawShape(
         element,
         pointFrom(cx, cy),
@@ -1236,10 +1314,11 @@ const getVariableWidthFreedrawOutline = (
   const inputPoints = element.simulatePressure
     ? element.points
     : element.points.length
-    ? element.points.map(
-        ([x, y], i) => [x, y, element.pressures[i]] as [number, number, number],
-      )
-    : [[0, 0, 0.5]];
+      ? element.points.map(
+          ([x, y], i) =>
+            [x, y, element.pressures[i]] as [number, number, number],
+        )
+      : [[0, 0, 0.5]];
 
   return getStroke(inputPoints as number[][], {
     simulatePressure: element.simulatePressure,
@@ -1268,6 +1347,7 @@ const getConstantWidthFreedrawOutline = (
   element: ExcalidrawFreeDrawElement,
 ): [number, number][] => {
   const laserPointer = createLaserPointer(element);
+
   element.points.map(([x, y]) => laserPointer.addPoint([x, y, 1]));
 
   return laserPointer
@@ -1343,6 +1423,7 @@ const getSvgPathFromStroke = (points: number[][]): string => {
         } else {
           acc.push(point, med(point, arr[i + 1]));
         }
+
         return acc;
       },
       ["M", points[0], "Q"],

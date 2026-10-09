@@ -92,11 +92,13 @@ export const dragSelectedElements = (
 
   for (const element of elementsToUpdate) {
     const origElement = pointerDownState.originalElements.get(element.id);
+
     // if original element is not set (e.g. when you duplicate during a drag
     // operation), exit to avoid undefined behavior
     if (!origElement) {
       return;
     }
+
     origElements.push(origElement);
   }
 
@@ -123,6 +125,7 @@ export const dragSelectedElements = (
         element,
         scene.getNonDeletedElementsMap(),
       );
+
       if (textElement) {
         updateElementCoords(
           pointerDownState,
@@ -131,6 +134,7 @@ export const dragSelectedElements = (
           adjustedOffset,
         );
       }
+
       updateBoundElements(element, scene, {
         simultaneouslyUpdated: elementsToUpdateArray,
       });
@@ -151,6 +155,7 @@ export const dragSelectedElements = (
       const shouldUnbindEnd = element.endBinding
         ? !elementsToUpdateIds.has(element.endBinding.elementId)
         : true;
+
       if (shouldUnbindStart || shouldUnbindEnd) {
         // NOTE: Moving the bound arrow should unbind it, otherwise we would
         // have weird situations, like 0 lenght arrow when the user moves
@@ -159,6 +164,7 @@ export const dragSelectedElements = (
         if (shouldUnbindStart) {
           unbindBindingElement(element, "start", scene);
         }
+
         if (shouldUnbindEnd) {
           unbindBindingElement(element, "end", scene);
         }
@@ -192,6 +198,7 @@ const calculateOffset = (
       nextY = nextGridY;
     }
   }
+
   return {
     x: nextX - x,
     y: nextY - y,
@@ -222,6 +229,7 @@ export const getDragOffsetXY = (
   y: number,
 ): [number, number] => {
   const [x1, y1] = getCommonBounds(selectedElements);
+
   return [x - x1, y - y1];
 };
 
@@ -369,6 +377,7 @@ export const dragNewElement = ({
       scene,
       informMutation,
     });
+
     return;
   }
 
@@ -384,6 +393,7 @@ export const dragNewElement = ({
 
   if (width !== 0 && height !== 0) {
     let imageInitialDimension = null;
+
     if (isImageElement(newElement)) {
       imageInitialDimension = {
         initialWidth: width,

@@ -52,6 +52,7 @@ export const useTextGeneration = ({
           ),
         );
       }
+
       if (prompt.length > MAX_PROMPT_LENGTH) {
         setError(
           new Error(t("chat.errors.promptTooLong", { max: MAX_PROMPT_LENGTH })),
@@ -60,6 +61,7 @@ export const useTextGeneration = ({
 
       return false;
     }
+
     return true;
   };
 
@@ -78,6 +80,7 @@ export const useTextGeneration = ({
     setError(null);
 
     const abortController = new AbortController();
+
     streamingAbortControllerRef.current = abortController;
 
     if (!isRepairFlow) {
@@ -122,6 +125,7 @@ export const useTextGeneration = ({
           onChunk: (chunk: string) => {
             setChatHistory((prev) => {
               const lastAssistantMessage = getLastAssistantMessage(prev);
+
               return updateAssistantContent(prev, {
                 content: lastAssistantMessage.content + chunk,
               });
@@ -164,6 +168,7 @@ export const useTextGeneration = ({
                   : "rateLimitExceeded",
             },
           ]);
+
           return messages;
         });
       }
@@ -182,9 +187,11 @@ export const useTextGeneration = ({
         const _error = new Error(
           error.message || t("chat.errors.requestFailed"),
         );
+
         if (error.status !== 429) {
           setAssistantError(_error.message, "network");
         }
+
         setError(_error);
 
         return;
@@ -198,6 +205,7 @@ export const useTextGeneration = ({
         const _error = new Error(
           error.message || t("chat.errors.mermaidParseError"),
         );
+
         setAssistantError(_error.message, "parse");
         setError(_error);
       }
@@ -205,6 +213,7 @@ export const useTextGeneration = ({
       const _error = new Error(
         error.message || t("chat.errors.generationFailed"),
       );
+
       setAssistantError(_error.message, "other");
       setError(_error);
     } finally {

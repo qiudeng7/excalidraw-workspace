@@ -65,6 +65,7 @@ export class AnimatedTrail implements Trail {
   hasLastPoint(x: number, y: number) {
     if (this.currentTrail) {
       const len = this.currentTrail.originalPoints.length;
+
       return (
         this.currentTrail.originalPoints[len - 1][0] === x &&
         this.currentTrail.originalPoints[len - 1][1] === y
@@ -95,6 +96,7 @@ export class AnimatedTrail implements Trail {
     if (!AnimationController.running(this.key)) {
       AnimationController.start(this.key, () => {
         const needsNext = this.onFrame();
+
         if (needsNext) {
           return { keep: true };
         }
@@ -163,6 +165,7 @@ export class AnimatedTrail implements Trail {
 
     if (this.currentTrail) {
       const currentPath = this.drawTrail(this.currentTrail, this.app.state);
+
       paths.push(currentPath);
     }
 
@@ -180,6 +183,7 @@ export class AnimatedTrail implements Trail {
     }
 
     const svgPaths = paths.join(" ").trim();
+
     this.trailElement.setAttribute("d", svgPaths);
 
     if (this.trailAnimation) {

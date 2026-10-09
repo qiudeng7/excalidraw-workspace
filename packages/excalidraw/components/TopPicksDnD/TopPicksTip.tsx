@@ -41,6 +41,7 @@ export const TopPicksTip = ({
                     "[tabindex]",
                   )
                 : null;
+
             onReset();
             focusTarget?.focus();
           }}

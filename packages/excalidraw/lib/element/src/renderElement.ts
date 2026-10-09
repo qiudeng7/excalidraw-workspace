@@ -109,6 +109,7 @@ const getCanvasPadding = (element: ExcalidrawElement) => {
       if (element.endArrowhead || element.endArrowhead) {
         return 40;
       }
+
       return 20;
     default:
       return 20;
@@ -128,6 +129,7 @@ export const getElementRenderOffset = (
   const container = isTextElement(element)
     ? getContainerElement(element, elementsMap)
     : null;
+
   return overrides?.get((container ?? element).id)?.offset;
 };
 
@@ -185,6 +187,7 @@ export const resolveElementRenderState = (
   let opacity =
     (frameOpacity * clamp(override?.opacity ?? element.opacity, 0, 100)) /
     10000;
+
   if (
     elementsPendingErasure.has(element.id) ||
     pendingFlowchartNodes?.some((node) => node.id === element.id) ||
@@ -192,6 +195,7 @@ export const resolveElementRenderState = (
   ) {
     opacity *= ELEMENT_READY_TO_ERASE_OPACITY / 100;
   }
+
   const offset = getElementRenderOffset(
     element,
     allElementsMap,
@@ -304,14 +308,10 @@ const generateElementCanvas = (
     const [x1, y1] = getElementAbsoluteCoords(element, elementsMap);
 
     canvasOffsetX =
-      element.x > x1
-        ? distance(element.x, x1) * pixelRatio * scale
-        : 0;
+      element.x > x1 ? distance(element.x, x1) * pixelRatio * scale : 0;
 
     canvasOffsetY =
-      element.y > y1
-        ? distance(element.y, y1) * pixelRatio * scale
-        : 0;
+      element.y > y1 ? distance(element.y, y1) * pixelRatio * scale : 0;
 
     context.translate(canvasOffsetX, canvasOffsetY);
   }
@@ -407,6 +407,7 @@ const drawStickyNotePath = (
       );
     }
   }
+
   context.closePath();
 };
 
@@ -448,6 +449,7 @@ const drawElementOnCanvas = (
       );
 
       const commands = getStickyNotePathCommands(element);
+
       context.fillStyle = applyDarkModeFilter(
         element.backgroundColor,
         renderConfig.theme === THEME.DARK,
@@ -459,6 +461,7 @@ const drawElementOnCanvas = (
       // year boundary — and is regenerated on the next zoom, theme or
       // element change anyway
       const footer = getStickyNoteFooter(element);
+
       if (footer) {
         context.font = `${STICKY_NOTE_FOOTER.fontSize}px ${STICKY_NOTE_FOOTER.fontFamily}`;
         context.textAlign = "right";
@@ -474,6 +477,7 @@ const drawElementOnCanvas = (
       context.restore();
       break;
     }
+
     case "rectangle":
     case "iframe":
     case "embeddable":
@@ -485,6 +489,7 @@ const drawElementOnCanvas = (
       rc.draw(ShapeCache.generateElementShape(element, renderConfig));
       break;
     }
+
     case "arrow":
     case "line": {
       context.lineJoin = "round";
@@ -497,6 +502,7 @@ const drawElementOnCanvas = (
       );
       break;
     }
+
     case "freedraw": {
       // Draw directly to canvas
       context.save();
@@ -518,6 +524,7 @@ const drawElementOnCanvas = (
       context.restore();
       break;
     }
+
     case "image": {
       context.save();
       const cacheEntry =
@@ -557,6 +564,7 @@ const drawElementOnCanvas = (
         if (shouldInvertImage && isSafari) {
           const devicePixelRatio = window.devicePixelRatio || 1;
           const tempCanvas = document.createElement("canvas");
+
           tempCanvas.width = element.width * devicePixelRatio;
           tempCanvas.height = element.height * devicePixelRatio;
           const tempContext = tempCanvas.getContext("2d");
@@ -623,18 +631,22 @@ const drawElementOnCanvas = (
       } else {
         drawImagePlaceholder(element, context, renderConfig.theme);
       }
+
       context.restore();
       break;
     }
+
     default: {
       if (isTextElement(element)) {
         const rtl = isRTL(element.text);
         const shouldTemporarilyAttach = rtl && !context.canvas.isConnected;
+
         if (shouldTemporarilyAttach) {
           // to correctly render RTL text mixed with LTR, we have to append it
           // to the DOM
           document.body.appendChild(context.canvas);
         }
+
         context.canvas.setAttribute("dir", rtl ? "rtl" : "ltr");
         context.save();
         context.font = getFontString(element);
@@ -651,8 +663,8 @@ const drawElementOnCanvas = (
           element.textAlign === "center"
             ? element.width / 2
             : element.textAlign === "right"
-            ? element.width
-            : 0;
+              ? element.width
+              : 0;
 
         const lineHeightPx = getLineHeightInPx(
           element.fontSize,
@@ -672,6 +684,7 @@ const drawElementOnCanvas = (
             index * lineHeightPx + verticalOffset,
           );
         }
+
         context.restore();
         if (shouldTemporarilyAttach) {
           context.canvas.remove();
@@ -732,6 +745,7 @@ const generateElementWithCanvas = (
 
     return elementWithCanvas;
   }
+
   return prevElementWithCanvas;
 };
 
@@ -804,6 +818,7 @@ const drawElementFromCanvas = (
     const outerHalf =
       Math.max(distance(x1, x2), distance(y1, y2)) * devicePixelRatio +
       padding * 10;
+
     context.beginPath();
     context.rect(cx - outerHalf, cy - outerHalf, outerHalf * 2, outerHalf * 2);
     context.rect(
@@ -893,6 +908,7 @@ const drawElementFromCanvas = (
     // Form the relative vector before introducing the scroll translation.
     const dx = (x1 - anchorSceneX) * devicePixelRatio + anchorPadding - padding;
     const dy = (y1 - anchorSceneY) * devicePixelRatio + anchorPadding - padding;
+
     context.setTransform(
       a,
       b,
@@ -927,6 +943,7 @@ const drawElementFromCanvas = (
       allElementsMap,
     ) as ExcalidrawTextElementWithContainer;
     const coords = getContainerCoords(element);
+
     context.strokeStyle = "#c92a2a";
     context.lineWidth = 3;
     context.strokeRect(
@@ -936,6 +953,7 @@ const drawElementFromCanvas = (
       getBoundTextMaxHeight(element, textElement) * devicePixelRatio,
     );
   }
+
   context.restore();
 
   // Clear the nested element we appended to the DOM
@@ -977,16 +995,18 @@ const shouldRenderDirectly = (
   if (renderConfig.isExporting) {
     return true;
   }
+
   const options = renderConfig.renderingOptions;
+
   return Boolean(
     (options?.directText && element.type === "text") ||
-      (options?.directShapes &&
-        (element.type === "rectangle" ||
-          element.type === "ellipse" ||
-          element.type === "diamond" ||
-          element.type === "line" ||
-          (element.type === "arrow" &&
-            !getBoundTextElement(element, allElementsMap)))),
+    (options?.directShapes &&
+      (element.type === "rectangle" ||
+        element.type === "ellipse" ||
+        element.type === "diamond" ||
+        element.type === "line" ||
+        (element.type === "arrow" &&
+          !getBoundTextElement(element, allElementsMap)))),
   );
 };
 
@@ -994,18 +1014,25 @@ export const renderElement = (
   ...args: Parameters<typeof renderElementInternal>
 ) => {
   const [element, , , , context, renderConfig, appState] = args;
-  const options = renderConfig.isExporting ? undefined : renderConfig.renderingOptions;
+  const options = renderConfig.isExporting
+    ? undefined
+    : renderConfig.renderingOptions;
+
   context.save();
   try {
     if (options?.smoothCache) {
       context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = options.highQualitySmoothing ? "high" : "low";
+      context.imageSmoothingQuality = options.highQualitySmoothing
+        ? "high"
+        : "low";
     }
+
     if (options?.alignPixels && !element.angle) {
       // 只调整绘制位置，不改元素坐标。最多偏移半个画布像素。
       const transform = context.getTransform();
       const x = (element.x + appState.scrollX) * transform.a + transform.e;
       const y = (element.y + appState.scrollY) * transform.d + transform.f;
+
       if (transform.a && transform.d) {
         context.translate(
           (Math.round(x) - x) / transform.a,
@@ -1013,6 +1040,7 @@ export const renderElement = (
         );
       }
     }
+
     renderElementInternal(...args);
   } finally {
     context.restore();
@@ -1052,6 +1080,7 @@ const renderElementInternal = (
   ) {
     context.translate(renderState.offset.x, renderState.offset.y);
   }
+
   try {
     drawElement(
       element,
@@ -1120,8 +1149,10 @@ const drawElement = (
 
         context.restore();
       }
+
       break;
     }
+
     case "freedraw": {
       if (renderConfig.isExporting) {
         const [x1, y1, x2, y2] = getElementAbsoluteCoords(element, elementsMap);
@@ -1129,6 +1160,7 @@ const drawElement = (
         const cy = (y1 + y2) / 2 + appState.scrollY;
         const shiftX = (x2 - x1) / 2 - (element.x - x1);
         const shiftY = (y2 - y1) / 2 - (element.y - y1);
+
         context.save();
         context.translate(cx, cy);
         context.rotate(element.angle);
@@ -1142,6 +1174,7 @@ const drawElement = (
           renderConfig,
           appState,
         );
+
         if (!elementWithCanvas) {
           return;
         }
@@ -1158,6 +1191,7 @@ const drawElement = (
 
       break;
     }
+
     case "rectangle":
     case "stickynote":
     case "diamond":
@@ -1176,8 +1210,10 @@ const drawElement = (
         const cy = centerY + appState.scrollY;
         let shiftX = (x2 - x1) / 2 - (element.x - x1);
         let shiftY = (y2 - y1) / 2 - (element.y - y1);
+
         if (isTextElement(element)) {
           const container = getContainerElement(element, elementsMap);
+
           if (isArrowElement(container)) {
             const boundTextCoords =
               LinearElementEditor.getBoundTextElementPosition(
@@ -1185,10 +1221,12 @@ const drawElement = (
                 element as ExcalidrawTextElementWithContainer,
                 elementsMap,
               );
+
             shiftX = (x2 - x1) / 2 - (boundTextCoords.x - x1);
             shiftY = (y2 - y1) / 2 - (boundTextCoords.y - y1);
           }
         }
+
         context.save();
         context.translate(cx, cy);
 
@@ -1326,8 +1364,10 @@ const drawElement = (
         // reset
         context.imageSmoothingEnabled = currentImageSmoothingStatus;
       }
+
       break;
     }
+
     default: {
       // @ts-ignore
       throw new Error(`Unimplemented type ${element.type}`);
@@ -1366,6 +1406,7 @@ export function getFreedrawOutlineAsSegments(
           ),
         ),
       );
+
       return acc;
     },
     [

@@ -44,8 +44,10 @@ const handleFontSizeChange: DragInputCallbackType<
   const elementsMap = scene.getNonDeletedElementsMap();
 
   const origElement = originalElements[0];
+
   if (origElement) {
     const latestElement = elementsMap.get(origElement.id);
+
     if (!latestElement || !isTextElement(latestElement)) {
       return;
     }
@@ -59,6 +61,7 @@ const handleFontSizeChange: DragInputCallbackType<
         getBaseFontSize(origElement, elementsMap),
       );
       const changeInFontSize = Math.round(accumulatedChange);
+
       nextFontSize = Math.max(
         originalFontSize + changeInFontSize,
         MIN_FONT_SIZE,
@@ -86,8 +89,8 @@ const FontSize = ({ element, scene, appState, property }: FontSizeProps) => {
   const _element = isTextElement(element)
     ? element
     : hasBoundTextElement(element)
-    ? getBoundTextElement(element, scene.getNonDeletedElementsMap())
-    : null;
+      ? getBoundTextElement(element, scene.getNonDeletedElementsMap())
+      : null;
 
   if (!_element) {
     return null;

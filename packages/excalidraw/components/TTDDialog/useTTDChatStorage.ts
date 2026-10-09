@@ -21,15 +21,19 @@ interface UseTTDChatStorageReturn {
 
 const generateChatTitle = (firstMessage: string): string => {
   const trimmed = firstMessage.trim();
+
   if (trimmed.length <= 50) {
     return trimmed;
   }
+
   return `${trimmed.substring(0, 47)}...`;
 };
 
 // Shared atom for saved chats - starts empty, populated via onLoadChats
 export const savedChatsAtom = atom<SavedChats>([]);
+
 export const isLoadingChatsAtom = atom<boolean>(false);
+
 export const chatsLoadedAtom = atom<boolean>(false);
 
 export const useTTDChatStorage = ({
@@ -42,6 +46,7 @@ export const useTTDChatStorage = ({
 
   // Ref to track latest savedChats for async operations
   const savedChatsRef = useRef(savedChats);
+
   savedChatsRef.current = savedChats;
 
   const lastMessageInHistory =
@@ -56,6 +61,7 @@ export const useTTDChatStorage = ({
     setIsLoading(true);
     try {
       const chats = await persistenceAdapter.loadChats();
+
       setSavedChats(chats);
       setChatsLoaded(true);
     } catch (error) {
@@ -88,6 +94,7 @@ export const useTTDChatStorage = ({
     const firstUserMessage = chatHistory.messages.find(
       (msg) => msg.type === "user",
     );
+
     if (!firstUserMessage || typeof firstUserMessage.content !== "string") {
       return;
     }
@@ -123,7 +130,7 @@ export const useTTDChatStorage = ({
       currentPrompt: chatHistory.currentPrompt,
       timestamp: messagesChanged
         ? Date.now()
-        : existingChat?.timestamp ?? Date.now(),
+        : (existingChat?.timestamp ?? Date.now()),
     };
 
     const updatedChats = [
@@ -159,6 +166,7 @@ export const useTTDChatStorage = ({
       const updatedChats = savedChatsRef.current.filter(
         (chat) => chat.id !== chatId,
       );
+
       setSavedChats(updatedChats);
 
       try {
@@ -179,6 +187,7 @@ export const useTTDChatStorage = ({
 
   const createNewChatId = useCallback(async (): Promise<string> => {
     await saveCurrentChat();
+
     return randomId();
   }, [saveCurrentChat]);
 

@@ -53,6 +53,7 @@ const getParentEditingGroupId = (
 
   for (const element of candidateElements) {
     const editingGroupIndex = element.groupIds.indexOf(appState.editingGroupId);
+
     if (editingGroupIndex !== -1 && element.groupIds[editingGroupIndex + 1]) {
       return element.groupIds[editingGroupIndex + 1] as GroupId;
     }
@@ -67,6 +68,7 @@ export const actionDeselect = register({
   trackEvent: false,
   perform: (_elements, appState, _, app) => {
     const activeTool = getNextActiveTool(appState, app);
+
     app.cursor.applyForTool(activeTool);
 
     if (appState.editingGroupId) {
@@ -77,10 +79,14 @@ export const actionDeselect = register({
           : getElementsInGroup(
               nonDeletedElements,
               appState.editingGroupId,
-            ).reduce((acc, element) => {
-              acc[element.id] = true;
-              return acc;
-            }, {} as Record<string, true>);
+            ).reduce(
+              (acc, element) => {
+                acc[element.id] = true;
+
+                return acc;
+              },
+              {} as Record<string, true>,
+            );
 
       return {
         appState: {

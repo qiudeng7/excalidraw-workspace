@@ -36,6 +36,7 @@ const filterOutDeletedFiles = (
   files: BinaryFiles,
 ) => {
   const nextFiles: BinaryFiles = {};
+
   for (const element of elements) {
     if (
       !element.isDeleted &&
@@ -46,6 +47,7 @@ const filterOutDeletedFiles = (
       nextFiles[element.fileId] = files[element.fileId];
     }
   }
+
   return nextFiles;
 };
 
@@ -85,6 +87,7 @@ export const saveAsJSON = async ({
 }) => {
   const blob = Promise.resolve(data).then(({ elements, appState, files }) => {
     const serialized = serializeAsJSON(elements, appState, files, "local");
+
     return new Blob([serialized], {
       type: MIME_TYPES.excalidraw,
     });
@@ -96,6 +99,7 @@ export const saveAsJSON = async ({
     description: "Excalidraw file",
     fileHandle: isImageFileHandle(fileHandle) ? null : fileHandle,
   });
+
   return { fileHandle: savedFileHandle };
 };
 
@@ -109,6 +113,7 @@ export const loadFromJSON = async (
     // gets resolved. Else, iOS users cannot open `.excalidraw` files.
     // extensions: ["json", "excalidraw", "png", "svg"],
   });
+
   return loadFromBlob(file, localAppState, localElements, file.handle);
 };
 
@@ -141,11 +146,13 @@ export const serializeLibraryAsJSON = (libraryItems: LibraryItems) => {
     source: getExportSource(),
     libraryItems,
   };
+
   return JSON.stringify(data, null, 2);
 };
 
 export const saveLibraryAsJSON = async (libraryItems: LibraryItems) => {
   const serialized = serializeLibraryAsJSON(libraryItems);
+
   await fileSave(
     new Blob([serialized], {
       type: MIME_TYPES.excalidrawlib,

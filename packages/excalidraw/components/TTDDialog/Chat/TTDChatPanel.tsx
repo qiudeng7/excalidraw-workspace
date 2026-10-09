@@ -76,6 +76,7 @@ export const TTDChatPanel = ({
 
   const getPanelActions = () => {
     const actions: TTDPanelAction[] = [];
+
     if (rateLimits) {
       actions.push({
         label: t("chat.rateLimitRemaining", {
@@ -106,6 +107,7 @@ export const TTDChatPanel = ({
     if (actions.length === 2) {
       return "space-between";
     }
+
     if (actions.length === 1 && actions[0].variant === "rateLimit") {
       return "flex-start";
     }

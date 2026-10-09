@@ -1,11 +1,14 @@
 import type { Authentication } from "./auth";
 import { assertOrigin, fail } from "./http";
+
 export interface RouteHandler {
   handle(): Promise<Response | undefined>;
 }
+
 export interface ApiRouter {
   handle(): Promise<Response>;
 }
+
 export interface RouterDependencies {
   request: Request;
   publicOrigin: string;
@@ -17,6 +20,7 @@ export interface RouterDependencies {
   canvasRoutes: RouteHandler;
   libraryRoutes: RouteHandler;
 }
+
 export function createApiRouter({
   request,
   publicOrigin,
@@ -32,6 +36,7 @@ export function createApiRouter({
     async handle() {
       assertOrigin(request, publicOrigin);
       const publicResponse = await accountsRoutes.handle();
+
       if (publicResponse) return publicResponse;
       await authentication.requireUser();
       for (const route of [
@@ -42,8 +47,10 @@ export function createApiRouter({
         libraryRoutes,
       ]) {
         const response = await route.handle();
+
         if (response) return response;
       }
+
       return fail(404, "NOT_FOUND", "接口不存在");
     },
   };

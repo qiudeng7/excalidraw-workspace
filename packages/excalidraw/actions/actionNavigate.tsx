@@ -35,6 +35,7 @@ export const actionGoToCollaborator = register<Collaborator>({
       collaborator.isCurrentUser
     ) {
       app.requestUnfollow();
+
       return {
         appState,
         captureUpdate: CaptureUpdateAction.EVENTUALLY,

@@ -71,6 +71,7 @@ export const IconButton = React.forwardRef(
     ref,
   ) => {
     const innerRef = React.useRef(null);
+
     React.useImperativeHandle(ref, () => innerRef.current);
     const sizeCn = `ToolIcon_size_${size}`;
 
@@ -101,6 +102,7 @@ export const IconButton = React.forwardRef(
 
     useEffect(() => {
       isMountedRef.current = true;
+
       return () => {
         isMountedRef.current = false;
       };

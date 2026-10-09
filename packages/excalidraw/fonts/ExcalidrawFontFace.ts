@@ -40,8 +40,8 @@ export class ExcalidrawFontFace {
       return;
     }
 
-    const codepoints = Array.from(characters).map(
-      (char) => char.codePointAt(0)!,
+    const codepoints = Array.from(characters).map((char) =>
+      char.codePointAt(0)!,
     );
 
     return this.getContent(codepoints).then(
@@ -101,12 +101,14 @@ export class ExcalidrawFontFace {
 
       if (!response.ok) {
         const urlString = url instanceof URL ? url.toString() : "dataurl";
+
         throw new Error(
           `Failed to fetch "${urlString}": ${response.statusText}`,
         );
       }
 
       const arrayBuffer = await response.arrayBuffer();
+
       return arrayBuffer;
     });
   }
@@ -119,6 +121,7 @@ export class ExcalidrawFontFace {
       .split(/,\s*/)
       .map((range) => {
         const [start, end] = range.replace("U+", "").split("-");
+
         if (end) {
           return `\\u{${start}}-\\u{${end}}`;
         }
@@ -159,6 +162,7 @@ export class ExcalidrawFontFace {
     } else if (Array.isArray(window.EXCALIDRAW_ASSET_PATH)) {
       window.EXCALIDRAW_ASSET_PATH.forEach((path) => {
         const normalizedBaseUrl = this.normalizeBaseUrl(path);
+
         urls.push(new URL(assetUrl, normalizedBaseUrl));
       });
     }
@@ -184,6 +188,11 @@ export class ExcalidrawFontFace {
 
       return `format('${parts.pop()}')`;
     } catch (error) {
+      console.warn(
+        "Could not determine font format; using browser detection",
+        error,
+      );
+
       return "";
     }
   }

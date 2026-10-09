@@ -16,20 +16,33 @@ import type {
 } from "@excalidraw/common/utility-types";
 
 export type ChartType = "bar" | "line" | "radar";
+
 export type FillStyle = "hachure" | "cross-hatch" | "solid" | "zigzag";
+
 export type FontFamilyKeys = keyof typeof FONT_FAMILY;
-export type FontFamilyValues = typeof FONT_FAMILY[FontFamilyKeys];
-export type Theme = typeof THEME[keyof typeof THEME];
+
+export type FontFamilyValues = (typeof FONT_FAMILY)[FontFamilyKeys];
+
+export type Theme = (typeof THEME)[keyof typeof THEME];
+
 export type FontString = string & { _brand: "fontString" };
+
 export type GroupId = string;
+
 export type PointerType = "mouse" | "pen" | "touch";
+
 export type StrokeRoundness = "round" | "sharp";
+
 export type RoundnessType = ValueOf<typeof ROUNDNESS>;
+
 export type StrokeStyle = "solid" | "dashed" | "dotted";
-export type TextAlign = typeof TEXT_ALIGN[keyof typeof TEXT_ALIGN];
+
+export type TextAlign = (typeof TEXT_ALIGN)[keyof typeof TEXT_ALIGN];
 
 type VerticalAlignKeys = keyof typeof VERTICAL_ALIGN;
-export type VerticalAlign = typeof VERTICAL_ALIGN[VerticalAlignKeys];
+
+export type VerticalAlign = (typeof VERTICAL_ALIGN)[VerticalAlignKeys];
+
 export type FractionalIndex = string & { _brand: "franctionalIndex" };
 
 export type BoundElement = Readonly<{
@@ -136,18 +149,16 @@ export type ExcalidrawIframeElement = _ExcalidrawElementBase &
   }>;
 
 export type ExcalidrawIframeLikeElement =
-  | ExcalidrawIframeElement
-  | ExcalidrawEmbeddableElement;
+  ExcalidrawIframeElement | ExcalidrawEmbeddableElement;
 
-export type IframeData =
-  | {
-      intrinsicSize: { w: number; h: number };
-      error?: Error;
-      sandbox?: { allowSameOrigin?: boolean };
-    } & (
-      | { type: "video" | "generic"; link: string }
-      | { type: "document"; srcdoc: (theme: Theme) => string }
-    );
+export type IframeData = {
+  intrinsicSize: { w: number; h: number };
+  error?: Error;
+  sandbox?: { allowSameOrigin?: boolean };
+} & (
+  | { type: "video" | "generic"; link: string }
+  | { type: "document"; srcdoc: (theme: Theme) => string }
+);
 
 export type ImageCrop = {
   x: number;
@@ -186,8 +197,7 @@ export type ExcalidrawMagicFrameElement = _ExcalidrawElementBase & {
 };
 
 export type ExcalidrawFrameLikeElement =
-  | ExcalidrawFrameElement
-  | ExcalidrawMagicFrameElement;
+  ExcalidrawFrameElement | ExcalidrawMagicFrameElement;
 
 /**
  * These are elements that don't have any additional properties.
@@ -348,10 +358,7 @@ export type CardinalityArrowhead =
   | "cardinality_zero_or_many";
 
 export type ArrowheadLegacy =
-  | "dot"
-  | "crowfoot_one"
-  | "crowfoot_many"
-  | "crowfoot_one_or_many";
+  "dot" | "crowfoot_one" | "crowfoot_many" | "crowfoot_one_or_many";
 
 export type Arrowhead =
   | "arrow"
@@ -478,19 +485,17 @@ export type NonDeletedSceneElementsMap = Map<
   MakeBrand<"NonDeletedSceneElementsMap">;
 
 export type ElementsMapOrArray =
-  | readonly ExcalidrawElement[]
-  | Readonly<ElementsMap>;
+  readonly ExcalidrawElement[] | Readonly<ElementsMap>;
 
 export type NonDeletedElementsMapOrArray =
   | readonly NonDeletedExcalidrawElement[]
   | Readonly<NonDeletedElementsMap | NonDeletedSceneElementsMap>;
 
 export type ExcalidrawLinearElementSubType =
-  | "line"
-  | "sharpArrow"
-  | "curvedArrow"
-  | "elbowArrow";
+  "line" | "sharpArrow" | "curvedArrow" | "elbowArrow";
 
 export type ConvertibleGenericTypes = "rectangle" | "diamond" | "ellipse";
+
 export type ConvertibleLinearTypes = ExcalidrawLinearElementSubType;
+
 export type ConvertibleTypes = ConvertibleGenericTypes | ConvertibleLinearTypes;

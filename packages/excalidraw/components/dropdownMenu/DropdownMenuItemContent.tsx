@@ -18,6 +18,7 @@ const MenuItemContent = ({
   badge?: React.ReactNode;
 }) => {
   const editorInterface = useEditorInterface();
+
   return (
     <>
       {icon && <div className="dropdown-menu-item__icon">{icon}</div>}
@@ -31,4 +32,5 @@ const MenuItemContent = ({
     </>
   );
 };
+
 export default MenuItemContent;

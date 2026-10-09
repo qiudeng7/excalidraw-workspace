@@ -58,6 +58,7 @@ export const actionPaste = register({
   trackEvent: { category: "element" },
   perform: async (elements, appState, data, app) => {
     let types;
+
     try {
       types = await readSystemClipboard();
     } catch (error: any) {
@@ -92,6 +93,7 @@ export const actionPaste = register({
       app.pasteFromClipboard(createPasteEvent({ types }));
     } catch (error: any) {
       console.error(error);
+
       return {
         captureUpdate: CaptureUpdateAction.EVENTUALLY,
         appState: {
@@ -116,6 +118,7 @@ export const actionCut = register<ClipboardEvent | null>({
   trackEvent: { category: "element" },
   perform: (elements, appState, event, app) => {
     actionCopy.perform(elements, appState, event, app);
+
     return actionDeleteSelected.perform(elements, appState, null, app);
   },
   keyTest: (event) => event[KEYS.CTRL_OR_CMD] && event.key === KEYS.X,
@@ -175,6 +178,7 @@ export const actionCopyAsSvg = register({
       };
     } catch (error: any) {
       console.error(error);
+
       return {
         appState: {
           errorMessage: error.message,
@@ -200,6 +204,7 @@ export const actionCopyAsPng = register({
         captureUpdate: CaptureUpdateAction.EVENTUALLY,
       };
     }
+
     const selectedElements = app.scene.getSelectedElements({
       selectedElementIds: appState.selectedElementIds,
       includeBoundTextElement: true,
@@ -211,12 +216,14 @@ export const actionCopyAsPng = register({
       appState,
       true,
     );
+
     try {
       await exportCanvas("clipboard", exportedElements, appState, app.files, {
         ...appState,
         exportingFrame,
         name: app.getName(),
       });
+
       return {
         appState: {
           ...appState,
@@ -235,6 +242,7 @@ export const actionCopyAsPng = register({
       };
     } catch (error: any) {
       console.error(error);
+
       return {
         appState: {
           ...appState,
@@ -268,8 +276,9 @@ export const copyText = register({
     try {
       copyTextToSystemClipboard(getTextFromElements(selectedElements));
     } catch (e) {
-      throw new Error(t("errors.copyToSystemClipboardFailed"));
+      throw new Error(t("errors.copyToSystemClipboardFailed"), { cause: e });
     }
+
     return {
       captureUpdate: CaptureUpdateAction.EVENTUALLY,
     };

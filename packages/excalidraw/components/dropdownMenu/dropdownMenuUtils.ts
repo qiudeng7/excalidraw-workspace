@@ -10,18 +10,23 @@ const getMenuComponent = (component: string) => (children: React.ReactNode) => {
       //@ts-ignore
       child.type.displayName === component,
   );
+
   if (!comp) {
     return null;
   }
+
   //@ts-ignore
   return comp;
 };
 
 export const getMenuTriggerComponent = getMenuComponent("DropdownMenuTrigger");
+
 export const getMenuContentComponent = getMenuComponent("DropdownMenuContent");
+
 export const getSubMenuTriggerComponent = getMenuComponent(
   "DropdownMenuSubTrigger",
 );
+
 export const getSubMenuContentComponent = getMenuComponent(
   "DropdownMenuSubContent",
 );

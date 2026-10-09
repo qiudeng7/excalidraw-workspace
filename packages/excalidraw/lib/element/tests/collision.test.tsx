@@ -65,6 +65,7 @@ describe("check rotated elements can be hit:", () => {
       threshold: 10,
       elementsMap: window.h.scene.getNonDeletedElementsMap(),
     });
+
     expect(hit).toBe(true);
   });
 });
@@ -266,6 +267,7 @@ describe("hitElementItself cache", () => {
       height: 25,
       containerId: arrow.id,
     });
+
     API.setElements([arrow, label]);
     API.updateElement(arrow, {
       boundElements: [{ id: label.id, type: "text" }],
@@ -516,6 +518,7 @@ describe("freedraw loop fill containment", () => {
     (angle) => {
       const element = createLoop({ angle });
       const elementsMap = arrayToMap([element]);
+
       mutateElement(element, elementsMap, {
         points: [
           ...element.points.slice(0, -1),
@@ -648,6 +651,7 @@ describe("freedraw loop fill containment", () => {
     const element = createLoop({
       points: Array.from({ length: 6 }, (_, i) => {
         const angle = -Math.PI / 2 + (((i * 2) % 5) / 5) * 2 * Math.PI;
+
         return pointFrom<LocalPoint>(
           100 + 95 * Math.cos(angle),
           100 + 95 * Math.sin(angle),
@@ -689,7 +693,8 @@ describe("freedraw loop fill containment", () => {
 
 describe("binding hit tests", () => {
   type SceneElement = Ordered<NonDeletedExcalidrawElement>;
-  const zoom = (value: number) => ({ value } as Zoom);
+
+  const zoom = (value: number) => ({ value }) as Zoom;
 
   const hitTest = (
     elements: SceneElement[],
@@ -697,6 +702,7 @@ describe("binding hit tests", () => {
     zoomValue = 1,
   ) => {
     const elementsMap = arrayToMap(elements) as NonDeletedSceneElementsMap;
+
     return {
       hovered: getHoveredElementForBinding(
         point,
@@ -763,6 +769,7 @@ describe("binding hit tests", () => {
     });
 
     const transparent = hitTest([hidden, cover("transparent")], point);
+
     expect(transparent.hovered).toBe("hidden");
     expect(transparent.all).toEqual(["cover", "hidden"]);
   });
@@ -788,6 +795,7 @@ describe("binding hit tests", () => {
       height: 100,
       index: "a1" as SceneElement["index"],
     }) as SceneElement;
+
     expect(hitTest([hidden, image], point)).toEqual({
       hovered: "image",
       all: ["image"],
@@ -805,6 +813,7 @@ describe("binding hit tests", () => {
         locked: true,
         index: "a1" as SceneElement["index"],
       }) as SceneElement;
+
     // can't bind to the locked element, nor through it
     expect(hitTest([hidden, locked("#ffc9c9")], point)).toEqual({
       hovered: undefined,

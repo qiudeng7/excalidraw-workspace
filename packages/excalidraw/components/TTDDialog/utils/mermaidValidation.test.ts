@@ -131,6 +131,7 @@ describe("isValidMermaidSyntax", () => {
     Start[Start] --> Decision{Is it?}
     Decision -->|Yes| End1[End 1]
     Decision -->|No| End2[End 2]`;
+
       expect(isValidMermaidSyntax(mermaid)).toBe(true);
     });
 
@@ -138,6 +139,7 @@ describe("isValidMermaidSyntax", () => {
       const mermaid = `sequenceDiagram
     Alice->>John: Hello John
     John-->>Alice: Great!`;
+
       expect(isValidMermaidSyntax(mermaid)).toBe(true);
     });
 
@@ -145,6 +147,7 @@ describe("isValidMermaidSyntax", () => {
       const mermaid = `flowchart TD
     Start[Start --> Decision{Is it?}
     Decision -->|Yes| End[End]`;
+
       expect(isValidMermaidSyntax(mermaid)).toBe(false);
     });
 
@@ -152,6 +155,7 @@ describe("isValidMermaidSyntax", () => {
       const mermaid = `flowchart TD
     Start[Start] --> Decision{Is it?}
     Decision -->`;
+
       expect(isValidMermaidSyntax(mermaid)).toBe(false);
     });
 
@@ -160,6 +164,7 @@ describe("isValidMermaidSyntax", () => {
     A[Square] --> B(Round)
     B --> C{Diamond}
     C --> D[Square]`;
+
       expect(isValidMermaidSyntax(mermaid)).toBe(true);
     });
 
@@ -179,6 +184,7 @@ describe("isValidMermaidSyntax", () => {
       a2[Second]
     end
     a1 --> a2`;
+
       expect(isValidMermaidSyntax(mermaid)).toBe(true);
     });
   });

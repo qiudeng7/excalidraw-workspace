@@ -55,7 +55,9 @@ export const actionDuplicateSelection = register({
           appState: newAppState,
           captureUpdate: CaptureUpdateAction.IMMEDIATELY,
         };
-      } catch {
+      } catch (error) {
+        console.error("Failed to duplicate linear element points", error);
+
         return false;
       }
     }
@@ -74,6 +76,7 @@ export const actionDuplicateSelection = register({
       overrides: ({ origElement, origIdToDuplicateId }) => {
         const duplicateFrameId =
           origElement.frameId && origIdToDuplicateId.get(origElement.frameId);
+
         return {
           x: origElement.x + DEFAULT_GRID_SIZE / 2,
           y: origElement.y + DEFAULT_GRID_SIZE / 2,

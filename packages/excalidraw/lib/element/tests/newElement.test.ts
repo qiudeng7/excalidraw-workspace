@@ -26,10 +26,12 @@ describe("element creation time", () => {
   ] as const)("initializes a new %s before any capture", (type) => {
     vi.spyOn(common, "getUpdatedTimestamp").mockReturnValue(123);
     const element = API.createElement({ type });
+
     expect(element.created).toBe(123);
 
     vi.mocked(common.getUpdatedTimestamp).mockReturnValue(456);
     const edited = newElementWith(element, { x: 50 });
+
     mutateElement(edited, new Map(), { y: 50 });
 
     expect(edited).toMatchObject({ created: 123, updated: 456 });

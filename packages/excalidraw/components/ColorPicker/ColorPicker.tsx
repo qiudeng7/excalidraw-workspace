@@ -135,6 +135,7 @@ const ColorPickerPopupContent = ({
       preventAutoFocusOnTouch={!!appState.editingTextElement}
       onFocusOutside={(event) => {
         const target = event.target;
+
         // focus moving into the top-picks context menu — let the menu keep
         // it (stealing it back would clear the menu's focus-driven
         // `data-highlighted` styling and break its keyboard navigation)
@@ -143,8 +144,10 @@ const ColorPickerPopupContent = ({
           target.closest(".top-picks-dnd__context-menu")
         ) {
           event.preventDefault();
+
           return;
         }
+
         // refocus due to eye dropper
         if (!isWritableElement(event.target)) {
           if (
@@ -162,6 +165,7 @@ const ColorPickerPopupContent = ({
             focusPickerContent();
           }
         }
+
         event.preventDefault();
       }}
       onPointerDownOutside={(event) => {
@@ -177,6 +181,7 @@ const ColorPickerPopupContent = ({
         if (getOpenPopup() === type) {
           updateData({ openPopup: null });
         }
+
         setActiveColorPickerSection(null);
 
         // Refocus text editor when popover closes if we were editing text
@@ -185,6 +190,7 @@ const ColorPickerPopupContent = ({
             const textEditor = app.ownerDocument.querySelector(
               ".excalidraw-wysiwyg",
             ) as HTMLTextAreaElement;
+
             if (textEditor) {
               textEditor.focus();
             }
@@ -222,6 +228,7 @@ const ColorPickerPopupContent = ({
                   colorPickerType: type,
                 };
                 state.keepOpenOnAlt = true;
+
                 return state;
               }
 
@@ -361,6 +368,7 @@ const ColorPickerComponent = ({
   customizableTopPicks,
 }: ColorPickerProps) => {
   const openRef = useRef(appState.openPopup);
+
   useEffect(() => {
     openRef.current = appState.openPopup;
   }, [appState.openPopup]);
@@ -379,10 +387,10 @@ const ColorPickerComponent = ({
   // drag & drop customization starts from
   const effectiveTopPicks = customTopPicks?.length
     ? customTopPicks
-    : topPicks ??
+    : (topPicks ??
       (type === "elementStroke"
         ? DEFAULT_ELEMENT_STROKE_PICKS
-        : DEFAULT_ELEMENT_BACKGROUND_PICKS);
+        : DEFAULT_ELEMENT_BACKGROUND_PICKS));
 
   const resetTopPicks =
     isTopPicksCustomizable && customizableTopPicks
@@ -403,6 +411,7 @@ const ColorPickerComponent = ({
       if (!customizableTopPicks) {
         return;
       }
+
       // NOTE the comparator comparing `appState.colorTopPicks` is what keeps
       // this captured spread fresh — see `areColorPickerPropsEqual`
       updateData({
@@ -526,6 +535,7 @@ const areColorPickerPropsEqual = (
   ) {
     return false;
   }
+
   return (
     prev.type === next.type &&
     prev.color === next.color &&

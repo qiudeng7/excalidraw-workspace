@@ -96,6 +96,7 @@ export type GapSnap = {
 export type GapSnaps = GapSnap[];
 
 export type Snap = GapSnap | PointSnap;
+
 export type Snaps = Snap[];
 
 export type PointSnapLine = {
@@ -188,6 +189,7 @@ export const isSnappingEnabled = ({
   if (selectedElements.length === 1 && selectedElements[0].type === "arrow") {
     return false;
   }
+
   return app.state.objectsSnapModeEnabled;
 };
 
@@ -407,6 +409,7 @@ export const getVisibleGaps = (
       if (++c > VISIBLE_GAPS_LIMIT_PER_AXIS) {
         break vertical;
       }
+
       const endBounds = verticallySorted[j];
 
       const [startMinX, , startMaxX, startMaxY] = startBounds;
@@ -486,6 +489,7 @@ const getGapSnaps = (
         if (Math.abs(centerOffset) < minOffset.x) {
           nearestSnapsX.length = 0;
         }
+
         minOffset.x = Math.abs(centerOffset);
 
         const snap: GapSnap = {
@@ -508,6 +512,7 @@ const getGapSnaps = (
         if (Math.abs(sideOffsetRight) < minOffset.x) {
           nearestSnapsX.length = 0;
         }
+
         minOffset.x = Math.abs(sideOffsetRight);
 
         const snap: GapSnap = {
@@ -516,6 +521,7 @@ const getGapSnaps = (
           gap,
           offset: sideOffsetRight,
         };
+
         nearestSnapsX.push(snap);
         continue;
       }
@@ -529,6 +535,7 @@ const getGapSnaps = (
         if (Math.abs(sideOffsetLeft) < minOffset.x) {
           nearestSnapsX.length = 0;
         }
+
         minOffset.x = Math.abs(sideOffsetLeft);
 
         const snap: GapSnap = {
@@ -537,10 +544,12 @@ const getGapSnaps = (
           gap,
           offset: sideOffsetLeft,
         };
+
         nearestSnapsX.push(snap);
         continue;
       }
     }
+
     for (const gap of verticalGaps) {
       if (!rangesOverlap(rangeInclusive(minX, maxX), gap.overlap)) {
         continue;
@@ -555,6 +564,7 @@ const getGapSnaps = (
         if (Math.abs(centerOffset) < minOffset.y) {
           nearestSnapsY.length = 0;
         }
+
         minOffset.y = Math.abs(centerOffset);
 
         const snap: GapSnap = {
@@ -577,6 +587,7 @@ const getGapSnaps = (
         if (Math.abs(sideOffsetTop) < minOffset.y) {
           nearestSnapsY.length = 0;
         }
+
         minOffset.y = Math.abs(sideOffsetTop);
 
         const snap: GapSnap = {
@@ -585,6 +596,7 @@ const getGapSnaps = (
           gap,
           offset: sideOffsetTop,
         };
+
         nearestSnapsY.push(snap);
         continue;
       }
@@ -598,6 +610,7 @@ const getGapSnaps = (
         if (Math.abs(sideOffsetBottom) < minOffset.y) {
           nearestSnapsY.length = 0;
         }
+
         minOffset.y = Math.abs(sideOffsetBottom);
 
         const snap: GapSnap = {
@@ -606,6 +619,7 @@ const getGapSnaps = (
           gap,
           offset: sideOffsetBottom,
         };
+
         nearestSnapsY.push(snap);
         continue;
       }
@@ -625,6 +639,7 @@ export const getReferenceSnapPoints = (
     appState,
     elementsMap,
   );
+
   return getMaximumGroups(referenceElements, elementsMap)
     .filter(
       (elementsGroup) =>
@@ -698,6 +713,7 @@ export const snapDraggedElements = (
 ) => {
   const appState = app.state;
   const selectedElements = getSelectedElements(elements, appState);
+
   if (
     !isSnappingEnabled({ app, event, selectedElements }) ||
     selectedElements.length === 0
@@ -710,6 +726,7 @@ export const snapDraggedElements = (
       snapLines: [],
     };
   }
+
   dragOffset.x = round(dragOffset.x);
   dragOffset.y = round(dragOffset.y);
   const nearestSnapsX: Snaps = [];
@@ -808,6 +825,7 @@ export const snapDraggedElements = (
 
 const round = (x: number) => {
   const decimalPlaces = 6;
+
   return Math.round(x * 10 ** decimalPlaces) / 10 ** decimalPlaces;
 };
 
@@ -837,9 +855,11 @@ const createPointSnapLines = (
       if (snap.type === "point") {
         // key = thisPoint.x
         const key = round(snap.points[0][0]);
+
         if (!snapsX[key]) {
           snapsX[key] = [];
         }
+
         snapsX[key].push(
           ...snap.points.map((p) =>
             pointFrom<GlobalPoint>(round(p[0]), round(p[1])),
@@ -854,9 +874,11 @@ const createPointSnapLines = (
       if (snap.type === "point") {
         // key = thisPoint.y
         const key = round(snap.points[0][1]);
+
         if (!snapsY[key]) {
           snapsY[key] = [];
         }
+
         snapsY[key].push(
           ...snap.points.map((p) =>
             pointFrom<GlobalPoint>(round(p[0]), round(p[1])),
@@ -964,8 +986,10 @@ const createGapSnapLines = (
             },
           );
         }
+
         break;
       }
+
       case "center_vertical": {
         if (horizontalGapIntersection) {
           const gapLineX =
@@ -990,8 +1014,10 @@ const createGapSnapLines = (
             },
           );
         }
+
         break;
       }
+
       case "side_right": {
         if (verticalIntersection) {
           const gapLineY =
@@ -1013,8 +1039,10 @@ const createGapSnapLines = (
             },
           );
         }
+
         break;
       }
+
       case "side_left": {
         if (verticalIntersection) {
           const gapLineY =
@@ -1039,8 +1067,10 @@ const createGapSnapLines = (
             },
           );
         }
+
         break;
       }
+
       case "side_top": {
         if (horizontalGapIntersection) {
           const gapLineX =
@@ -1065,8 +1095,10 @@ const createGapSnapLines = (
             },
           );
         }
+
         break;
       }
+
       case "side_bottom": {
         if (horizontalGapIntersection) {
           const gapLineX =
@@ -1088,6 +1120,7 @@ const createGapSnapLines = (
             },
           );
         }
+
         break;
       }
     }
@@ -1151,30 +1184,37 @@ export const snapResizingElements = (
         selectionSnapPoints.push(pointFrom(maxX, minY), pointFrom(maxX, maxY));
         break;
       }
+
       case "w": {
         selectionSnapPoints.push(pointFrom(minX, minY), pointFrom(minX, maxY));
         break;
       }
+
       case "n": {
         selectionSnapPoints.push(pointFrom(minX, minY), pointFrom(maxX, minY));
         break;
       }
+
       case "s": {
         selectionSnapPoints.push(pointFrom(minX, maxY), pointFrom(maxX, maxY));
         break;
       }
+
       case "ne": {
         selectionSnapPoints.push(pointFrom(maxX, minY));
         break;
       }
+
       case "nw": {
         selectionSnapPoints.push(pointFrom(minX, minY));
         break;
       }
+
       case "se": {
         selectionSnapPoints.push(pointFrom(maxX, maxY));
         break;
       }
+
       case "sw": {
         selectionSnapPoints.push(pointFrom(minX, maxY));
         break;

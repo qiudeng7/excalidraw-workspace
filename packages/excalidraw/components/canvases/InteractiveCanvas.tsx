@@ -93,6 +93,7 @@ const InteractiveCanvas = (props: InteractiveCanvasProps) => {
   useEffect(() => {
     if (!isComponentMounted.current) {
       isComponentMounted.current = true;
+
       return;
     }
 
@@ -113,18 +114,23 @@ const InteractiveCanvas = (props: InteractiveCanvasProps) => {
           if (!remoteSelectedElementIds.has(id)) {
             remoteSelectedElementIds.set(id, []);
           }
+
           remoteSelectedElementIds.get(id)!.push(socketId);
         }
       }
+
       if (!user.pointer || user.pointer.renderCursor === false) {
         return;
       }
+
       if (user.username) {
         remotePointerUsernames.set(socketId, user.username);
       }
+
       if (user.userState) {
         remotePointerUserStates.set(socketId, user.userState);
       }
+
       remotePointerViewportCoords.set(
         socketId,
         sceneCoordsToViewportCoords(
@@ -204,8 +210,7 @@ const InteractiveCanvas = (props: InteractiveCanvasProps) => {
       // computed value changes across rerenders
       style={{
         imageRendering:
-          props.smoothCanvas ||
-          props.scale > window.devicePixelRatio
+          props.smoothCanvas || props.scale > window.devicePixelRatio
             ? "auto"
             : undefined,
         width: props.appState.width,

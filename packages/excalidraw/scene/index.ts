@@ -4,7 +4,9 @@ export {
   getSelectedElements,
   getTargetElements,
 } from "@excalidraw/element";
+
 export { getScrollToContentState } from "../viewport";
+
 export {
   hasBackground,
   hasFillStyle,
@@ -15,6 +17,7 @@ export {
   canHaveArrowheads,
   canChangeRoundness,
 } from "@excalidraw/element";
+
 export {
   getNormalizedZoom,
   getNormalizedGridSize,

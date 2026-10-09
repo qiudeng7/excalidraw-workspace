@@ -18,12 +18,14 @@ export const saveCaretPosition = (
   ownerDocument: Document = document,
 ): CaretPosition | null => {
   const textEditor = getTextEditor(ownerDocument);
+
   if (textEditor) {
     return {
       start: textEditor.selectionStart,
       end: textEditor.selectionEnd,
     };
   }
+
   return null;
 };
 
@@ -32,8 +34,10 @@ export const restoreCaretPosition = (
   ownerDocument: Document = document,
 ): void => {
   const ownerWindow = ownerDocument.defaultView ?? window;
+
   ownerWindow.setTimeout(() => {
     const textEditor = getTextEditor(ownerDocument);
+
     if (textEditor) {
       textEditor.focus();
       if (position) {
@@ -76,13 +80,16 @@ export const useTextEditorFocus = (ownerDocument: Document = document) => {
 
   const saveCaretPositionToState = useCallback(() => {
     const position = saveCaretPosition(ownerDocument);
+
     setSavedCaretPosition(position);
   }, [ownerDocument]);
 
   const restoreCaretPositionFromState = useCallback(() => {
     const ownerWindow = ownerDocument.defaultView ?? window;
+
     ownerWindow.setTimeout(() => {
       const textEditor = getTextEditor(ownerDocument);
+
       if (textEditor) {
         textEditor.focus();
         if (savedCaretPosition) {
@@ -112,11 +119,14 @@ export const temporarilyDisableTextEditorBlur = (
   duration: number = 100,
 ): void => {
   const textEditor = getTextEditor(ownerDocument);
+
   if (textEditor) {
     const originalOnBlur = textEditor.onblur;
+
     textEditor.onblur = null;
 
     const ownerWindow = ownerDocument.defaultView ?? window;
+
     ownerWindow.setTimeout(() => {
       textEditor.onblur = originalOnBlur;
     }, duration);

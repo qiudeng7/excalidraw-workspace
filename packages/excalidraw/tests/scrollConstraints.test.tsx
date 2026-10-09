@@ -83,6 +83,7 @@ const waitForAnimationToStop = (key: string, maxFrames = 200) => {
             requestAnimationFrame(check);
           }
         };
+
         requestAnimationFrame(check);
       }),
   );
@@ -116,6 +117,7 @@ describe("constrainScrollState (pure)", () => {
     const result = constrainScrollState(
       makeState({ scrollX: 9999, scrollY: 9999, scrollConstraints: lock }),
     );
+
     expect(result.scrollX).toBe(9999);
     expect(result.scrollY).toBe(9999);
   });
@@ -136,6 +138,7 @@ describe("constrainScrollState (pure)", () => {
         scrollConstraints: lock,
       }),
     );
+
     expect(zoom.value).toBeCloseTo(0.15);
   });
 
@@ -153,6 +156,7 @@ describe("constrainScrollState (pure)", () => {
       const corner = constrainScrollState(
         makeState({ scrollX: 100, scrollY: 100, scrollConstraints: lock }),
       );
+
       expect(corner.scrollX).toBeCloseTo(0);
       expect(corner.scrollY).toBeCloseTo(0);
 
@@ -160,6 +164,7 @@ describe("constrainScrollState (pure)", () => {
       const farEdge = constrainScrollState(
         makeState({ scrollX: -5000, scrollY: -5000, scrollConstraints: lock }),
       );
+
       expect(farEdge.scrollX).toBeCloseTo(VIEWPORT.width - lock.width); // -800
       expect(farEdge.scrollY).toBeCloseTo(VIEWPORT.height - lock.height); // -900
     });
@@ -171,6 +176,7 @@ describe("constrainScrollState (pure)", () => {
         zoom: { value: getNormalizedZoom(1) },
         scrollConstraints: lock,
       });
+
       expect(constrainScrollState(inBounds)).toMatchObject({
         scrollX: -100,
         scrollY: -100,
@@ -190,6 +196,7 @@ describe("constrainScrollState (pure)", () => {
       );
       // centered: (min + max) / 2, min = w/zoom - (x+w), max = -x
       const centeredX = (VIEWPORT.width / 0.1 - lock.width + 0) / 2;
+
       expect(result.scrollX).toBeCloseTo(centeredX);
     });
   });
@@ -205,6 +212,7 @@ describe("zoom lock (pure)", () => {
         scrollConstraints: makeLock({ ...base, lockZoom: true, zoom: 0.5 }),
       }),
     );
+
     expect(zoom.value).toBeCloseTo(0.5);
   });
 
@@ -215,6 +223,7 @@ describe("zoom lock (pure)", () => {
         scrollConstraints: makeLock({ ...base, lockZoom: true, zoom: 0.5 }),
       }),
     );
+
     expect(zoom.value).toBeCloseTo(MAX_ZOOM);
   });
 
@@ -225,6 +234,7 @@ describe("zoom lock (pure)", () => {
         scrollConstraints: makeLock({ ...base, lockZoom: true, zoom: 0.5 }),
       }),
     );
+
     expect(zoom.value).toBeCloseTo(1.5);
   });
 });
@@ -240,6 +250,7 @@ describe("offsets (pure)", () => {
     const topLeft = constrainScrollState(
       makeState({ scrollX: 999, scrollY: 999, scrollConstraints: lock }),
     );
+
     expect(topLeft.scrollX).toBeCloseTo(40); // left offset
     expect(topLeft.scrollY).toBeCloseTo(10); // top offset
 
@@ -247,6 +258,7 @@ describe("offsets (pure)", () => {
     const farEdge = constrainScrollState(
       makeState({ scrollX: -5000, scrollY: -5000, scrollConstraints: lock }),
     );
+
     expect(farEdge.scrollX).toBeCloseTo(VIEWPORT.width - base.width - 20); // -820
     expect(farEdge.scrollY).toBeCloseTo(VIEWPORT.height - base.height - 30); // -930
   });
@@ -264,6 +276,7 @@ describe("offsets (pure)", () => {
         }),
       }),
     );
+
     expect(result.scrollY).toBeCloseTo(20);
   });
 
@@ -274,6 +287,7 @@ describe("offsets (pure)", () => {
         scrollConstraints: makeLock({ ...base, lockScroll: true }),
       }),
     );
+
     expect(result.scrollX).toBeCloseTo(0);
   });
 
@@ -291,6 +305,7 @@ describe("offsets (pure)", () => {
       }),
       overscroll,
     );
+
     // left offset (40) + overscroll give (30) at zoom 1
     expect(result.scrollX).toBeCloseTo(70);
   });
@@ -308,6 +323,7 @@ describe("rubberband overscroll (pure)", () => {
       }),
       overscroll,
     );
+
     expect(result.scrollX).toBeCloseTo(overscroll / 1); // 30 (zoom 1)
   });
 
@@ -321,6 +337,7 @@ describe("rubberband overscroll (pure)", () => {
       }),
       overscroll,
     );
+
     // 30 screen px at zoom 2 -> 15 scene px of overscroll
     expect(result.scrollX).toBeCloseTo(overscroll / 2); // 15
   });
@@ -332,6 +349,7 @@ describe("rubberband overscroll (pure)", () => {
         scrollConstraints: makeLock({ ...base, lockScroll: true }),
       }),
     );
+
     expect(result.scrollX).toBeCloseTo(0);
   });
 
@@ -370,6 +388,7 @@ describe("animateToConstraints (rubberband snap-back)", () => {
 
   it("starts an animation toward the box when overscrolled", () => {
     const onFrame = vi.fn();
+
     // scrollX 200 is outside the hard range [-800, 0]
     snapBackToConstraints(
       makeState({ scrollX: 200, scrollConstraints: lock }),
@@ -383,6 +402,7 @@ describe("animateToConstraints (rubberband snap-back)", () => {
 
   it("is a no-op when already within the box", () => {
     const onFrame = vi.fn();
+
     snapBackToConstraints(
       makeState({ scrollX: -100, scrollConstraints: lock }),
       onFrame,
@@ -474,6 +494,7 @@ describe("setViewport lock (integration)", () => {
     for (let i = 0; i < 20; i++) {
       Keyboard.keyPress(KEYS.PAGE_DOWN);
     }
+
     expect(h.state.scrollY).toBeGreaterThanOrEqual(h.state.height - 1000);
 
     // clearing the lock lets it scroll freely again
@@ -482,6 +503,7 @@ describe("setViewport lock (integration)", () => {
     });
     expect(h.state.scrollConstraints).toBe(null);
     const before = h.state.scrollY;
+
     Keyboard.keyPress(KEYS.PAGE_DOWN);
     expect(h.state.scrollY).toBeLessThan(before);
   });
@@ -497,6 +519,7 @@ describe("setViewport lock (integration)", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([rect]);
 
     React.act(() => {
@@ -596,6 +619,7 @@ describe("setViewport lock (integration)", () => {
       width: 200,
       height: 200,
     });
+
     API.setElements([firstTarget, secondTarget]);
 
     window.EXCALIDRAW_THROTTLE_RENDER = true;
@@ -816,6 +840,7 @@ describe("setViewport lock (integration)", () => {
       const missingRect = API.createElement({
         type: "rectangle",
       });
+
       API.setElements([validRect, deletedRect]);
 
       React.act(() => {
@@ -826,7 +851,7 @@ describe("setViewport lock (integration)", () => {
             missingRect,
             undefined,
             null,
-          ] as unknown as readonly typeof validRect[],
+          ] as unknown as readonly (typeof validRect)[],
           fit: "scale-down",
           animation: false,
           lock: { scroll: true },
@@ -843,6 +868,7 @@ describe("setViewport lock (integration)", () => {
       });
 
       const scrollConstraints = h.state.scrollConstraints;
+
       warnSpy.mockClear();
 
       React.act(() => {
@@ -852,7 +878,7 @@ describe("setViewport lock (integration)", () => {
             missingRect,
             undefined,
             null,
-          ] as unknown as readonly typeof validRect[],
+          ] as unknown as readonly (typeof validRect)[],
           fit: "scale-down",
           animation: false,
           lock: { scroll: true },
@@ -924,6 +950,7 @@ describe("setViewport lock (integration)", () => {
       width: 100,
       height: 50,
     });
+
     API.setElements([rect]);
 
     React.act(() => {
@@ -936,6 +963,7 @@ describe("setViewport lock (integration)", () => {
     });
 
     const lockedZoom = h.state.scrollConstraints?.zoom;
+
     expect(lockedZoom).toBeGreaterThan(1);
 
     // zoom in, then reset → should land back on the locked minimum, not 100%
@@ -961,6 +989,7 @@ describe("setViewport lock (integration)", () => {
       width: 100,
       height: 50,
     });
+
     API.setElements([rect]);
 
     React.act(() => {
@@ -973,6 +1002,7 @@ describe("setViewport lock (integration)", () => {
     });
 
     const lockedZoom = h.state.scrollConstraints?.zoom;
+
     expect(lockedZoom).toBeGreaterThan(1);
 
     // hammer zoom-out far past the locked floor; it must stay clamped
@@ -981,6 +1011,7 @@ describe("setViewport lock (integration)", () => {
         h.app.actionManager.executeAction(actionZoomOut);
       });
     }
+
     expect(h.state.zoom.value).toBeCloseTo(lockedZoom!);
   });
 });
@@ -1078,6 +1109,7 @@ describe("rubberband overscroll (integration)", () => {
     // fitted at zoom 0.1; the box exactly fills the viewport vertically,
     // so the hard bound is scrollY = 0
     const initialZoom = h.state.zoom.value;
+
     expect(initialZoom).toBeCloseTo(0.1);
     expect(h.state.scrollY).toBeCloseTo(0);
 
@@ -1102,6 +1134,7 @@ describe("rubberband overscroll (integration)", () => {
     // zooming must keep working while overscrolled (used to be pinned),
     // without yanking the viewport back inside the box
     const zoomedWhileOverscrolled = h.state.zoom.value;
+
     finger1.move(-2, 0);
     finger2.move(2, 0);
     expect(h.state.zoom.value).toBeGreaterThan(zoomedWhileOverscrolled);
@@ -1133,6 +1166,7 @@ describe("rubberband overscroll (integration)", () => {
     finger1.move(0, 5);
     finger2.move(0, 5);
     const heldScrollY = h.state.scrollY;
+
     expect(heldScrollY).toBeGreaterThan(0);
 
     // the debounced snap-back elapses while the fingers are still down —
@@ -1175,6 +1209,7 @@ describe("rubberband overscroll (integration)", () => {
     mouse.downAt(50, 2);
     mouse.move(0, 5);
     const heldScrollY = h.state.scrollY;
+
     expect(heldScrollY).toBeGreaterThan(0);
 
     // The debounce may elapse while the mouse is still held, but the viewport
@@ -1219,6 +1254,7 @@ describe("rubberband overscroll (integration)", () => {
     for (let i = 0; i < 20; i++) {
       Keyboard.keyPress(KEYS.PAGE_UP);
     }
+
     expect(h.state.scrollY).toBeGreaterThan(
       constrainScrollState(h.state).scrollY,
     );
@@ -1254,6 +1290,7 @@ describe("rubberband overscroll (integration)", () => {
     });
 
     const mouse = new Pointer("mouse");
+
     window.EXCALIDRAW_THROTTLE_RENDER = true;
     try {
       mouse.downAt(50, 2);
@@ -1268,6 +1305,7 @@ describe("rubberband overscroll (integration)", () => {
       );
 
       const zoomBefore = h.state.zoom.value;
+
       fireEvent.wheel(GlobalTestState.interactiveCanvas, {
         ctrlKey: true,
         deltaY: -10,
@@ -1288,6 +1326,7 @@ describe("rubberband overscroll (integration)", () => {
       ).toBe(false);
       expect(h.state.zoom.value).toBeGreaterThan(zoomBefore);
       const restingViewport = constrainScrollState(h.state);
+
       expect(h.state.scrollX).toBeCloseTo(restingViewport.scrollX);
       expect(h.state.scrollY).toBeCloseTo(restingViewport.scrollY);
       expect(h.state.zoom.value).toBeCloseTo(restingViewport.zoom.value);

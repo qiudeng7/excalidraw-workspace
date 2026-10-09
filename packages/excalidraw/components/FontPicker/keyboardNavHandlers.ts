@@ -30,11 +30,13 @@ export const fontPickerKeyHandler = ({
   ) {
     // refocus input on the popup trigger shortcut
     inputRef.current?.focus();
+
     return true;
   }
 
   if (event.key === KEYS.ESCAPE) {
     onClose();
+
     return true;
   }
 

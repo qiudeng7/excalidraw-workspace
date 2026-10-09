@@ -75,6 +75,7 @@ export const languages: Language[] = [
 ];
 
 const TEST_LANG_CODE = "__test__";
+
 if (isDevEnv()) {
   languages.unshift(
     { code: TEST_LANG_CODE, label: "test language" },
@@ -113,14 +114,18 @@ export const getLanguage = () => currentLang;
 const findPartsForData = (data: any, parts: string[]) => {
   for (let index = 0; index < parts.length; ++index) {
     const part = parts[index];
+
     if (data[part] === undefined) {
       return undefined;
     }
+
     data = data[part];
   }
+
   if (typeof data !== "string") {
     return undefined;
   }
+
   return data;
 };
 
@@ -133,6 +138,7 @@ export const t = (
     const name = replacement
       ? `${path}(${JSON.stringify(replacement).slice(1, -1)})`
       : path;
+
     return `\u{202a}[[${name}]]\u{202c}`;
   }
 
@@ -141,13 +147,17 @@ export const t = (
     findPartsForData(currentLangData, parts) ||
     findPartsForData(fallbackLangData, parts) ||
     fallback;
+
   if (translation === undefined) {
     const errorMessage = `Can't find translation for ${path}`;
+
     // in production, don't blow up the app on a missing translation key
     if (import.meta.env.PROD) {
       console.warn(errorMessage);
+
       return "";
     }
+
     throw new Error(errorMessage);
   }
 
@@ -156,6 +166,7 @@ export const t = (
       translation = translation.replace(`{{${key}}}`, String(replacement[key]));
     }
   }
+
   return translation;
 };
 
@@ -168,5 +179,6 @@ const editorLangCodeAtom = atom(defaultLang.code);
 //   is memoized w/o being updated on `langCode`, `AppState`, or `UIAppState`
 export const useI18n = () => {
   const langCode = useAtomValue(editorLangCodeAtom);
+
   return { t, langCode };
 };

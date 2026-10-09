@@ -55,6 +55,7 @@ import "./SearchMenu.scss";
 import type { AppClassProperties, SearchMatch } from "../types";
 
 const searchQueryAtom = atom<string>("");
+
 export const searchItemInFocusAtom = atom<number | null>(null);
 
 const SEARCH_DEBOUNCE = 350;
@@ -104,6 +105,7 @@ export const SearchMenu = () => {
     if (isSearching) {
       return;
     }
+
     if (
       searchQuery !== searchedQueryRef.current ||
       app.scene.getSceneNonce() !== lastSceneNonceRef.current
@@ -184,6 +186,7 @@ export const SearchMenu = () => {
             if (index === focusIndex) {
               return { ...match, focus: true };
             }
+
             return { ...match, focus: false };
           }),
         },
@@ -274,6 +277,7 @@ export const SearchMenu = () => {
   useEffect(() => {
     const eventHandler = (event: KeyboardEvent) => {
       const target = event.target;
+
       if (
         event.key === KEYS.ESCAPE &&
         !app.state.openDialog &&
@@ -284,6 +288,7 @@ export const SearchMenu = () => {
         setAppState({
           openSidebar: null,
         });
+
         return;
       }
 
@@ -301,6 +306,7 @@ export const SearchMenu = () => {
               openDialog: null,
             });
           }
+
           searchInputRef.current?.focus();
           searchInputRef.current?.select();
         }
@@ -354,6 +360,7 @@ export const SearchMenu = () => {
             setInputValue(value);
             setIsSearching(true);
             const searchQuery = value.trim() as SearchQuery;
+
             handleSearch(searchQuery, app, (matchItems, index) => {
               setSearchMatches({
                 nonce: randomInteger(),
@@ -681,6 +688,7 @@ const getMatchedLines = (
       );
 
       const matchedWord = remainingQuery.slice(0, matchCapacity);
+
       remainingQuery = remainingQuery.slice(matchCapacity);
 
       const offset = measureText(
@@ -706,6 +714,7 @@ const getMatchedLines = (
           textElement.textAlign === "center"
             ? (textElement.width - lineLength.width) / 2
             : textElement.width - lineLength.width;
+
         offset.width += spaceToStart;
       }
 
@@ -786,6 +795,7 @@ const handleSearch = debounce(
   ) => {
     if (!searchQuery || searchQuery === "") {
       cb([], null);
+
       return;
     }
 

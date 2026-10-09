@@ -216,15 +216,19 @@ const checkElementsBoundingBox = async (
 
 const checkHorizontalFlip = async (toleranceInPx: number = 0.00001) => {
   const originalElement = cloneJSON(h.elements[0]);
+
   API.executeAction(actionFlipHorizontal);
   const newElement = h.elements[0];
+
   await checkElementsBoundingBox(originalElement, newElement, toleranceInPx);
 };
 
 const checkTwoPointsLineHorizontalFlip = async () => {
   const originalElement = cloneJSON(h.elements[0]) as ExcalidrawLinearElement;
+
   API.executeAction(actionFlipHorizontal);
   const newElement = h.elements[0] as ExcalidrawLinearElement;
+
   await waitFor(() => {
     expect(originalElement.points[0][0]).toBeCloseTo(
       -newElement.points[0][0],
@@ -247,8 +251,10 @@ const checkTwoPointsLineHorizontalFlip = async () => {
 
 const checkTwoPointsLineVerticalFlip = async () => {
   const originalElement = cloneJSON(h.elements[0]) as ExcalidrawLinearElement;
+
   API.executeAction(actionFlipVertical);
   const newElement = h.elements[0] as ExcalidrawLinearElement;
+
   await waitFor(() => {
     expect(originalElement.points[0][0]).toBeCloseTo(
       newElement.points[0][0],
@@ -274,8 +280,10 @@ const checkRotatedHorizontalFlip = async (
   toleranceInPx: number = 0.00001,
 ) => {
   const originalElement = cloneJSON(h.elements[0]);
+
   API.executeAction(actionFlipHorizontal);
   const newElement = h.elements[0];
+
   await waitFor(() => {
     expect(newElement.angle).toBeCloseTo(expectedAngle);
   });
@@ -287,8 +295,10 @@ const checkRotatedVerticalFlip = async (
   toleranceInPx: number = 0.00001,
 ) => {
   const originalElement = cloneJSON(h.elements[0]);
+
   API.executeAction(actionFlipVertical);
   const newElement = h.elements[0];
+
   await waitFor(() => {
     expect(newElement.angle).toBeCloseTo(expectedAngle);
   });
@@ -301,6 +311,7 @@ const checkVerticalFlip = async (toleranceInPx: number = 0.00001) => {
   API.executeAction(actionFlipVertical);
 
   const newElement = h.elements[0];
+
   await checkElementsBoundingBox(originalElement, newElement, toleranceInPx);
 };
 
@@ -311,6 +322,7 @@ const checkVerticalHorizontalFlip = async (toleranceInPx: number = 0.00001) => {
   API.executeAction(actionFlipVertical);
 
   const newElement = h.elements[0];
+
   await checkElementsBoundingBox(originalElement, newElement, toleranceInPx);
 };
 
@@ -419,6 +431,7 @@ describe("ellipse", () => {
 describe("arrow", () => {
   it("flips an unrotated arrow horizontally with line inside min/max points bounds", async () => {
     const arrow = createLinearElementWithCurveInsideMinMaxPoints("arrow");
+
     API.setElements([arrow]);
     API.setAppState({ selectedElementIds: { [arrow.id]: true } });
     await checkHorizontalFlip(
@@ -428,6 +441,7 @@ describe("arrow", () => {
 
   it("flips an unrotated arrow vertically with line inside min/max points bounds", async () => {
     const arrow = createLinearElementWithCurveInsideMinMaxPoints("arrow");
+
     API.setElements([arrow]);
     API.setAppState({ selectedElementIds: { [arrow.id]: true } });
 
@@ -438,6 +452,7 @@ describe("arrow", () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
     const line = createLinearElementWithCurveInsideMinMaxPoints("arrow");
+
     API.setElements([line]);
     API.setAppState({
       selectedElementIds: {
@@ -459,6 +474,7 @@ describe("arrow", () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
     const line = createLinearElementWithCurveInsideMinMaxPoints("arrow");
+
     API.setElements([line]);
     API.setAppState({
       selectedElementIds: {
@@ -479,6 +495,7 @@ describe("arrow", () => {
   //TODO: elements with curve outside minMax points have a wrong bounding box!!!
   it.skip("flips an unrotated arrow horizontally with line outside min/max points bounds", async () => {
     const arrow = createLinearElementsWithCurveOutsideMinMaxPoints("arrow");
+
     API.setElements([arrow]);
     API.setAppState({ selectedElementIds: { [arrow.id]: true } });
 
@@ -492,6 +509,7 @@ describe("arrow", () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
     const line = createLinearElementsWithCurveOutsideMinMaxPoints("arrow");
+
     API.updateElement(line, { angle: originalAngle });
     API.setElements([line]);
     API.setAppState({ selectedElementIds: { [line.id]: true } });
@@ -505,6 +523,7 @@ describe("arrow", () => {
   //TODO: elements with curve outside minMax points have a wrong bounding box!!!
   it.skip("flips an unrotated arrow vertically with line outside min/max points bounds", async () => {
     const arrow = createLinearElementsWithCurveOutsideMinMaxPoints("arrow");
+
     API.setElements([arrow]);
     API.setAppState({ selectedElementIds: { [arrow.id]: true } });
 
@@ -516,6 +535,7 @@ describe("arrow", () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
     const line = createLinearElementsWithCurveOutsideMinMaxPoints("arrow");
+
     API.updateElement(line, { angle: originalAngle });
     API.setElements([line]);
     API.setAppState({ selectedElementIds: { [line.id]: true } });
@@ -553,6 +573,7 @@ describe("arrow", () => {
 describe("line", () => {
   it("flips an unrotated line horizontally with line inside min/max points bounds", async () => {
     const line = createLinearElementWithCurveInsideMinMaxPoints("line");
+
     API.setElements([line]);
     API.setAppState({ selectedElementIds: { [line.id]: true } });
 
@@ -563,6 +584,7 @@ describe("line", () => {
 
   it("flips an unrotated line vertically with line inside min/max points bounds", async () => {
     const line = createLinearElementWithCurveInsideMinMaxPoints("line");
+
     API.setElements([line]);
     API.setAppState({ selectedElementIds: { [line.id]: true } });
 
@@ -578,6 +600,7 @@ describe("line", () => {
   //TODO: elements with curve outside minMax points have a wrong bounding box
   it.skip("flips an unrotated line horizontally with line outside min/max points bounds", async () => {
     const line = createLinearElementsWithCurveOutsideMinMaxPoints("line");
+
     API.setElements([line]);
     API.setAppState({ selectedElementIds: { [line.id]: true } });
 
@@ -589,6 +612,7 @@ describe("line", () => {
   //TODO: elements with curve outside minMax points have a wrong bounding box
   it.skip("flips an unrotated line vertically with line outside min/max points bounds", async () => {
     const line = createLinearElementsWithCurveOutsideMinMaxPoints("line");
+
     API.setElements([line]);
     API.setAppState({ selectedElementIds: { [line.id]: true } });
 
@@ -600,6 +624,7 @@ describe("line", () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
     const line = createLinearElementsWithCurveOutsideMinMaxPoints("line");
+
     API.updateElement(line, { angle: originalAngle });
     API.setElements([line]);
     API.setAppState({ selectedElementIds: { [line.id]: true } });
@@ -615,6 +640,7 @@ describe("line", () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
     const line = createLinearElementsWithCurveOutsideMinMaxPoints("line");
+
     API.updateElement(line, { angle: originalAngle });
     API.setElements([line]);
     API.setAppState({ selectedElementIds: { [line.id]: true } });
@@ -634,6 +660,7 @@ describe("line", () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
     const line = createLinearElementWithCurveInsideMinMaxPoints("line");
+
     API.setElements([line]);
     API.setAppState({
       selectedElementIds: {
@@ -655,6 +682,7 @@ describe("line", () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
     const line = createLinearElementWithCurveInsideMinMaxPoints("line");
+
     API.setElements([line]);
     API.setAppState({
       selectedElementIds: {
@@ -687,6 +715,7 @@ describe("line", () => {
 describe("freedraw", () => {
   it("flips an unrotated drawing horizontally correctly", async () => {
     const draw = createAndReturnOneDraw();
+
     // select draw, since not done automatically
     API.setAppState({
       selectedElementIds: {
@@ -699,6 +728,7 @@ describe("freedraw", () => {
 
   it("flips an unrotated drawing vertically correctly", async () => {
     const draw = createAndReturnOneDraw();
+
     // select draw, since not done automatically
     API.setAppState({
       selectedElementIds: {
@@ -714,6 +744,7 @@ describe("freedraw", () => {
     const expectedAngle = (7 * Math.PI) / 4;
 
     const draw = createAndReturnOneDraw(originalAngle);
+
     // select draw, since not done automatically
     API.setAppState({
       selectedElementIds: {
@@ -730,6 +761,7 @@ describe("freedraw", () => {
     const expectedAngle = (7 * Math.PI) / 4;
 
     const draw = createAndReturnOneDraw(originalAngle);
+
     // select draw, since not done automatically
     API.setAppState({
       selectedElementIds: {
@@ -765,6 +797,7 @@ describe("image", () => {
   const createImage = async () => {
     const sendPasteEvent = (file?: File) => {
       const clipboardEvent = createPasteEvent({ files: file ? [file] : [] });
+
       document.dispatchEvent(clipboardEvent);
     };
 
@@ -803,6 +836,7 @@ describe("image", () => {
   it("flips an rotated image horizontally correctly", async () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
+
     //paste image
     await createImage();
     await waitFor(() => {
@@ -821,6 +855,7 @@ describe("image", () => {
   it("flips an rotated image vertically correctly", async () => {
     const originalAngle = (Math.PI / 4) as Radians;
     const expectedAngle = ((7 * Math.PI) / 4) as Radians;
+
     //paste image
     await createImage();
     await waitFor(() => {
@@ -868,6 +903,7 @@ describe("mutliple elements", () => {
 
     Keyboard.keyPress(KEYS.ENTER);
     let editor = await getTextEditor();
+
     fireEvent.input(editor, { target: { value: "arrow" } });
     Keyboard.exitTextEditor(editor);
 

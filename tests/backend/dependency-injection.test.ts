@@ -35,6 +35,7 @@ test("real request scopes isolate concurrent identities and do not dispose share
     role: "user",
   };
   const tokens = ["a".repeat(64), "b".repeat(64)];
+
   try {
     for (const [index, user] of [alice, bob].entries()) {
       await storage.repository.createAccount(
@@ -50,6 +51,7 @@ test("real request scopes isolate concurrent identities and do not dispose share
         Date.now() + 60000,
       );
     }
+
     const call = (
       path: string,
       token: string,
@@ -70,27 +72,35 @@ test("real request scopes isolate concurrent identities and do not dispose share
         context,
       );
     const settings = createDefaultUserSettings();
+
     settings.features.edgeBinding = false;
     const saved = await call("/user-settings", tokens[0]!, "PUT", {
       settings,
       revision: 0,
     });
+
     assert.equal(saved.status, 200);
     const results = await Promise.all(
       Array.from({ length: 24 }, async (_, index) => {
         const owner = index % 2;
         const session = await call("/session", tokens[owner]!);
+
         assert.equal(session.status, 200);
         const sessionBody = (await session.json()) as { user: User };
+
         assert.equal(sessionBody.user.id, [alice, bob][owner]!.id);
         const response = await call("/user-settings", tokens[owner]!);
+
         assert.equal(response.status, 200);
         const document = (await response.json()) as UserSettingsDocument;
+
         assert.equal(document.configured, owner === 0);
         assert.equal(document.settings.features.edgeBinding, owner !== 0);
+
         return response.status;
       }),
     );
+
     assert.equal(results.length, 24);
     assert.equal((await call("/session", "c".repeat(64))).status, 200);
     assert.equal((await call("/user-settings", "c".repeat(64))).status, 401);
@@ -114,12 +124,15 @@ test("composition failures use the normal HTTP error boundary", async () => {
     waitUntil() {},
   } as BackendContext;
   const original = console.error;
+
   console.error = () => {};
+
   try {
     const response = await handleApi(
       new Request("https://demo.test/api/bootstrap"),
       context,
     );
+
     assert.equal(response.status, 500);
     assert.deepEqual(await response.json(), {
       error: { code: "INTERNAL_ERROR", message: "服务暂时不可用，请稍后重试" },
@@ -148,6 +161,7 @@ test("repository rejects malformed SQL rows at the storage boundary", async () =
       return [];
     },
   });
+
   await assert.rejects(
     repository.session("hash", Date.now()),
     /Invalid stored role/,

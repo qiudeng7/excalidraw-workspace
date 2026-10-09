@@ -18,11 +18,11 @@ export class AbortError extends DOMException {
 }
 
 type ImageSceneDataErrorCode =
-  | "IMAGE_NOT_CONTAINS_SCENE_DATA"
-  | "IMAGE_SCENE_DATA_ERROR";
+  "IMAGE_NOT_CONTAINS_SCENE_DATA" | "IMAGE_SCENE_DATA_ERROR";
 
 export class ImageSceneDataError extends Error {
   public code;
+
   constructor(
     message = "Image Scene Data Error",
     code: ImageSceneDataErrorCode = "IMAGE_SCENE_DATA_ERROR",
@@ -37,6 +37,7 @@ type WorkerErrorCodes = "WORKER_URL_NOT_DEFINED" | "WORKER_IN_THE_MAIN_CHUNK";
 
 export class WorkerUrlNotDefinedError extends Error {
   public code;
+
   constructor(
     message = "Worker URL is not defined!",
     code: WorkerErrorCodes = "WORKER_URL_NOT_DEFINED",
@@ -49,6 +50,7 @@ export class WorkerUrlNotDefinedError extends Error {
 
 export class WorkerInTheMainChunkError extends Error {
   public code;
+
   constructor(
     message = "Worker has to be in a separate chunk!",
     code: WorkerErrorCodes = "WORKER_IN_THE_MAIN_CHUNK",
@@ -73,9 +75,11 @@ export class ExcalidrawError extends Error {
 export class RequestError extends Error {
   public status: number;
   public data: any;
+
   toObject() {
     return { name: this.name, status: this.status, message: this.message };
   }
+
   constructor({
     message = "Something went wrong",
     status = 500,

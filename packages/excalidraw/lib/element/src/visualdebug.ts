@@ -75,9 +75,11 @@ export const debugDrawHitVolume = (
       elementsMap,
       lineSegment(center, end),
     );
+
     if (hits.length === 0) {
       continue;
     }
+
     hits.sort(pointDistanceSq);
     points.push(hits[0]);
   }
@@ -252,6 +254,7 @@ const addToCurrentFrame = (element: DebugElement) => {
   if (window.visualDebug?.data && window.visualDebug.data.length === 0) {
     window.visualDebug.data[0] = [];
   }
+
   window.visualDebug?.data &&
     window.visualDebug.data[window.visualDebug.data.length - 1].push(element);
 };

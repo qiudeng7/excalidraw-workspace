@@ -50,13 +50,16 @@ const getIndicesToMove = (
           includeElementsInFrames: true,
         }),
   );
+
   while (++index < elements.length) {
     const element = elements[index];
+
     if (selectedElementIds.get(element.id)) {
       if (deletedIndices.length) {
         selectedIndices = selectedIndices.concat(deletedIndices);
         deletedIndices = [];
       }
+
       selectedIndices.push(index);
       includeDeletedIndex = index + 1;
     } else if (element.isDeleted && includeDeletedIndex === index) {
@@ -66,16 +69,20 @@ const getIndicesToMove = (
       deletedIndices = [];
     }
   }
+
   return selectedIndices;
 };
 
 const toContiguousGroups = (array: number[]) => {
   let cursor = 0;
+
   return array.reduce((acc, value, index) => {
     if (index > 0 && array[index - 1] !== value - 1) {
       cursor = ++cursor;
     }
+
     (acc[cursor] || (acc[cursor] = [])).push(value);
+
     return acc;
   }, [] as number[][]);
 };
@@ -94,6 +101,7 @@ const getTargetIndexAccountingForBinding = (
   if ("containerId" in nextElement && nextElement.containerId) {
     // TODO: why not to get the container from the nextElements?
     const containerElement = scene.getElement(nextElement.containerId);
+
     if (containerElement) {
       return direction === "left"
         ? Math.min(
@@ -109,8 +117,10 @@ const getTargetIndexAccountingForBinding = (
     const boundElementId = nextElement.boundElements?.find(
       (binding) => binding.type !== "arrow",
     )?.id;
+
     if (boundElementId) {
       const boundTextElement = scene.getElement(boundElementId);
+
       if (boundTextElement) {
         return direction === "left"
           ? Math.min(
@@ -132,17 +142,20 @@ const getContiguousFrameRangeElements = (
 ) => {
   let rangeStart = -1;
   let rangeEnd = -1;
+
   allElements.forEach((element, index) => {
     if (isOfTargetFrame(element, frameId)) {
       if (rangeStart === -1) {
         rangeStart = index;
       }
+
       rangeEnd = index;
     }
   });
   if (rangeStart === -1) {
     return [];
   }
+
   return allElements.slice(rangeStart, rangeEnd + 1);
 };
 
@@ -178,6 +191,7 @@ export const moveArrowAboveBindable = (
   if (arrowIdx !== -1 && bindableIdx !== -1 && arrowIdx < bindableIdx) {
     const updatedElements = Array.from(elements);
     const arrow = updatedElements.splice(arrowIdx, 1)[0];
+
     updatedElements.splice(bindableIdx, 0, arrow);
 
     scene.replaceAllElements(updatedElements);
@@ -208,14 +222,17 @@ const getTargetIndex = (
     if (element.isDeleted) {
       return false;
     }
+
     if (containingFrame) {
       return element.frameId === containingFrame;
     }
+
     // if we're editing group, find closest sibling irrespective of whether
     // there's a different-group element between them (for legacy reasons)
     if (appState.editingGroupId) {
       return element.groupIds.includes(appState.editingGroupId);
     }
+
     return true;
   };
 
@@ -261,6 +278,7 @@ const getTargetIndex = (
       elements,
       nextElement.frameId || nextElement.id,
     );
+
     return direction === "left"
       ? elements.indexOf(frameElements[0])
       : elements.indexOf(frameElements[frameElements.length - 1]);
@@ -304,7 +322,9 @@ const getTargetElementsMap = <T extends ExcalidrawElement>(
 ) => {
   return indices.reduce((acc, index) => {
     const element = elements[index];
+
     acc.set(element.id, element);
+
     return acc;
   }, new Map<string, ExcalidrawElement>());
 };
@@ -317,10 +337,12 @@ const hasSameElementIds = (
     console.error(
       "z-index reordering failed: resulting array have different lengths",
     );
+
     return false;
   }
 
   const prevElementIdCounts = new Map<ExcalidrawElement["id"], number>();
+
   for (const element of prevElements) {
     prevElementIdCounts.set(
       element.id,
@@ -330,12 +352,15 @@ const hasSameElementIds = (
 
   for (const element of nextElements) {
     const count = prevElementIdCounts.get(element.id);
+
     if (!count) {
       console.error(
         "z-index reordering failed: element id mismatch / duplicate ids",
       );
+
       return false;
     }
+
     prevElementIdCounts.set(element.id, count - 1);
   }
 
@@ -371,6 +396,7 @@ const shiftElementsByOne = (
 
     const containingFrame = indices.some((idx) => {
       const el = elements[idx];
+
       return el.frameId && selectedFrames.has(el.frameId);
     })
       ? null
@@ -450,6 +476,7 @@ const shiftElementsToEnd = (
 
   let leadingIndex: number | undefined;
   let trailingIndex: number | undefined;
+
   if (direction === "left") {
     if (containingFrame) {
       leadingIndex = findIndex(elements, (el) =>
@@ -460,9 +487,11 @@ const shiftElementsToEnd = (
         elements,
         appState.editingGroupId,
       );
+
       if (!groupElements.length) {
         return elements;
       }
+
       leadingIndex = elements.indexOf(groupElements[0]);
     } else {
       leadingIndex = 0;
@@ -479,9 +508,11 @@ const shiftElementsToEnd = (
         elements,
         appState.editingGroupId,
       );
+
       if (!groupElements.length) {
         return elements;
       }
+
       trailingIndex = elements.indexOf(groupElements[groupElements.length - 1]);
     } else {
       trailingIndex = elements.length - 1;
@@ -586,6 +617,7 @@ function shiftElementsAccountingForFrames(
           frameAwareContiguousElementsToMove.frameChildren.get(
             element.frameId,
           ) || [];
+
         frameChildren.push(element);
         frameAwareContiguousElementsToMove.frameChildren.set(
           element.frameId,

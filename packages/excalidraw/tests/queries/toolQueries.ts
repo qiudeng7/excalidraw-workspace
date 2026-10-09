@@ -6,6 +6,7 @@ import type { ToolType } from "@excalidraw/excalidraw/types";
 
 const _getAllByToolName = (container: HTMLElement, tool: ToolType | "lock") => {
   const toolTitle = tool === "lock" ? "lock" : TOOL_TYPE[tool];
+
   return (
     queries
       .getAllByTestId(container, `toolbar-${toolTitle}`)

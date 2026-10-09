@@ -84,6 +84,7 @@ const getElementShapesCacheEntry = <T extends ExcalidrawElement>(
 
   if (version !== element.version) {
     ElementShapesCache.delete(element);
+
     return undefined;
   }
 
@@ -144,6 +145,7 @@ export function deconstructLinearOrFreeDrawElement(
     const op = ops[idx];
     const prevPoint =
       ops[idx - 1] && pointFromArray<LocalPoint>(ops[idx - 1].data.slice(-2));
+
     switch (op.op) {
       case "move":
         continue;
@@ -198,6 +200,7 @@ export function deconstructLinearOrFreeDrawElement(
   }
 
   const shape: ElementShape = [lines, curves];
+
   setElementShapesCacheEntry(element, shape, 0);
 
   return shape;
@@ -336,11 +339,8 @@ export function deconstructRectanguloidElement(
 
   const corners =
     offset > 0
-      ? baseCorners.map(
-          (corner) =>
-            curveCatmullRomCubicApproxPoints(
-              curveOffsetPoints(corner, offset),
-            )!,
+      ? baseCorners.map((corner) =>
+          curveCatmullRomCubicApproxPoints(curveOffsetPoints(corner, offset))!,
         )
       : [
           [baseCorners[0]],
@@ -468,11 +468,8 @@ export function deconstructDiamondElement(
 
   const corners =
     offset > 0
-      ? baseCorners.map(
-          (corner) =>
-            curveCatmullRomCubicApproxPoints(
-              curveOffsetPoints(corner, offset),
-            )!,
+      ? baseCorners.map((corner) =>
+          curveCatmullRomCubicApproxPoints(curveOffsetPoints(corner, offset))!,
         )
       : [
           [baseCorners[0]],
@@ -522,6 +519,7 @@ export const isPathALoop = (
     // really close we make the threshold smaller, and vice versa.
     return distance <= LINE_CONFIRM_THRESHOLD / zoomValue;
   }
+
   return false;
 };
 
@@ -558,6 +556,7 @@ const getDiagonalsForBindableElement = (
   const shrinkSegment = (seg: LineSegment<GlobalPoint>) => {
     const v = vectorNormalize(vectorFromPoint(seg[1], seg[0]));
     const offset = vectorScale(v, OFFSET_PX);
+
     return lineSegment<GlobalPoint>(
       pointTranslate(seg[0], offset),
       pointTranslate(seg[1], vectorScale(offset, -1)),
@@ -825,6 +824,7 @@ export const projectFixedPointOntoDiagonal = (
       zoom,
       arrow,
     );
+
     if (sideMidPoint) {
       return sideMidPoint;
     }
@@ -850,14 +850,14 @@ export const projectFixedPointOntoDiagonal = (
     startOrEnd === "start" ? 1 : arrow.points.length - 2,
     elementsMap,
   );
+
   if (arrow.points.length === 2) {
     const otherBinding =
       startOrEnd === "start" ? arrow.endBinding : arrow.startBinding;
     const otherBindable =
       otherBinding &&
       (elementsMap.get(otherBinding.elementId) as
-        | ExcalidrawBindableElement
-        | undefined);
+        ExcalidrawBindableElement | undefined);
     const otherFocusPoint =
       otherBinding &&
       otherBindable &&
@@ -866,6 +866,7 @@ export const projectFixedPointOntoDiagonal = (
         otherBindable,
         elementsMap,
       );
+
     if (otherFocusPoint) {
       a = otherFocusPoint;
     }
@@ -889,6 +890,7 @@ export const projectFixedPointOntoDiagonal = (
   const d2 = p2 && pointDistance(a, p2);
 
   let projection = null;
+
   if (d1 != null && d2 != null) {
     projection = d1 < d2 ? p1 : p2;
   } else {

@@ -35,6 +35,7 @@ export const alignElements = (
       selectionBoundingBox,
       alignment,
     );
+
     return group.map((element) => {
       // update element
       const updatedEle = scene.mutateElement(element, {
@@ -46,6 +47,7 @@ export const alignElements = (
       updateBoundElements(element, scene, {
         simultaneouslyUpdated: group,
       });
+
       return updatedEle;
     });
   });
@@ -62,6 +64,7 @@ const calculateTranslation = (
     axis === "x" ? ["minX", "maxX"] : ["minY", "maxY"];
 
   const noTranslation = { x: 0, y: 0 };
+
   if (position === "start") {
     return {
       ...noTranslation,
@@ -73,6 +76,7 @@ const calculateTranslation = (
       [axis]: selectionBoundingBox[max] - groupBoundingBox[max],
     };
   } // else if (position === "center") {
+
   return {
     ...noTranslation,
     [axis]:

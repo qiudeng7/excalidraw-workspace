@@ -24,6 +24,7 @@ export const Avatar = ({
   const [error, setError] = useState(false);
   const loadImg = !error && src;
   const style = loadImg ? undefined : { background: color };
+
   return (
     <div className={clsx("Avatar", className)} style={style} onClick={onClick}>
       {loadImg ? (

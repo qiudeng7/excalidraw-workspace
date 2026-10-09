@@ -16,13 +16,17 @@ import type {
 
 function hashToInteger(id: string) {
   let hash = 0;
+
   if (id.length === 0) {
     return hash;
   }
+
   for (let i = 0; i < id.length; i++) {
     const char = id.charCodeAt(i);
+
     hash = (hash << 5) - hash + char;
   }
+
   return hash;
 }
 
@@ -48,6 +52,7 @@ export const getClientColor = (
 export const getNameInitial = (name?: string | null) => {
   // first char can be a surrogate pair, hence using codePointAt
   const firstCodePoint = name?.trim()?.codePointAt(0);
+
   return (
     firstCodePoint ? String.fromCodePoint(firstCodePoint) : "?"
   ).toUpperCase();
@@ -196,6 +201,7 @@ export const renderRemoteCursors = ({
       const boxY = offsetY - 1;
       const boxWidth = measure.width + 2 + paddingHorizontal * 2 + 2;
       const boxHeight = finalHeight + 2 + paddingVertical * 2 + 2;
+
       if (context.roundRect) {
         context.beginPath();
         context.roundRect(boxX, boxY, boxWidth, boxHeight, 8);
@@ -213,6 +219,7 @@ export const renderRemoteCursors = ({
       } else {
         roundRect(context, boxX, boxY, boxWidth, boxHeight, 8, COLOR_WHITE);
       }
+
       context.fillStyle = COLOR_CHARCOAL_BLACK;
 
       context.fillText(
@@ -231,6 +238,7 @@ export const renderRemoteCursors = ({
         const barheight = 8;
         const margin = 8;
         const gap = 5;
+
         context.fillRect(
           boxX + boxWidth + margin,
           boxY + (boxHeight / 2 - barheight / 2),

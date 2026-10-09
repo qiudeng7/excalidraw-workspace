@@ -61,6 +61,7 @@ export class AppDrawShape {
       // starting a new one
       this.app.actionManager.executeAction(actionFinalize);
     }
+
     this.gestureInProgress = true;
     this.trail.startPath(
       pointerDownState.lastCoords.x,
@@ -98,6 +99,7 @@ export class AppDrawShape {
         startOrEnd === "start" ? 0 : -1,
         elementsMap,
       );
+
       return {
         startOrEnd,
         globalPoint,
@@ -139,10 +141,12 @@ export class AppDrawShape {
     // exist by now, so each endpoint clips the segment between the two focus
     // points (mirrors the focusPoint branch of bindOrUnbindBindingElement)
     const updates: PointsPositionUpdates = new Map();
+
     for (const { startOrEnd, target } of endpoints) {
       if (!target) {
         continue;
       }
+
       const point = updateBoundPoint(
         arrow,
         startOrEnd === "start" ? "startBinding" : "endBinding",
@@ -150,12 +154,14 @@ export class AppDrawShape {
         target,
         elementsMap,
       );
+
       if (point) {
         updates.set(startOrEnd === "start" ? 0 : arrow.points.length - 1, {
           point,
         });
       }
     }
+
     if (updates.size) {
       LinearElementEditor.movePoints(arrow, app.scene, updates);
     }
@@ -187,6 +193,7 @@ export class AppDrawShape {
         app.state.zoom,
       ),
     );
+
     if ((!startTarget && !endTarget) || startTarget === endTarget) {
       return null;
     }
@@ -224,6 +231,7 @@ export class AppDrawShape {
 
     // when no gesture is in progress this only clears residual trail state
     const points = this.gestureInProgress ? this.trail.getCurrentPoints() : [];
+
     this.gestureInProgress = false;
     this.trail.endPath();
 

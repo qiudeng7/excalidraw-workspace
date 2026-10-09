@@ -157,6 +157,7 @@ export const hitElementItself = ({
     frameNameBoundsEqual(frameNameBound, cachedFrameNameBound)
   ) {
     const derefElement = cachedElement?.deref();
+
     if (
       derefElement &&
       derefElement.id === element.id &&
@@ -254,6 +255,7 @@ export const hitElementBoundingBox = (
   tolerance = 0,
 ) => {
   const bounds = getElementBounds(element, elementsMap, true);
+
   return isPointInRotatedBounds(point, bounds, element.angle, tolerance);
 };
 
@@ -276,6 +278,7 @@ export const hitElementBoundText = (
   if (!boundTextElementCandidate) {
     return false;
   }
+
   const boundTextElement = getTextElementWithAccuratePosition(
     boundTextElementCandidate,
     elementsMap,
@@ -316,6 +319,7 @@ const bindableElementBorderDistanceIfClose = (
   const t = Math.max(1, tolerance);
   const bounds = [x - t, y - t, x + t, y + t] as Bounds;
   const elementBounds = getElementBounds(element, elementsMap);
+
   if (!doBoundsIntersect(bounds, elementBounds)) {
     return -Infinity;
   }
@@ -325,6 +329,7 @@ const bindableElementBorderDistanceIfClose = (
   }
 
   const isInside = isPointInElement(point, element, elementsMap);
+
   // frames are only bindable from the outside, so arrows ending inside
   // a frame can bind to its children (or stay unbound)
   if (isInside && isFrameLikeElement(element)) {
@@ -332,6 +337,7 @@ const bindableElementBorderDistanceIfClose = (
   }
 
   const distance = distanceToElement(element, elementsMap, point);
+
   if (isInside) {
     return distance;
   }
@@ -370,6 +376,7 @@ const getBindingCandidates = (
   // A frame's children sit just below it in z-order, so a frame's background
   // can't end the search: it only hides the non-children behind it
   let occludingFrameId: ExcalidrawElement["id"] | null = null;
+
   // We need to do hit testing from front (end of the array) to back (beginning of the array)
   // because array is ordered from lower z-index to highest and we want element z-index
   // with higher z-index
@@ -611,6 +618,7 @@ const lineIntersections = (
 ) => {
   for (const l of lines) {
     const intersection = lineSegmentIntersectionPoints(l, segment);
+
     if (intersection) {
       intersections.push(pointRotateRads(intersection, center, angle));
 
@@ -639,6 +647,7 @@ const intersectLinearOrFreeDrawWithLineSegment = (
 
   for (const l of lines) {
     const intersection = lineSegmentIntersectionPoints(l, segment);
+
     if (intersection) {
       intersections.push(intersection);
 
@@ -906,8 +915,10 @@ export const isBindableElementInsideOtherBindable = (
         pointFrom(x + bottomX, y + bottomY + offset), // bottom
         pointFrom(x + leftX - offset, y + leftY), // left
       ];
+
       return corners.map((corner) => pointRotateRads(corner, center, angle));
     }
+
     if (element.type === "ellipse") {
       // For ellipse, test points at the extremes (top, right, bottom, left)
       const cx = x + width / 2;
@@ -920,8 +931,10 @@ export const isBindableElementInsideOtherBindable = (
         pointFrom(cx, cy + ry + offset), // bottom
         pointFrom(cx - rx - offset, cy), // left
       ];
+
       return corners.map((corner) => pointRotateRads(corner, center, angle));
     }
+
     // Rectangle and other rectangular shapes (image, text, etc.)
     const corners: GlobalPoint[] = [
       pointFrom(x - offset, y - offset), // top-left
@@ -929,6 +942,7 @@ export const isBindableElementInsideOtherBindable = (
       pointFrom(x + width + offset, y + height + offset), // bottom-right
       pointFrom(x - offset, y + height + offset), // bottom-left
     ];
+
     return corners.map((corner) => pointRotateRads(corner, center, angle));
   };
 

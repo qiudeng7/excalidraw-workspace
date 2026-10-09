@@ -41,30 +41,34 @@ const _ce = ({
     width: w,
     height: h,
     angle: a,
-  } as ExcalidrawElement);
+  }) as ExcalidrawElement;
 
 describe("getElementAbsoluteCoords", () => {
   it("test x1 coordinate", () => {
     const element = _ce({ x: 10, y: 20, w: 10, h: 0 });
     const [x1] = getElementAbsoluteCoords(element, arrayToMap([element]));
+
     expect(x1).toEqual(10);
   });
 
   it("test x2 coordinate", () => {
     const element = _ce({ x: 10, y: 20, w: 10, h: 0 });
     const [, , x2] = getElementAbsoluteCoords(element, arrayToMap([element]));
+
     expect(x2).toEqual(20);
   });
 
   it("test y1 coordinate", () => {
     const element = _ce({ x: 0, y: 10, w: 0, h: 10 });
     const [, y1] = getElementAbsoluteCoords(element, arrayToMap([element]));
+
     expect(y1).toEqual(10);
   });
 
   it("test y2 coordinate", () => {
     const element = _ce({ x: 0, y: 10, w: 0, h: 10 });
     const [, , , y2] = getElementAbsoluteCoords(element, arrayToMap([element]));
+
     expect(y2).toEqual(20);
   });
 });
@@ -80,6 +84,7 @@ describe("getElementBounds", () => {
       t: "rectangle",
     });
     const [x1, y1, x2, y2] = getElementBounds(element, arrayToMap([element]));
+
     expect(x1).toEqual(39.39339828220179);
     expect(y1).toEqual(24.393398282201787);
     expect(x2).toEqual(60.60660171779821);
@@ -115,6 +120,7 @@ describe("getElementBounds", () => {
     });
 
     const [x1, y1, x2, y2] = getElementBounds(element, arrayToMap([element]));
+
     expect(x1).toEqual(42.09430584957905);
     expect(y1).toEqual(27.09430584957905);
     expect(x2).toEqual(57.90569415042095);
@@ -139,6 +145,7 @@ describe("getElementBounds", () => {
     } as ExcalidrawLinearElement;
 
     const [x1, y1, x2, y2] = getElementBounds(element, arrayToMap([element]));
+
     expect(x1).toEqual(360.9291017525165);
     expect(y1).toEqual(185.24770129343722);
     expect(x2).toEqual(481.4815539037601);

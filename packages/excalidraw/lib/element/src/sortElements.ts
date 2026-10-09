@@ -19,16 +19,20 @@ const defragmentGroups = (elements: readonly ExcalidrawElement[]) => {
 
     for (const element of levelElements) {
       const groupId = groupIdAtLevel(element, level);
+
       if (groupId === undefined) {
         slots.push(element);
         continue;
       }
+
       let bucket = buckets.get(groupId);
+
       if (!bucket) {
         bucket = [];
         buckets.set(groupId, bucket);
         slots.push(groupId);
       }
+
       bucket.push(element);
     }
 
@@ -47,6 +51,7 @@ const defragmentGroups = (elements: readonly ExcalidrawElement[]) => {
   // original instead as that's better than losing data
   if (sortedElements.length !== elements.length) {
     console.error("defragmentGroups: lost some elements... bailing!");
+
     return elements;
   }
 
@@ -78,10 +83,12 @@ export const normalizeBoundElementsOrder = <T extends ExcalidrawElement>(
       sortedElements.add(element);
       for (const boundElement of element.boundElements) {
         const child = elementsMap.get(boundElement.id);
+
         if (child && boundElement.type === "text") {
           sortedElements.add(child);
         }
       }
+
       continue;
     }
 
@@ -106,6 +113,7 @@ export const normalizeBoundElementsOrder = <T extends ExcalidrawElement>(
     console.error(
       "normalizeBoundElementsOrder: lost some elements... bailing!",
     );
+
     return elements;
   }
 

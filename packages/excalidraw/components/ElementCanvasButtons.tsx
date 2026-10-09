@@ -26,6 +26,7 @@ const getContainerCoords = (
   );
   const x = viewportX - appState.offsetLeft + 10;
   const y = viewportY - appState.offsetTop;
+
   return { x, y };
 };
 

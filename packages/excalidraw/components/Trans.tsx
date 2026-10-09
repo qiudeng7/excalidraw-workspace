@@ -44,6 +44,7 @@ const getTransChildren = (
         // tagStartMatch[1] = "link" and props contain "link" then it will be
         // pushed to stack.
         const name = tagStartMatch[1];
+
         if (props.hasOwnProperty(name)) {
           stack.push({
             name,
@@ -63,6 +64,7 @@ const getTransChildren = (
         // pushed to "link"'s children so on DOM when rendering it's rendered as
         // <a href="https://example.com">click the button</a>
         const name = tagEndMatch[1];
+
         if (name === stack[stack.length - 1].name) {
           const item = stack.pop()!;
           const itemChildren = React.createElement(
@@ -71,6 +73,7 @@ const getTransChildren = (
             ...item.children,
           );
           const fn = props[item.name];
+
           if (typeof fn === "function") {
             stack[stack.length - 1].children.push(fn(itemChildren));
           }
@@ -86,6 +89,7 @@ const getTransChildren = (
         // value will be pushed to "name"'s children so it's rendered on DOM as
         // "Hello Excalidraw"
         const name = keyMatch[1];
+
         if (props.hasOwnProperty(name)) {
           stack[stack.length - 1].children.push(props[name] as React.ReactNode);
         } else {

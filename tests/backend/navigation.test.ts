@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { nodeStorage } from "../../server/storage/node";
 import { handleApi } from "../../server/services/api";
+
 const legacy = await readFile(
   new URL("../../migrations/0001_accounts.sql", import.meta.url),
   "utf8",
@@ -13,6 +14,7 @@ const legacy = await readFile(
 const seed = `INSERT INTO users VALUES('legacy','legacy@example.com','Legacy','admin','hash','2020-01-01');
 INSERT INTO workspaces VALUES('legacy-space','legacy','Legacy','2020-01-01','2020-01-01');
 INSERT INTO canvases(id,workspace_id,name,created_at,updated_at) VALUES('b','legacy-space','B','2020-01-01','2020-01-01'),('a','legacy-space','A','2020-01-01','2020-01-01'),('c','legacy-space','C','2020-01-02','2020-01-02');`;
+
 test(`node: navigation and catalog CAS are atomic, migrated order and foreign keys are preserved`, async () => {
   const directory = await mkdtemp(resolve(tmpdir(), "navigation-"));
   let close: () => unknown;
@@ -22,6 +24,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
     "repository" | "objects"
   >;
   const db = new DatabaseSync(resolve(directory, "workspace.sqlite"));
+
   db.exec(legacy);
   db.exec(seed);
   db.exec(
@@ -29,16 +32,20 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
   );
   db.close();
   const node = await nodeStorage(directory);
+
   storage = node;
   const raw = new DatabaseSync(resolve(directory, "workspace.sqlite"));
+
   raw.exec("PRAGMA foreign_keys=ON");
   legacyWrite = async (sql) => {
     raw.exec(sql);
   };
+
   close = () => {
     raw.close();
     node.close();
   };
+
   const request = async (
     path: string,
     method = "GET",
@@ -64,18 +71,22 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
         waitUntil: (p) => promises.push(p),
       },
     );
+
     await Promise.all(promises);
+
     return {
       status: response.status,
       body: (await response.json()) as any,
       cookie: response.headers.get("set-cookie")?.split(";")[0],
     };
   };
+
   try {
     const migrated = await storage.repository.canvasCatalog(
       "legacy-space",
       "legacy",
     );
+
     assert.deepEqual(
       migrated!.canvases.map((row) => [row.id, row.position]),
       [
@@ -97,6 +108,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
       "legacy-space",
       "legacy",
     );
+
     assert.deepEqual(
       appended!.canvases.map((row) => [row.id, row.position]),
       [
@@ -115,10 +127,10 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
       email: "bob@example.com",
       password: "strong-password-123",
     });
+
     assert.equal(alice.status, 200);
-    const space = (
-      await request("/workspaces", "GET", undefined, alice.cookie)
-    ).body.workspaces[0];
+    const space = (await request("/workspaces", "GET", undefined, alice.cookie))
+      .body.workspaces[0];
     const list = () =>
       request(
         `/workspaces/${space.id}/canvases`,
@@ -144,6 +156,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
         alice.cookie,
       )
     ).body.canvas.id;
+
     catalog = (await list()).body;
     assert.equal(catalog.catalogRevision, 2);
     assert.equal(
@@ -163,6 +176,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
       { canvasIds: [third, first, second], catalogRevision: 2 },
       alice.cookie,
     );
+
     assert.equal(reorder.status, 200);
     assert.deepEqual(
       reorder.body.canvases.map((row: any) => [
@@ -182,6 +196,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
       { canvasIds: [second, first, third], catalogRevision: 2 },
       alice.cookie,
     );
+
     assert.equal(stale.status, 409);
     assert.deepEqual(
       (await list()).body.canvases.map((row: any) => row.id),
@@ -198,6 +213,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
         alice.cookie,
       )
     ).body.canvas.id;
+
     assert.equal(
       (
         await request(
@@ -222,18 +238,15 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
     );
     const navs = await Promise.all(
       [first, other].map((canvasId) =>
-        request(
-          "/navigation",
-          "PUT",
-          { canvasId, revision: 0 },
-          alice.cookie,
-        ),
+        request("/navigation", "PUT", { canvasId, revision: 0 }, alice.cookie),
       ),
     );
+
     assert.deepEqual(navs.map((row) => row.status).sort(), [200, 409]);
     const navigation = (
       await request("/navigation", "GET", undefined, alice.cookie)
     ).body;
+
     assert.equal(navigation.revision, 1);
     assert.equal(navigation.workspaces.length, 1);
     assert.equal(
@@ -280,6 +293,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
         alice.cookie,
       ),
     ]);
+
     assert.deepEqual(races.map((row) => row.status).sort(), [200, 409]);
     catalog = (await list()).body;
     assert.equal(catalog.catalogRevision, 4);
@@ -303,10 +317,8 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
         alice.cookie,
       ),
     ]);
-    assert.deepEqual(
-      deletionRaces.map((row) => row.status).sort(),
-      [200, 409],
-    );
+
+    assert.deepEqual(deletionRaces.map((row) => row.status).sort(), [200, 409]);
     catalog = (await list()).body;
     assert.equal(catalog.catalogRevision, 5);
     assert.deepEqual(
@@ -340,6 +352,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
     const afterDelete = (
       await request("/navigation", "GET", undefined, alice.cookie)
     ).body;
+
     assert.equal(afterDelete.lastCanvasId, null);
     assert.equal(afterDelete.lastWorkspaceId, space.id);
     assert.equal(
@@ -359,9 +372,9 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
       ).status,
       200,
     );
-    const final = (
-      await request("/navigation", "GET", undefined, alice.cookie)
-    ).body;
+    const final = (await request("/navigation", "GET", undefined, alice.cookie))
+      .body;
+
     assert.equal(final.lastWorkspaceId, null);
     assert.equal(final.lastCanvasId, null);
     assert.equal(

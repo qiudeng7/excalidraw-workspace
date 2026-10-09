@@ -79,6 +79,7 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
 
   for (const key in updates) {
     const value = (updates as any)[key];
+
     if (typeof value !== "undefined") {
       if (
         (element as any)[key] === value &&
@@ -95,18 +96,22 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
       if (key === "scale") {
         const prevScale = (element as any)[key];
         const nextScale = value;
+
         if (prevScale[0] === nextScale[0] && prevScale[1] === nextScale[1]) {
           continue;
         }
       } else if (key === "points") {
         const prevPoints = (element as any)[key];
         const nextPoints = value;
+
         if (prevPoints.length === nextPoints.length) {
           let didChangePoints = false;
           let index = prevPoints.length;
+
           while (--index) {
             const prevPoint = prevPoints[index];
             const nextPoint = nextPoints[index];
+
             if (
               prevPoint[0] !== nextPoint[0] ||
               prevPoint[1] !== nextPoint[1]
@@ -115,6 +120,7 @@ export const mutateElement = <TElement extends Mutable<ExcalidrawElement>>(
               break;
             }
           }
+
           if (!didChangePoints) {
             continue;
           }
@@ -153,8 +159,10 @@ export const newElementWith = <TElement extends ExcalidrawElement>(
   force = false,
 ): TElement => {
   let didChange = false;
+
   for (const key in updates) {
     const value = (updates as any)[key];
+
     if (typeof value !== "undefined") {
       if (
         (element as any)[key] === value &&
@@ -163,6 +171,7 @@ export const newElementWith = <TElement extends ExcalidrawElement>(
       ) {
         continue;
       }
+
       didChange = true;
     }
   }
@@ -192,5 +201,6 @@ export const bumpVersion = <T extends Mutable<ExcalidrawElement>>(
   element.version = (version ?? element.version) + 1;
   element.versionNonce = randomInteger();
   element.updated = getUpdatedTimestamp();
+
   return element;
 };

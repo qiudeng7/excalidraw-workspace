@@ -22,9 +22,11 @@ const setup = (elements: NonDeletedExcalidrawElement[]) => ({
 
 const polygonArea = (pts: GlobalPoint[]): number => {
   let area = 0;
+
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
     area += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]);
   }
+
   return Math.abs(area / 2);
 };
 
@@ -37,6 +39,7 @@ const materializeFill = (scenePoints: readonly GlobalPoint[]) => {
   const minY = Math.min(...scenePoints.map((p) => p[1]));
   const maxX = Math.max(...scenePoints.map((p) => p[0]));
   const maxY = Math.max(...scenePoints.map((p) => p[1]));
+
   return API.createElement({
     type: "line",
     x: minX,
@@ -80,6 +83,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBe(rect.id);
     expect(result.boundaryElementIds).toEqual([]);
     // transparent owner => the fill goes below it
@@ -113,6 +117,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(isClosed(result.scenePoints)).toBe(true);
     expect(polygonArea(result.scenePoints)).toBeCloseTo(10000, -1);
   });
@@ -137,6 +142,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(isClosed(result.scenePoints)).toBe(true);
     // circle of r=50 ~ 7854; simplified polygon is slightly smaller
     expect(polygonArea(result.scenePoints)).toBeGreaterThan(7000);
@@ -179,6 +185,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // the smoothed curve bulges away from the polyline between sparse
     // points — some fill vertex must deviate from every polyline chord by
     // clearly more than the snap epsilon (a polyline-based boundary would
@@ -193,6 +200,7 @@ describe("computeBucketFillPolygon", () => {
         ),
       ),
     );
+
     expect(maxDeviation).toBeGreaterThan(2);
   });
 
@@ -220,6 +228,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(isClosed(result.scenePoints)).toBe(true);
     // diamond area = w*h/2 = 15000
     expect(polygonArea(result.scenePoints)).toBeCloseTo(15000, -3);
@@ -240,10 +249,12 @@ describe("computeBucketFillPolygon", () => {
       [0, 100],
       [0, 5],
     ];
+
     for (let c = 0; c < corners.length - 1; c++) {
       const [ax, ay] = corners[c];
       const [bx, by] = corners[c + 1];
       const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 10);
+
       for (let s = 0; s < steps; s++) {
         points.push(
           pointFrom<LocalPoint>(
@@ -253,6 +264,7 @@ describe("computeBucketFillPolygon", () => {
         );
       }
     }
+
     points.push(pointFrom<LocalPoint>(0, 5));
     const freedraw = API.createElement({
       type: "freedraw",
@@ -274,6 +286,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(isClosed(result.scenePoints)).toBe(true);
     expect(polygonArea(result.scenePoints)).toBeCloseTo(10000, -3);
   });
@@ -289,10 +302,12 @@ describe("computeBucketFillPolygon", () => {
       [0, 100],
       [0, 0],
     ];
+
     for (let c = 0; c < corners.length - 1; c++) {
       const [ax, ay] = corners[c];
       const [bx, by] = corners[c + 1];
       const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 10);
+
       for (let s = 0; s < steps; s++) {
         points.push(
           pointFrom<LocalPoint>(
@@ -302,6 +317,7 @@ describe("computeBucketFillPolygon", () => {
         );
       }
     }
+
     points.push(pointFrom<LocalPoint>(0, 0));
     const freedraw = API.createElement({
       type: "freedraw",
@@ -323,6 +339,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(isClosed(result.scenePoints)).toBe(true);
     expect(polygonArea(result.scenePoints)).toBeCloseTo(10000, -3);
   });
@@ -354,6 +371,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(isClosed(result.scenePoints)).toBe(true);
     expect(polygonArea(result.scenePoints)).toBeCloseTo(5000, -3);
   });
@@ -389,6 +407,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBe(owner.id);
     expect(result.boundaryElementIds).toContain(below.id);
     // both participants are transparent => below the lowest one
@@ -432,6 +451,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // owner (10000) minus overlap (2500) => 7500
     expect(polygonArea(result.scenePoints)).toBeGreaterThan(7200);
     expect(polygonArea(result.scenePoints)).toBeLessThan(7800);
@@ -470,6 +490,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBe(owner.id);
     // the whole visible owner fills (~10000); the hidden outline does NOT carve
     // out the ~6400 L-shape it would if it were visible
@@ -508,6 +529,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // the visible outline carves out the overlap corner => ~6400 L-shape
     expect(polygonArea(result.scenePoints)).toBeGreaterThan(6000);
     expect(polygonArea(result.scenePoints)).toBeLessThan(7000);
@@ -545,6 +567,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(polygonArea(result.scenePoints)).toBeCloseTo(10000, -1);
   });
 
@@ -581,6 +604,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // the outline visible through the hachure carves out the overlap corner
     expect(polygonArea(result.scenePoints)).toBeGreaterThan(6000);
     expect(polygonArea(result.scenePoints)).toBeLessThan(7000);
@@ -617,6 +641,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // the outline blended through the 50% fill still bounds the region
     expect(polygonArea(result.scenePoints)).toBeGreaterThan(6000);
     expect(polygonArea(result.scenePoints)).toBeLessThan(7000);
@@ -660,6 +685,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       expect(polygonArea(result.scenePoints)).toBeGreaterThan(6000);
       expect(polygonArea(result.scenePoints)).toBeLessThan(7000);
     },
@@ -699,6 +725,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBe(top.id);
     // the whole top rectangle (~10000), NOT the 50x50 overlap (~2500)
     expect(polygonArea(result.scenePoints)).toBeGreaterThan(9000);
@@ -755,6 +782,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBe(owner.id);
   });
 
@@ -797,6 +825,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBeNull();
     expect(result.boundaryElementIds.sort()).toEqual(
       [l1.id, l2.id, l3.id, l4.id].sort(),
@@ -836,6 +865,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBeNull();
     expect(result.boundaryElementIds).toEqual([line.id]);
     // triangle (50,50)-(0,100)-(100,100) => area 2500
@@ -878,6 +908,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBeNull();
     expect(result.boundaryElementIds.sort()).toEqual([line.id, rect.id].sort());
     // triangle (100,20)-(160,50)-(100,80) => area 1800
@@ -913,6 +944,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // one lobe (area 2500), not the whole figure-eight
     expect(polygonArea(result.scenePoints)).toBeCloseTo(2500, -3);
   });
@@ -947,6 +979,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.ownerId).toBe(rect.id);
     expect(isClosed(result.scenePoints)).toBe(true);
     expect(polygonArea(result.scenePoints)).toBeCloseTo(10000, -3);
@@ -980,10 +1013,12 @@ describe("computeBucketFillPolygon", () => {
     const point = pointFrom<GlobalPoint>(50, 30);
 
     const result = computeBucketFillPolygon({ point, elements, elementsMap });
+
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
+
     // fidelity: gaps are closed by ADDING connector edges, never by moving
     // vertices — every polygon vertex must lie (near-)on one of the strokes,
     // not be dragged toward a merged corner position
@@ -995,10 +1030,12 @@ describe("computeBucketFillPolygon", () => {
       ),
       lineSegment(pointFrom<GlobalPoint>(48, 96), pointFrom<GlobalPoint>(0, 4)),
     ];
+
     for (const vertex of result.scenePoints) {
       const distance = Math.min(
         ...strokes.map((stroke) => distanceToLineSegment(vertex, stroke)),
       );
+
       expect(distance).toBeLessThanOrEqual(2);
     }
 
@@ -1008,6 +1045,7 @@ describe("computeBucketFillPolygon", () => {
       elementsMap,
       options: { gapTolerance: 2 },
     });
+
     expect(strict.ok).toBe(false);
   });
 
@@ -1043,6 +1081,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // upper half of the rectangle, not the whole thing
     expect(polygonArea(result.scenePoints)).toBeGreaterThan(4500);
     expect(polygonArea(result.scenePoints)).toBeLessThan(5500);
@@ -1084,17 +1123,20 @@ describe("computeBucketFillPolygon", () => {
 
     const originalSet = Map.prototype.set;
     let spatialBucketSets = 0;
-    const setSpy = vi
-      .spyOn(Map.prototype, "set")
-      .mockImplementation(function (this: Map<unknown, unknown>, key, value) {
-        if (typeof key === "string" && /^-?\d+:-?\d+$/.test(key)) {
-          spatialBucketSets++;
-          if (spatialBucketSets > 512) {
-            throw new Error("spatial grid exceeded its bucket budget");
-          }
+    const setSpy = vi.spyOn(Map.prototype, "set").mockImplementation(function (
+      this: Map<unknown, unknown>,
+      key,
+      value,
+    ) {
+      if (typeof key === "string" && /^-?\d+:-?\d+$/.test(key)) {
+        spatialBucketSets++;
+        if (spatialBucketSets > 512) {
+          throw new Error("spatial grid exceeded its bucket budget");
         }
-        return originalSet.call(this, key, value);
-      });
+      }
+
+      return originalSet.call(this, key, value);
+    });
 
     const result = (() => {
       try {
@@ -1124,6 +1166,7 @@ describe("computeBucketFillPolygon", () => {
         y,
         points: [pointFrom<LocalPoint>(0, 0), pointFrom<LocalPoint>(dx, dy)],
       });
+
     return [
       mkLine(-half, -half, 2 * half, 0),
       mkLine(half, -half, 0, 2 * half),
@@ -1148,6 +1191,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(polygonArea(result.scenePoints)).toBeCloseTo(4_000_000, -5);
   });
 
@@ -1168,6 +1212,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(polygonArea(result.scenePoints)).toBeCloseTo(1016 * 1016, -4);
   });
 
@@ -1203,6 +1248,7 @@ describe("computeBucketFillPolygon", () => {
       elements,
       elementsMap,
     });
+
     expect(result).toEqual({ ok: false, reason: "no_owner" });
   });
 
@@ -1221,6 +1267,7 @@ describe("computeBucketFillPolygon", () => {
       elements,
       elementsMap,
     });
+
     expect(result.ok).toBe(false);
   });
 
@@ -1240,6 +1287,7 @@ describe("computeBucketFillPolygon", () => {
       elementsMap,
       options: { maxBoundarySegments: 2 },
     });
+
     expect(result).toEqual({ ok: false, reason: "too_complex" });
   });
 
@@ -1277,6 +1325,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(polygonArea(result.scenePoints)).toBeCloseTo(5000, -1);
   }, 2000);
 
@@ -1323,6 +1372,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // owner is the rectangle, not the paint on top of it
     expect(result.ownerId).toBe(rect.id);
   });
@@ -1359,6 +1409,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.insertion).toEqual({
       placement: "below",
       elementId: floating.id,
@@ -1393,6 +1444,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.insertion).toEqual({
       placement: "below",
       elementId: label.id,
@@ -1448,6 +1500,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.insertion).toEqual({
       placement: "above",
       elementId: oldFill.id,
@@ -1501,6 +1554,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.insertion).toEqual({
       placement: "above",
       elementId: coverer.id,
@@ -1551,6 +1605,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(result.insertion).toEqual({
       placement: "above",
       elementId: coverer.id,
@@ -1607,6 +1662,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     // the whole rect, not the top half the buried line would carve out
     expect(polygonArea(result.scenePoints)).toBeCloseTo(10000, -2);
     expect(result.boundaryElementIds).not.toContain(buried.id);
@@ -1644,10 +1700,12 @@ describe("computeBucketFillPolygon", () => {
       point: pointFrom<GlobalPoint>(75, 75),
       ...setup([upper, lower]),
     });
+
     expect(first.ok).toBe(true);
     if (!first.ok) {
       return;
     }
+
     expect(polygonArea(first.scenePoints)).toBeGreaterThan(2000);
     expect(polygonArea(first.scenePoints)).toBeLessThan(2600);
     expect(first.insertion).toEqual({
@@ -1661,10 +1719,12 @@ describe("computeBucketFillPolygon", () => {
       point: pointFrom<GlobalPoint>(120, 120),
       ...setup([upper, materializeFill(first.scenePoints), lower]),
     });
+
     expect(second.ok).toBe(true);
     if (!second.ok) {
       return;
     }
+
     // the lower container MINUS the lens (~7270), not the whole container
     // (~9530 — the regression: the fill flooded through the lens)
     expect(polygonArea(second.scenePoints)).toBeGreaterThan(6900);
@@ -1698,10 +1758,12 @@ describe("computeBucketFillPolygon", () => {
       point: pointFrom<GlobalPoint>(75, 75),
       ...setup([lower, upper]),
     });
+
     expect(first.ok).toBe(true);
     if (!first.ok) {
       return;
     }
+
     expect(polygonArea(first.scenePoints)).toBeGreaterThan(9000);
     expect(polygonArea(first.scenePoints)).toBeLessThan(10000);
     expect(first.insertion).toEqual({
@@ -1715,10 +1777,12 @@ describe("computeBucketFillPolygon", () => {
       point: pointFrom<GlobalPoint>(120, 120),
       ...setup([lower, upper, materializeFill(first.scenePoints)]),
     });
+
     expect(second.ok).toBe(true);
     if (!second.ok) {
       return;
     }
+
     expect(polygonArea(second.scenePoints)).toBeGreaterThan(6900);
     expect(polygonArea(second.scenePoints)).toBeLessThan(7700);
   });
@@ -1740,10 +1804,12 @@ describe("computeBucketFillPolygon", () => {
       elements,
       elementsMap,
     });
+
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
+
     const scenePoints = result.scenePoints;
 
     // NOTE deliberately no `customData.bucketFill` — restylability is
@@ -1769,6 +1835,7 @@ describe("computeBucketFillPolygon", () => {
 
     // fill-like polygon covering the clicked region -> restylable
     const fill = mkFill(100);
+
     expect(
       isRestylableFill({
         hitElement: fill,
@@ -1780,6 +1847,7 @@ describe("computeBucketFillPolygon", () => {
     // a fill the user gave a visible stroke has been repurposed into an
     // outline (it participates as a boundary instead) -> not restylable
     const stroked = mkFill(100, { strokeColor: "#1e1e1e" });
+
     expect(
       isRestylableFill({
         hitElement: stroked,
@@ -1790,6 +1858,7 @@ describe("computeBucketFillPolygon", () => {
 
     // covers a smaller region than the computed one -> not restylable
     const subRegion = mkFill(20);
+
     expect(
       isRestylableFill({
         hitElement: subRegion,
@@ -1848,6 +1917,7 @@ describe("computeBucketFillPolygon", () => {
     if (!annulus.ok) {
       return;
     }
+
     // the stroked fill is a visible outline now: it islands the region
     expect(polygonArea(annulus.scenePoints)).toBeCloseTo(30000, -2);
     expect(annulus.boundaryElementIds).toContain(strokedFill.id);
@@ -1859,10 +1929,12 @@ describe("computeBucketFillPolygon", () => {
       elements,
       elementsMap,
     });
+
     expect(inside.ok).toBe(true);
     if (!inside.ok) {
       return;
     }
+
     expect(inside.ownerId).toBe(outer.id);
     expect(polygonArea(inside.scenePoints)).toBeCloseTo(10000, -2);
   });
@@ -1895,8 +1967,10 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     const distToPolyline = (p: GlobalPoint, poly: [number, number][]) => {
       let best = Infinity;
+
       for (let i = 0; i < poly.length - 1; i++) {
         const [ax, ay] = poly[i];
         const [bx, by] = poly[i + 1];
@@ -1906,11 +1980,13 @@ describe("computeBucketFillPolygon", () => {
         const t = l2
           ? Math.max(0, Math.min(1, ((p[0] - ax) * dx + (p[1] - ay) * dy) / l2))
           : 0;
+
         best = Math.min(
           best,
           Math.hypot(p[0] - (ax + t * dx), p[1] - (ay + t * dy)),
         );
       }
+
       return best;
     };
     const rawPolyline = [...CIRCLE_POINTS, CIRCLE_POINTS[0]];
@@ -1923,12 +1999,14 @@ describe("computeBucketFillPolygon", () => {
     const deviationFromSmoothed = Math.max(
       ...result.scenePoints.map((v) => distToPolyline(v, smoothedPolyline)),
     );
+
     expect(deviationFromSmoothed).toBeLessThan(0.5);
     // ...and measurably OFF the raw polyline, proving the boundary follows
     // the rendered path rather than the raw chords
     const deviationFromRaw = Math.max(
       ...result.scenePoints.map((v) => distToPolyline(v, rawPolyline)),
     );
+
     expect(deviationFromRaw).toBeGreaterThan(1.5);
   });
 
@@ -1961,6 +2039,7 @@ describe("computeBucketFillPolygon", () => {
     if (!result.ok) {
       return;
     }
+
     expect(polygonArea(result.scenePoints)).toBeGreaterThan(15000);
   });
 
@@ -2001,6 +2080,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       // annulus, not the whole outer interior (which would be ~40000)
       expect(polygonArea(result.scenePoints)).toBeCloseTo(30000, -2);
       expect(isClosed(result.scenePoints)).toBe(true);
@@ -2028,6 +2108,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       expect(result.ownerId).toBe(inner.id);
       expect(polygonArea(result.scenePoints)).toBeCloseTo(10000, -2);
     });
@@ -2048,6 +2129,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       // outer minus middle; the innermost sits inside the hole and is
       // irrelevant to the clicked region
       expect(polygonArea(result.scenePoints)).toBeCloseTo(90000 - 40000, -2);
@@ -2076,6 +2158,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       expect(polygonArea(result.scenePoints)).toBeCloseTo(30000, -2);
     });
 
@@ -2102,6 +2185,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       // same net region as the annulus, reached without any hole splicing
       expect(polygonArea(result.scenePoints)).toBeCloseTo(30000, -2);
     });
@@ -2126,6 +2210,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       expect(polygonArea(result.scenePoints)).toBeCloseTo(10000, -2);
     });
 
@@ -2145,6 +2230,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       expect(polygonArea(result.scenePoints)).toBeCloseTo(90000 - 2 * 6400, -2);
       expect(
         evenOddContains(result.scenePoints, pointFrom<GlobalPoint>(70, 70)),
@@ -2195,6 +2281,7 @@ describe("computeBucketFillPolygon", () => {
         if (!result.ok) {
           return;
         }
+
         // outer minus the union: 3×(120×80) − two 20×40 lenses
         expect(polygonArea(result.scenePoints)).toBeCloseTo(
           160000 - (3 * 9600 - 2 * 800),
@@ -2234,6 +2321,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       expect(result.insertion).toEqual({
         placement: "below",
         elementId: inner.id,
@@ -2257,6 +2345,7 @@ describe("computeBucketFillPolygon", () => {
       if (!result.ok) {
         return;
       }
+
       // the fill paints through the dropped island...
       expect(polygonArea(result.scenePoints)).toBeCloseTo(40000, -2);
       // ...so it must NOT claim the island as a boundary...

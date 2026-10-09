@@ -15,6 +15,7 @@ export const Section: React.FC<{
       {t(`headings.${heading}`)}
     </h2>
   );
+
   return (
     <section {...props} aria-labelledby={`${id}-${heading}-title`}>
       {typeof children === "function" ? (

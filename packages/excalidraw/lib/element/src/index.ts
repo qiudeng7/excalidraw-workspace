@@ -20,9 +20,11 @@ export const getSceneVersion = (elements: readonly ExcalidrawElement[]) =>
  */
 export const hashElementsVersion = (elements: ElementsMapOrArray): number => {
   let hash = 5381;
+
   for (const element of toIterable(elements)) {
     hash = (hash << 5) + hash + element.versionNonce;
   }
+
   return hash >>> 0; // Ensure unsigned 32-bit integer
 };
 
@@ -33,10 +35,13 @@ export const hashElementsVersion = (elements: ElementsMapOrArray): number => {
 // (as such, no need to encode to byte string first)
 export const hashString = (s: string): number => {
   let hash: number = 5381;
+
   for (let i = 0; i < s.length; i++) {
     const char: number = s.charCodeAt(i);
+
     hash = (hash << 5) + hash + char;
   }
+
   return hash >>> 0; // Ensure unsigned 32-bit integer
 };
 
@@ -57,52 +62,101 @@ export const getNonDeletedElements = <T extends ExcalidrawElement>(
 ): readonly NonDeleted<T>[] => elements.filter(isNonDeletedElement);
 
 export * from "./align";
+
 export * from "./arrowEndpointText";
+
 export * from "./binding";
+
 export * from "./bounds";
+
 export * from "./bucketFill";
+
 export * from "./collision";
+
 export * from "./comparisons";
+
 export * from "./containerCache";
+
 export * from "./cropElement";
+
 export * from "./delta";
+
 export * from "./distance";
+
 export * from "./distribute";
+
 export * from "./dragElements";
+
 export * from "./duplicate";
+
 export * from "./elbowArrow";
+
 export * from "./elementLink";
+
 export * from "./embeddable";
+
 export * from "./flowchart";
+
 export * from "./arrows/focus";
+
 export * from "./fractionalIndex";
+
 export * from "./frame";
+
 export * from "./groups";
+
 export * from "./heading";
+
 export * from "./image";
+
 export * from "./linearElementEditor";
+
 export * from "./mutateElement";
+
 export * from "./newElement";
+
 export * from "./positionElementsOnGrid";
+
 export * from "./renderElement";
+
 export * from "./resizeElements";
+
 export * from "./resizeTest";
+
 export * from "./Scene";
+
 export * from "./selection";
+
 export * from "./shape";
+
 export * from "./showSelectedShapeActions";
+
 export * from "./sizeHelpers";
+
 export * from "./sortElements";
+
 export * from "./store";
+
 export * from "./stickyNote";
+
 export * from "./textElement";
+
 export * from "./textMeasurements";
+
 export * from "./textWrapping";
+
 export * from "./transform";
+
 export * from "./transformHandles";
+
 export * from "./typeChecks";
+
 export * from "./utils";
+
 export * from "./zindex";
+
 export * from "./arrows/helpers";
+
 export * from "./arrowheads";
+
 export * from "./convertToShape";

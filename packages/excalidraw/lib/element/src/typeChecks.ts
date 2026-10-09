@@ -256,9 +256,11 @@ export const isExcalidrawElement = (
   element: any,
 ): element is ExcalidrawElement => {
   const type: ExcalidrawElementType | undefined = element?.type;
+
   if (!type) {
     return false;
   }
+
   switch (type) {
     case "text":
     case "diamond":
@@ -276,8 +278,10 @@ export const isExcalidrawElement = (
     case "selection": {
       return true;
     }
+
     default: {
       assertNever(type, null);
+
       return false;
     }
   }
@@ -344,6 +348,7 @@ export const canApplyRoundnessTypeToElement = (
   ) {
     return true;
   }
+
   if (
     roundnessType === ROUNDNESS.PROPORTIONAL_RADIUS &&
     isUsingProportionalRadius(element.type)
@@ -378,12 +383,15 @@ export const getLinearElementSubType = (
   if (isSharpArrow(element)) {
     return "sharpArrow";
   }
+
   if (isCurvedArrow(element)) {
     return "curvedArrow";
   }
+
   if (isElbowArrow(element)) {
     return "elbowArrow";
   }
+
   return "line";
 };
 
@@ -425,6 +433,7 @@ export const isEligibleFrameChildType = (type: ElementOrToolType) => {
     case "embeddable": {
       return true;
     }
+
     default: {
       return false;
     }

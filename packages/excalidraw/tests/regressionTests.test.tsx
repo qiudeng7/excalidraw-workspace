@@ -53,6 +53,7 @@ const checkpoint = (name: string) => {
 
   checkpointHistory(h.history, name);
 };
+
 beforeEach(async () => {
   unmountComponent();
 
@@ -135,6 +136,7 @@ describe("regression tests", () => {
     mouse.up(10, 10);
 
     const prevSelectedId = API.getSelectedElement().id;
+
     mouse.restorePosition(...firstRectPos);
     mouse.click();
 
@@ -164,6 +166,7 @@ describe("regression tests", () => {
       });
     }
   }
+
   it("change the properties of a shape", () => {
     UI.clickTool("rectangle");
 
@@ -185,10 +188,12 @@ describe("regression tests", () => {
     mouse.up(10, 10);
 
     const { x: prevX, y: prevY } = API.getSelectedElement();
+
     mouse.down(-8, -8);
     mouse.up(10, 10);
 
     const { x: nextX, y: nextY } = API.getSelectedElement();
+
     expect(nextX).toBeGreaterThan(prevX);
     expect(nextY).toBeGreaterThan(prevY);
 
@@ -198,6 +203,7 @@ describe("regression tests", () => {
     mouse.up(-10, -10);
 
     const { x, y } = API.getSelectedElement();
+
     expect(x).toBe(prevX);
     expect(y).toBe(prevY);
   });
@@ -283,6 +289,7 @@ describe("regression tests", () => {
     finger1.move(-10, 0);
     expect(h.state.zoom.value).toBeGreaterThan(1);
     const zoomed = h.state.zoom.value;
+
     finger1.move(5, 0);
     finger2.move(-5, 0);
     expect(h.state.zoom.value).toBeLessThan(zoomed);
@@ -327,11 +334,13 @@ describe("regression tests", () => {
 
   it("spacebar + drag scrolls the canvas", () => {
     const { scrollX: startScrollX, scrollY: startScrollY } = h.state;
+
     Keyboard.keyDown(KEYS.SPACE);
     mouse.down(50, 50);
     mouse.up(60, 60);
     Keyboard.keyUp(KEYS.SPACE);
     const { scrollX, scrollY } = h.state;
+
     expect(scrollX).not.toEqual(startScrollX);
     expect(scrollY).not.toEqual(startScrollY);
   });
@@ -493,6 +502,7 @@ describe("regression tests", () => {
 
     expect(h.elements.length).toBe(6);
     const groups = new Set();
+
     for (const element of h.elements) {
       for (const groupId of element.groupIds) {
         groups.add(groupId);
@@ -737,6 +747,7 @@ describe("regression tests", () => {
     mouse.up(10, 10);
 
     const { x: prevX, y: prevY } = API.getSelectedElement();
+
     API.clearSelection();
     // drag element from point on bounding box that doesn't hit element
     mouse.reset();
@@ -770,6 +781,7 @@ describe("regression tests", () => {
         width: 500,
         height: 500,
       });
+
       API.setElements([rect1, rect2]);
 
       mouse.select(rect1);
@@ -806,6 +818,7 @@ describe("regression tests", () => {
         width: 500,
         height: 500,
       });
+
       API.setElements([rect1, rect2]);
 
       mouse.select(rect1);
@@ -1033,6 +1046,7 @@ describe("regression tests", () => {
     const rect2 = UI.createElement("rectangle", {
       x: 50,
     });
+
     UI.group([rect1, rect2]);
 
     const rect3 = UI.createElement("rectangle", {
@@ -1043,6 +1057,7 @@ describe("regression tests", () => {
       x: 50,
       y: 50,
     });
+
     UI.group([rect3, rect4]);
 
     Keyboard.withModifierKeys({ ctrl: true }, () => {
@@ -1052,6 +1067,7 @@ describe("regression tests", () => {
 
     const selectedGroupIds_prev = h.state.selectedGroupIds;
     const selectedElements_prev = API.getSelectedElements();
+
     mouse.clickOn(rect3);
     expect(h.state.selectedGroupIds).toEqual(selectedGroupIds_prev);
     expect(API.getSelectedElements()).toEqual(selectedElements_prev);
@@ -1098,6 +1114,7 @@ describe("regression tests", () => {
     assertSelectedElements(rect1);
 
     const rect3 = UI.createElement("rectangle", { x: 60 });
+
     UI.group([rect1, rect3]);
     assertSelectedElements(rect1, rect2, rect3);
 
@@ -1174,6 +1191,7 @@ it(
 
     expect(API.getSelectedElements().length).toBe(2);
     const selectedGroupIds = Object.keys(h.state.selectedGroupIds);
+
     expect(selectedGroupIds.length).toBe(1);
 
     // Select second rectangle without deselecting group

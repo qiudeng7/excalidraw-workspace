@@ -49,6 +49,7 @@ export const TopPicks = ({
   const dragState = dnd?.dragState ?? null;
 
   let colors;
+
   if (type === "elementStroke") {
     colors = DEFAULT_ELEMENT_STROKE_PICKS;
   }
@@ -68,6 +69,7 @@ export const TopPicks = ({
 
   if (!colors) {
     console.error("Invalid type for TopPicks");
+
     return null;
   }
 
@@ -87,6 +89,7 @@ export const TopPicks = ({
         {colors.map((color: string, index: number) => {
           const reorderOffset = getTopPickReorderOffset(dragState, index);
           const displayColor = applyDarkModeFilter(color, theme === THEME.DARK);
+
           return (
             <button
               className={clsx("color-picker__button top-picks-dnd__pick", {

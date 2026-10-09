@@ -23,6 +23,7 @@ describe("restore appState.colorTopPicks", () => {
       } as any,
       null,
     );
+
     expect(restored.colorTopPicks.elementBackground).toEqual([
       "#FFF",
       "#a5d8ff",
@@ -43,6 +44,7 @@ describe("restore appState.colorTopPicks", () => {
       } as any,
       null,
     );
+
     expect(restored.colorTopPicks.elementStroke).toEqual(
       many.slice(0, COLOR_TOP_PICKS_SLOTS),
     );

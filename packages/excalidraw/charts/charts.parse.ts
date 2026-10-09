@@ -6,9 +6,11 @@ import { type ParseSpreadsheetResult } from "./charts.types";
 export const tryParseNumber = (s: string): number | null => {
   const match =
     /^([-+]?)[$\u20AC\u00A3\u00A5\u20A9]?([-+]?)([\d.,]+)[%]?$/.exec(s);
+
   if (!match) {
     return null;
   }
+
   return parseFloat(`${(match[1] || match[2]) + match[3]}`.replace(/,/g, ""));
 };
 
@@ -32,6 +34,7 @@ export const tryParseCells = (cells: string[][]): ParseSpreadsheetResult => {
     const invalidNumericColumn = rows.some((row) =>
       row.slice(1).some((value) => tryParseNumber(value) === null),
     );
+
     if (invalidNumericColumn) {
       return { ok: false, reason: "Value is not numeric" };
     }
@@ -40,6 +43,7 @@ export const tryParseCells = (cells: string[][]): ParseSpreadsheetResult => {
     // "wide" format — transpose so columns become labels (dimensions)
     // and rows become series. This enables e.g. radar charts for wide data.
     const numValueCols = numCols - 1;
+
     if (numValueCols > rows.length) {
       const labels = hasHeader ? cells[0].slice(1).map((h) => h.trim()) : null;
       const series = rows.map((row) => ({
@@ -50,8 +54,9 @@ export const tryParseCells = (cells: string[][]): ParseSpreadsheetResult => {
         series.length === 1
           ? series[0].title
           : hasHeader
-          ? cells[0][0].trim() || null
-          : null;
+            ? cells[0][0].trim() || null
+            : null;
+
       return {
         ok: true,
         data: { title, labels, series },
@@ -61,6 +66,7 @@ export const tryParseCells = (cells: string[][]): ParseSpreadsheetResult => {
     const series = cells[0].slice(1).map((seriesTitle, index) => {
       const valueColumnIndex = index + 1;
       const fallbackTitle = `Series ${valueColumnIndex}`;
+
       return {
         title: hasHeader ? seriesTitle.trim() || fallbackTitle : fallbackTitle,
         values: rows.map((row) => tryParseNumber(row[valueColumnIndex])!),
@@ -112,6 +118,7 @@ export const tryParseCells = (cells: string[][]): ParseSpreadsheetResult => {
   const invalidNumericColumn = rows.some(
     (row) => tryParseNumber(row[1]) === null,
   );
+
   if (invalidNumericColumn) {
     return { ok: false, reason: "Value is not numeric" };
   }
@@ -144,6 +151,7 @@ export const tryParseSpreadsheet = (text: string): ParseSpreadsheetResult => {
     const numCols = parsed[0]?.length ?? 0;
     const isConsistent =
       parsed.length > 0 && parsed.every((line) => line.length === numCols);
+
     return { delimiter, parsed, numCols, isConsistent };
   });
 

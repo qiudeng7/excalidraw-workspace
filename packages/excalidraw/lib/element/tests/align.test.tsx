@@ -931,6 +931,7 @@ describe("aligning", () => {
     // Create the nested group
     API.executeAction(actionGroup);
   };
+
   it("aligns elements within a single-selected group containing a nested group correctly to the top", () => {
     createAndSelectSingleGroupWithNestedGroup();
 

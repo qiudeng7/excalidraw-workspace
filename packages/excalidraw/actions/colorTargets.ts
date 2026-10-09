@@ -119,6 +119,7 @@ export const resolveColorTarget = (
     elementsMap.get(appState.editingTextElement.id);
   const editing =
     editingText && getColorTargetElement(editingText, property, elementsMap);
+
   if (
     editing &&
     !editing.isDeleted &&
@@ -129,18 +130,20 @@ export const resolveColorTarget = (
   }
 
   let kind: ColorTargetKind;
+
   if (!targets.length) {
     kind = appState.activeTool.type === "stickynote" ? "sticky" : "regular";
   } else {
     const stickyCount = targets.filter((element) =>
       isStickyNoteColorTarget(element, elementsMap),
     ).length;
+
     kind =
       stickyCount === 0
         ? "regular"
         : stickyCount === targets.length
-        ? "sticky"
-        : "mixed";
+          ? "sticky"
+          : "mixed";
   }
 
   const keys = DEFAULT_KEYS[property];
@@ -160,16 +163,16 @@ export const resolveColorTarget = (
           ? STICKY_NOTE_STROKE_PICKS
           : STICKY_NOTE_BACKGROUND_PICKS
         : isStroke
-        ? DEFAULT_ELEMENT_STROKE_PICKS
-        : DEFAULT_ELEMENT_BACKGROUND_PICKS,
+          ? DEFAULT_ELEMENT_STROKE_PICKS
+          : DEFAULT_ELEMENT_BACKGROUND_PICKS,
     customizableTopPicks:
       kind === "sticky"
         ? isStroke
           ? "stickyNoteStroke"
           : "stickyNoteBackground"
         : isStroke
-        ? "elementStroke"
-        : "elementBackground",
+          ? "elementStroke"
+          : "elementBackground",
     excludedColors: kind === "sticky" ? STICKY_NOTE_EXCLUDED_COLORS : undefined,
   };
 };
@@ -180,13 +183,15 @@ export const getColorTargetAppStateUpdates = (
   color: string,
 ): Partial<AppState> => {
   const updates: Partial<AppState> = {};
+
   for (const key of target.appStateKeys) {
     updates[key] =
       key === "currentItemStickynoteStrokeColor"
         ? normalizeStickyNoteStrokeColor(color)
         : key === "currentItemStickynoteBackgroundColor"
-        ? normalizeStickyNoteBackgroundColor(color)
-        : color;
+          ? normalizeStickyNoteBackgroundColor(color)
+          : color;
   }
+
   return updates;
 };

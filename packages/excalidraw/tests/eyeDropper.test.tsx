@@ -20,7 +20,9 @@ describe("eye dropper", () => {
         GlobalTestState.renderResult.container.querySelector<HTMLDivElement>(
           ".excalidraw-eye-dropper-preview",
         );
+
       expect(element).not.toBeNull();
+
       return element!;
     });
 
@@ -28,6 +30,7 @@ describe("eye dropper", () => {
       GlobalTestState.renderResult.container.querySelector<HTMLDivElement>(
         ".excalidraw-eye-dropper-backdrop",
       )!;
+
     expect(eyeDropperContainer.style.cursor).toMatch(
       /^url\(data:image\/svg\+xml/,
     );
@@ -66,6 +69,7 @@ describe("eye dropper", () => {
     );
 
     const ctx = h.app.canvas.getContext("2d")!;
+
     vi.spyOn(ctx, "getImageData").mockReturnValue({
       data: new Uint8ClampedArray([18, 18, 18, 255]),
     } as ImageData);
@@ -77,7 +81,9 @@ describe("eye dropper", () => {
         GlobalTestState.renderResult.container.querySelector<HTMLDivElement>(
           ".excalidraw-eye-dropper-backdrop",
         );
+
       expect(element).not.toBeNull();
+
       return element!;
     });
 
@@ -104,7 +110,9 @@ describe("eye dropper", () => {
         GlobalTestState.renderResult.container.querySelector<HTMLDivElement>(
           ".excalidraw-eye-dropper-preview",
         );
+
       expect(element).not.toBeNull();
+
       return element!;
     });
 

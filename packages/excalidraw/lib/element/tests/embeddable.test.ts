@@ -19,6 +19,7 @@ describe("YouTube timestamp parsing", () => {
 
     testCases.forEach(({ url, expectedStart }) => {
       const result = getEmbedLink(url);
+
       expect(result).toBeTruthy();
       expect(result?.type).toBe("video");
       if (result?.type === "video" || result?.type === "generic") {
@@ -57,6 +58,7 @@ describe("YouTube timestamp parsing", () => {
 
     testCases.forEach(({ url, expectedStart }) => {
       const result = getEmbedLink(url);
+
       expect(result).toBeTruthy();
       expect(result?.type).toBe("video");
       if (result?.type === "video" || result?.type === "generic") {
@@ -74,6 +76,7 @@ describe("YouTube timestamp parsing", () => {
 
     testCases.forEach((url) => {
       const result = getEmbedLink(url);
+
       expect(result).toBeTruthy();
       expect(result?.type).toBe("video");
       if (result?.type === "video" || result?.type === "generic") {
@@ -91,6 +94,7 @@ describe("YouTube timestamp parsing", () => {
     if (result?.type === "video" || result?.type === "generic") {
       expect(result.link).toContain("start=30");
     }
+
     // Shorts should have portrait aspect ratio
     expect(result?.intrinsicSize).toEqual({ w: 315, h: 560 });
   });
@@ -138,6 +142,7 @@ describe("YouTube timestamp parsing", () => {
 
     testCases.forEach(({ url, expectedStart }) => {
       const result = getEmbedLink(url);
+
       expect(result).toBeTruthy();
       expect(result?.type).toBe("video");
       if (result?.type === "video" || result?.type === "generic") {
@@ -189,6 +194,7 @@ describe("Google Drive video embedding", () => {
     if (result?.type === "video" || result?.type === "generic") {
       expect(result.link).toBe(expectedLink);
     }
+
     expect(result?.intrinsicSize).toEqual({ w: 560, h: 315 });
   });
 

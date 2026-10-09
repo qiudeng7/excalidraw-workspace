@@ -24,6 +24,7 @@ const MenuTrigger = ({
       "dropdown-menu-button--mobile": editorInterface.formFactor === "phone",
     },
   ).trim();
+
   return (
     <DropdownMenuPrimitive.Trigger
       className={classNames}

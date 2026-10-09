@@ -8,7 +8,9 @@ import type { InteractiveCanvasAppState } from "../types";
 import type { RenderableElementsMap, ScrollBars } from "./types";
 
 export const SCROLLBAR_MARGIN = 4;
+
 export const SCROLLBAR_WIDTH = 6;
+
 export const SCROLLBAR_COLOR = "rgba(0,0,0,0.3)";
 
 // The scrollbar represents where the viewport is in relationship to the scene
@@ -24,6 +26,7 @@ export const getScrollBars = (
       vertical: null,
     };
   }
+
   // This is the bounding box of all the elements
   const [elementsMinX, elementsMinY, elementsMaxX, elementsMaxY] =
     getCommonBounds(elements);
@@ -90,6 +93,7 @@ export const getScrollBars = (
       ? (extendedSceneHeight * appState.zoom.value) /
         (scrollbarHeight + scrollbarHeightOffset)
       : viewportHeight / (scrollbarHeight + scrollbarHeightOffset);
+
   return {
     horizontal:
       viewportMinX === sceneMinX && viewportMaxX === sceneMaxX
@@ -151,5 +155,6 @@ export const isOverScrollBars = (
     );
   });
   const isOverEither = isOverHorizontal || isOverVertical;
+
   return { isOverEither, isOverHorizontal, isOverVertical };
 };

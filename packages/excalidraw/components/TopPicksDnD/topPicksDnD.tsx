@@ -108,22 +108,28 @@ export const getTopPickReorderOffset = (
   ) {
     return 0;
   }
+
   const from = dragState.origin.index;
   const to = dragState.overIndex;
+
   if (from === to) {
     return 0;
   }
+
   let newIndex = index;
+
   if (index === from) {
     newIndex = to;
   } else {
     if (index > from) {
       newIndex -= 1;
     }
+
     if (newIndex >= to) {
       newIndex += 1;
     }
   }
+
   return (newIndex - index) * dragState.slotSpan;
 };
 
@@ -159,6 +165,7 @@ export const useTopPicksDnD = <T,>({
     isSamePick,
     createGhost,
   });
+
   latestRef.current = {
     enabled,
     picks,
@@ -186,32 +193,39 @@ export const useTopPicksDnD = <T,>({
 
     const measureStrip = () => {
       const strip = stripRef.current;
+
       if (!strip || !session) {
         return false;
       }
+
       const buttons = Array.from(
         strip.querySelectorAll<HTMLElement>("[data-top-pick-index]"),
       ).sort(
         (a, b) =>
           Number(a.dataset.topPickIndex) - Number(b.dataset.topPickIndex),
       );
+
       if (!buttons.length) {
         return false;
       }
+
       session.slotRects = buttons.map((button) =>
         button.getBoundingClientRect(),
       );
       const [first, second] = session.slotRects;
+
       // strip is evenly spaced; sign flips under RTL
       session.slotSpan = second ? second.left - first.left : first.width + 4;
       const stripRect = strip.getBoundingClientRect();
       const padX = Math.max(Math.abs(session.slotSpan) / 2, 10);
+
       session.hitRect = {
         left: stripRect.left - padX,
         right: stripRect.right + padX,
         top: stripRect.top - 14,
         bottom: stripRect.bottom + 14,
       };
+
       return true;
     };
 
@@ -232,6 +246,7 @@ export const useTopPicksDnD = <T,>({
       if (!session?.ghost) {
         return;
       }
+
       if (session.ghostW !== width || session.ghostH !== height) {
         session.ghostW = width;
         session.ghostH = height;
@@ -245,9 +260,11 @@ export const useTopPicksDnD = <T,>({
       if (!session) {
         return;
       }
+
       const { ghostContent, homeRect: rect } = session;
 
       const ghost = document.createElement("div");
+
       ghost.className = GHOST_CLASS;
       ghostContent.classList.add(`${GHOST_CLASS}__content`);
       ghost.appendChild(ghostContent);
@@ -277,6 +294,7 @@ export const useTopPicksDnD = <T,>({
       if (!session?.hitRect) {
         return;
       }
+
       const { hitRect, slotRects } = session;
       let overIndex: number | null = null;
       let duplicateIndex: number | null = null;
@@ -289,8 +307,10 @@ export const useTopPicksDnD = <T,>({
       ) {
         let best = 0;
         let bestDistance = Infinity;
+
         slotRects.forEach((rect, index) => {
           const distance = Math.abs(x - (rect.left + rect.width / 2));
+
           if (distance < bestDistance) {
             bestDistance = distance;
             best = index;
@@ -301,6 +321,7 @@ export const useTopPicksDnD = <T,>({
           const duplicate = picks.findIndex((pick) =>
             isSamePick(pick, session!.value),
           );
+
           if (duplicate !== -1) {
             duplicateIndex = duplicate;
           } else {
@@ -319,6 +340,7 @@ export const useTopPicksDnD = <T,>({
         session.duplicateIndex = duplicateIndex;
 
         const { ghost } = session;
+
         if (ghost) {
           ghost.classList.toggle(`${GHOST_CLASS}--over`, overIndex !== null);
           ghost.classList.toggle(
@@ -326,12 +348,14 @@ export const useTopPicksDnD = <T,>({
             duplicateIndex !== null,
           );
         }
+
         publish();
       }
 
       // over the strip the ghost morphs to slot size to preview the landing
       if (overIndex !== null) {
         const rect = session.slotRects[overIndex];
+
         setGhostSize(rect.width, rect.height, x, y);
       } else {
         setGhostSize(session.homeRect.width, session.homeRect.height, x, y);
@@ -342,15 +366,19 @@ export const useTopPicksDnD = <T,>({
       if (!session?.ghost) {
         return;
       }
+
       const { ghost } = session;
+
       session.ghost = null;
       ghost.classList.add(`${GHOST_CLASS}--dropping`);
       const rect = target.rect;
+
       if (rect) {
         ghost.style.width = `${rect.width}px`;
         ghost.style.height = `${rect.height}px`;
         ghost.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
       }
+
       window.setTimeout(() => {
         ghost.classList.add(`${GHOST_CLASS}--fade`);
       }, 160);
@@ -369,16 +397,20 @@ export const useTopPicksDnD = <T,>({
     // directly.
     const settleStripInstantly = () => {
       const strip = stripRef.current;
+
       if (!strip || !session?.activated) {
         return;
       }
+
       const buttons = Array.from(
         strip.querySelectorAll<HTMLElement>("[data-top-pick-index]"),
       );
+
       for (const button of buttons) {
         button.style.transition = "none";
         button.style.transform = "none";
       }
+
       // flush the non-animated state...
       void strip.offsetWidth;
       // ...then let the stylesheet govern transitions again (next drag)
@@ -392,6 +424,7 @@ export const useTopPicksDnD = <T,>({
         event.preventDefault();
         event.stopPropagation();
       };
+
       window.addEventListener("click", suppress, { capture: true, once: true });
       window.setTimeout(() => {
         window.removeEventListener("click", suppress, { capture: true });
@@ -411,6 +444,7 @@ export const useTopPicksDnD = <T,>({
       if (session?.activationTimer != null) {
         window.clearTimeout(session.activationTimer);
       }
+
       session = null;
       setDragState(null);
     };
@@ -419,6 +453,7 @@ export const useTopPicksDnD = <T,>({
       if (!session) {
         return;
       }
+
       settleStripInstantly();
       if (session.ghost) {
         if (animate) {
@@ -428,6 +463,7 @@ export const useTopPicksDnD = <T,>({
           session.ghost = null;
         }
       }
+
       dispose();
     };
 
@@ -435,10 +471,13 @@ export const useTopPicksDnD = <T,>({
       if (!session || session.activated) {
         return;
       }
+
       if (!measureStrip()) {
         dispose();
+
         return;
       }
+
       activate(x, y);
       hitTest(x, y);
     };
@@ -447,6 +486,7 @@ export const useTopPicksDnD = <T,>({
       if (!session || event.pointerId !== session.pointerId) {
         return;
       }
+
       session.lastX = event.clientX;
       session.lastY = event.clientY;
       if (!session.activated) {
@@ -463,9 +503,12 @@ export const useTopPicksDnD = <T,>({
             window.clearTimeout(session.activationTimer);
             session.activationTimer = null;
           }
+
           return;
         }
+
         const elapsed = performance.now() - session.startTime;
+
         if (elapsed < DRAG_TIME_THRESHOLD_MS) {
           // spatial threshold crossed, temporal not yet — likely a fast
           // sloppy click. Wait out the rest of the grace period; the timeout
@@ -487,13 +530,16 @@ export const useTopPicksDnD = <T,>({
               }
             }, DRAG_TIME_THRESHOLD_MS - elapsed);
           }
+
           return;
         }
+
         tryActivate(event.clientX, event.clientY);
         if (!session?.activated) {
           return;
         }
       }
+
       event.preventDefault();
       positionGhost(event.clientX, event.clientY);
       hitTest(event.clientX, event.clientY);
@@ -503,11 +549,14 @@ export const useTopPicksDnD = <T,>({
       if (!session || event.pointerId !== session.pointerId) {
         return;
       }
+
       if (!session.activated) {
         // never became a drag — let the regular click happen
         dispose();
+
         return;
       }
+
       event.preventDefault();
       event.stopPropagation();
       suppressNextClick();
@@ -521,19 +570,23 @@ export const useTopPicksDnD = <T,>({
         if (origin.kind === "source") {
           if (!picks.some((pick) => isSamePick(pick, value))) {
             const next = [...picks];
+
             next[overIndex] = value;
             onPicksChange(next);
           }
         } else if (origin.index !== overIndex) {
           const next = [...picks];
           const [moved] = next.splice(origin.index, 1);
+
           next.splice(overIndex, 0, moved);
           onPicksChange(next);
         }
+
         releaseGhost({ rect: slotRects[overIndex] });
       } else {
         releaseGhost({ rect: session.homeRect });
       }
+
       dispose();
     };
 
@@ -564,10 +617,13 @@ export const useTopPicksDnD = <T,>({
       ) {
         return;
       }
+
       const stripEl = stripRef.current;
+
       if (!stripEl) {
         return;
       }
+
       // build & measure the ghost now, while the source is guaranteed to be
       // mounted — it may be re-rendered (detached) before the drag activates
       // (e.g. the font list re-renders on hover), and a detached source
@@ -579,6 +635,7 @@ export const useTopPicksDnD = <T,>({
           sourceEl: event.currentTarget as HTMLElement,
           stripEl,
         });
+
       session = {
         pointerId: event.pointerId,
         startX: event.clientX,

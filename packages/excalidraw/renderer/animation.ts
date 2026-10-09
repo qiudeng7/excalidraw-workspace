@@ -28,9 +28,11 @@ export class AnimationController {
       lastTime: 0,
       state: undefined,
     };
+
     AnimationController.animations.set(key, record);
 
     let initialState: R | null | undefined;
+
     try {
       initialState = animation({
         deltaTime: 0,
@@ -41,6 +43,7 @@ export class AnimationController {
         AnimationController.animations.delete(key);
         AnimationController.cancelScheduledFrameIfIdle();
       }
+
       throw error;
     }
 
@@ -54,6 +57,7 @@ export class AnimationController {
     if (!initialState) {
       AnimationController.animations.delete(key);
       AnimationController.cancelScheduledFrameIfIdle();
+
       return;
     }
 
@@ -99,6 +103,7 @@ export class AnimationController {
     }
 
     AnimationController.cancelScheduledFrame();
+
     return true;
   }
 
@@ -110,6 +115,7 @@ export class AnimationController {
       // from the frame's starting set so newly started animations begin on the
       // next frame and every record runs at most once per tick.
       const animations = [...AnimationController.animations];
+
       for (const [key, animation] of animations) {
         if (AnimationController.animations.get(key) !== animation) {
           continue;

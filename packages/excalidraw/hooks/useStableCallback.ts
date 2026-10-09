@@ -7,6 +7,7 @@ export const useStableCallback = <T extends (...args: any[]) => any>(
   userFn: T,
 ) => {
   const stableRef = useRef<{ userFn: T; stableFn?: T }>({ userFn });
+
   stableRef.current.userFn = userFn;
 
   if (!stableRef.current.stableFn) {

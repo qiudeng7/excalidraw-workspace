@@ -134,6 +134,7 @@ export const ellipseDistanceFromPoint = <
     tx = Math.min(1, Math.max(0, ((qx * r) / q + ex) / a));
     ty = Math.min(1, Math.max(0, ((qy * r) / q + ey) / b));
     const t = Math.hypot(ty, tx);
+
     tx /= t;
     ty /= t;
   }
@@ -194,6 +195,7 @@ export function ellipseSegmentInterceptPoints<
     }
   } else if (d === 0) {
     const t = -b / a;
+
     if (0 <= t && t <= 1) {
       intersections.push(
         pointFrom(

@@ -113,7 +113,7 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
   const showImageToolOutside = toolbarWidth >= MIN_WIDTH + 2 * ADDITIONAL_WIDTH;
   const showFrameToolOutside = toolbarWidth >= MIN_WIDTH + 3 * ADDITIONAL_WIDTH;
 
-  const extraTools: readonly typeof activeTool.type[] = (
+  const extraTools: readonly (typeof activeTool.type)[] = (
     [
       "text",
       "stickynote",
@@ -127,9 +127,11 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
     if (showTextToolOutside && tool === "text") {
       return false;
     }
+
     if (showFrameToolOutside && tool === "frame") {
       return false;
     }
+
     return true;
   });
   const extraToolSelected = extraTools.includes(activeTool.type);
@@ -137,20 +139,20 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
     ? activeTool.type === "text"
       ? TextIcon
       : activeTool.type === "image"
-      ? ImageIcon
-      : activeTool.type === "frame"
-      ? frameToolIcon
-      : activeTool.type === "stickynote"
-      ? stickyNoteToolIcon
-      : activeTool.type === "embeddable"
-      ? EmbedIcon
-      : activeTool.type === "laser"
-      ? laserPointerToolIcon
-      : activeTool.type === "bucketfill"
-      ? bucketFillIcon
-      : activeTool.type === "magicframe"
-      ? MagicIcon
-      : DotsIcon
+        ? ImageIcon
+        : activeTool.type === "frame"
+          ? frameToolIcon
+          : activeTool.type === "stickynote"
+            ? stickyNoteToolIcon
+            : activeTool.type === "embeddable"
+              ? EmbedIcon
+              : activeTool.type === "laser"
+                ? laserPointerToolIcon
+                : activeTool.type === "bucketfill"
+                  ? bucketFillIcon
+                  : activeTool.type === "magicframe"
+                    ? MagicIcon
+                    : DotsIcon
     : DotsIcon;
 
   const toolProps = { app, activeTool };

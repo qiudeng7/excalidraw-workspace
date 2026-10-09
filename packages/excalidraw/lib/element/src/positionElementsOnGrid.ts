@@ -30,6 +30,7 @@ export const positionElementsOnGrid = <TElement extends ExcalidrawElement>(
 
   // Group atomic units into rows based on the calculated number of columns
   const rows: TElement[][][] = [];
+
   for (let i = 0; i < numUnits; i += numColumns) {
     rows.push(atomicUnits.slice(i, i + numColumns));
   }
@@ -43,6 +44,7 @@ export const positionElementsOnGrid = <TElement extends ExcalidrawElement>(
 
     const unitBounds = rowUnits.map((unit) => {
       const [minX, minY, maxX, maxY] = getCommonBounds(unit);
+
       return {
         elements: unit,
         bounds: [minX, minY, maxX, maxY] as const,
@@ -57,12 +59,14 @@ export const positionElementsOnGrid = <TElement extends ExcalidrawElement>(
       if (index < unitBounds.length - 1) {
         rowWidth += padding;
       }
+
       if (unitBound.height > maxUnitHeightInRow) {
         maxUnitHeightInRow = unitBound.height;
       }
     });
 
     totalGridActualHeight += maxUnitHeightInRow;
+
     return {
       unitBounds,
       width: rowWidth,
@@ -108,5 +112,6 @@ export const positionElementsOnGrid = <TElement extends ExcalidrawElement>(
     // This accounts for the tallest unit in the current row and the inter-row padding
     currentY += rowMaxHeight + padding;
   });
+
   return res;
 };

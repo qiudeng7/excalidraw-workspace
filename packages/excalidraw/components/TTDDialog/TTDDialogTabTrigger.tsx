@@ -18,4 +18,5 @@ export const TTDDialogTabTrigger = ({
     </RadixTabs.Trigger>
   );
 };
+
 TTDDialogTabTrigger.displayName = "TTDDialogTabTrigger";

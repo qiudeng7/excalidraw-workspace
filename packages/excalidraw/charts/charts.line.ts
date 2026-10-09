@@ -65,6 +65,7 @@ export const renderLineChart = (
     seriesData.values.map((value, valueIndex) => {
       const cx = valueIndex * (layout.slotWidth + layout.gap) + layout.gap / 2;
       const cy = -(value / max) * layout.chartHeight + layout.gap / 2;
+
       return newElement({
         backgroundColor: seriesColors[seriesIndex],
         ...commonProps,
@@ -89,6 +90,7 @@ export const renderLineChart = (
   const guides = guideValues.map((value, valueIndex) => {
     const cx = valueIndex * (layout.slotWidth + layout.gap) + layout.gap / 2;
     const cy = (value / max) * layout.chartHeight + layout.gap / 2 + layout.gap;
+
     return newLinearElement({
       backgroundColor,
       ...commonProps,

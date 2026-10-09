@@ -26,6 +26,7 @@ describe("setActiveTool()", () => {
 
   beforeEach(async () => {
     const excalidrawAPIPromise = resolvablePromise<ExcalidrawImperativeAPI>();
+
     await render(
       <Excalidraw
         onExcalidrawAPI={(api) => excalidrawAPIPromise.resolve(api as any)}
@@ -84,7 +85,7 @@ describe("findShapeByKey()", () => {
           type: preferredSelectionTool,
         },
       },
-    } as AppClassProperties);
+    }) as AppClassProperties;
 
   it("selection shortcuts activate selection when it's preferred", () => {
     const app = appWithPreferredTool("selection");
@@ -198,6 +199,7 @@ describe("props.activeTool (forced tool)", () => {
       width: 50,
       height: 50,
     });
+
     API.setElements([rect]);
     API.setAppState({ selectedElementIds: { [rect.id]: true } });
 
@@ -277,11 +279,13 @@ describe("props.activeTool (forced tool)", () => {
     const frameItem = document.querySelector<HTMLButtonElement>(
       '[data-testid="toolbar-frame"]',
     );
+
     expect(frameItem).not.toBe(null);
     expect(frameItem!.disabled).toBe(true);
     const laserItem = document.querySelector<HTMLButtonElement>(
       '[data-testid="toolbar-laser"]',
     );
+
     expect(laserItem!.disabled).toBe(true);
 
     // Q (toggle tool lock) is ignored — locking is implied while forced
@@ -293,6 +297,7 @@ describe("props.activeTool (forced tool)", () => {
 
   it("cannot force the image tool", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     await render(<Excalidraw activeTool={{ type: "image" } as any} />);
     expect(h.state.activeTool.type).toBe("selection");
     expect(warnSpy).toHaveBeenCalledWith(
@@ -332,6 +337,7 @@ describe("props.activeTool (forced tool)", () => {
 
   it("forcing a non-activatable tool resolves to selection until activatable", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     await render(
       <Excalidraw activeTool={{ type: "laser" }} interaction={false} />,
     );
@@ -379,6 +385,7 @@ describe("toolbar", () => {
     await render(<Excalidraw />);
     const badge = (type: string) =>
       queryTool(type)?.querySelector(".ToolIcon__keybinding")?.textContent;
+
     expect(badge("selection")).toBe("V");
     expect(badge("rectangle")).toBe("R");
     expect(badge("text")).toBe("T");

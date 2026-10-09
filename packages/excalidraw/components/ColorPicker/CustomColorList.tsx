@@ -43,6 +43,7 @@ export const CustomColorList = ({
     <div className="color-picker-content--default">
       {colors.map((c, i) => {
         const displayColor = applyDarkModeFilter(c, theme === THEME.DARK);
+
         return (
           <button
             ref={color === c ? btnRef : undefined}

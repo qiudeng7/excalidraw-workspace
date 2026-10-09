@@ -57,11 +57,13 @@ const updatePath = (startPoint: GlobalPoint, points: LocalPoint[]) => {
     });
 
     const elementsSegments: ElementsSegmentsMap = new Map();
+
     for (const element of h.elements) {
       const segments = getElementLineSegments(
         element,
         h.app.scene.getElementsMapIncludingDeleted(),
       );
+
       elementsSegments.set(element.id, segments);
     }
 
@@ -363,7 +365,7 @@ describe("Basic lasso selection tests", () => {
           angle: e.angle as Radians,
           index: null,
           created: null,
-        } as ExcalidrawElement),
+        }) as ExcalidrawElement,
     );
 
     act(() => {
@@ -644,6 +646,7 @@ describe("Basic lasso selection tests", () => {
 
     updatePath(startPoint, points);
     const selectedElements = getSelectedElements(h.elements, h.state);
+
     expect(selectedElements.length).toBe(3);
     expect(selectedElements.filter((e) => e.type === "arrow").length).toBe(1);
     expect(selectedElements.filter((e) => e.type === "rectangle").length).toBe(
@@ -867,6 +870,7 @@ describe("Basic lasso selection tests", () => {
     updatePath(startPoint, points);
 
     const selectedElements = getSelectedElements(h.elements, h.state);
+
     expect(selectedElements.length).toBe(4);
     expect(selectedElements.filter((e) => e.type === "line").length).toBe(1);
     expect(selectedElements.filter((e) => e.type === "ellipse").length).toBe(1);
@@ -914,9 +918,11 @@ describe("Basic lasso selection tests", () => {
       [-42.0625, 102.12109375],
       [-42.0625, 102.12109375],
     ] as LocalPoint[];
+
     updatePath(startPoint, points);
 
     const selectedElements = getSelectedElements(h.elements, h.state);
+
     expect(selectedElements.length).toBe(1);
     expect(h.app.state.selectedLinearElement).toBeDefined();
   });
@@ -1196,6 +1202,7 @@ describe("Special cases", () => {
     updatePath(startPoint, points);
 
     const selectedElements = getSelectedElements(h.elements, h.state);
+
     expect(selectedElements.length).toBe(1);
     expect(selectedElements[0].type).toBe("frame");
   });
@@ -1807,6 +1814,7 @@ describe("Special cases", () => {
     updatePath(startPoint, points);
 
     const selectedElements = getSelectedElements(h.elements, h.state);
+
     expect(selectedElements.length).toBe(16);
     expect(h.app.state.selectedGroupIds["-9NzH7Fa5JaHu4ArEFpa_"]).toBe(true);
   });
@@ -1847,6 +1855,7 @@ describe("Special cases", () => {
     act(() => h.app.setState({ boxSelectionMode: "overlap" }));
     updatePath(startPoint, lassoPoints);
     let selected = getSelectedElements(h.elements, h.state);
+
     expect(selected.map((el) => el.id)).toContain("rect1");
     expect(selected.map((el) => el.id)).toContain("rect2");
 

@@ -28,6 +28,7 @@ export const fileOpen = async <M extends boolean | undefined = false>(opts: {
     if (ext === "jpg") {
       return acc.concat(".jpg", ".jpeg");
     }
+
     return acc.concat(`.${ext}`);
   }, [] as string[]);
 
@@ -43,6 +44,7 @@ export const fileOpen = async <M extends boolean | undefined = false>(opts: {
       files.map((file) => normalizeFile(file)),
     )) as RetType;
   }
+
   return (await normalizeFile(files)) as RetType;
 };
 

@@ -365,9 +365,10 @@ const CombinedArrowProperties = ({
                     return element.elbowed
                       ? "elbow"
                       : element.roundness
-                      ? "round"
-                      : "sharp";
+                        ? "round"
+                        : "sharp";
                   }
+
                   return null;
                 },
                 (element) => isArrowElement(element),
@@ -378,9 +379,11 @@ const CombinedArrowProperties = ({
               if (arrowType === "elbow") {
                 return elbowArrowIcon;
               }
+
               if (arrowType === "round") {
                 return roundArrowIcon;
               }
+
               return sharpArrowIcon;
             })()}
           </button>
@@ -427,6 +430,7 @@ const CombinedTextProperties = ({
             if (appState.editingTextElement) {
               saveCaretPosition();
             }
+
             setAppState({ openPopup: "compactTextProperties" });
           } else {
             setAppState({ openPopup: null });
@@ -453,6 +457,7 @@ const CombinedTextProperties = ({
                 if (appState.editingTextElement) {
                   saveCaretPosition();
                 }
+
                 setAppState({ openPopup: "compactTextProperties" });
               }
             }}

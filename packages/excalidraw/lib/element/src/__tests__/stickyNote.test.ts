@@ -459,9 +459,11 @@ describe("sticky note text layout", () => {
     const { scene, stickyId, textId } = createStickyWithText(overflowingText);
     const sticky = getSticky(scene, stickyId);
     const text = getBoundText(scene, textId);
+
     scene.mutateElement(sticky, { angle: 0.5 as Radians });
     scene.mutateElement(text, { angle: 0.5 as Radians });
     const grownHeight = sticky.height;
+
     expect(grownHeight).toBeGreaterThan(sticky.baseHeight);
     const originalElementsMap = arrayToMap([{ ...sticky }, { ...text }]);
 
@@ -545,6 +547,7 @@ describe("sticky note text layout", () => {
         { shouldResizeFromCenter: true },
       );
       const updated = getSticky(scene, stickyId);
+
       // content-pinned: the height springs back, but around the center
       expect(updated.height).toBeCloseTo(originalSticky.height);
       expect(updated.y + updated.height / 2).toBeCloseTo(centerY);
@@ -579,6 +582,7 @@ describe("sticky note text layout", () => {
 
     const updatedSticky = getSticky(scene, stickyId);
     const updatedText = getBoundText(scene, textId);
+
     expect(updatedSticky.width).toBe(500);
     expect(updatedSticky.height).toBe(500);
     expect(updatedSticky.baseHeight).toBe(500);
@@ -616,6 +620,7 @@ describe("sticky note text layout", () => {
     );
 
     const updated = getSticky(scene, sticky.id);
+
     expect(updated.width).toBe(500);
     expect(updated.height).toBe(375);
     expect(updated.baseHeight).toBe(375);
@@ -653,6 +658,7 @@ describe("sticky note text layout", () => {
 
     const updatedSticky = getSticky(scene, stickyId);
     const updatedText = getBoundText(scene, textId);
+
     expect(updatedSticky.width).toBe(DEFAULT_STICKY_NOTE_SIZE);
     expect(updatedSticky.baseHeight).toBe(DEFAULT_STICKY_NOTE_SIZE);
     expect(updatedText.baseFontSize).toBe(STICKY_FONT_SIZE);
@@ -663,6 +669,7 @@ describe("sticky note text layout", () => {
     const { scene, stickyId, textId } = createStickyWithText("short");
     const sticky = getSticky(scene, stickyId);
     const text = getBoundText(scene, textId);
+
     scene.mutateElement(sticky, { angle: 0.6 as Radians });
     scene.mutateElement(text, { angle: 0.6 as Radians });
     const topEdgeMidpoint = (element: ExcalidrawStickyNoteElement) =>
@@ -682,8 +689,10 @@ describe("sticky note text layout", () => {
     });
 
     const after = getSticky(scene, stickyId);
+
     expect(after.height).toBeGreaterThan(heightBefore);
     const [x, y] = topEdgeMidpoint(after);
+
     expect(x).toBeCloseTo(before[0]);
     expect(y).toBeCloseTo(before[1]);
   });
@@ -716,6 +725,7 @@ describe("sticky note text layout", () => {
     const { scene, stickyId, textId } = createStickyWithText("short");
     const sticky = getSticky(scene, stickyId);
     const text = getBoundText(scene, textId);
+
     expect(text.fontSize).toBe(STICKY_FONT_SIZE);
 
     const layout = getStickyNoteLayout(sticky, text, { baseFontSize: 20 });
@@ -741,6 +751,7 @@ describe("sticky note text layout", () => {
       originalText: overflowing,
       baseFontSize: 27,
     }).text!.fontSize;
+
     expect(fitted).toBeLessThan(27);
     expect(
       fitted === STICKY_NOTE_MIN_FONT_SIZE || (27 - fitted) % 2 === 0,
@@ -782,6 +793,7 @@ describe("sticky note text layout", () => {
       fontSize: STICKY_FONT_SIZE,
       fontFamily: FONT_FAMILY.Excalifont,
     });
+
     expect(minSize).toEqual({
       width: STICKY_NOTE_MIN_SIZE,
       height: 35 + STICKY_NOTE_BODY_INSET_Y,
@@ -798,6 +810,7 @@ describe("sticky note text layout", () => {
     );
 
     const resized = getSticky(scene, stickyId);
+
     expect(resized.width).toBe(minSize.width);
     expect(resized.baseHeight).toBe(minSize.height);
     expect(resized.height).toBe(minSize.height);
@@ -827,6 +840,7 @@ describe("sticky note text layout", () => {
 
     const resized = getSticky(scene, stickyId);
     const text = getBoundText(scene, textId);
+
     expect(resized.width).toBe(400);
     expect(resized.height).toBe(400);
     expect(resized.x).toBe(100);
@@ -859,6 +873,7 @@ describe("sticky note text layout", () => {
     );
 
     const resized = getSticky(scene, stickyId);
+
     // one scale for both axes, so the square is kept through the clamp
     expect(resized.width).toBeCloseTo(resized.height);
     expect(resized.height).toBeGreaterThanOrEqual(
@@ -886,6 +901,7 @@ describe("sticky note text layout", () => {
     );
 
     const resized = getSticky(scene, stickyId);
+
     expect(resized.width).toBe(300);
     expect(resized.height).toBe(DEFAULT_STICKY_NOTE_SIZE);
     expect(resized.x).toBe(100 - 300);
@@ -911,6 +927,7 @@ describe("sticky note text layout", () => {
     );
 
     const resized = getSticky(scene, stickyId);
+
     expect(resized.width).toBe(STICKY_NOTE_MIN_SIZE);
     expect(resized.x).toBe(100 - STICKY_NOTE_MIN_SIZE);
     scene.destroy();
@@ -922,6 +939,7 @@ describe("sticky note text layout", () => {
       const { scene, stickyId, textId } = createStickyWithText("Balanced");
       const sticky = getSticky(scene, stickyId);
       const text = getBoundText(scene, textId);
+
       scene.mutateElement(sticky, { angle: angle as Radians });
       redrawTextBoundingBox(text, sticky, scene);
 
@@ -932,6 +950,7 @@ describe("sticky note text layout", () => {
         pointFrom(sticky.x + sticky.width / 2, sticky.y + sticky.height / 2),
         -angle as Radians,
       );
+
       expect(centerX).toBeCloseTo(sticky.x + sticky.width / 2);
       expect(centerY).toBeCloseTo(sticky.y + sticky.height / 2);
       scene.destroy();
@@ -952,12 +971,14 @@ describe("sticky note text layout", () => {
 
     // fits centered with room to spare above the footer
     const short = { ...text, height: 100 };
+
     expect(computeBoundTextPosition(sticky, short, elementsMap).y).toBeCloseTo(
       sticky.y + STICKY_NOTE_PADDING + (paddedHeight - 100) / 2,
     );
 
     // centered it would run into the footer: it ends at the body's bottom
     const tall = { ...text, height: paddedHeight - STICKY_NOTE_FOOTER.height };
+
     expect(computeBoundTextPosition(sticky, tall, elementsMap).y).toBeCloseTo(
       bodyBottom - tall.height,
     );
@@ -970,6 +991,7 @@ describe("sticky note text layout", () => {
       const { scene, stickyId, textId } = createStickyWithText("Last line");
       const sticky = getSticky(scene, stickyId);
       const text = getBoundText(scene, textId);
+
       scene.mutateElement(sticky, { angle: angle as Radians });
       scene.mutateElement(text, { verticalAlign: VERTICAL_ALIGN.BOTTOM });
       redrawTextBoundingBox(text, sticky, scene);
@@ -980,6 +1002,7 @@ describe("sticky note text layout", () => {
         pointFrom(sticky.x + sticky.width / 2, sticky.y + sticky.height / 2),
         -angle as Radians,
       );
+
       expect(centerY + text.height / 2).toBeCloseTo(
         sticky.y +
           sticky.height -
@@ -1048,6 +1071,7 @@ describe("sticky note creation date", () => {
   it("reserves the footer below the label body", () => {
     const { scene, stickyId, textId } = createStickyWithText("A");
     const sticky = getSticky(scene, stickyId);
+
     expect(getBoundTextMaxHeight(sticky, getBoundText(scene, textId))).toBe(
       sticky.height - STICKY_NOTE_BODY_INSET_Y,
     );
@@ -1076,6 +1100,7 @@ describe("sticky note ink", () => {
       containerId: container.id,
       strokeColor: labelInk,
     });
+
     return [
       newElementWith(container, {
         boundElements: [{ type: "text", id: label.id }],
@@ -1088,12 +1113,14 @@ describe("sticky note ink", () => {
 
   it("is a no-op when the note and its label agree", () => {
     const elements = pair(RED, RED);
+
     expect(syncStickyNoteInk(elements, arrayToMap(elements))).toBe(elements);
   });
 
   it("follows whichever side changed", () => {
     const [container, label] = pair(RED, RED);
     const prev = arrayToMap([container, label]);
+
     // the note was recolored (selection): the label follows
     expect(
       inks(

@@ -34,6 +34,7 @@ export const actionToggleCropEditor = register({
   },
   predicate: (elements, appState, _, app) => {
     const selectedElements = app.scene.getSelectedElements(appState);
+
     if (
       !appState.croppingElementId &&
       selectedElements.length === 1 &&
@@ -41,6 +42,7 @@ export const actionToggleCropEditor = register({
     ) {
       return true;
     }
+
     return false;
   },
   PanelComponent: ({ appState, updateData, app }) => {

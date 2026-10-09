@@ -35,6 +35,7 @@ export const createIcon = (
     style,
     ...rest
   } = typeof opts === "number" ? ({ width: opts } as Opts) : opts;
+
   return (
     <svg
       aria-hidden="true"
@@ -2214,6 +2215,7 @@ export const boltIcon = createIcon(
   </g>,
   tablerIconProps,
 );
+
 export const selectAllIcon = createIcon(
   <g>
     <path stroke="none" d="M0 0h24v24H0z" fill="none" />

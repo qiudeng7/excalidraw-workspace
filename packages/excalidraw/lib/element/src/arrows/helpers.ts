@@ -12,6 +12,7 @@ export const maybeHandleArrowPointlikeDrag = ({
   event: KeyboardEvent | React.KeyboardEvent<Element> | PointerEvent;
 }): boolean => {
   const appState = app.state;
+
   if (appState.selectedLinearElement && app.lastPointerMoveCoords) {
     // Update focus point status if the binding mode is changing
     if (appState.selectedLinearElement.draggedFocusPointBinding) {
@@ -24,6 +25,7 @@ export const maybeHandleArrowPointlikeDrag = ({
         app.getEffectiveGridSize(),
         event.altKey,
       );
+
       return true;
     } else if (
       appState.selectedLinearElement.hoverPointIndex !== null &&
@@ -38,8 +40,10 @@ export const maybeHandleArrowPointlikeDrag = ({
         app.lastPointerMoveCoords.y,
         appState.selectedLinearElement,
       );
+
       return true;
     }
   }
+
   return false;
 };

@@ -142,6 +142,7 @@ function resample<P extends LocalPoint | GlobalPoint>(
   n: number,
 ): P[] {
   let totalLen = 0;
+
   for (let i = 1; i < pts.length; i++) {
     totalLen += Math.hypot(
       pts[i][0] - pts[i - 1][0],
@@ -157,27 +158,33 @@ function resample<P extends LocalPoint | GlobalPoint>(
   for (let i = 1; i < pts.length; i++) {
     const curr = pts[i];
     const segLen = Math.hypot(curr[0] - prev[0], curr[1] - prev[1]);
+
     if (accumulated + segLen >= interval) {
       // Insert interpolated points within this segment
       let remaining = interval - accumulated;
+
       while (remaining <= segLen + 1e-10) {
         const t = remaining / segLen;
         const newPt: P = [
           prev[0] + t * (curr[0] - prev[0]),
           prev[1] + t * (curr[1] - prev[1]),
         ] as P;
+
         result.push(newPt);
         if (result.length === n) {
           return result;
         }
+
         prev = newPt;
         accumulated = 0;
         remaining += interval;
       }
+
       accumulated = segLen - (remaining - interval);
     } else {
       accumulated += segLen;
     }
+
     prev = curr;
   }
 
@@ -185,6 +192,7 @@ function resample<P extends LocalPoint | GlobalPoint>(
   while (result.length < n) {
     result.push(pts[pts.length - 1]);
   }
+
   return result;
 }
 
@@ -235,26 +243,33 @@ function shaftDeviationRatio<P extends LocalPoint | GlobalPoint>(
   const start = pts[0];
   let tip = start;
   let tipDistance = 0;
+
   for (const point of pts) {
     const distance = Math.hypot(point[0] - start[0], point[1] - start[1]);
+
     if (distance > tipDistance) {
       tipDistance = distance;
       tip = point;
     }
   }
+
   if (tipDistance === 0) {
     return 0;
   }
 
   const chord = lineSegment(start, tip);
   let maxDeviation = 0;
+
   for (const point of pts) {
     const tipDist = Math.hypot(point[0] - tip[0], point[1] - tip[1]);
+
     if (tipDist <= ARROWHEAD_ZONE_RATIO * tipDistance) {
       continue;
     }
+
     maxDeviation = Math.max(maxDeviation, distanceToLineSegment(point, chord));
   }
+
   return maxDeviation / tipDistance;
 }
 
@@ -267,6 +282,7 @@ function windowedTurns<P extends LocalPoint | GlobalPoint>(
   pts: readonly P[],
 ): number[] {
   const turns: number[] = [];
+
   for (let i = TURN_WINDOW; i < pts.length - TURN_WINDOW; i++) {
     const [ax, ay] = pts[i - TURN_WINDOW];
     const [bx, by] = pts[i];
@@ -275,10 +291,12 @@ function windowedTurns<P extends LocalPoint | GlobalPoint>(
     const v1y = by - ay;
     const v2x = cx - bx;
     const v2y = cy - by;
+
     turns.push(
       Math.abs(Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y)),
     );
   }
+
   return turns;
 }
 
@@ -290,24 +308,29 @@ function cornerTurnShare<P extends LocalPoint | GlobalPoint>(
 ): number {
   const turns = windowedTurns(pts);
   const total = turns.reduce((sum, turn) => sum + turn, 0);
+
   if (total === 0) {
     return 0;
   }
 
   const taken = new Array<boolean>(turns.length).fill(false);
   let top4 = 0;
+
   for (let corner = 0; corner < 4; corner++) {
     let peak = -1;
     let peakTurn = 0;
+
     for (let i = 0; i < turns.length; i++) {
       if (!taken[i] && turns[i] > peakTurn) {
         peakTurn = turns[i];
         peak = i;
       }
     }
+
     if (peak < 0) {
       break;
     }
+
     for (let i = peak - TURN_WINDOW; i <= peak + TURN_WINDOW; i++) {
       if (i >= 0 && i < turns.length && !taken[i]) {
         top4 += turns[i];
@@ -315,6 +338,7 @@ function cornerTurnShare<P extends LocalPoint | GlobalPoint>(
       }
     }
   }
+
   return top4 / total;
 }
 
@@ -327,12 +351,14 @@ function extractFeatures<P extends LocalPoint | GlobalPoint>(
   const pts = resample(points, RESAMPLE_N);
 
   let pathLength = 0;
+
   for (let i = 1; i < pts.length; i++) {
     pathLength += Math.hypot(
       pts[i][0] - pts[i - 1][0],
       pts[i][1] - pts[i - 1][1],
     );
   }
+
   const gap = Math.hypot(
     pts[pts.length - 1][0] - pts[0][0],
     pts[pts.length - 1][1] - pts[0][1],
@@ -428,6 +454,7 @@ function classifyOpenStroke(features: StrokeFeatures): Shape {
   ) {
     return "freedraw";
   }
+
   return Math.abs(features.majorSkew) >= ARROW_MIN_SKEW ? "arrow" : "line";
 }
 
@@ -473,8 +500,10 @@ function getArrowEndpoint<P extends LocalPoint | GlobalPoint>(
   // Ideal endpoint = perimeter point farthest from start.
   let idealDist = -1;
   let idealEndpoint: LocalPoint = pointFrom(maxX, maxY);
+
   for (const pp of perimeterPoints) {
     const d = Math.hypot(pp[0] - startPoint[0], pp[1] - startPoint[1]);
+
     if (d > idealDist) {
       idealDist = d;
       idealEndpoint = pp;
@@ -484,13 +513,16 @@ function getArrowEndpoint<P extends LocalPoint | GlobalPoint>(
   // Find the original input point closest to the ideal endpoint.
   let bestDist = Infinity;
   let bestPoint: P = points[points.length - 1];
+
   for (const pt of points) {
     const d = Math.hypot(pt[0] - idealEndpoint[0], pt[1] - idealEndpoint[1]);
+
     if (d < bestDist) {
       bestDist = d;
       bestPoint = pt;
     }
   }
+
   return bestPoint;
 }
 
@@ -513,6 +545,7 @@ export const recognizeShape = <P extends LocalPoint | GlobalPoint>(
 
   const [minX, minY, maxX, maxY] = boundingBox;
   const maxDim = Math.max(maxX - minX, maxY - minY);
+
   if (points.length < 3 || maxDim * zoom < RECOGNITION_MIN_SCREEN_SIZE) {
     return { type: "freedraw", points, boundingBox };
   }
@@ -553,6 +586,7 @@ export const convertToShape = (
   const frameId =
     frameLikeElements.find((frame) => {
       const [fx1, fy1, fx2, fy2] = getElementAbsoluteCoords(frame, elementsMap);
+
       return fx1 <= minX && fy1 <= minY && fx2 >= maxX && fy2 >= maxY;
     })?.id ?? null;
 
@@ -591,6 +625,7 @@ export const convertToShape = (
         ),
       }) as NonDeletedRecognizedShapeElement;
     }
+
     case "arrow": {
       const [arrowX, arrowY] = recognizedShape.points[0];
 
@@ -607,6 +642,7 @@ export const convertToShape = (
         globalEndX - recognizedShape.points[0][0],
         globalEndY - recognizedShape.points[0][1],
       );
+
       if (arrowLen < 60) {
         const tempElement = newLinearElement({
           type: "line",
@@ -644,6 +680,7 @@ export const convertToShape = (
           ...normalized,
         }) as NonDeletedRecognizedShapeElement;
       }
+
       const tempElement = newArrowElement({
         type: "arrow",
         x: arrowX,
@@ -682,6 +719,7 @@ export const convertToShape = (
         ...normalized,
       });
     }
+
     case "line": {
       const [lineX, lineY] = recognizedShape.points[0];
       const endPoint =
@@ -745,10 +783,12 @@ const isDrawShapePreviewEqual = (
   ) {
     return false;
   }
+
   if (isLinearElement(a) && isLinearElement(b)) {
     if (a.points.length !== b.points.length) {
       return false;
     }
+
     for (let i = 0; i < a.points.length; i++) {
       if (
         a.points[i][0] !== b.points[i][0] ||
@@ -758,6 +798,7 @@ const isDrawShapePreviewEqual = (
       }
     }
   }
+
   return true;
 };
 
@@ -772,6 +813,7 @@ export const convertToShapeHandlePointerMoveFromPointerDown = (
     app.drawShape.trail.addPointToPath(pointerCoords.x, pointerCoords.y);
 
     const drawShapeTrailPoints = app.drawShape.trail.getCurrentPoints();
+
     // note: size gate inside recognizeShape
     if (drawShapeTrailPoints.length >= 3) {
       const shapePreview = convertToShape(

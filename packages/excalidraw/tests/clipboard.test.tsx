@@ -56,6 +56,7 @@ const sendPasteEvent = (text: string) => {
       "text/plain": text,
     },
   });
+
   document.dispatchEvent(clipboardEvent);
 };
 
@@ -107,6 +108,7 @@ describe("general paste behavior", () => {
       elements: [rectangle],
       files: null,
     });
+
     pasteWithCtrlCmdV(clipboardJSON);
 
     await waitFor(() => {
@@ -134,6 +136,7 @@ describe("general paste behavior", () => {
 describe("paste text as single lines", () => {
   it("should create an element for each line when copying with Ctrl/Cmd+V", async () => {
     const text = "sajgfakfn\naaksfnknas\nakefnkasf";
+
     pasteWithCtrlCmdV(text);
     await waitFor(() => {
       expect(h.elements.length).toEqual(text.split("\n").length);
@@ -142,6 +145,7 @@ describe("paste text as single lines", () => {
 
   it("should ignore empty lines when creating an element for each line", async () => {
     const text = "\n\nsajgfakfn\n\n\naaksfnknas\n\nakefnkasf\n\n\n";
+
     pasteWithCtrlCmdV(text);
     await waitFor(() => {
       expect(h.elements.length).toEqual(3);
@@ -150,6 +154,7 @@ describe("paste text as single lines", () => {
 
   it("should not create any element if clipboard has only new lines", async () => {
     const text = "\n\n\n\n\n";
+
     pasteWithCtrlCmdV(text);
     await waitFor(async () => {
       await sleep(50); // elements lenght will always be zero if we don't wait, since paste is async
@@ -167,14 +172,17 @@ describe("paste text as single lines", () => {
         getLineHeight(h.state.currentItemFontFamily),
       ) +
       10 / h.app.state.zoom.value;
+
     mouse.moveTo(100, 100);
     pasteWithCtrlCmdV(text);
     await waitFor(async () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const [fx, firstElY] = getElementBounds(h.elements[0], elementsMap);
+
       for (let i = 1; i < h.elements.length; i++) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const [fx, elY] = getElementBounds(h.elements[i], elementsMap);
+
         expect(elY).toEqual(firstElY + lineHeightPx * i);
       }
     });
@@ -189,6 +197,7 @@ describe("paste text as single lines", () => {
         getLineHeight(h.state.currentItemFontFamily),
       ) +
       10 / h.app.state.zoom.value;
+
     mouse.moveTo(100, 100);
     pasteWithCtrlCmdV(text);
 
@@ -197,6 +206,7 @@ describe("paste text as single lines", () => {
       const [fx, firstElY] = getElementBounds(h.elements[0], elementsMap);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const [lx, lastElY] = getElementBounds(h.elements[1], elementsMap);
+
       expect(lastElY).toEqual(firstElY + lineHeightPx * 2);
     });
   });
@@ -205,6 +215,7 @@ describe("paste text as single lines", () => {
 describe("paste text as a single element", () => {
   it("should create single text element when copying text with Ctrl/Cmd+Shift+V", async () => {
     const text = "sajgfakfn\naaksfnknas\nakefnkasf";
+
     pasteWithCtrlCmdShiftV(text);
     await waitFor(() => {
       expect(h.elements.length).toEqual(1);
@@ -218,6 +229,7 @@ describe("paste text as a single element", () => {
     // the view at 800%, less some room at each side: under the 200px a
     // pasted text otherwise wraps at, at the least
     const maxWidth = (1000 - 2 * TEXT_VIEWPORT_PADDING) / 8;
+
     expect(maxWidth).toBeLessThan(200);
 
     pasteWithCtrlCmdShiftV(
@@ -227,6 +239,7 @@ describe("paste text as a single element", () => {
       expect(h.elements.length).toEqual(1);
     });
     const text = h.elements[0] as ExcalidrawTextElement;
+
     expect(text.autoResize).toBe(false);
     expect(text.width).toBeLessThanOrEqual(maxWidth);
   });
@@ -243,10 +256,12 @@ describe("paste text as a single element", () => {
       expect(h.elements.length).toEqual(1);
     });
     const text = h.elements[0] as ExcalidrawTextElement;
+
     expect(text.autoResize).toBe(false);
     // all of it within the view, with room at each side
     const { scrollX, scrollY } = h.state;
     const zoom = h.state.zoom.value;
+
     expect((text.x + scrollX) * zoom).toBeGreaterThanOrEqual(
       TEXT_VIEWPORT_PADDING - 0.01,
     );
@@ -262,6 +277,7 @@ describe("paste text as a single element", () => {
   });
   it("should not create any element when only new lines in clipboard", async () => {
     const text = "\n\n\n\n";
+
     pasteWithCtrlCmdShiftV(text);
     await waitFor(async () => {
       await sleep(50);
@@ -304,12 +320,14 @@ describe("Paste bound text container", () => {
       type: "excalidraw/clipboard",
       elements: [container, textElement],
     });
+
     pasteWithCtrlCmdShiftV(data);
 
     await waitFor(async () => {
       await sleep(1);
       expect(h.elements.length).toEqual(2);
       const container = h.elements[0];
+
       expect(container.height).toBe(368);
       expect(container.width).toBe(166);
     });
@@ -326,12 +344,14 @@ describe("Paste bound text container", () => {
         textElement,
       ],
     });
+
     pasteWithCtrlCmdShiftV(data);
 
     await waitFor(async () => {
       await sleep(1);
       expect(h.elements.length).toEqual(2);
       const container = h.elements[0];
+
       expect(container.height).toBe(770);
       expect(container.width).toBe(166);
     });
@@ -628,6 +648,7 @@ describe("clipboard - pasting mermaid definition", () => {
     mockMermaidToExcalidraw({
       parseMermaidToExcalidraw: async (definition) => {
         const lines = definition.split("\n");
+
         return new Promise((resolve, reject) => {
           if (lines.some((line) => line === "flowchart TD")) {
             resolve({
@@ -690,6 +711,7 @@ describe("clipboard - pasting mermaid definition", () => {
 
   it("should paste as normal text if invalid mermaid", async () => {
     const text = "flowchart TD xx\nA";
+
     pasteWithCtrlCmdV(text);
     await waitFor(() => {
       expect(h.elements.length).toEqual(2);

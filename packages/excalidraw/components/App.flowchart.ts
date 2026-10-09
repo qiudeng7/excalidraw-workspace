@@ -58,38 +58,47 @@ export class AppFlowchart {
         return false;
       case "canceled":
         this.app.triggerRender(true);
+
         return true;
       case "creating":
         event.preventDefault();
         if (operation.pending.length) {
           this.app.revealIfHidden(operation.pending);
         }
+
         return true;
       case "navigating": {
         event.preventDefault();
         const node =
           operation.nodeId &&
           this.app.scene.getNonDeletedElementsMap().get(operation.nodeId);
+
         if (node) {
           this.selectAndReveal(node);
         }
+
         return true;
       }
+
       case "committed": {
         if (operation.nodes.length) {
           this.app.insertNewElements(operation.nodes);
         }
 
         const firstNode = operation.nodes[0];
+
         if (firstNode) {
           this.selectAndReveal(firstNode);
         }
 
         this.captureUpdate();
+
         return true;
       }
+
       case "navigationEnded":
         this.captureUpdate();
+
         return true;
     }
   };
@@ -102,6 +111,7 @@ export class AppFlowchart {
     if (event.type === "keydown") {
       if (event.key === KEYS.ESCAPE && creator.isCreatingChart) {
         creator.clear();
+
         return { type: "canceled" };
       }
 
@@ -152,13 +162,16 @@ export class AppFlowchart {
     // keyup: releasing a modifier finalizes the workflow it was driving;
     // both can finalize on the same event
     const navigationEnded = !event.altKey && navigator.isExploring;
+
     if (navigationEnded) {
       navigator.clear();
     }
 
     if (!event[KEYS.CTRL_OR_CMD] && creator.isCreatingChart) {
       const nodes = creator.pendingNodes ?? [];
+
       creator.clear();
+
       return { type: "committed", nodes };
     }
 

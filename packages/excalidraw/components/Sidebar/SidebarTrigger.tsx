@@ -35,6 +35,7 @@ export const SidebarTrigger = ({
           .querySelector(".layer-ui__wrapper")
           ?.classList.remove("animate");
         const nextOpen = !isOpen;
+
         setAppState({
           openSidebar: nextOpen ? { name, tab } : null,
           openMenu: null,
@@ -50,4 +51,5 @@ export const SidebarTrigger = ({
     </button>
   );
 };
+
 SidebarTrigger.displayName = "SidebarTrigger";

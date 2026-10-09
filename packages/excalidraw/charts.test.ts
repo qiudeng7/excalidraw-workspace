@@ -27,6 +27,7 @@ describe("charts", () => {
     const rotatedHeight = element.width * sin + element.height * cos;
     const centerX = element.x + element.width / 2;
     const centerY = element.y + element.height / 2;
+
     return {
       left: centerX - rotatedWidth / 2,
       right: centerX + rotatedWidth / 2,
@@ -194,6 +195,7 @@ describe("charts", () => {
       ];
 
       const result = tryParseCells(spreadsheet);
+
       expect(result.ok).toBe(true);
 
       const parsed = (result as { ok: true; data: Spreadsheet }).data;
@@ -213,6 +215,7 @@ describe("charts", () => {
       ];
 
       const result = tryParseCells(spreadsheet);
+
       expect(result.ok).toBe(true);
 
       const parsed = (result as { ok: true; data: Spreadsheet }).data;
@@ -237,6 +240,7 @@ describe("charts", () => {
       ];
 
       const result = tryParseCells(spreadsheet);
+
       expect(result.ok).toBe(true);
 
       const parsed = (result as { ok: true; data: Spreadsheet }).data;
@@ -259,6 +263,7 @@ describe("charts", () => {
       ];
 
       const result = tryParseCells(spreadsheet);
+
       expect(result.ok).toBe(true);
 
       const parsed = (result as { ok: true; data: Spreadsheet }).data;
@@ -282,6 +287,7 @@ describe("charts", () => {
       ];
 
       const result = tryParseCells(spreadsheet);
+
       expect(result).toEqual({
         ok: false,
         reason: "Value is not numeric",
@@ -384,6 +390,7 @@ describe("charts", () => {
 
       const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
       const elements = renderSpreadsheet("bar", spreadsheet, 0, 0);
+
       randomSpy.mockRestore();
 
       const bars = elements!.filter(
@@ -405,6 +412,7 @@ describe("charts", () => {
 
       const circularDistance = (first: number, second: number) => {
         const absoluteDistance = Math.abs(first - second);
+
         return Math.min(absoluteDistance, palette.length - absoluteDistance);
       };
       const minDistance = Math.min(
@@ -414,6 +422,7 @@ describe("charts", () => {
             .map((other) => circularDistance(index, other)),
         ),
       );
+
       expect(minDistance).toBeGreaterThan(1);
     });
 
@@ -425,6 +434,7 @@ describe("charts", () => {
         ["Book Knowledge", "2.5", "8", "4"],
       ];
       const parsedResult = tryParseCells(cells);
+
       expect(parsedResult.ok).toBe(true);
       const parsedSpreadsheet = (
         parsedResult as {
@@ -595,6 +605,7 @@ describe("charts", () => {
       expect(axisLabels).toHaveLength(spreadsheet.labels!.length);
 
       const bounds = axisLabels.map(getRotatedBounds);
+
       for (const bound of bounds) {
         expect(bound.top).toBeGreaterThan(0);
       }
@@ -602,6 +613,7 @@ describe("charts", () => {
       const sortedBounds = bounds.sort(
         (left, right) => left.centerX - right.centerX,
       );
+
       for (let index = 1; index < sortedBounds.length; index++) {
         expect(sortedBounds[index - 1].right).toBeLessThanOrEqual(
           sortedBounds[index].left + 2,
@@ -649,6 +661,7 @@ describe("charts", () => {
 
       const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
       const elements = renderSpreadsheet("line", spreadsheet, 0, 0);
+
       randomSpy.mockRestore();
 
       const seriesLines = elements!.filter(
@@ -662,6 +675,7 @@ describe("charts", () => {
 
       const circularDistance = (first: number, second: number) => {
         const absoluteDistance = Math.abs(first - second);
+
         return Math.min(absoluteDistance, palette.length - absoluteDistance);
       };
       const minDistance = Math.min(
@@ -688,6 +702,7 @@ describe("charts", () => {
 
       const getSeriesLineColors = (seed: number) => {
         const elements = renderSpreadsheet("line", spreadsheet, 0, 0, seed);
+
         return elements!
           .filter(
             (element): element is NonDeleted<ExcalidrawLineElement> =>
@@ -767,6 +782,7 @@ describe("charts", () => {
       expect(axisLabels).toHaveLength(spreadsheet.labels!.length);
 
       const bounds = axisLabels.map(getRotatedBounds);
+
       for (const bound of bounds) {
         expect(bound.top).toBeGreaterThan(0);
       }
@@ -774,6 +790,7 @@ describe("charts", () => {
       const sortedBounds = bounds.sort(
         (left, right) => left.centerX - right.centerX,
       );
+
       for (let index = 1; index < sortedBounds.length; index++) {
         expect(sortedBounds[index - 1].right).toBeLessThanOrEqual(
           sortedBounds[index].left + 2,
@@ -836,11 +853,13 @@ describe("charts", () => {
       // On alpha axis, second series is about ~1.9x first series.
       const alphaRatio =
         getRadius(series2.points[0]!) / getRadius(series1.points[0]!);
+
       expect(alphaRatio).toBeCloseTo(76000 / 40000, 1);
 
       // On epsilon axis, first series should dominate strongly.
       const epsilonRatio =
         getRadius(series1.points[4]!) / getRadius(series2.points[4]!);
+
       expect(epsilonRatio).toBeGreaterThan(50);
     });
 
@@ -1004,6 +1023,7 @@ describe("charts", () => {
           )
           .map((element) => element.y + element.points[1][1]),
       );
+
       expect(topLabel).toBeDefined();
       expect(topLabel!.y + topLabel!.height).toBeLessThan(topSpokeY - 2);
     });
@@ -1089,6 +1109,7 @@ describe("charts", () => {
 
       const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
       const elements = renderSpreadsheet("radar", spreadsheet, 0, 0);
+
       randomSpy.mockRestore();
 
       const seriesPolygons = elements!.filter(
@@ -1106,6 +1127,7 @@ describe("charts", () => {
 
       const circularDistance = (first: number, second: number) => {
         const absoluteDistance = Math.abs(first - second);
+
         return Math.min(absoluteDistance, palette.length - absoluteDistance);
       };
       const minDistance = Math.min(

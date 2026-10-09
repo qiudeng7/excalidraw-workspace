@@ -41,6 +41,7 @@ const mockLibraryFilePromise = new Promise<Blob>(async (resolve, reject) => {
 
 vi.mock("../data/filesystem.ts", async (importOriginal) => {
   const module = await importOriginal();
+
   return {
     __esmodule: true,
     //@ts-ignore
@@ -113,6 +114,7 @@ describe("library items inserting", () => {
       const rectangle = h.elements.find((e) => e.type === "rectangle")!;
       const text = h.elements.find((e) => e.type === "text")!;
       const arrow = h.elements.find((e) => e.type === "arrow")!;
+
       expect(h.elements).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -174,6 +176,7 @@ describe("library", () => {
   it("drop library item onto canvas", async () => {
     expect(h.elements).toEqual([]);
     const libraryItems = parseLibraryJSON(await libraryJSONPromise);
+
     await API.drop([
       {
         kind: "string",
@@ -227,6 +230,7 @@ describe("library", () => {
     UI.clickTool("rectangle");
     expect(h.elements).toEqual([]);
     const libraryItems = parseLibraryJSON(await libraryJSONPromise);
+
     await API.drop([
       {
         kind: "string",
@@ -247,6 +251,7 @@ describe("library menu", () => {
     const { container } = await render(<Excalidraw />);
 
     const latestLibrary = await h.app.library.getLatestLibrary();
+
     expect(latestLibrary.length).toBe(0);
 
     const libraryButton = container.querySelector(".sidebar-trigger");
@@ -264,9 +269,11 @@ describe("library menu", () => {
 
     await waitFor(async () => {
       const latestLibrary = await h.app.library.getLatestLibrary();
+
       expect(latestLibrary.length).toBeGreaterThan(0);
       expect(latestLibrary.length).toBe(libraryItems.length);
       const { versionNonce, ...strippedElement } = libraryItems[0]?.elements[0]; // stripped due to mutations
+
       expect(latestLibrary[0].elements).toEqual([
         expect.objectContaining(strippedElement),
       ]);
@@ -277,6 +284,7 @@ describe("library menu", () => {
 describe("library menu Escape (undocked sidebar)", () => {
   const openLibraryWithItems = async () => {
     const { container } = await render(<Excalidraw />);
+
     await act(() =>
       h.app.library.updateLibrary({
         libraryItems: ["wall", "door"].map((name) => ({
@@ -293,10 +301,14 @@ describe("library menu Escape (undocked sidebar)", () => {
       const input = container.querySelector<HTMLInputElement>(
         ".library-menu-items-container__search input",
       );
+
       expect(input).not.toBeNull();
+
       return input!;
     });
+
     expect(h.state.openSidebar).not.toBe(null);
+
     return { container, searchInput };
   };
 
@@ -320,9 +332,12 @@ describe("library menu Escape (undocked sidebar)", () => {
 
     const itemDragger = await waitFor(() => {
       const dragger = container.querySelector(".library-unit__dragger");
+
       expect(dragger).not.toBeNull();
+
       return dragger!;
     });
+
     fireEvent.click(itemDragger, { shiftKey: true });
     await waitFor(() =>
       expect(container.querySelector(".library-unit--selected")).not.toBe(null),
@@ -397,6 +412,7 @@ describe("distributeLibraryItemsOnSquareGrid()", () => {
     ];
 
     const distributed = distributeLibraryItemsOnSquareGrid(libraryItems);
+
     // assert the returned library items are flattened to elements
     expect(distributed.length).toEqual(
       libraryItems.map((x) => x.elements).flat().length,

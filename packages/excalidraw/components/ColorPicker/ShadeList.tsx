@@ -65,6 +65,7 @@ export const ShadeList = ({
               color,
               theme === THEME.DARK,
             );
+
             return (
               <button
                 ref={

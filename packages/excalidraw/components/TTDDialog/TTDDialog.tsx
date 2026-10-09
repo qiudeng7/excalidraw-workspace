@@ -78,6 +78,7 @@ const TTDDialogBase = withInternalFallback(
         await mermaidToExcalidrawLib.api;
         setMermaidToExcalidrawLib((prev) => ({ ...prev, loaded: true }));
       };
+
       fn();
     }, [mermaidToExcalidrawLib.api]);
 

@@ -16,21 +16,25 @@ export const toByteString = (data: string | Uint8Array | ArrayBuffer) => {
     typeof data === "string"
       ? new TextEncoder().encode(data)
       : data instanceof Uint8Array
-      ? data
-      : new Uint8Array(data);
+        ? data
+        : new Uint8Array(data);
   let bstring = "";
+
   for (const byte of bytes) {
     bstring += String.fromCharCode(byte);
   }
+
   return bstring;
 };
 
 const byteStringToArrayBuffer = (byteString: string) => {
   const buffer = new ArrayBuffer(byteString.length);
   const bufferView = new Uint8Array(buffer);
+
   for (let i = 0, len = byteString.length; i < len; i++) {
     bufferView[i] = byteString.charCodeAt(i);
   }
+
   return buffer;
 };
 
@@ -62,6 +66,7 @@ export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
     // Node.js environment
     return Buffer.from(base64, "base64").buffer;
   }
+
   // Browser environment
   return byteStringToArrayBuffer(atob(base64));
 };
@@ -105,6 +110,7 @@ export const encode = ({
   compress?: boolean;
 }): EncodedData => {
   let deflated!: string;
+
   if (compress !== false) {
     try {
       deflated = toByteString(deflate(text));
@@ -112,6 +118,7 @@ export const encode = ({
       console.error("encode: cannot deflate", error);
     }
   }
+
   return {
     version: "1",
     encoding: "bstring",
@@ -179,6 +186,7 @@ function dataView(
   offset: number,
   value: number,
 ): Uint8Array;
+
 /**
  * abstraction over DataView that serves as a typed getter/setter in case
  * you're using constants for the byte size and want to ensure there's no
@@ -198,11 +206,16 @@ function dataView(
         `attempting to set value higher than the allocated bytes (value: ${value}, bytes: ${bytes})`,
       );
     }
+
     const method = `setUint${DATA_VIEW_BITS_MAP[bytes]}` as const;
+
     new DataView(buffer.buffer)[method](offset, value);
+
     return buffer;
   }
+
   const method = `getUint${DATA_VIEW_BITS_MAP[bytes]}` as const;
+
   return new DataView(buffer.buffer)[method](offset);
 }
 
@@ -263,6 +276,7 @@ const splitBuffers = (concatenatedBuffer: Uint8Array) => {
     NEXT_CHUNK_SIZE_DATAVIEW_BYTES,
     cursor,
   );
+
   // If version is outside of the supported versions, throw an error.
   // This usually means the buffer wasn't encoded using this API, so we'd only
   // waste compute.
@@ -278,6 +292,7 @@ const splitBuffers = (concatenatedBuffer: Uint8Array) => {
       NEXT_CHUNK_SIZE_DATAVIEW_BYTES,
       cursor,
     );
+
     cursor += NEXT_CHUNK_SIZE_DATAVIEW_BYTES;
 
     buffers.push(concatenatedBuffer.slice(cursor, cursor + chunkSize));

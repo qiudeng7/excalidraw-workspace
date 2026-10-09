@@ -127,6 +127,7 @@ const onProgressToast = (
   },
 ) => {
   const message = progress.message ?? t("progressDialog.defaultMessage");
+
   app.setAppState({
     toast: {
       message:
@@ -164,8 +165,10 @@ async function handleOnExportResult(
     for await (const value of onExportResult) {
       if (opts.signal.aborted) {
         onExportResult.return();
+
         return;
       }
+
       if (value.type === "progress") {
         onProgressToast(opts.app, {
           message: value.message,
@@ -266,6 +269,7 @@ export const actionSaveToActiveFile = register({
     if (onExportInProgress) {
       return false;
     }
+
     onExportInProgress = true;
 
     const previousFileHandle = appState.fileHandle;
@@ -311,6 +315,7 @@ export const actionSaveToActiveFile = register({
       } else {
         console.warn(error);
       }
+
       return {
         captureUpdate: CaptureUpdateAction.NEVER,
         appState: {
@@ -335,6 +340,7 @@ export const actionSaveFileToDisk = register({
     if (onExportInProgress) {
       return false;
     }
+
     onExportInProgress = true;
 
     const { abortController, data: exportedDataPromise } =
@@ -362,6 +368,7 @@ export const actionSaveFileToDisk = register({
       } else {
         console.warn(error);
       }
+
       return {
         captureUpdate: CaptureUpdateAction.NEVER,
         appState: {
@@ -406,6 +413,7 @@ export const actionLoadScene = register({
         appState: loadedAppState,
         files,
       } = await loadFromJSON(appState, elements);
+
       return {
         elements: loadedElements,
         appState: loadedAppState,
@@ -415,8 +423,10 @@ export const actionLoadScene = register({
     } catch (error: any) {
       if (error?.name === "AbortError") {
         console.warn(error);
+
         return false;
       }
+
       return {
         elements,
         appState: { ...appState, errorMessage: error.message },
@@ -436,6 +446,7 @@ export const actionExportWithDarkMode = register<
   trackEvent: { category: "export", action: "toggleTheme" },
   perform: (_elements, appState, value, app) => {
     app.sessionExportThemeOverride = value ? THEME.DARK : THEME.LIGHT;
+
     return {
       appState: { ...appState, exportWithDarkMode: value },
       captureUpdate: CaptureUpdateAction.EVENTUALLY,

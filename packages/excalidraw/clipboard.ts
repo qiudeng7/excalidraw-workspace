@@ -53,7 +53,7 @@ export interface ClipboardData {
   programmaticAPI?: boolean;
 }
 
-type AllowedPasteMimeTypes = typeof ALLOWED_PASTE_MIME_TYPES[number];
+type AllowedPasteMimeTypes = (typeof ALLOWED_PASTE_MIME_TYPES)[number];
 
 type ParsedClipboardEventTextData =
   | { type: "text"; value: string }
@@ -84,6 +84,7 @@ const clipboardContainsElements = (
   ) {
     return true;
   }
+
   return false;
 };
 
@@ -109,6 +110,7 @@ export const createPasteEvent = ({
         files.push(value);
         continue;
       }
+
       try {
         event.clipboardData?.items.add(value, type);
         if (event.clipboardData?.getData(type) !== value) {
@@ -122,6 +124,7 @@ export const createPasteEvent = ({
 
   if (files) {
     let idx = -1;
+
     for (const file of files) {
       idx++;
       try {
@@ -160,6 +163,7 @@ export const serializeAsClipboardJSON = ({
         acc[element.fileId] = files[element.fileId];
       }
     }
+
     return acc;
   }, {} as BinaryFiles);
 
@@ -178,9 +182,11 @@ export const serializeAsClipboardJSON = ({
         !framesToCopy.has(getContainingFrame(element, elementsMap)!)
       ) {
         const copiedElement = deepCopyElement(element);
+
         mutateElement(copiedElement, elementsMap, {
           frameId: null,
         });
+
         return copiedElement;
       }
 
@@ -212,14 +218,17 @@ export const copyToClipboard = async (
 /** internal, specific to parsing paste events. Do not reuse. */
 function parseHTMLTree(el: ChildNode) {
   let result: PastedMixedContent = [];
+
   for (const node of el.childNodes) {
     if (node.nodeType === 3) {
       const text = node.textContent?.trim();
+
       if (text) {
         result.push({ type: "text", value: text });
       }
     } else if (node instanceof HTMLImageElement) {
       const url = node.getAttribute("src");
+
       if (url && url.startsWith("http")) {
         result.push({ type: "imageUrl", value: url });
       }
@@ -227,11 +236,12 @@ function parseHTMLTree(el: ChildNode) {
       result = result.concat(parseHTMLTree(node));
     }
   }
+
   return result;
 }
 
 const maybeParseHTMLDataItem = (
-  dataItem: ParsedDataTransferItemType<typeof MIME_TYPES["html"]>,
+  dataItem: ParsedDataTransferItemType<(typeof MIME_TYPES)["html"]>,
 ): { type: "mixedContent"; value: PastedMixedContent } | null => {
   const html = dataItem.value;
 
@@ -268,6 +278,7 @@ export const readSystemClipboard = async () => {
           `navigator.clipboard.readText() failed (${error.message}). Failling back to navigator.clipboard.read()`,
         );
         const readText = await navigator.clipboard?.readText();
+
         if (readText) {
           return { [MIME_TYPES.text]: readText };
         }
@@ -283,12 +294,14 @@ export const readSystemClipboard = async () => {
           console.warn(
             `navigator.clipboard.read() error, clipboard is probably empty: ${error.message}`,
           );
+
           return types;
         }
 
         throw error;
       }
     }
+
     throw error;
   }
 
@@ -297,12 +310,14 @@ export const readSystemClipboard = async () => {
       if (!isMemberOf(ALLOWED_PASTE_MIME_TYPES, type)) {
         continue;
       }
+
       try {
         if (type === MIME_TYPES.text || type === MIME_TYPES.html) {
           types[type] = await (await item.getType(type)).text();
         } else if (isSupportedImageFileType(type)) {
           const imageBlob = await item.getType(type);
           const file = createFile(imageBlob, type, undefined);
+
           types[type] = file;
         } else {
           throw new ExcalidrawError(`Unsupported clipboard type: ${type}`);
@@ -319,6 +334,7 @@ export const readSystemClipboard = async () => {
 
   if (Object.keys(types).length === 0) {
     console.warn("No clipboard data found from clipboard.read().");
+
     return types;
   }
 
@@ -358,7 +374,9 @@ const parseClipboardEventTextData = async (
       type: "text",
       value: (dataList.getData(MIME_TYPES.text) || "").trim(),
     };
-  } catch {
+  } catch (error) {
+    console.warn("Failed to read clipboard data; treating it as empty", error);
+
     return { type: "text", value: "" };
   }
 };
@@ -481,9 +499,12 @@ export const parseDataTransferEvent = async (
         async (item): Promise<ParsedDataTransferItem | null> => {
           if (item.kind === "file") {
             let file = item.getAsFile();
+
             if (file) {
               const fileHandle = await getFileHandle(item);
+
               file = await normalizeFile(file);
+
               return {
                 type: file.type,
                 kind: "file",
@@ -494,6 +515,7 @@ export const parseDataTransferEvent = async (
           } else if (item.kind === "string") {
             const { type } = item;
             let value: string;
+
             if ("clipboardData" in event && event.clipboardData) {
               value = event.clipboardData?.getData(type);
             } else {
@@ -501,6 +523,7 @@ export const parseDataTransferEvent = async (
                 item.getAsString((str) => resolve(str));
               });
             }
+
             return { type, kind: "string", value };
           }
 
@@ -539,6 +562,7 @@ export const parseClipboard = async (
     const systemClipboardData = JSON.parse(parsedEventData.value);
     const programmaticAPI =
       systemClipboardData.type === EXPORT_DATA_TYPES.excalidrawClipboardWithAPI;
+
     if (clipboardContainsElements(systemClipboardData)) {
       return {
         elements: systemClipboardData.elements,
@@ -549,7 +573,12 @@ export const parseClipboard = async (
         programmaticAPI,
       };
     }
-  } catch {}
+  } catch (error) {
+    console.debug(
+      "Clipboard is not an Excalidraw document; using plain text",
+      error,
+    );
+  }
 
   return { text: parsedEventData.value };
 };
@@ -606,6 +635,7 @@ export const copyTextToSystemClipboard = async <
           throw new Error("Failed to setData on clipboardEvent");
         }
       }
+
       return;
     }
   } catch (error: any) {
@@ -624,6 +654,7 @@ export const copyTextToSystemClipboard = async <
       // NOTE: doesn't work on FF on non-HTTPS domains, or when document
       // not focused
       await navigator.clipboard.writeText(plainTextEntry[1]);
+
       return;
     } catch (error: any) {
       console.error(error);
@@ -654,6 +685,7 @@ const copyTextViaExecCommand = (text: string | null) => {
   textarea.style.position = "absolute";
   textarea.style[isRTL ? "right" : "left"] = "-9999px";
   const yPosition = window.pageYOffset || document.documentElement.scrollTop;
+
   textarea.style.top = `${yPosition}px`;
   // Prevent zooming on iOS
   textarea.style.fontSize = "12pt";

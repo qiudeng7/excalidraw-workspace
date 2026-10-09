@@ -1,12 +1,16 @@
 export { actionDeleteSelected } from "./actionDeleteSelected";
+
 export {
   actionBringForward,
   actionBringToFront,
   actionSendBackward,
   actionSendToBack,
 } from "./actionZindex";
+
 export { actionSelectAll } from "./actionSelectAll";
+
 export { actionDuplicateSelection } from "./actionDuplicateSelection";
+
 export {
   actionChangeStrokeColor,
   actionChangeBackgroundColor,
@@ -34,6 +38,7 @@ export {
 } from "./actionCanvas";
 
 export { actionFinalize } from "./actionFinalize";
+
 export { actionDeselect } from "./actionDeselect";
 
 export {
@@ -45,6 +50,7 @@ export {
 } from "./actionExport";
 
 export { actionCopyStyles, actionPasteStyles } from "./actionStyles";
+
 export { actionShortcuts } from "./actionMenu";
 
 export { actionGroup, actionUngroup } from "./actionGroup";
@@ -78,15 +84,23 @@ export {
 } from "./actionClipboard";
 
 export { actionToggleGridMode } from "./actionToggleGridMode";
+
 export { actionToggleZenMode } from "./actionToggleZenMode";
+
 export { actionToggleObjectsSnapMode } from "./actionToggleObjectsSnapMode";
+
 export { actionToggleArrowBinding } from "./actionToggleArrowBinding";
+
 export { actionToggleMidpointSnapping } from "./actionToggleMidpointSnapping";
 
 export { actionToggleStats } from "./actionToggleStats";
+
 export { actionUnbindText, actionBindText } from "./actionBoundText";
+
 export { actionLink } from "./actionLink";
+
 export { actionToggleElementLock } from "./actionElementLock";
+
 export { actionToggleLinearEditor } from "./actionLinearEditor";
 
 export { actionToggleSearchMenu } from "./actionToggleSearchMenu";

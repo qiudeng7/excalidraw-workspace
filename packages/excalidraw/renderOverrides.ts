@@ -11,8 +11,10 @@ export const copyElementRenderOverrides = (
   overrides: ElementRenderOverrides | null,
 ): ElementRenderOverrides => {
   const copy = new Map<string, ElementRenderOverride>();
+
   for (const [id, value] of overrides ?? []) {
     const { opacity, offset } = value;
+
     if (
       (opacity !== undefined && !Number.isFinite(opacity)) ||
       (offset !== undefined &&
@@ -22,14 +24,17 @@ export const copyElementRenderOverrides = (
     ) {
       throw new TypeError(`Render overrides for ${id} must be finite numbers`);
     }
+
     if (opacity === undefined && offset === undefined) {
       continue;
     }
+
     copy.set(id, {
       ...(opacity !== undefined ? { opacity: clamp(opacity, 0, 100) } : {}),
       ...(offset ? { offset: { x: offset.x, y: offset.y } } : {}),
     });
   }
+
   return copy;
 };
 
@@ -45,26 +50,32 @@ export const getElementRenderOffsets = (
   // Compare before allocating: fades can carry many unchanged offsets.
   let offsetCount = 0;
   let changed = false;
+
   for (const [id, { offset }] of overrides) {
     if (!offset) {
       continue;
     }
+
     offsetCount++;
     const before = previous.get(id);
+
     if (!before || before.x !== offset.x || before.y !== offset.y) {
       changed = true;
       break;
     }
   }
+
   if (!changed && offsetCount === previous.size) {
     return previous;
   }
 
   const next = new Map<string, NonNullable<ElementRenderOverride["offset"]>>();
+
   for (const [id, { offset }] of overrides) {
     if (offset) {
       next.set(id, offset);
     }
   }
+
   return next;
 };

@@ -183,6 +183,7 @@ const FONT_SIZE_RELATIVE_INCREASE_STEP = 0.1;
 
 const getStylesPanelInfo = (app: AppClassProperties) => {
   const stylesPanelMode = deriveStylesPanelMode(app.editorInterface);
+
   return {
     stylesPanelMode,
     isCompact: stylesPanelMode !== "full",
@@ -214,7 +215,9 @@ export const changeProperty = (
           "[NONDELETED][INVARIANT] changeProperty(): skipping deleted selected/editing element",
         );
       }
+
       const nextElement = callback(element as NonDeletedExcalidrawElement);
+
       // sticky notes keep their data invariants (never-transparent colors,
       // solid fill, minimum size) whatever property was written; a no-op
       // normalization returns the same object
@@ -222,6 +225,7 @@ export const changeProperty = (
         ? normalizeStickyNote(nextElement)
         : nextElement;
     }
+
     return element;
   });
 };
@@ -278,6 +282,7 @@ const offsetElementAfterFontResize = (
   if (isBoundToContainer(nextElement) || !nextElement.autoResize) {
     return nextElement;
   }
+
   return scene.mutateElement(nextElement, {
     x:
       prevElement.textAlign === "left"
@@ -307,6 +312,7 @@ const changeFontSize = (
     (oldElement) => {
       if (isTextElement(oldElement)) {
         const newFontSize = getNewFontSize(oldElement);
+
         newFontSizes.add(newFontSize);
         const container = app.scene.getContainerElement(oldElement);
 
@@ -314,6 +320,7 @@ const changeFontSize = (
           oldElement,
           getBaseFontSizeUpdate(oldElement, newFontSize, elementsMap),
         );
+
         redrawTextBoundingBox(newElement, container, app.scene);
 
         newElement = offsetElementAfterFontResize(
@@ -324,6 +331,7 @@ const changeFontSize = (
 
         return newElement;
       }
+
       return oldElement;
     },
     true,
@@ -347,7 +355,7 @@ const changeFontSize = (
       currentItemFontSize:
         newFontSizes.size === 1
           ? [...newFontSizes][0]
-          : fallbackValue ?? appState.currentItemFontSize,
+          : (fallbackValue ?? appState.currentItemFontSize),
     },
     captureUpdate: CaptureUpdateAction.IMMEDIATELY,
   };
@@ -363,12 +371,14 @@ export const actionChangeStrokeColor = register<
   trackEvent: false,
   perform: (elements, appState, value) => {
     const { color, ...appStateUpdates } = value ?? {};
+
     if (color === undefined) {
       return {
         appState: { ...appState, ...appStateUpdates },
         captureUpdate: CaptureUpdateAction.EVENTUALLY,
       };
     }
+
     // resolved from the state the action runs against — never from the
     // render-time closure of the memoized picker (see `resolveColorTarget`)
     const target = resolveColorTarget(appState, elements, "strokeColor");
@@ -442,12 +452,14 @@ export const actionChangeBackgroundColor = register<
   trackEvent: false,
   perform: (elements, appState, value, app) => {
     const { color, ...appStateUpdates } = value ?? {};
+
     if (color === undefined) {
       return {
         appState: { ...appState, ...appStateUpdates },
         captureUpdate: CaptureUpdateAction.EVENTUALLY,
       };
     }
+
     const target = resolveColorTarget(appState, elements, "backgroundColor");
     const elementsMap = arrayToMap(elements);
 
@@ -464,6 +476,7 @@ export const actionChangeBackgroundColor = register<
 
     if (shouldEnablePolygon) {
       const selectedElementsMap = arrayToMap(selectedElements);
+
       nextElements = elements.map((el) => {
         if (selectedElementsMap.has(el.id) && isLineElement(el)) {
           return newElementWith(el, {
@@ -471,6 +484,7 @@ export const actionChangeBackgroundColor = register<
             ...toggleLinePolygonState(el, true),
           });
         }
+
         return el;
       });
     } else {
@@ -491,6 +505,7 @@ export const actionChangeBackgroundColor = register<
       const editingTarget =
         editingText &&
         getColorTargetElement(editingText, "backgroundColor", elementsMap);
+
       if (editingTarget && editingTarget !== editingText) {
         nextElements = nextElements.map((el) =>
           el.id === editingTarget.id
@@ -615,6 +630,7 @@ export const actionChangeFillStyle = register<ExcalidrawElement["fillStyle"]>({
         app.editorInterface.formFactor === "phone" ? "mobile" : "desktop"
       })`,
     );
+
     return {
       elements: changeProperty(elements, appState, (el) =>
         hasFillStyle(el.type) ? newElementWith(el, { fillStyle: value }) : el,
@@ -829,6 +845,7 @@ export const actionChangeFreedrawMode = register<StrokeVariability>({
         if (el.type !== "freedraw") {
           return el;
         }
+
         return newElementWith(el, {
           strokeOptions: {
             ...el.strokeOptions,
@@ -856,6 +873,7 @@ export const actionChangeFreedrawMode = register<StrokeVariability>({
     // that cycles between the two variability modes on click
     if (data?.cycle) {
       const isVariable = strokeVariability === "variable";
+
       return (
         <IconButton
           type="button"
@@ -1008,6 +1026,7 @@ export const actionChangeFontSize = register<ExcalidrawTextElement["fontSize"]>(
         app,
         () => {
           invariant(value, "actionChangeFontSize: Expected a font size value");
+
           return value;
         },
         value,
@@ -1053,16 +1072,20 @@ export const actionChangeFontSize = register<ExcalidrawTextElement["fontSize"]>(
                 app,
                 (element) => {
                   const elementsMap = app.scene.getNonDeletedElementsMap();
+
                   if (isTextElement(element)) {
                     return getBaseFontSize(element, elementsMap);
                   }
+
                   const boundTextElement = getBoundTextElement(
                     element,
                     elementsMap,
                   );
+
                   if (boundTextElement) {
                     return getBaseFontSize(boundTextElement, elementsMap);
                   }
+
                   return null;
                 },
                 (element) =>
@@ -1174,6 +1197,7 @@ export const actionChangeFontFamily = register<{
         appState,
         (element) => {
           const cachedElement = cachedElements?.get(element.id);
+
           if (cachedElement) {
             const newElement = newElementWith(element, {
               ...cachedElement,
@@ -1229,6 +1253,7 @@ export const actionChangeFontFamily = register<{
           textLengthAccumulator < 5000
         ) {
           const textElement = selectedTextElements[i] as ExcalidrawTextElement;
+
           textLengthAccumulator += textElement?.originalText.length || 0;
           i++;
         }
@@ -1378,10 +1403,13 @@ export const actionChangeFontFamily = register<{
             if (isTextElement(element)) {
               return element.fontFamily;
             }
+
             const boundTextElement = getBoundTextElement(element, elementsMap);
+
             if (boundTextElement) {
               return boundTextElement.fontFamily;
             }
+
             return null;
           },
           (element) =>
@@ -1559,11 +1587,13 @@ export const actionChangeTextAlign = register<TextAlign>({
               oldElement,
               { textAlign: value },
             );
+
             redrawTextBoundingBox(
               newElement,
               app.scene.getContainerElement(oldElement),
               app.scene,
             );
+
             return newElement;
           }
 
@@ -1615,13 +1645,16 @@ export const actionChangeTextAlign = register<TextAlign>({
                 if (isTextElement(element)) {
                   return element.textAlign;
                 }
+
                 const boundTextElement = getBoundTextElement(
                   element,
                   elementsMap,
                 );
+
                 if (boundTextElement) {
                   return boundTextElement.textAlign;
                 }
+
                 return null;
               },
               (element) =>
@@ -1666,6 +1699,7 @@ export const actionChangeVerticalAlign = register<VerticalAlign>({
               app.scene.getContainerElement(oldElement),
               app.scene,
             );
+
             return newElement;
           }
 
@@ -1681,6 +1715,7 @@ export const actionChangeVerticalAlign = register<VerticalAlign>({
   },
   PanelComponent: ({ elements, appState, updateData, app, data }) => {
     const { isCompact } = getStylesPanelInfo(app);
+
     return (
       <fieldset>
         <div className="buttonList">
@@ -1713,13 +1748,16 @@ export const actionChangeVerticalAlign = register<VerticalAlign>({
                 if (isTextElement(element) && element.containerId) {
                   return element.verticalAlign;
                 }
+
                 const boundTextElement = getBoundTextElement(
                   element,
                   app.scene.getNonDeletedElementsMap(),
                 );
+
                 if (boundTextElement) {
                   return boundTextElement.verticalAlign;
                 }
+
                 return null;
               },
               (element) =>
@@ -1811,8 +1849,8 @@ export const actionChangeRoundness = register<"sharp" | "round">({
                 hasLegacyRoundness
                   ? null
                   : element.roundness
-                  ? "round"
-                  : "sharp",
+                    ? "round"
+                    : "sharp",
               (element) =>
                 !isArrowElement(element) && element.hasOwnProperty("roundness"),
               (hasSelection) =>
@@ -1960,11 +1998,13 @@ export const actionChangeArrowhead = register<{
             const element: ExcalidrawLinearElement = newElementWith(el, {
               startArrowhead: type,
             });
+
             return element;
           } else if (position === "end") {
             const element: ExcalidrawLinearElement = newElementWith(el, {
               endArrowhead: type,
             });
+
             return element;
           }
         }
@@ -2063,6 +2103,7 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
       if (!isArrowElement(el)) {
         return el;
       }
+
       const elementsMap = app.scene.getNonDeletedElementsMap();
       const startPoint = LinearElementEditor.getPointAtIndexGlobalCoordinates(
         el,
@@ -2178,9 +2219,8 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
           startBinding,
           endBinding,
           ...updateElbowArrowPoints(newElement, elementsMap, {
-            points: [startGlobalPoint, endGlobalPoint].map(
-              (p): LocalPoint =>
-                pointFrom(p[0] - newElement.x, p[1] - newElement.y),
+            points: [startGlobalPoint, endGlobalPoint].map((p): LocalPoint =>
+              pointFrom(p[0] - newElement.x, p[1] - newElement.y),
             ),
             startBinding,
             endBinding,
@@ -2189,10 +2229,12 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
         } as typeof newElement;
       } else {
         const elementsMap = app.scene.getNonDeletedElementsMap();
+
         if (newElement.startBinding) {
           const startElement = elementsMap.get(
             newElement.startBinding.elementId,
           ) as NonDeleted<ExcalidrawBindableElement>;
+
           if (startElement) {
             bindBindingElement(
               newElement,
@@ -2204,10 +2246,12 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
             );
           }
         }
+
         if (newElement.endBinding) {
           const endElement = elementsMap.get(
             newElement.endBinding.elementId,
           ) as NonDeleted<ExcalidrawBindableElement>;
+
           if (endElement) {
             bindBindingElement(
               newElement,
@@ -2232,8 +2276,10 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
     // Change the arrow type and update any other state settings for
     // the arrow.
     const selectedId = appState.selectedLinearElement?.elementId;
+
     if (selectedId) {
       const selected = newElements.find((el) => el.id === selectedId);
+
       if (selected) {
         newState.selectedLinearElement = new LinearElementEditor(
           selected as NonDeleted<ExcalidrawLinearElement>,
@@ -2283,8 +2329,8 @@ export const actionChangeArrowType = register<keyof typeof ARROW_TYPE>({
                   return element.elbowed
                     ? ARROW_TYPE.elbow
                     : element.roundness
-                    ? ARROW_TYPE.round
-                    : ARROW_TYPE.sharp;
+                      ? ARROW_TYPE.round
+                      : ARROW_TYPE.sharp;
                 }
 
                 return null;

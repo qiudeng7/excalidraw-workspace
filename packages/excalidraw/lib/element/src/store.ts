@@ -192,6 +192,7 @@ export class Store {
       // execute a single scheduled "macro" function
       // similar to macro tasks, there can be only one within a single commit (loop)
       const action = this.getScheduledMacroAction();
+
       this.processAction({ action, elements, appState });
     } finally {
       this.satisfiesScheduledActionsInvariant();
@@ -260,6 +261,7 @@ export class Store {
       storeChange = change;
     } else {
       const prevSnapshot = this.snapshot;
+
       storeChange = StoreChange.create(prevSnapshot, snapshot);
     }
 
@@ -409,14 +411,12 @@ export class Store {
    * Ensures that the scheduled actions invariant is satisfied.
    */
   private satisfiesScheduledActionsInvariant() {
-    if (
-      !(
-        this.scheduledMacroActions.size >= 0 &&
-        this.scheduledMacroActions.size <=
-          Object.keys(CaptureUpdateAction).length
-      )
-    ) {
+    if (!(
+      this.scheduledMacroActions.size >= 0 &&
+      this.scheduledMacroActions.size <= Object.keys(CaptureUpdateAction).length
+    )) {
       const message = `There can be at most three store actions scheduled at the same time, but there are "${this.scheduledMacroActions.size}".`;
+
       console.error(message, this.scheduledMacroActions.values());
 
       if (isTestEnv() || isDevEnv()) {
@@ -539,6 +539,7 @@ export class StoreDelta {
    */
   public static restore(storeDeltaDTO: DTO<StoreDelta>) {
     const { id, elements, appState } = storeDeltaDTO;
+
     return new this(
       id,
       ElementsDelta.restore(elements),
@@ -858,6 +859,7 @@ export class StoreSnapshot {
     }
 
     const elementsSnapshot = this.createElementsSnapshot(changedElements);
+
     return elementsSnapshot;
   }
 

@@ -23,6 +23,7 @@ export const measureText = (
   const fontSize = parseFloat(font);
   const height = getTextHeight(_text, fontSize, lineHeight);
   const width = getTextWidth(_text, font);
+
   return { width, height };
 };
 
@@ -34,12 +35,14 @@ export const getApproxMinLineWidth = (
   lineHeight: ExcalidrawTextElement["lineHeight"],
 ) => {
   const maxCharWidth = getMaxCharWidth(font);
+
   if (maxCharWidth === 0) {
     return (
       measureText(DUMMY_TEXT.split("").join("\n"), font, lineHeight).width +
       BOUND_TEXT_PADDING * 2
     );
   }
+
   return maxCharWidth + BOUND_TEXT_PADDING * 2;
 };
 
@@ -58,6 +61,7 @@ export const isMeasureTextSupported = () => {
       fontFamily: DEFAULT_FONT_FAMILY,
     }),
   );
+
   return width > 0;
 };
 
@@ -79,6 +83,7 @@ const splitIntoLines = (text: string) => {
  */
 export const detectLineHeight = (textElement: ExcalidrawTextElement) => {
   const lineCount = splitIntoLines(textElement.text).length;
+
   return (textElement.height /
     lineCount /
     textElement.fontSize) as ExcalidrawTextElement["lineHeight"];
@@ -134,6 +139,7 @@ class CanvasTextMetricsProvider implements TextMetricsProvider {
    */
   public getLineWidth(text: string, fontString: FontString): number {
     const context = this.canvas.getContext("2d")!;
+
     context.font = fontString;
     const metrics = context.measureText(text);
     const advanceWidth = metrics.width;
@@ -160,6 +166,7 @@ export const getLineWidth = (text: string, font: FontString) => {
 export const getTextWidth = (text: string, font: FontString) => {
   const lines = splitIntoLines(text);
   let width = 0;
+
   lines.forEach((line) => {
     width = Math.max(width, getLineWidth(line, font));
   });
@@ -173,6 +180,7 @@ export const getTextHeight = (
   lineHeight: ExcalidrawTextElement["lineHeight"],
 ) => {
   const lineCount = splitIntoLines(text).length;
+
   return getLineHeightInPx(fontSize, lineHeight) * lineCount;
 };
 
@@ -181,11 +189,14 @@ export const charWidth = (() => {
 
   const calculate = (char: string, font: FontString) => {
     const unicode = char.charCodeAt(0);
+
     if (!cachedCharWidth[font]) {
       cachedCharWidth[font] = [];
     }
+
     if (!cachedCharWidth[font][unicode]) {
       const width = getLineWidth(char, font);
+
       cachedCharWidth[font][unicode] = width;
     }
 
@@ -209,9 +220,11 @@ export const charWidth = (() => {
 
 export const getMinCharWidth = (font: FontString) => {
   const cache = charWidth.getCache(font);
+
   if (!cache) {
     return 0;
   }
+
   const cacheWithOutEmpty = cache.filter((val) => val !== undefined);
 
   return Math.min(...cacheWithOutEmpty);
@@ -219,9 +232,12 @@ export const getMinCharWidth = (font: FontString) => {
 
 export const getMaxCharWidth = (font: FontString) => {
   const cache = charWidth.getCache(font);
+
   if (!cache) {
     return 0;
   }
+
   const cacheWithOutEmpty = cache.filter((val) => val !== undefined);
+
   return Math.max(...cacheWithOutEmpty);
 };

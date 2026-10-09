@@ -182,6 +182,7 @@ export function curveIntersectLineSegment<
     opts?.tolerance,
     opts?.iterLimit,
   );
+
   if (solution) {
     return [solution];
   }
@@ -249,8 +250,10 @@ export function curveClosestParameter<Point extends GlobalPoint | LocalPoint>(
 
   const maxSteps = 30;
   let closestStep = 0;
+
   for (let min = Infinity, step = 0; step <= maxSteps; step++) {
     const d = pointDistance(p, bezierEquation(c, step / maxSteps));
+
     if (d < min) {
       min = d;
       closestStep = step;
@@ -342,6 +345,7 @@ export function curveCatmullRomQuadraticApproxPoints(
   }
 
   const pointSets: [GlobalPoint, GlobalPoint][] = [];
+
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[i - 1 < 0 ? 0 : i - 1];
     const p1 = points[i];
@@ -366,6 +370,7 @@ export function curveCatmullRomCubicApproxPoints<
   }
 
   const pointSets: Curve<Point>[] = [];
+
   for (let i = 0; i < points.length - 1; i++) {
     const p0 = points[i - 1 < 0 ? 0 : i - 1];
     const p1 = points[i];
@@ -460,6 +465,7 @@ export function curveLength<P extends GlobalPoint | LocalPoint>(
       derivativeVector[0] * derivativeVector[0] +
         derivativeVector[1] * derivativeVector[1],
     );
+
     sum += LegendreGaussN24CValues[i] * magnitude;
   }
 
@@ -481,6 +487,7 @@ export function curveLengthAtParameter<P extends GlobalPoint | LocalPoint>(
   if (t <= 0) {
     return 0;
   }
+
   if (t >= 1) {
     return curveLength(c);
   }
@@ -499,6 +506,7 @@ export function curveLengthAtParameter<P extends GlobalPoint | LocalPoint>(
       derivativeVector[0] * derivativeVector[0] +
         derivativeVector[1] * derivativeVector[1],
     );
+
     sum += LegendreGaussN24CValues[i] * magnitude;
   }
 

@@ -27,8 +27,8 @@ export const renderSnaps = (
     appState.theme === THEME.LIGHT
       ? SNAP_COLOR_LIGHT
       : appState.zenModeEnabled
-      ? SNAP_COLOR_DARK_ZEN
-      : SNAP_COLOR_DARK;
+        ? SNAP_COLOR_DARK_ZEN
+        : SNAP_COLOR_DARK;
   // in zen mode make the cross more visible since we don't draw the lines
   const snapWidth =
     (appState.zenModeEnabled ? SNAP_WIDTH * 1.5 : SNAP_WIDTH) /
@@ -101,6 +101,7 @@ const drawCross = <Point extends LocalPoint | GlobalPoint>(
   const size =
     (appState.zenModeEnabled ? SNAP_CROSS_SIZE * 1.5 : SNAP_CROSS_SIZE) /
     appState.zoom.value;
+
   context.beginPath();
 
   context.moveTo(x - size, y - size);
@@ -143,6 +144,7 @@ const drawGapLine = <Point extends LocalPoint | GlobalPoint>(
 
   if (direction === "horizontal") {
     const halfPoint = [(from[0] + to[0]) / 2, from[1]];
+
     // (1)
     if (!appState.zenModeEnabled) {
       drawLine(
@@ -177,6 +179,7 @@ const drawGapLine = <Point extends LocalPoint | GlobalPoint>(
     }
   } else {
     const halfPoint = [from[0], (from[1] + to[1]) / 2];
+
     // (1)
     if (!appState.zenModeEnabled) {
       drawLine(

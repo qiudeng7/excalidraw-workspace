@@ -72,9 +72,11 @@ const isSameHover = (
   if (a === b) {
     return true;
   }
+
   if (!a || !b || a.type !== b.type || a.elementId !== b.elementId) {
     return false;
   }
+
   return a.type !== "arrow" || b.type !== "arrow" || a.anchor === b.anchor;
 };
 
@@ -132,17 +134,20 @@ export class AppTextTool {
     const { x, y } = scenePointer;
 
     const endpoint = this.app.arrowText.getBindableEndpointAtPosition(x, y);
+
     if (endpoint) {
       return { type: "endpoint", endpoint };
     }
 
     const text = this.app.getTextElementAtPosition(x, y);
+
     if (text) {
       return { type: "text", element: text };
     }
 
     if (!modifiers[KEYS.CTRL_OR_CMD]) {
       const container = this.app.getTextBindableContainerAtPosition(x, y);
+
       if (
         container &&
         // an existing label is edited by hitting the text itself (above)
@@ -174,15 +179,18 @@ export class AppTextTool {
     isOverScrollBar = false,
   ): TextToolTarget | null => {
     const { state } = this.app;
+
     if (state.activeTool.type !== "text") {
       return null;
     }
+
     // a pending center click keeps the affordance it was armed with until
     // it resolves (the pointer may leave the snap radius before the drag
     // threshold, and a release would still bind)
     if (this.pending) {
       return null;
     }
+
     this.lastModifiers = {
       ctrlKey: modifiers.ctrlKey,
       metaKey: modifiers.metaKey,
@@ -196,7 +204,9 @@ export class AppTextTool {
       isOverScrollBar
         ? null
         : this.getTargetAt(scenePointer, modifiers);
+
     this.setHover(target && toHoverState(target));
+
     return target;
   };
 
@@ -216,6 +226,7 @@ export class AppTextTool {
    */
   refresh = (modifiers: Modifiers = this.lastModifiers) => {
     const pointer = this.app.lastPointerMoveEvent;
+
     if (
       this.app.state.activeTool.type !== "text" ||
       !pointer ||
@@ -223,10 +234,12 @@ export class AppTextTool {
     ) {
       return;
     }
+
     const target = this.updateHover(
       viewportCoordsToSceneCoords(pointer, this.app.state),
       modifiers,
     );
+
     if (!this.app.pan.isNavigating()) {
       this.app.cursor.set(this.cursorFor(target));
     }
@@ -270,9 +283,11 @@ export class AppTextTool {
     ) {
       return CURSOR_TYPE.POINTER;
     }
+
     if (target?.type === "text") {
       return CURSOR_TYPE.TEXT;
     }
+
     return CURSOR_TYPE.CROSSHAIR;
   };
 
@@ -285,6 +300,7 @@ export class AppTextTool {
     if (this.app.state.editingTextElement) {
       return;
     }
+
     const sceneX = pointerDownState.origin.x;
     const sceneY = pointerDownState.origin.y;
     const target = this.getTargetAt({ x: sceneX, y: sceneY }, event);
@@ -319,6 +335,7 @@ export class AppTextTool {
           origin: { x: sceneX, y: sceneY },
         };
         this.setHover(toHoverState(target));
+
         return;
       case "free":
         this.app.startTextEditing({
@@ -350,15 +367,20 @@ export class AppTextTool {
     if (!this.pending) {
       return false;
     }
+
     // a tool switch mid-press orphans the click
     if (this.app.state.activeTool.type !== "text") {
       this.cancel();
+
       return true;
     }
+
     const pointerCoords = viewportCoordsToSceneCoords(event, this.app.state);
+
     if (this.isDrag(pointerCoords)) {
       this.resolvePending(true, pointerCoords, pointerDownState, event);
     }
+
     return true;
   };
 
@@ -375,14 +397,18 @@ export class AppTextTool {
     if (!this.pending) {
       return;
     }
+
     if (
       event.type !== EVENT.POINTER_UP ||
       this.app.state.activeTool.type !== "text"
     ) {
       this.cancel();
+
       return;
     }
+
     const pointerCoords = viewportCoordsToSceneCoords(event, this.app.state);
+
     this.resolvePending(
       this.isDrag(pointerCoords),
       pointerCoords,
@@ -403,6 +429,7 @@ export class AppTextTool {
     event: PointerEvent,
   ) => {
     const { containerId, origin } = this.pending!;
+
     this.pending = null;
 
     // gone mid-press (a collaborator deleted it): nothing to create, but the
@@ -422,6 +449,7 @@ export class AppTextTool {
           autoEdit: !isDrag,
         });
       }
+
       this.finish();
     });
 

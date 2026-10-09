@@ -128,11 +128,14 @@ const constrainScrollAxis = (
 ): number => {
   const max = -boxStart + offsetStart;
   const min = visibleSize - (boxStart + boxSize) - offsetEnd;
+
   if (min > max) {
     // box can't cover the viewport: rest at center, with rubberband give
     const center = (min + max) / 2;
+
     return clamp(scroll, center - overscroll, center + overscroll);
   }
+
   return clamp(scroll, min - overscroll, max + overscroll);
 };
 
@@ -253,6 +256,7 @@ export const getViewportForZoomWithScrollConstraints = (
   }
 
   const zoom = zoomedViewport.zoom.value;
+
   return constrainScrollState(
     {
       ...state,
@@ -361,6 +365,7 @@ export const zoomToFitBounds = ({
 
 const doBoundsExceedViewport = (appState: AppState, bounds: Bounds) => {
   const [x1, y1, x2, y2] = bounds;
+
   return (
     (x2 - x1) * appState.zoom.value > appState.width ||
     (y2 - y1) * appState.zoom.value > appState.height
@@ -378,6 +383,7 @@ export const getClosestElementBounds = (
   let minDistance = Infinity;
   let closestElement = elements[0];
   const elementsMap = arrayToMap(elements);
+
   elements.forEach((element) => {
     const [x1, y1, x2, y2] = getElementBounds(element, elementsMap);
     const distance = pointDistance(
@@ -445,9 +451,11 @@ export const scrollBoundsIntoView = ({
   const viewRight = width - (offsets?.right ?? 0);
   const viewTop = offsets?.top ?? 0;
   const viewBottom = height - (offsets?.bottom ?? 0);
+
   if (viewRight <= viewLeft || viewBottom <= viewTop) {
     return null;
   }
+
   // how far (screen px) to move a span to bring it within [start, end]
   const shift = (
     spanStart: number,
@@ -458,22 +466,28 @@ export const scrollBoundsIntoView = ({
   ) => {
     const screenStart = (spanStart + scroll) * zoom.value;
     const screenEnd = (spanEnd + scroll) * zoom.value;
+
     if (screenEnd - screenStart > end - start) {
       return tooLarge === "alignStart" ? start - screenStart : 0;
     }
+
     if (screenEnd > end) {
       return end - screenEnd;
     }
+
     if (screenStart < start) {
       return start - screenStart;
     }
+
     return 0;
   };
   const dx = shift(x1, x2, scrollX, viewLeft, viewRight);
   const dy = shift(y1, y2, scrollY, viewTop, viewBottom);
+
   if (!dx && !dy) {
     return null;
   }
+
   return {
     scrollX: scrollX + dx / zoom.value,
     scrollY: scrollY + dy / zoom.value,
@@ -492,6 +506,7 @@ export const getScrollToContentState = (
       scrollY: 0,
     };
   }
+
   let [x1, y1, x2, y2] = getCommonBounds(elements);
 
   if (doBoundsExceedViewport(appState, [x1, y1, x2, y2])) {

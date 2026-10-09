@@ -26,6 +26,7 @@ export class AppWheel {
    * are DOM, but sit inside the container this listener is attached to */
   private isOverEditorSurface = (event: WheelEvent) => {
     const { ownerWindow } = this.app;
+
     return (
       event.target instanceof ownerWindow.HTMLCanvasElement ||
       event.target instanceof ownerWindow.HTMLTextAreaElement ||
@@ -40,6 +41,7 @@ export class AppWheel {
     if (!this.app.isNavigationEnabled()) {
       return;
     }
+
     if (!this.isOverEditorSurface(event)) {
       // prevent zooming the browser (but allow scrolling DOM)
       if (event[KEYS.CTRL_OR_CMD]) {
@@ -64,6 +66,7 @@ export class AppWheel {
       if (!isWheelButtonHeld) {
         return;
       }
+
       // the drag-pan applies pointer movement once per frame; a move still
       // waiting for its frame has to land before the zoom, or it lands after
       // it — at the new zoom, on a viewport the zoom anchored without it —
@@ -73,9 +76,11 @@ export class AppWheel {
     }
 
     const { deltaX, deltaY } = event;
+
     if (!deltaX && !deltaY) {
       return;
     }
+
     // note that event.ctrlKey is necessary to handle pinch zooming
     const hasZoomModifier = event.metaKey || event.ctrlKey;
     const shouldZoom =
@@ -86,8 +91,10 @@ export class AppWheel {
         (!event.shiftKey &&
           (hasZoomModifier ||
             resolveInputDevice(this.app.state.inputDevice) === "mouse")));
+
     if (shouldZoom) {
       this.zoomBy(deltaY);
+
       return;
     }
 
@@ -95,10 +102,12 @@ export class AppWheel {
     if (event.shiftKey) {
       // on Mac, shift+wheel tends to result in deltaX
       const delta = deltaY || deltaX;
+
       this.app.viewport.translate(({ zoom, scrollX, scrollY }) => ({
         scrollX: hasZoomModifier ? scrollX : scrollX - delta / zoom.value,
         scrollY: hasZoomModifier ? scrollY - delta / zoom.value : scrollY,
       }));
+
       return;
     }
 
@@ -127,6 +136,7 @@ export class AppWheel {
     const MAX_STEP = ZOOM_STEP * 100;
     const absDelta = Math.abs(deltaY);
     let delta = deltaY;
+
     if (absDelta > MAX_STEP) {
       delta = MAX_STEP * sign;
     }
@@ -141,6 +151,7 @@ export class AppWheel {
       // otherwise all start from the same zoom and collapse into one step
       (state) => {
         let newZoom = state.zoom.value - delta / 100;
+
         // increase zoom steps the more zoomed-in we are (applies to >100% only)
         newZoom +=
           Math.log10(Math.max(1, state.zoom.value)) *
@@ -152,6 +163,7 @@ export class AppWheel {
           ? state.scrollConstraints.zoom
           : MIN_ZOOM;
         const nextZoom = getNormalizedZoom(Math.max(newZoom, minZoom));
+
         if (nextZoom === state.zoom.value) {
           // at a zoom limit there is nothing to do; flipping the bitmap-cache
           // flag would only redraw the scene on every tick
@@ -171,6 +183,7 @@ export class AppWheel {
         preserveScrollConstraintsSnapBack: true,
       },
     );
+
     if (didTranslate) {
       this.app.resetShouldCacheIgnoreZoomDebounced();
     }

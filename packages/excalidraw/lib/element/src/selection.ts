@@ -41,6 +41,7 @@ const excludeElementsFromFrames = <T extends ExcalidrawElement>(
     if (element.frameId && framesInSelection.has(element.frameId)) {
       return false;
     }
+
     return true;
   });
 };
@@ -109,6 +110,7 @@ export const getVisibleAndNonSelectedElements = <
   const selectedElementsSet = new Set(
     selectedElements.map((element) => element.id),
   );
+
   return elements.filter((element) => {
     const isVisible = isElementInViewport(
       element,
@@ -169,6 +171,7 @@ export const getSelectedElements = (
   const addedElements = new Set<ExcalidrawElement["id"]>();
   // selection can only contain non-deleted elements
   const selectedElements: NonDeletedExcalidrawElement[] = [];
+
   for (const element of elements.values()) {
     if (appState.selectedElementIds[element.id]) {
       if (isNonDeletedElement(element)) {
@@ -179,8 +182,10 @@ export const getSelectedElements = (
           "[NONDELETED][INVARIANT] getSelectedElements skipping deleted selected element which should not be in the selection",
         );
       }
+
       continue;
     }
+
     if (
       opts?.includeBoundTextElement &&
       isBoundToContainer(element) &&
@@ -195,6 +200,7 @@ export const getSelectedElements = (
 
   if (opts?.includeElementsInFrames) {
     const elementsToInclude: NonDeletedExcalidrawElement[] = [];
+
     selectedElements.forEach((element) => {
       if (isFrameLikeElement(element)) {
         getFrameChildren(elements, element.id).forEach(
@@ -203,6 +209,7 @@ export const getSelectedElements = (
             elementsToInclude.push(e as NonDeletedExcalidrawElement),
         );
       }
+
       elementsToInclude.push(element);
     });
 
@@ -222,13 +229,13 @@ export const getTargetElements = (
   appState.editingTextElement
     ? [appState.editingTextElement]
     : // the drawShape recognition preview in `newElement` is not a real
-    // in-progress element — targeting it would make the styles panel track
-    // whatever shape is currently recognized instead of the tool defaults
-    appState.newElement && appState.activeTool.type !== "autoshape"
-    ? [appState.newElement]
-    : getSelectedElements(elements, appState, {
-        includeBoundTextElement: true,
-      });
+      // in-progress element — targeting it would make the styles panel track
+      // whatever shape is currently recognized instead of the tool defaults
+      appState.newElement && appState.activeTool.type !== "autoshape"
+      ? [appState.newElement]
+      : getSelectedElements(elements, appState, {
+          includeBoundTextElement: true,
+        });
 
 /**
  * returns prevState's selectedElementids if no change from previous, so as to
@@ -250,6 +257,7 @@ const _getLinearElementEditor = (
   allElements: readonly NonDeletedExcalidrawElement[],
 ) => {
   const linears = targetElements.filter(isLinearElement);
+
   if (linears.length === 1) {
     const linear = linears[0];
     const boundElements = linear.boundElements?.map((def) => def.id) ?? [];
@@ -281,6 +289,7 @@ export const getSelectionStateForElements = (
           if (!isBoundToContainer(element)) {
             acc[element.id] = true;
           }
+
           return acc;
         }, {}),
       },

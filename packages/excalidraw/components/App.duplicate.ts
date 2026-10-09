@@ -128,6 +128,7 @@ export class AppDuplicate {
         duplicatedElements,
         topLayerFrame,
       );
+
       nextElements = addElementsToFrame(
         nextElements,
         eligibleElements,
@@ -177,6 +178,7 @@ export class AppDuplicate {
       includeBoundTextElement: true,
       includeElementsInFrames: true,
     });
+
     if (
       hitElement &&
       // hit element may not end up being selected
@@ -223,14 +225,17 @@ export class AppDuplicate {
               x: origEl.x,
               y: origEl.y,
             });
+
             // so that the host gets the originals as they are in the
             // next elements
             if (origElementsMap.has(el.id)) {
               origElementsMap.set(el.id, resetElement);
             }
+
             return resetElement;
           }
         }
+
         return el;
       },
     );
@@ -270,14 +275,17 @@ export class AppDuplicate {
           pointerDownState.hit.element.id,
         );
         const clonedElement = cloneId && duplicateElementsMap.get(cloneId);
+
         pointerDownState.hit.element = clonedElement || null;
       }
+
       // swap hit elements with the duplicated ones
       pointerDownState.hit.allHitElements =
         pointerDownState.hit.allHitElements.reduce(
           (acc: typeof pointerDownState.hit.allHitElements, origHitElement) => {
             const cloneId = origIdToDuplicateId.get(origHitElement.id);
             const clonedElement = cloneId && duplicateElementsMap.get(cloneId);
+
             if (clonedElement) {
               acc.push(clonedElement);
             }

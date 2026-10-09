@@ -42,8 +42,8 @@ const getArrowTypeIcon = (arrowType: AppState["currentItemArrowType"]) =>
   arrowType === ARROW_TYPE.elbow
     ? elbowArrowIcon
     : arrowType === ARROW_TYPE.round
-    ? roundArrowIcon
-    : sharpArrowIcon;
+      ? roundArrowIcon
+      : sharpArrowIcon;
 
 /**
  * Owns the cursor-hint policy. App reports semantic interaction events
@@ -68,9 +68,11 @@ export class CursorHints {
     // pointermove, so in pointer-less flows (e.g. keyboard-only session so
     // far) we don't know where to show the hint — don't show it at all
     const { x, y } = this.app.viewport.lastPosition;
+
     if (x === 0 && y === 0) {
       return;
     }
+
     this.lastShownAt = Date.now();
     this.app.updateEditorAtom(cursorHintAtom, {
       content,
@@ -124,9 +126,11 @@ export const CursorHint = () => {
 
     const updatePosition = (clientX: number, clientY: number) => {
       const element = hintRef.current;
+
       if (!element) {
         return;
       }
+
       const { left, top } = positionElementBesideCursor({
         cursor: { x: clientX, y: clientY },
         element: {
@@ -147,6 +151,7 @@ export const CursorHint = () => {
     };
 
     window.addEventListener(EVENT.POINTER_MOVE, onPointerMove);
+
     return () => {
       window.removeEventListener(EVENT.POINTER_MOVE, onPointerMove);
     };
@@ -178,6 +183,7 @@ export const CursorHint = () => {
     const onPointerDown = () => {
       setHint(null);
     };
+
     window.addEventListener(EVENT.POINTER_DOWN, onPointerDown, {
       capture: true,
     });

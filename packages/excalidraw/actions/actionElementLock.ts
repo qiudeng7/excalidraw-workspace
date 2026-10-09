@@ -36,11 +36,13 @@ export const actionToggleElementLock = register({
   },
   icon: (appState, elements) => {
     const selectedElements = getSelectedElements(elements, appState);
+
     return shouldLock(selectedElements) ? LockedIcon : UnlockedIcon;
   },
   trackEvent: { category: "element" },
   predicate: (elements, appState, _, app) => {
     const selectedElements = app.scene.getSelectedElements(appState);
+
     return (
       selectedElements.length > 0 &&
       !selectedElements.some((element) => element.locked && element.frameId)
@@ -74,6 +76,7 @@ export const actionToggleElementLock = register({
       };
     } else if (isAGroup) {
       const groupId = selectedElements[0].groupIds.at(-1)!;
+
       delete nextLockedMultiSelections[groupId];
     }
 
@@ -124,8 +127,8 @@ export const actionToggleElementLock = register({
       ? newGroupId
         ? newGroupId
         : isAGroup
-        ? selectedElements[0].groupIds.at(-1)!
-        : selectedElements[0].id
+          ? selectedElements[0].groupIds.at(-1)!
+          : selectedElements[0].id
       : null;
 
     return {
@@ -164,6 +167,7 @@ export const actionUnlockAllElements = register({
   icon: UnlockedIcon,
   predicate: (elements, appState) => {
     const selectedElements = getSelectedElements(elements, appState);
+
     return (
       selectedElements.length === 0 &&
       elements.some((element) => element.locked)
@@ -188,6 +192,7 @@ export const actionUnlockAllElements = register({
               : element.groupIds,
         });
       }
+
       return element;
     });
 

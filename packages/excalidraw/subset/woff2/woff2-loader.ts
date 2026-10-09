@@ -20,6 +20,7 @@ let loadedWasm: ReturnType<typeof load> | null = null;
 // re-map from internal vector into byte array
 function convertFromVecToUint8Array(vector: Vector): Uint8Array<ArrayBuffer> {
   const arr = [];
+
   for (let i = 0, l = vector.size(); i < l; i++) {
     arr.push(vector.get(i));
   }

@@ -5,6 +5,7 @@ import { credentials } from "../auth";
 import { ApiError, fail, json, body, name } from "../http";
 import { digest, hashPassword, verifyPassword } from "../passwords";
 import type { RouteHandler } from "../routing";
+
 export interface AccountsRoutesDependencies {
   request: Request;
   repository: Pick<
@@ -19,6 +20,7 @@ export interface AccountsRoutesDependencies {
   clientIp: string;
   waitUntil: (promise: Promise<unknown>) => void;
 }
+
 export function createAccountsRoutes({
   request,
   repository,
@@ -31,15 +33,18 @@ export function createAccountsRoutes({
       const req = request;
       const path = new URL(req.url).pathname;
       const method = req.method;
+
       if (path === "/api/bootstrap" && method === "GET") {
         const admin = await repository.administrator();
         const settings = await repository.registration();
+
         return json({
           needsSetup: !admin,
           registrationEnabled: !!settings?.registration_enabled,
           emailVerification: false,
         });
       }
+
       if (path === "/api/session" && method === "GET")
         return json({ user: await authentication.currentUser() });
       if (
@@ -49,6 +54,7 @@ export function createAccountsRoutes({
         await authentication.rateLimit(`auth-ip:${await digest(clientIp)}`, 40);
         const data = await body(req);
         const { email, password } = credentials(data);
+
         await authentication.rateLimit(`auth-email:${await digest(email)}`, 15);
         waitUntil(repository.purgeExpired(Date.now()));
         if (path === "/api/login") {
@@ -58,11 +64,14 @@ export function createAccountsRoutes({
             row?.password_hash ??
               `pbkdf2-sha256$100000$${"0".repeat(64)}$${"0".repeat(64)}`,
           );
+
           if (!row || !valid)
             return fail(401, "INVALID_CREDENTIALS", "邮箱或密码不正确");
           const { password_hash: _, ...user } = row;
+
           return authentication.createSession(user);
         }
+
         const user: User = {
           id: crypto.randomUUID(),
           email,
@@ -71,6 +80,7 @@ export function createAccountsRoutes({
         };
         const now = new Date().toISOString();
         const workspaceId = crypto.randomUUID();
+
         try {
           const changes = await repository.createAccount(
             user,
@@ -79,6 +89,7 @@ export function createAccountsRoutes({
             crypto.randomUUID(),
             now,
           );
+
           if (!changes)
             return fail(
               403,
@@ -95,8 +106,10 @@ export function createAccountsRoutes({
             );
           throw error;
         }
+
         return authentication.createSession(user);
       }
+
       if (path === "/api/logout" && method === "POST")
         return authentication.logout();
 

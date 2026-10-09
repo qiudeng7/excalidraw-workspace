@@ -31,6 +31,7 @@ const createFontGhost: CreateTopPicksGhost<FontFamilyValues> = ({
   const templateRect = template.getBoundingClientRect();
 
   const tile = document.createElement("div");
+
   tile.className = "excalidraw-font-dnd-ghost-tile";
   tile.style.backgroundColor = templateStyle.backgroundColor;
   tile.style.color = templateStyle.color;
@@ -40,23 +41,28 @@ const createFontGhost: CreateTopPicksGhost<FontFamilyValues> = ({
   tile.style.borderRadius = templateStyle.borderTopLeftRadius;
 
   const icon = sourceEl.querySelector("svg");
+
   if (icon) {
     const templateIconRect = template
       .querySelector("svg")
       ?.getBoundingClientRect();
     const iconClone = icon.cloneNode(true) as SVGSVGElement;
+
     if (templateIconRect) {
       iconClone.style.width = `${templateIconRect.width}px`;
       iconClone.style.height = `${templateIconRect.height}px`;
     }
+
     tile.appendChild(iconClone);
   } else {
     // a pick rendering a glyph sample instead of an icon
     const sample = sourceEl.querySelector<HTMLElement>(
       ".FontPicker__top-pick-sample",
     );
+
     if (sample) {
       const sampleClone = sample.cloneNode(true) as HTMLElement;
+
       // the ghost is outside the editor's CSS scope
       sampleClone.style.fontSize = getComputedStyle(sample).fontSize;
       sampleClone.style.lineHeight = "1";
@@ -70,6 +76,7 @@ const createFontGhost: CreateTopPicksGhost<FontFamilyValues> = ({
 
   // list rows: spawn from (and fly back to) the row's icon
   const anchorRect = (icon ?? sourceEl).getBoundingClientRect();
+
   return {
     content: tile,
     rect: new DOMRect(

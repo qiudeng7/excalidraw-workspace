@@ -114,6 +114,7 @@ describe("DefaultSidebar", () => {
         expect(h.state.defaultSidebarDockedPreference).toBe(false);
 
         const { sidebar } = await assertSidebarDockButton(false);
+
         expect(sidebar).toHaveClass("sidebar--docked");
       },
     );
@@ -127,6 +128,7 @@ describe("DefaultSidebar", () => {
         expect(h.state.defaultSidebarDockedPreference).toBe(false);
 
         const { sidebar } = await assertSidebarDockButton(false);
+
         expect(sidebar).toHaveClass("sidebar--docked");
       },
     );
@@ -140,6 +142,7 @@ describe("DefaultSidebar", () => {
         expect(h.state.defaultSidebarDockedPreference).toBe(false);
 
         const { sidebar } = await assertSidebarDockButton(false);
+
         expect(sidebar).not.toHaveClass("sidebar--docked");
       },
     );

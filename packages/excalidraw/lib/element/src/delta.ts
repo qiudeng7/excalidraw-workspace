@@ -230,6 +230,7 @@ export class Delta<T> {
         insertedObject,
       ).reduce((acc, curr) => {
         acc[curr] = setValue(deletedObject[curr]);
+
         return acc;
       }, {} as RecordLike);
 
@@ -238,6 +239,7 @@ export class Delta<T> {
         insertedObject,
       ).reduce((acc, curr) => {
         acc[curr] = setValue(insertedObject[curr]);
+
         return acc;
       }, {} as RecordLike);
 
@@ -547,6 +549,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
 
   public static restore(appStateDeltaDTO: DTO<AppStateDelta>): AppStateDelta {
     const { delta } = appStateDeltaDTO;
+
     return new AppStateDelta(delta);
   }
 
@@ -556,6 +559,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
 
   public inverse(): AppStateDelta {
     const inversedDelta = Delta.create(this.delta.inserted, this.delta.deleted);
+
     return new AppStateDelta(inversedDelta);
   }
 
@@ -803,6 +807,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
 
             break;
           }
+
           case "editingGroupId":
             const editingGroupId = nextAppState[key];
 
@@ -847,6 +852,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
             if (!isShallowEqual(prevLockedUnits, nextLockedUnits)) {
               visibleDifferenceFlag.value = true;
             }
+
             break;
           case "activeLockedId":
             const prevHitLockedId = prevAppState[key] || null;
@@ -858,6 +864,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
             if (prevHitLockedId !== nextHitLockedId) {
               visibleDifferenceFlag.value = true;
             }
+
             break;
           default:
             assertNever(
@@ -882,6 +889,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
     if (!ids.length) {
       // previously there were ids (assuming related to visible elements), now there are none
       visibleDifferenceFlag.value = true;
+
       return selectedElementIds;
     }
 
@@ -911,6 +919,7 @@ export class AppStateDelta implements DeltaContainer<AppState> {
     if (!ids.length) {
       // previously there were ids (assuming related to visible groups), now there are none
       visibleDifferenceFlag.value = true;
+
       return selectedGroupIds;
     }
 
@@ -1087,6 +1096,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
 
   public static restore(elementsDeltaDTO: DTO<ElementsDelta>): ElementsDelta {
     const { added, removed, updated } = elementsDeltaDTO;
+
     return ElementsDelta.create(added, removed, updated);
   }
 
@@ -1114,15 +1124,13 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
   }: Delta<ElementPartial>) =>
     !!(
       // versions are required integers
-      (
-        Number.isInteger(deleted.version) &&
-        Number.isInteger(inserted.version) &&
-        // versions should be positive, zero included
-        deleted.version! >= 0 &&
-        inserted.version! >= 0 &&
-        // versions should never be the same
-        deleted.version !== inserted.version
-      )
+      Number.isInteger(deleted.version) &&
+      Number.isInteger(inserted.version) &&
+      // versions should be positive, zero included
+      deleted.version! >= 0 &&
+      inserted.version! >= 0 &&
+      // versions should never be the same
+      deleted.version !== inserted.version
     );
 
   private static satisfiesUniqueInvariants = (
@@ -1130,6 +1138,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
     id: string,
   ) => {
     const { added, removed, updated } = elementsDelta;
+
     // it's required that there is only one unique delta type per element
     return [added[id], removed[id], updated[id]].filter(Boolean).length === 1;
   };
@@ -1327,6 +1336,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
           console.error(
             `Element not found when trying to apply latest changes`,
           );
+
           return partial;
         }
 
@@ -1464,19 +1474,23 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
       // `nextElements`, so the instance in `elements` is their "before" as
       // is. Only `idsToCheck` is saved; the whole scene is never copied.
       const previousElements = new Map<string, OrderedExcalidrawElement>();
+
       for (const id of idsToCheck) {
         const previous = elements.get(id);
         const next = nextElements.get(id);
+
         for (const element of [previous, next]) {
           if (element) {
             if (isTextElement(element) && element.containerId) {
               idsToCheck.add(element.containerId);
             }
+
             for (const binding of element.boundElements ?? []) {
               idsToCheck.add(binding.id);
             }
           }
         }
+
         if (previous) {
           previousElements.set(
             id,
@@ -1604,6 +1618,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
         this.added[id] = nextDelta;
       } else {
         const mergedDelta = mergeBoundElements(prevDelta, nextDelta);
+
         delete this.removed[id];
         delete this.updated[id];
 
@@ -1618,6 +1633,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
         this.removed[id] = nextDelta;
       } else {
         const mergedDelta = mergeBoundElements(prevDelta, nextDelta);
+
         delete this.added[id];
         delete this.updated[id];
 
@@ -1752,6 +1768,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
       }
 
       const value = delta.inserted[key];
+
       Reflect.set(directlyApplicablePartial, key, value);
     }
 
@@ -1819,6 +1836,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
       if (!element || element.isDeleted) {
         return null;
       }
+
       if (
         isTextElement(element) &&
         !element.text.trim() &&
@@ -1833,6 +1851,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
 
     const before = visibleElement(previous, previousElements);
     const after = visibleElement(next, nextElements);
+
     if (!before || !after) {
       return before !== after;
     }
@@ -1844,6 +1863,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
       (element.boundElements ?? [])
         .filter((binding) => {
           const label = elements.get(binding.id);
+
           return (
             binding.type !== "text" ||
             isArrowElement(element) ||
@@ -1893,6 +1913,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
       updates: ElementUpdate<ExcalidrawElement>,
     ) => {
       const nextElement = nextElements.get(element.id); // only ever modify next element!
+
       if (!nextElement) {
         return;
       }
@@ -1951,6 +1972,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
         ),
     )) {
       const updatedElement = nextElements.get(id);
+
       if (!updatedElement || updatedElement.isDeleted) {
         // skip fixing bindings for updates on deleted elements
         continue;
@@ -2139,6 +2161,7 @@ export class ElementsDelta implements DeltaContainer<SceneElementsMap> {
     const moved = Delta.getRightDifferences(unordered, ordered, true).reduce(
       (acc, arrayIndex) => {
         const candidate = unordered[Number(arrayIndex)];
+
         if (candidate && changed.has(candidate.id)) {
           acc.set(candidate.id, candidate);
         }

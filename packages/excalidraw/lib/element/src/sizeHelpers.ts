@@ -171,6 +171,7 @@ export const getPerfectElementSize = (
     const lockedAngle =
       Math.round(Math.atan(absHeight / absWidth) / SHIFT_LOCKING_ANGLE) *
       SHIFT_LOCKING_ANGLE;
+
     if (lockedAngle === 0) {
       height = 0;
     } else if (lockedAngle === Math.PI / 2) {
@@ -181,6 +182,7 @@ export const getPerfectElementSize = (
   } else if (elementType !== "selection") {
     height = absWidth * Math.sign(height);
   }
+
   return { width, height };
 };
 
@@ -204,6 +206,7 @@ export const getLockedLinearCursorAlignSize = (
     // higher or lower angle depending on the current angle vs custom angle.
     const lower = (Math.floor(customAngle / SHIFT_LOCKING_ANGLE) *
       SHIFT_LOCKING_ANGLE) as Radians;
+
     if (
       radiansBetweenAngles(
         angle,
@@ -270,12 +273,14 @@ export const getNormalizedDimensions = (
 
   if (element.width < 0) {
     const nextWidth = Math.abs(element.width);
+
     ret.width = nextWidth;
     ret.x = element.x - nextWidth;
   }
 
   if (element.height < 0) {
     const nextHeight = Math.abs(element.height);
+
     ret.height = nextHeight;
     ret.y = element.y - nextHeight;
   }

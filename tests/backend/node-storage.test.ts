@@ -7,6 +7,7 @@ import { nodeStorage } from "../../server/storage/node";
 import { handleApi } from "../../server/services/api";
 import { collectOrphans } from "../../server/storage/repository";
 import { clientIp, publicOrigin } from "../../server/services/security";
+
 test("SQLite service preserves sessions, image snapshots and revisions across restarts", async () => {
   const directory = await mkdtemp(resolve(tmpdir(), "workspace-storage-"));
   let storage = await nodeStorage(directory);
@@ -34,7 +35,9 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
       clientIp: "192.0.2.7",
       waitUntil: (p) => pending.push(p),
     });
+
     await Promise.all(pending);
+
     return {
       status: response.status,
       body: (await response.json()) as any,
@@ -42,6 +45,7 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
       header: response.headers.get("set-cookie"),
     };
   };
+
   try {
     assert.equal((await request("/bootstrap")).body.needsSetup, true);
     const setups = await Promise.all(
@@ -52,11 +56,13 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
         }),
       ),
     );
+
     assert.deepEqual(
       setups.map((response) => response.status).sort(),
       [200, 409],
     );
     const admin = setups.find((response) => response.status === 200)!;
+
     assert.match(admin.header!, /; Secure/);
     const alice = await request("/register", "POST", {
       email: "alice@example.com",
@@ -66,6 +72,7 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
       email: "bob@example.com",
       password: "strong-password-123",
     });
+
     assert.equal(alice.status, 200);
     assert.equal(bob.status, 200);
     const workspace = (
@@ -79,6 +86,7 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
         alice.cookie,
       )
     ).body.canvases[0];
+
     assert.equal(
       (await request(`/canvases/${canvas.id}`, "GET", undefined, bob.cookie))
         .status,
@@ -99,11 +107,13 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
         ),
       ),
     );
+
     assert.deepEqual(
       saves.map((response) => response.status).sort(),
       [200, 409],
     );
     const items = [{ id: "library-image", elements: scene.elements }];
+
     assert.equal(
       (await request("/library", "PUT", { items, revision: 0 }, alice.cookie))
         .status,
@@ -153,6 +163,7 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
       items,
     );
     const key = `${alice.body.user.id}/canvas/${canvas.id}/orphan.json`;
+
     await storage.objects.write(key, {});
     await collectOrphans(storage.repository, storage.objects);
     assert.ok(
@@ -160,6 +171,7 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
       "fresh uncommitted object must survive GC",
     );
     const stale = new Date(Date.now() - 48 * 60 * 60 * 1000);
+
     await utimes(resolve(directory, "objects", key), stale, stale);
     await collectOrphans(storage.repository, storage.objects);
     assert.equal(await storage.objects.read(key), null);

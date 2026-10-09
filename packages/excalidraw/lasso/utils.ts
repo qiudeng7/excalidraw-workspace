@@ -58,13 +58,16 @@ export const getLassoSelectedElementIds = (input: {
   } = input;
   // simplify the path to reduce the number of points
   let path: GlobalPoint[] = lassoPath;
+
   if (simplifyDistance) {
     path = simplify(lassoPath, simplifyDistance) as GlobalPoint[];
   }
+
   // bound text is never selected on its own, it's covered by its container
   const selectableElements = elements.filter(
     (el) => !el.locked && !isBoundToContainer(el),
   );
+
   // as the path might not enclose a shape anymore, clear before checking
   enclosedElements.clear();
   intersectedElements.clear();
@@ -122,6 +125,7 @@ export const getLassoSelectedElementIds = (input: {
         elementBounds,
         mode,
       );
+
       if (mode === "contain") {
         if (
           enclosed &&
@@ -235,21 +239,25 @@ const clipSegmentsToBounds = (
           inside = false;
           break;
         }
+
         continue;
       }
 
       const t = q / p;
+
       if (p < 0) {
         if (t > t1) {
           inside = false;
           break;
         }
+
         t0 = Math.max(t0, t);
       } else {
         if (t < t0) {
           inside = false;
           break;
         }
+
         t1 = Math.min(t1, t);
       }
     }
@@ -294,6 +302,7 @@ const excludeIncompleteGroups = (
     }
 
     const group = groups.get(groupId);
+
     if (group) {
       group.push(element.id);
     } else {

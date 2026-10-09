@@ -121,6 +121,7 @@ const flipElements = (
   ) {
     return selectedElements.map((element) => {
       const _element = element as ExcalidrawArrowElement;
+
       return newElementWith(_element, {
         startArrowhead: _element.endArrowhead,
         endArrowhead: _element.startArrowhead,
@@ -178,6 +179,7 @@ const flipElements = (
   const { midX: newMidX, midY: newMidY } =
     getCommonBoundingBox(selectedElements);
   const [diffX, diffY] = [midX - newMidX, midY - newMidY];
+
   otherElements.forEach((element) =>
     app.scene.mutateElement(element, {
       x: element.x + diffX,

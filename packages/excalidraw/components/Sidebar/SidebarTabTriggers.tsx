@@ -13,4 +13,5 @@ export const SidebarTabTriggers = ({
     </RadixTabs.List>
   );
 };
+
 SidebarTabTriggers.displayName = "SidebarTabTriggers";

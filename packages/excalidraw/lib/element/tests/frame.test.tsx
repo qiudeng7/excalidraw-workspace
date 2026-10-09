@@ -28,6 +28,7 @@ const mouse = new Pointer("mouse");
 
 describe("adding elements to frames", () => {
   type ElementType = string;
+
   const assertOrder = (
     els: readonly { type: ElementType }[],
     order: ElementType[],
@@ -41,6 +42,7 @@ describe("adding elements to frames", () => {
   ) => {
     return order.reduce((acc: T[], el) => {
       acc.push(els.find((e) => e.type === el)!);
+
       return acc;
     }, []);
   };
@@ -971,6 +973,7 @@ describe("adding elements to frames", () => {
         height: 80,
         backgroundColor: "#ffc9c9",
       });
+
       API.setElements([frame, cover, rect2]);
 
       mouse.clickAt(rect2.x, rect2.y);
@@ -991,6 +994,7 @@ describe("adding elements to frames", () => {
         height: 80,
         backgroundColor: "#ffc9c9",
       });
+
       API.setElements([cover, rect2, frame]);
 
       mouse.clickAt(rect2.x, rect2.y);

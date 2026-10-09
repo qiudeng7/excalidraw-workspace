@@ -35,10 +35,16 @@ export const isRenderThrottlingEnabled = (() => {
   // we don't want to throttle in react < 18 because of #5439 and it was
   // getting more complex to maintain the fix
   let IS_REACT_18_AND_UP: boolean;
+
   try {
     const version = ReactVersion.split(".");
+
     IS_REACT_18_AND_UP = Number(version[0]) > 17;
-  } catch {
+  } catch (error) {
+    console.warn(
+      "Could not detect the React version; disabling render throttling",
+      error,
+    );
     IS_REACT_18_AND_UP = false;
   }
 
@@ -53,10 +59,13 @@ export const isRenderThrottlingEnabled = (() => {
             "Excalidraw: render throttling is disabled on React versions < 18.",
           );
         }
+
         return false;
       }
+
       return true;
     }
+
     return false;
   };
 })();

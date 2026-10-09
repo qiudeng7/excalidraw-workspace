@@ -41,6 +41,7 @@ export class Debug {
       Debug.DEBUG_LOG_INTERVAL_ID = window.setInterval(Debug.debugLogger, 1000);
       Debug.scheduleAnimationFrame();
     }
+
     Debug.LAST_DEBUG_LOG_CALL = Date.now();
   };
 
@@ -56,11 +57,13 @@ export class Debug {
           Debug.TIMES_AGGR[name] = { t, times: [] };
         }
       }
+
       for (const [name, { t, times, avg }] of Object.entries(Debug.TIMES_AVG)) {
         if (times.length) {
           // const avgFrameTime = getAvgFrameTime(times);
           const totalTime = times.reduce((a, b) => a + b);
           const avgFrameTime = lessPrecise(totalTime / Debug.FRAME_COUNT);
+
           console.info(
             name,
             `- ${times.length} calls - ${avgFrameTime}ms/frame across ${
@@ -79,6 +82,7 @@ export class Debug {
         }
       }
     }
+
     Debug.FRAME_COUNT = 0;
 
     // Check for stop condition after logging
@@ -106,9 +110,11 @@ export class Debug {
       t: 0,
       times: [],
     });
+
     if (t) {
       times.push(time != null ? time : now - t);
     }
+
     Debug.TIMES_AGGR[name].t = now;
   };
   public static logTimeAverage = (time?: number, name = "default") => {
@@ -118,9 +124,11 @@ export class Debug {
       t: 0,
       times: [],
     });
+
     if (t) {
       times.push(time != null ? time : now - t);
     }
+
     Debug.TIMES_AVG[name].t = now;
   };
 
@@ -130,7 +138,9 @@ export class Debug {
       return (...args: T) => {
         const t0 = performance.now();
         const ret = fn(...args);
+
         Debug[type](performance.now() - t0, name);
+
         return ret;
       };
     };
@@ -146,8 +156,10 @@ export class Debug {
       // eslint-disable-next-line no-console
       console.time(name);
       const ret = fn(...args);
+
       // eslint-disable-next-line no-console
       console.timeEnd(name);
+
       return ret;
     };
   };
@@ -169,6 +181,7 @@ export class Debug {
     for (const key of allKeys) {
       const prevVal = prev[key];
       const nextVal = obj[key];
+
       if (!deepEqual(prevVal, nextVal)) {
         changed[key] = { prev: prevVal, next: nextVal };
       }

@@ -24,6 +24,7 @@ describe("laser tool interactions", () => {
       onLinkOpenSpy(...args);
       args[1].preventDefault();
     };
+
     await render(<Excalidraw onLinkOpen={onLinkOpen} />);
 
     const linkedRect = API.createElement({
@@ -33,6 +34,7 @@ describe("laser tool interactions", () => {
       width: 120,
       height: 90,
     });
+
     API.setElements([linkedRect]);
     API.updateElement(linkedRect, {
       link: "https://example.com",
@@ -72,6 +74,7 @@ describe("laser tool interactions", () => {
       width: 300,
       height: 180,
     });
+
     API.setElements([embeddable]);
     API.updateElement(embeddable, {
       link: "https://www.youtube.com/watch?v=gkGMXY0wekg",
@@ -126,6 +129,7 @@ describe("laser tool interactions", () => {
       backgroundColor: "#ff0000",
       fillStyle: "solid",
     });
+
     API.setElements([embeddable, coveringRectangle]);
     API.updateElement(embeddable, {
       link: "https://www.youtube.com/watch?v=gkGMXY0wekg",
@@ -210,7 +214,9 @@ describe("iframe-like element hit testing outside frame bounds", () => {
   const mouse = new Pointer("mouse");
   const iframeLikeTypes = ["embeddable", "iframe"] as const;
 
-  const addFramedIframeLikeElement = (type: typeof iframeLikeTypes[number]) => {
+  const addFramedIframeLikeElement = (
+    type: (typeof iframeLikeTypes)[number],
+  ) => {
     const frame = API.createElement({
       type: "frame",
       x: 40,
@@ -226,6 +232,7 @@ describe("iframe-like element hit testing outside frame bounds", () => {
       height: 180,
       frameId: frame.id,
     });
+
     API.setElements([frame, iframeLikeElement]);
     if (type === "embeddable") {
       API.updateElement(iframeLikeElement, {
@@ -248,6 +255,7 @@ describe("iframe-like element hit testing outside frame bounds", () => {
 
       const centerX = iframeLikeElement.x + iframeLikeElement.width / 2;
       const centerY = iframeLikeElement.y + iframeLikeElement.height / 2;
+
       expect(centerX).toBeGreaterThan(frame.x + frame.width);
 
       mouse.moveTo(centerX, centerY);
@@ -279,6 +287,7 @@ describe("iframe-like element hit testing outside frame bounds", () => {
       mouse.upAt(startX + 30, startY + 20);
 
       const draggedElement = API.getElement(iframeLikeElement);
+
       expect(draggedElement.x).toBe(initialX + 30);
       expect(draggedElement.y).toBe(initialY + 20);
     },

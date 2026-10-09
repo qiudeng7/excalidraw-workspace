@@ -55,6 +55,7 @@ describe("restoreElements", () => {
     const elements = [textElement, rectElement];
 
     const restoredElements = restore.restoreElements(elements, null);
+
     expect(restoredElements.length).toBe(elements.length);
   });
 
@@ -84,6 +85,7 @@ describe("restoreElements", () => {
       const exported: ImportedDataState = JSON.parse(
         serializeAsJSON(restored, getDefaultAppState(), {}, "local"),
       );
+
       expect(exported.elements?.[0]).toHaveProperty("created", created ?? null);
       expect(restore.restoreElements(exported.elements, null)).toEqual(
         restored,
@@ -115,6 +117,7 @@ describe("restoreElements", () => {
 
   it("when imported data state is null it should return an empty array of elements", () => {
     const restoredElements = restore.restoreElements(null, null);
+
     expect(restoredElements.length).toBe(0);
   });
 
@@ -125,6 +128,7 @@ describe("restoreElements", () => {
   it("should not call isInvisiblySmallElement when element is a selection element", () => {
     const selectionEl = { type: "selection" } as ExcalidrawElement;
     const restoreElements = restore.restoreElements([selectionEl], null);
+
     expect(restoreElements.length).toBe(0);
     expect(sizeHelpers.isInvisiblySmallElement).toBeCalledTimes(0);
   });
@@ -142,6 +146,7 @@ describe("restoreElements", () => {
 
   it("should return empty array when isInvisiblySmallElement is true", () => {
     const rectElement = API.createElement({ type: "rectangle" });
+
     mockSizeHelper.mockImplementation(() => true);
 
     expect(
@@ -205,6 +210,7 @@ describe("restoreElements", () => {
     const restoredText = restore.restoreElements([textElement], null, {
       deleteInvisibleElements: true,
     })[0] as ExcalidrawTextElement;
+
     expect(restoredText.isDeleted).toBe(true);
     expect(restoredText).toMatchSnapshot({
       seed: expect.any(Number),
@@ -217,6 +223,7 @@ describe("restoreElements", () => {
       type: "text",
       text: "text",
     });
+
     textElement.fontSize = NaN;
     textElement.baseFontSize = "abc";
 
@@ -234,6 +241,7 @@ describe("restoreElements", () => {
       type: "text",
       text: "text",
     });
+
     textElement.baseFontSize = 1e20;
 
     const restoredText = restore.restoreElements(
@@ -252,6 +260,7 @@ describe("restoreElements", () => {
       text: "text",
       fontSize: 20,
     });
+
     textElement.baseFontSize = 28;
 
     const restoredText = restore.restoreElements([textElement], null, {
@@ -277,6 +286,7 @@ describe("restoreElements", () => {
       }),
       strokeColor: COLOR_PALETTE.transparent,
     };
+
     delete label.baseFontSize;
 
     const restored = restore.restoreElements([stickyNote, label], null, {
@@ -483,6 +493,7 @@ describe("restoreElements", () => {
       type: "line",
       id: "id-draw01",
     });
+
     drawElement.type = "draw";
 
     const restoredElements = restore.restoreElements(
@@ -582,8 +593,7 @@ describe("restoreElements", () => {
     });
 
     const restoredArrow = restoredElements[0] as
-      | ExcalidrawArrowElement
-      | undefined;
+      ExcalidrawArrowElement | undefined;
 
     expect(restoredArrow).not.toBeUndefined();
     expect(restoredArrow?.isDeleted).toBe(true);
@@ -650,11 +660,9 @@ describe("restoreElements", () => {
     );
 
     const restoredLinear = restoredElements[0] as
-      | ExcalidrawLinearElement
-      | undefined;
+      ExcalidrawLinearElement | undefined;
     const restoredArrow = restoredElements[1] as
-      | ExcalidrawArrowElement
-      | undefined;
+      ExcalidrawArrowElement | undefined;
 
     expect(restoredLinear?.type).toBe("line");
     expect(restoredLinear?.points).toEqual([
@@ -683,6 +691,7 @@ describe("restoreElements", () => {
 
   it('should set arrow element endArrowHead as "arrow" when arrow element endArrowHead is undefined', () => {
     const arrowElement = API.createElement({ type: "arrow" });
+
     Object.defineProperty(arrowElement, "endArrowhead", {
       get: vi.fn(() => undefined),
     });
@@ -773,6 +782,7 @@ describe("restoreElements", () => {
       x: 419048829414166,
       y: 8484,
     });
+
     hugeLine.points = [
       [0, 0],
       [-302985021938436, 0],
@@ -780,12 +790,14 @@ describe("restoreElements", () => {
     ];
 
     const hugeArrow: any = API.createElement({ type: "arrow" });
+
     hugeArrow.points = [
       [0, 0],
       [900000, 0],
     ];
 
     const normalLine: any = API.createElement({ type: "line" });
+
     normalLine.points = [
       [0, 0],
       [100, 200],
@@ -829,6 +841,7 @@ describe("restoreElements", () => {
       [0, 0],
       [1, 1],
     ];
+
     Object.defineProperty(lineElement_0, "points", {
       get: vi.fn(() => pointsEl_0),
     });
@@ -837,6 +850,7 @@ describe("restoreElements", () => {
       [3, 4],
       [5, 6],
     ];
+
     Object.defineProperty(lineElement_1, "points", {
       get: vi.fn(() => pointsEl_1),
     });
@@ -857,6 +871,7 @@ describe("restoreElements", () => {
       [pointsEl_1[0][0] - offsetX, pointsEl_1[0][1] - offsetY],
       [pointsEl_1[1][0] - offsetX, pointsEl_1[1][1] - offsetY],
     ];
+
     expect(restoredLine_1.points).toMatchObject(restoredPointsEl1);
     expect(restoredLine_1.x).toBe(lineElement_1.x + offsetX);
     expect(restoredLine_1.y).toBe(lineElement_1.y + offsetY);
@@ -867,6 +882,7 @@ describe("restoreElements", () => {
 
     const elements: ExcalidrawElement[] = [];
     let idCount = 0;
+
     types.forEach((elType) => {
       idCount += 1;
       const element = API.createElement({
@@ -989,37 +1005,44 @@ describe("restoreAppState", () => {
 
   it("when appState is null it should return the local app state property", () => {
     const stubLocalAppState = getDefaultAppState();
+
     stubLocalAppState.cursorButton = "down";
     stubLocalAppState.name = "local app state";
 
     const restoredAppState = restore.restoreAppState(null, stubLocalAppState);
+
     expect(restoredAppState.cursorButton).toBe(stubLocalAppState.cursorButton);
     expect(restoredAppState.name).toBe(stubLocalAppState.name);
   });
 
   it("when local appState is null but imported app state is supplied", () => {
     const stubImportedAppState = getDefaultAppState();
+
     stubImportedAppState.cursorButton = "down";
     stubImportedAppState.name = "imported app state";
 
     const importedDataState = {} as ImportedDataState;
+
     importedDataState.appState = stubImportedAppState;
 
     const restoredAppState = restore.restoreAppState(
       importedDataState.appState,
       null,
     );
+
     expect(restoredAppState.cursorButton).toBe("up");
     expect(restoredAppState.name).toBe(stubImportedAppState.name);
   });
 
   it("should restore with imported data", () => {
     const stubImportedAppState = getDefaultAppState();
+
     stubImportedAppState.activeTool.type = "selection";
     stubImportedAppState.cursorButton = "down";
     stubImportedAppState.name = "imported app state";
 
     const stubLocalAppState = getDefaultAppState();
+
     stubLocalAppState.activeTool.type = "rectangle";
     stubLocalAppState.cursorButton = "up";
     stubLocalAppState.name = "local app state";
@@ -1028,6 +1051,7 @@ describe("restoreAppState", () => {
       stubImportedAppState,
       stubLocalAppState,
     );
+
     expect(restoredAppState.activeTool).toEqual(
       stubImportedAppState.activeTool,
     );
@@ -1071,6 +1095,7 @@ describe("restoreAppState", () => {
     };
 
     const stubLocalAppState = getDefaultAppState();
+
     stubLocalAppState.cursorButton = "down";
     stubLocalAppState.name = "local app state";
 
@@ -1078,12 +1103,14 @@ describe("restoreAppState", () => {
       stubImportedAppState,
       stubLocalAppState,
     );
+
     expect(restoredAppState.cursorButton).toBe(stubLocalAppState.cursorButton);
     expect(restoredAppState.name).toBe(stubLocalAppState.name);
   });
 
   it("should return imported data when local app state is null", () => {
     const stubImportedAppState = getDefaultAppState();
+
     stubImportedAppState.cursorButton = "down";
     stubImportedAppState.name = "imported app state";
 
@@ -1091,16 +1118,19 @@ describe("restoreAppState", () => {
       stubImportedAppState,
       null,
     );
+
     expect(restoredAppState.cursorButton).toBe("up");
     expect(restoredAppState.name).toBe(stubImportedAppState.name);
   });
 
   it("should return local app state when imported data state is null", () => {
     const stubLocalAppState = getDefaultAppState();
+
     stubLocalAppState.cursorButton = "down";
     stubLocalAppState.name = "local app state";
 
     const restoredAppState = restore.restoreAppState(null, stubLocalAppState);
+
     expect(restoredAppState.cursorButton).toBe(stubLocalAppState.cursorButton);
     expect(restoredAppState.name).toBe(stubLocalAppState.name);
   });
@@ -1120,6 +1150,7 @@ describe("restoreAppState", () => {
       stubImportedAppState,
       stubLocalAppState,
     );
+
     expect(restoredAppState.cursorButton).toBe(
       getDefaultAppState().cursorButton,
     );
@@ -1127,6 +1158,7 @@ describe("restoreAppState", () => {
 
   it("should return default app state when imported data state and local app state are null", () => {
     const restoredAppState = restore.restoreAppState(null, null);
+
     expect(restoredAppState.cursorButton).toBe(
       getDefaultAppState().cursorButton,
     );
@@ -1142,6 +1174,7 @@ describe("restoreAppState", () => {
       stubImportedAppState,
       stubLocalAppState,
     );
+
     expect(restoredAppState.activeTool.type).toBe("selection");
   });
 
@@ -1163,6 +1196,7 @@ describe("restoreAppState", () => {
 
     it("when the zoom of imported data state is not a number", () => {
       const stubImportedAppState = getDefaultAppState();
+
       stubImportedAppState.zoom = {
         value: 10 as NormalizedZoomValue,
       };
@@ -1450,9 +1484,11 @@ describe("repairing bindings", () => {
       type: invisibleBoundElement.type,
       id: invisibleBoundElement.id,
     };
+
     expect(container.boundElements).toEqual([]);
 
     const nonExistentBinding = { type: "text", id: "non-existent" };
+
     // @ts-ignore
     container.boundElements = [
       obsoleteBinding,

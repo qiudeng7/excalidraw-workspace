@@ -57,6 +57,7 @@ describe("export", () => {
       blob: pngBlob,
       metadata: serializeAsJSON(testElements, h.state, {}, "local"),
     });
+
     await API.drop([{ kind: "file", file: pngBlobEmbedded }]);
 
     await waitFor(() => {
@@ -77,6 +78,7 @@ describe("export", () => {
     const decoded = JSON.parse(
       decodeSvgBase64Payload({ svg: metadataElement.innerHTML }),
     );
+
     expect(decoded.elements).toEqual([
       expect.objectContaining({ type: "text", text: "😀" }),
     ]);

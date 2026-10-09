@@ -220,10 +220,12 @@ export const FontPickerList = React.memo(
       (fontFamily: FontFamilyValues) => {
         // Save caret position before font selection if editing text
         let savedSelection: { start: number; end: number } | null = null;
+
         if (app.state.editingTextElement) {
           const textEditor = document.querySelector(
             ".excalidraw-wysiwyg",
           ) as HTMLTextAreaElement;
+
           if (textEditor) {
             savedSelection = {
               start: textEditor.selectionStart,
@@ -240,6 +242,7 @@ export const FontPickerList = React.memo(
             const textEditor = document.querySelector(
               ".excalidraw-wysiwyg",
             ) as HTMLTextAreaElement;
+
             if (textEditor && savedSelection) {
               textEditor.focus();
               textEditor.selectionStart = savedSelection.start;
@@ -305,6 +308,7 @@ export const FontPickerList = React.memo(
         if (!isHovered) {
           return;
         }
+
         if (order === 0) {
           // scroll into the first item differently, so it's visible what is above (i.e. group title)
           ref.current?.scrollIntoView?.({ block: "end" });
@@ -394,6 +398,7 @@ export const FontPickerList = React.memo(
               const textEditor = document.querySelector(
                 ".excalidraw-wysiwyg",
               ) as HTMLTextAreaElement;
+
               if (textEditor) {
                 textEditor.focus();
               }

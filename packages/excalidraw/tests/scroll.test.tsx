@@ -119,6 +119,7 @@ describe("appState", () => {
       const initialScrollX = h.state.scrollX;
       const pageStepY = h.state.height / h.state.zoom.value;
       const pageStepX = h.state.width / h.state.zoom.value;
+
       // Assert the following assertions have meaning
       expect(pageStepY).toBeGreaterThan(0);
       expect(pageStepX).toBeGreaterThan(0);
@@ -154,6 +155,7 @@ describe("appState", () => {
     };
 
     const zoom = h.state.zoom.value;
+
     // Assert we scroll properly when zoomed in
     API.setAppState({ zoom: { value: (zoom * 1.1) as typeof zoom } });
     scrollTest();

@@ -20,7 +20,9 @@ export class Queue {
     if (this.running) {
       return;
     }
+
     const job = this.jobs.shift();
+
     if (job) {
       this.running = true;
       job.promise.resolve(
@@ -39,6 +41,7 @@ export class Queue {
     ...args: TArgs
   ): Promise<TValue> {
     const promise = resolvablePromise<TValue>();
+
     this.jobs.push({ jobFactory, promise, args });
 
     this.tick();

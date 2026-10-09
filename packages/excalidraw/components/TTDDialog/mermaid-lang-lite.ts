@@ -39,9 +39,11 @@ const mermaidStreamParser = StreamLanguage.define({
     if (stream.match(/^[-.=<>|ox]+>/)) {
       return "operator";
     }
+
     if (stream.match(/^<[-.=<>|ox]+/)) {
       return "operator";
     }
+
     if (stream.match(/^--+|\.\.+|==+/)) {
       return "operator";
     }
@@ -73,6 +75,7 @@ const mermaidStreamParser = StreamLanguage.define({
 
     // Skip any other character
     stream.next();
+
     return null;
   },
 });

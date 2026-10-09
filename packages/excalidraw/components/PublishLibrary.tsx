@@ -122,9 +122,11 @@ const SingleLibraryItem = ({
 
   useEffect(() => {
     const node = svgRef.current;
+
     if (!node) {
       return;
     }
+
     (async () => {
       const svg = await exportToSvg({
         elements: libItem.elements,
@@ -136,6 +138,7 @@ const SingleLibraryItem = ({
         files: null,
         skipInliningFonts: true,
       });
+
       node.innerHTML = svg.outerHTML;
     })();
   }, [libItem.elements, appState]);
@@ -235,6 +238,7 @@ const PublishLibrary = ({
     const data = EditorLocalStorage.get<PublishLibraryDataParams>(
       EDITOR_LS_KEYS.PUBLISH_LIBRARY,
     );
+
     if (data) {
       setLibraryData(data);
     }
@@ -260,18 +264,22 @@ const PublishLibrary = ({
     setIsSubmitting(true);
     const erroredLibItems: LibraryItem[] = [];
     let isError = false;
+
     clonedLibItems.forEach((libItem) => {
       let error = "";
+
       if (!libItem.name) {
         error = t("publishDialog.errors.required");
         isError = true;
       }
+
       erroredLibItems.push({ ...libItem, error });
     });
 
     if (isError) {
       setClonedLibItems(erroredLibItems);
       setIsSubmitting(false);
+
       return;
     }
 
@@ -287,6 +295,7 @@ const PublishLibrary = ({
     const lib = new Blob([content], { type: "application/json" });
 
     const formData = new FormData();
+
     formData.append("excalidrawLib", lib);
     formData.append("previewImage", previewImage);
     formData.append("previewImageType", previewImage.type);
@@ -315,6 +324,7 @@ const PublishLibrary = ({
               });
             });
           }
+
           return response
             .json()
             .catch(() => {
@@ -341,6 +351,7 @@ const PublishLibrary = ({
 
   const renderLibraryItems = () => {
     const items: ReactNode[] = [];
+
     clonedLibItems.forEach((libItem, index) => {
       items.push(
         <div className="single-library-item-wrapper" key={index}>
@@ -350,6 +361,7 @@ const PublishLibrary = ({
             index={index}
             onChange={(val, index) => {
               const items = clonedLibItems.slice();
+
               items[index].name = val;
               setClonedLibItems(items);
             }}
@@ -358,6 +370,7 @@ const PublishLibrary = ({
         </div>,
       );
     });
+
     return <div className="selected-library-items">{items}</div>;
   };
 

@@ -1,9 +1,7 @@
 import type { AppState, UnsubscribeCallback } from "../types";
 
 type StateChangeSelector =
-  | keyof AppState
-  | (keyof AppState)[]
-  | ((appState: AppState) => unknown);
+  keyof AppState | (keyof AppState)[] | ((appState: AppState) => unknown);
 
 type StateChangePredicateOptions = {
   predicate: (appState: AppState) => boolean;
@@ -76,6 +74,7 @@ export class AppStateObserver {
 
   private subscribe(listener: StateChangeListener): UnsubscribeCallback {
     this.listeners.push(listener);
+
     return () => {
       this.listeners = this.listeners.filter(
         (existingListener) => existingListener !== listener,
@@ -110,16 +109,19 @@ export class AppStateObserver {
       matchesImmediately = predicateFn(this.getState());
     } else if (typeof propOrOpts === "function") {
       const selector = propOrOpts;
+
       predicate = (appState: AppState, prevState: AppState) =>
         selector(appState) !== selector(prevState);
       getValue = (appState: AppState) => selector(appState);
     } else if (Array.isArray(propOrOpts)) {
       const keys = propOrOpts;
+
       predicate = (appState: AppState, prevState: AppState) =>
         keys.some((key) => appState[key] !== prevState[key]);
       getValue = (appState: AppState) => appState;
     } else {
       const key = propOrOpts;
+
       predicate = (appState: AppState, prevState: AppState) =>
         appState[key] !== prevState[key];
       getValue = (appState: AppState) => appState[key];
@@ -151,6 +153,7 @@ export class AppStateObserver {
       if (matchesImmediately) {
         queueMicrotask(() => {
           const state = this.getState();
+
           stateChangeCallback(getValue(state), state);
         });
         if (once) {

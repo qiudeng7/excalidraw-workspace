@@ -14,6 +14,7 @@ import type { NonDeletedExcalidrawElement } from "../src/types";
 
 vi.mock("../src/binding", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/binding")>();
+
   return {
     ...actual,
     updateBoundElements: vi.fn(actual.updateBoundElements),
@@ -28,6 +29,7 @@ const pointerDownStateFor = (scene: Scene): PointerDownState => {
         .map((element) => [element.id, { ...element }]),
     ),
   };
+
   return state as PointerDownState;
 };
 
@@ -67,6 +69,7 @@ const createBoundArrow = () => {
     },
   });
   const scene = new Scene(syncInvalidIndices([rectangle, arrow]));
+
   return { scene, rectangle, arrow };
 };
 
@@ -84,10 +87,12 @@ describe("dragSelectedElements", () => {
     drag(scene, selected);
 
     const calls = vi.mocked(updateBoundElements).mock.calls;
+
     expect(calls).toHaveLength(3);
     // a fresh array per call misses the per-array id-set cache and rebuilds
     // a selection-sized set for every element
     const [[, , firstOptions]] = calls;
+
     expect(firstOptions?.simultaneouslyUpdated).toEqual(selected);
     for (const [, , options] of calls) {
       expect(options?.simultaneouslyUpdated).toBe(
@@ -220,6 +225,7 @@ describe("dragSelectedElements", () => {
 
     drag(scene, [rectangle, second], { x: 20, y: 30 }, originalState);
     const moved = versions();
+
     expect(moved).toEqual(initial.map((version) => version + 1));
 
     drag(scene, [rectangle, second], { x: 20, y: 30 }, originalState);

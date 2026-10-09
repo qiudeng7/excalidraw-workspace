@@ -38,6 +38,7 @@ export const actionToggleSearchMenu = register({
 
       searchInput?.focus();
       searchInput?.select();
+
       return false;
     }
 

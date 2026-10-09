@@ -153,6 +153,7 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
         const arrow = h.elements.find(
           (el): el is ExcalidrawArrowElement => el.type === "arrow",
         );
+
         expect(arrow).toBeDefined();
         expect(arrow!.startBinding).not.toBeNull();
         expect(arrow!.startBinding!.elementId).toBe("baselineRect");
@@ -185,6 +186,7 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
         const arrow = h.elements.find(
           (el): el is ExcalidrawArrowElement => el.type === "arrow",
         );
+
         expect(arrow).toBeDefined();
         expect(arrow!.startBinding).toBeNull();
       });
@@ -216,6 +218,7 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
         const arrow = h.elements.find(
           (el): el is ExcalidrawArrowElement => el.type === "arrow",
         );
+
         expect(arrow).toBeDefined();
         expect(arrow!.endBinding).toBeNull();
       });
@@ -246,6 +249,7 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
         const arrow = h.elements.find(
           (el): el is ExcalidrawArrowElement => el.type === "arrow",
         );
+
         expect(arrow).toBeDefined();
         expect(arrow!.startBinding).not.toBeNull();
       });
@@ -260,6 +264,7 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
         width: 200,
         height: 120,
       }) as ExcalidrawBindableElement;
+
       API.setElements([rect]);
 
       // Turn off arrow binding
@@ -277,8 +282,10 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
       mouse.upAt(760, 460);
 
       let arrow: ExcalidrawArrowElement;
+
       await waitFor(() => {
         const maybeArrow = h.elements.find(isElbowArrow);
+
         expect(maybeArrow).toBeDefined();
         arrow = maybeArrow!;
       });
@@ -385,6 +392,7 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
         width: 200,
         height: 200,
       }) as ExcalidrawBindableElement;
+
       API.setElements([rect]);
       API.setAppState({
         currentItemArrowType: "elbow",
@@ -410,10 +418,12 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
 
       await waitFor(() => {
         const arrow = h.elements.find(isElbowArrow);
+
         expect(arrow).toBeDefined();
         expect(arrow!.endBinding?.elementId).toBe(rect.id);
 
         const endY = arrow!.y + arrow!.points.at(-1)![1];
+
         expect(endY).toBeCloseTo(397, 1);
       });
     });
@@ -429,6 +439,7 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
         width: 200,
         height: 200,
       }) as ExcalidrawBindableElement;
+
       API.setElements([rect]);
       API.setAppState({ gridModeEnabled: false, gridSize: 20 });
 
@@ -453,11 +464,13 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
           (element): element is ExcalidrawArrowElement =>
             element.type === "arrow",
         );
+
         expect(arrow).toBeDefined();
         expect(arrow!.endBinding?.elementId).toBe(rect.id);
 
         const startY = arrow!.y + arrow!.points[0][1];
         const endY = arrow!.y + arrow!.points.at(-1)![1];
+
         expect(endY).toBeCloseTo(startY);
       });
     });
@@ -472,6 +485,7 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
         height: 120,
         angle: Math.PI / 3,
       }) as ExcalidrawBindableElement;
+
       API.setElements([ellipse]);
       API.setAppState({ gridModeEnabled: true, gridSize: 20 });
 
@@ -494,11 +508,13 @@ describe("Arrow binding – non-default case (bindingPreference: disabled)", () 
           (element): element is ExcalidrawArrowElement =>
             element.type === "arrow",
         );
+
         expect(arrow).toBeDefined();
         expect(arrow!.endBinding?.elementId).toBe(ellipse.id);
 
         const startY = arrow!.y + arrow!.points[0][1];
         const endY = arrow!.y + arrow!.points.at(-1)![1];
+
         expect(endY).toBeCloseTo(startY, 1);
       });
     });

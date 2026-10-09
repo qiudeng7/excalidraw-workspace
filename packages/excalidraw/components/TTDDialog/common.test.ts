@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { convertMermaidToExcalidraw } from "./common";
 
 type ConvertMermaidArgs = Parameters<typeof convertMermaidToExcalidraw>[0];
+
 type ParseMermaidToExcalidraw = Awaited<
   ConvertMermaidArgs["mermaidToExcalidrawLib"]["api"]
 >["parseMermaidToExcalidraw"];
@@ -13,6 +14,7 @@ const createConvertArgs = (
 ): ConvertMermaidArgs => {
   const parent = document.createElement("div");
   const canvas = document.createElement("div");
+
   parent.appendChild(canvas);
 
   return {

@@ -97,9 +97,11 @@ export function polygonSignedArea<Point extends LocalPoint | GlobalPoint>(
     ? polygon.slice(0, -1)
     : polygon;
   let sum = 0;
+
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
     sum += pts[j][0] * pts[i][1] - pts[i][0] * pts[j][1];
   }
+
   return sum / 2;
 }
 
@@ -133,6 +135,7 @@ export function convexHull<Point extends LocalPoint | GlobalPoint>(
 
   const half = (pts: Point[]) => {
     const chain: Point[] = [];
+
     for (const p of pts) {
       while (
         chain.length >= 2 &&
@@ -140,9 +143,12 @@ export function convexHull<Point extends LocalPoint | GlobalPoint>(
       ) {
         chain.pop();
       }
+
       chain.push(p);
     }
+
     chain.pop(); // shared with the other half's first vertex
+
     return chain;
   };
 
@@ -173,6 +179,7 @@ export function simplifyConvexPolygon<Point extends LocalPoint | GlobalPoint>(
     const next = polygon[(i + 1) % polygon.length];
     const inAngle = Math.atan2(curr[1] - prev[1], curr[0] - prev[0]);
     const outAngle = Math.atan2(next[1] - curr[1], next[0] - curr[0]);
+
     return Math.abs(normalizeTurn(outAngle - inAngle));
   };
 
@@ -180,6 +187,7 @@ export function simplifyConvexPolygon<Point extends LocalPoint | GlobalPoint>(
   // has built up. Starting at the sharpest vertex keeps the result stable: a
   // real corner always ends a run rather than being split across the seam.
   let start = 0;
+
   for (let i = 1; i < polygon.length; i++) {
     if (turnAt(i) > turnAt(start)) {
       start = i;
@@ -188,8 +196,10 @@ export function simplifyConvexPolygon<Point extends LocalPoint | GlobalPoint>(
 
   const simplified: Point[] = [];
   let accumulated = 0;
+
   for (let k = 0; k < polygon.length; k++) {
     const i = (start + k) % polygon.length;
+
     accumulated += turnAt(i);
     if (accumulated >= angleThreshold) {
       simplified.push(polygon[i]);
@@ -202,11 +212,14 @@ export function simplifyConvexPolygon<Point extends LocalPoint | GlobalPoint>(
 
 function normalizeTurn(angle: number): number {
   let a = angle;
+
   while (a > Math.PI) {
     a -= 2 * Math.PI;
   }
+
   while (a < -Math.PI) {
     a += 2 * Math.PI;
   }
+
   return a;
 }

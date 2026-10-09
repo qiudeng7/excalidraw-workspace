@@ -61,10 +61,17 @@ const parseYouTubeLikeTimestamp = (url: string): number => {
 
   try {
     const urlObj = new URL(url.startsWith("http") ? url : `https://${url}`);
+
     timeParam =
       urlObj.searchParams.get("t") || urlObj.searchParams.get("start");
   } catch (error) {
+    console.debug(
+      "Could not parse embed timestamp URL; using the query text",
+      error,
+    );
+
     const timeMatch = url.match(/[?&#](?:t|start)=([^&#\s]+)/);
+
     timeParam = timeMatch?.[1];
   }
 
@@ -77,11 +84,13 @@ const parseYouTubeLikeTimestamp = (url: string): number => {
   }
 
   const timeMatch = timeParam.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/);
+
   if (!timeMatch) {
     return 0;
   }
 
   const [, hours = "0", minutes = "0", seconds = "0"] = timeMatch;
+
   return parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds);
 };
 
@@ -91,12 +100,14 @@ const parseGoogleDriveVideoLink = (
   try {
     const urlObj = new URL(url.startsWith("http") ? url : `https://${url}`);
     const hostname = urlObj.hostname.replace(/^www\./, "");
+
     if (hostname !== "drive.google.com") {
       return null;
     }
 
     let fileId: string | null = null;
     const pathMatch = urlObj.pathname.match(/^\/file\/d\/([^/]+)(?:\/|$)/);
+
     if (pathMatch?.[1]) {
       fileId = pathMatch[1];
     } else if (urlObj.pathname === "/open" || urlObj.pathname === "/uc") {
@@ -126,6 +137,8 @@ const parseGoogleDriveVideoLink = (
       timestamp: timestamp > 0 ? timestamp : undefined,
     };
   } catch (error) {
+    console.debug("Invalid Google Drive embed URL", error);
+
     return null;
   }
 };
@@ -188,10 +201,12 @@ export const getEmbedLink = (
   let type: "video" | "generic" = "generic";
   let aspectRatio = { w: 560, h: 840 };
   const ytLink = link.match(RE_YOUTUBE);
+
   if (ytLink?.[2]) {
     const startTime = parseYouTubeLikeTimestamp(originalLink);
     const time = startTime > 0 ? `&start=${startTime}` : ``;
     const isPortrait = link.includes("shorts");
+
     type = "video";
     switch (ytLink[1]) {
       case "embed/":
@@ -207,6 +222,7 @@ export const getEmbedLink = (
         link = `https://www.youtube.com/embed/${ytLink[2]}?enablejsapi=1${time}`;
         break;
     }
+
     aspectRatio = isPortrait ? { w: 315, h: 560 } : { w: 560, h: 315 };
     embeddedLinkCache.set(originalLink, {
       link,
@@ -214,6 +230,7 @@ export const getEmbedLink = (
       type,
       sandbox: { allowSameOrigin },
     });
+
     return {
       link,
       intrinsicSize: aspectRatio,
@@ -223,11 +240,13 @@ export const getEmbedLink = (
   }
 
   const vimeoLink = link.match(RE_VIMEO);
+
   if (vimeoLink?.[1]) {
     const target = vimeoLink?.[1];
     const error = !/^\d+$/.test(target)
       ? new URIError("Invalid embed link format")
       : undefined;
+
     type = "video";
     link = `https://player.vimeo.com/video/${target}?api=1`;
     aspectRatio = { w: 560, h: 315 };
@@ -239,6 +258,7 @@ export const getEmbedLink = (
       type,
       sandbox: { allowSameOrigin },
     });
+
     return {
       link,
       intrinsicSize: aspectRatio,
@@ -249,17 +269,21 @@ export const getEmbedLink = (
   }
 
   const googleDriveVideo = parseGoogleDriveVideoLink(link);
+
   if (googleDriveVideo) {
     type = "video";
     const searchParams = new URLSearchParams();
+
     if (googleDriveVideo.resourceKey) {
       searchParams.set("resourcekey", googleDriveVideo.resourceKey);
     }
+
     if (googleDriveVideo.timestamp) {
       searchParams.set("t", `${googleDriveVideo.timestamp}`);
     }
 
     const search = searchParams.toString();
+
     link = `https://drive.google.com/file/d/${googleDriveVideo.fileId}/preview${
       search ? `?${search}` : ""
     }`;
@@ -270,6 +294,7 @@ export const getEmbedLink = (
       type,
       sandbox: { allowSameOrigin },
     });
+
     return {
       link,
       intrinsicSize: aspectRatio,
@@ -279,6 +304,7 @@ export const getEmbedLink = (
   }
 
   const figmaLink = link.match(RE_FIGMA);
+
   if (figmaLink) {
     type = "generic";
     link = `https://www.figma.com/embed?embed_host=share&url=${encodeURIComponent(
@@ -291,6 +317,7 @@ export const getEmbedLink = (
       type,
       sandbox: { allowSameOrigin },
     });
+
     return {
       link,
       intrinsicSize: aspectRatio,
@@ -300,6 +327,7 @@ export const getEmbedLink = (
   }
 
   const valLink = link.match(RE_VALTOWN);
+
   if (valLink) {
     link =
       valLink[1] === "embed" ? valLink[0] : valLink[0].replace("/v", "/embed");
@@ -309,6 +337,7 @@ export const getEmbedLink = (
       type,
       sandbox: { allowSameOrigin },
     });
+
     return {
       link,
       intrinsicSize: aspectRatio,
@@ -340,7 +369,9 @@ export const getEmbedLink = (
       intrinsicSize: { w: 480, h: 480 },
       sandbox: { allowSameOrigin },
     };
+
     embeddedLinkCache.set(originalLink, ret);
+
     return ret;
   }
 
@@ -358,7 +389,9 @@ export const getEmbedLink = (
       intrinsicSize: { w: 480, h: 480 },
       sandbox: { allowSameOrigin },
     };
+
     embeddedLinkCache.set(originalLink, ret);
+
     return ret;
   }
 
@@ -381,7 +414,9 @@ export const getEmbedLink = (
       intrinsicSize: { w: 550, h: 720 },
       sandbox: { allowSameOrigin },
     };
+
     embeddedLinkCache.set(link, ret);
+
     return ret;
   }
 
@@ -391,6 +426,7 @@ export const getEmbedLink = (
     type,
     sandbox: { allowSameOrigin },
   });
+
   return {
     link,
     intrinsicSize: aspectRatio,
@@ -403,6 +439,7 @@ export const createPlaceholderEmbeddableLabel = (
   element: ExcalidrawIframeLikeElement,
 ): NonDeletedExcalidrawElement => {
   let text: string;
+
   if (isIframeElement(element)) {
     text = "IFrame element";
   } else {
@@ -455,34 +492,41 @@ const matchHostname = (
         /^([^.]+)/,
         "*",
       );
+
       if (ALLOWED_DOMAINS.has(bareDomainWithFirstSubdomainWildcarded)) {
         return bareDomainWithFirstSubdomainWildcarded;
       }
+
       return null;
     }
 
     const bareAllowedHostname = allowedHostnames.replace(/^www\./, "");
+
     if (bareDomain === bareAllowedHostname) {
       return bareAllowedHostname;
     }
   } catch (error) {
-    // ignore
+    console.debug("Invalid embed domain; rejecting the hostname", error);
   }
+
   return null;
 };
 
 export const maybeParseEmbedSrc = (str: string): string => {
   const twitterMatch = str.match(RE_TWITTER_EMBED);
+
   if (twitterMatch && twitterMatch.length === 2) {
     return twitterMatch[1];
   }
 
   const redditMatch = str.match(RE_REDDIT_EMBED);
+
   if (redditMatch && redditMatch.length === 2) {
     return redditMatch[1];
   }
 
   const gistMatch = str.match(RE_GH_GIST_EMBED);
+
   if (gistMatch && gistMatch.length === 2) {
     return gistMatch[1];
   }
@@ -492,6 +536,7 @@ export const maybeParseEmbedSrc = (str: string): string => {
   }
 
   const match = str.match(RE_GENERIC_EMBED);
+
   if (match && match.length === 2) {
     return match[1];
   }
@@ -506,9 +551,11 @@ export const embeddableURLValidator = (
   if (!url) {
     return false;
   }
+
   if (validateEmbeddable != null) {
     if (typeof validateEmbeddable === "function") {
       const ret = validateEmbeddable(url);
+
       // if return value is undefined, leave validation to default
       if (typeof ret === "boolean") {
         return ret;
@@ -527,6 +574,7 @@ export const embeddableURLValidator = (
           return true;
         }
       }
+
       return false;
     }
   }

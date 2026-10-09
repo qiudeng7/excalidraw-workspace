@@ -17,44 +17,58 @@ import {
   decodeWorkspace,
   decodeCanvas,
 } from "./rows";
+
 export type * from "./ports";
+
 const wc =
   "id,name,catalog_revision AS catalogRevision,created_at AS createdAt,updated_at AS updatedAt";
+
 const cc =
   "c.id,c.workspace_id AS workspaceId,c.name,c.revision,c.position,c.created_at AS createdAt,c.updated_at AS updatedAt";
+
 export class Repository implements RepositoryPort {
-  constructor(private sql: SqlDriver) { }
+  constructor(private sql: SqlDriver) {}
+
   private async one(sql: string, ...values: unknown[]) {
     return (await this.sql.query(sql, values)).rows[0] ?? null;
   }
+
   private async all(sql: string, ...values: unknown[]) {
     return (await this.sql.query(sql, values)).rows;
   }
+
   private async run(sql: string, ...values: unknown[]) {
     return (await this.sql.query(sql, values)).changes;
   }
+
   async administrator() {
     const row = await this.one(
       "SELECT id FROM users WHERE role='admin' LIMIT 1",
     );
+
     return row ? { id: text(row, "id") } : null;
   }
+
   async registration() {
     const row = await this.one(
       "SELECT registration_enabled FROM settings WHERE id=1",
     );
+
     return row
       ? { registration_enabled: integer(row, "registration_enabled") }
       : null;
   }
+
   async session(hash: string, now: number): Promise<User | null> {
     const row = await this.one(
       "SELECT u.id,u.email,u.name,u.role FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token_hash=? AND s.expires_at>?",
       hash,
       now,
     );
+
     return row ? decodeUser(row) : null;
   }
+
   createSession(hash: string, user: string, expires: number) {
     return this.run(
       "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",
@@ -63,32 +77,39 @@ export class Repository implements RepositoryPort {
       expires,
     );
   }
+
   deleteSession(hash: string) {
     return this.run("DELETE FROM sessions WHERE token_hash=?", hash);
   }
+
   async rateLimit(key: string, expires: number) {
     const row = await this.one(
       "INSERT INTO rate_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 RETURNING count",
       key,
       expires,
     );
+
     return row ? { count: integer(row, "count") } : null;
   }
+
   async purgeExpired(now: number) {
     await this.sql.transaction([
       { sql: "DELETE FROM rate_limits WHERE expires_at<?", values: [now] },
       { sql: "DELETE FROM sessions WHERE expires_at<?", values: [now] },
     ]);
   }
+
   async userByEmail(email: string): Promise<StoredCredentials | null> {
     const row = await this.one(
       "SELECT id,email,name,role,password_hash FROM users WHERE email=?",
       email,
     );
+
     return row
       ? { ...decodeUser(row), password_hash: text(row, "password_hash") }
       : null;
   }
+
   async createAccount(
     user: User,
     hash: string,
@@ -122,29 +143,36 @@ export class Repository implements RepositoryPort {
         values: [user.id],
       },
     ]);
+
     return result[0]!.changes;
   }
+
   setRegistration(enabled: boolean) {
     return this.run(
       "UPDATE settings SET registration_enabled=? WHERE id=1",
       enabled ? 1 : 0,
     );
   }
+
   async workspace(id: string, user: string) {
     const row = await this.one(
       `SELECT ${wc} FROM workspaces WHERE id=? AND user_id=?`,
       id,
       user,
     );
+
     return row ? decodeWorkspace(row) : null;
   }
+
   async workspaces(user: string) {
     const rows = await this.all(
       `SELECT ${wc} FROM workspaces WHERE user_id=? ORDER BY created_at,id`,
       user,
     );
+
     return rows.map(decodeWorkspace);
   }
+
   createWorkspace(id: string, user: string, name: string, now: string) {
     return this.run(
       "INSERT INTO workspaces(id,user_id,name,created_at,updated_at) VALUES(?,?,?,?,?)",
@@ -155,6 +183,7 @@ export class Repository implements RepositoryPort {
       now,
     );
   }
+
   renameWorkspace(id: string, user: string, name: string, now: string) {
     return this.run(
       "UPDATE workspaces SET name=?,updated_at=? WHERE id=? AND user_id=?",
@@ -164,6 +193,7 @@ export class Repository implements RepositoryPort {
       user,
     );
   }
+
   async deleteWorkspace(id: string, user: string) {
     const r = await this.sql.transaction([
       {
@@ -175,20 +205,24 @@ export class Repository implements RepositoryPort {
         values: [id, user],
       },
     ]);
+
     return r[0]!.rows.flatMap((r) =>
       nullableText(r, "object_key") ? [text(r, "object_key")] : [],
     );
   }
+
   async canvas(id: string, user: string): Promise<StoredCanvas | null> {
     const row = await this.one(
       `SELECT ${cc},c.object_key AS objectKey FROM canvases c JOIN workspaces w ON w.id=c.workspace_id WHERE c.id=? AND w.user_id=?`,
       id,
       user,
     );
+
     return row
       ? { ...decodeCanvas(row), objectKey: nullableText(row, "objectKey") }
       : null;
   }
+
   async canvases(workspace: string): Promise<CanvasMeta[]> {
     return (
       await this.all(
@@ -197,6 +231,7 @@ export class Repository implements RepositoryPort {
       )
     ).map(decodeCanvas);
   }
+
   async createCanvas(
     id: string,
     workspace: string,
@@ -215,8 +250,10 @@ export class Repository implements RepositoryPort {
         values: [workspace, user, catalogRevision],
       },
     ]);
+
     return result[1]!.changes;
   }
+
   renameCanvas(id: string, user: string, name: string, now: string) {
     return this.run(
       "UPDATE canvases SET name=?,updated_at=? WHERE id=? AND workspace_id IN (SELECT id FROM workspaces WHERE user_id=?)",
@@ -226,6 +263,7 @@ export class Repository implements RepositoryPort {
       user,
     );
   }
+
   async deleteCanvas(
     id: string,
     user: string,
@@ -242,6 +280,7 @@ export class Repository implements RepositoryPort {
         values: [workspace, user, catalogRevision],
       },
     ]);
+
     return {
       changed: result[1]!.changes,
       objectKey: result[0]!.rows[0]
@@ -249,6 +288,7 @@ export class Repository implements RepositoryPort {
         : undefined,
     };
   }
+
   async reorderCanvases(
     workspace: string,
     user: string,
@@ -259,13 +299,16 @@ export class Repository implements RepositoryPort {
       sql: "UPDATE canvases SET position=? WHERE id=? AND workspace_id=? AND EXISTS(SELECT 1 FROM workspaces WHERE id=? AND user_id=? AND catalog_revision=?)",
       values: [position, id, workspace, workspace, user, revision],
     }));
+
     statements.push({
       sql: "UPDATE workspaces SET catalog_revision=catalog_revision+1 WHERE id=? AND user_id=? AND catalog_revision=?",
       values: [workspace, user, revision],
     });
     const result = await this.sql.transaction(statements);
+
     return result[result.length - 1]!.changes;
   }
+
   async canvasCatalog(workspace: string, user: string) {
     const result = await this.sql.transaction([
       {
@@ -278,13 +321,15 @@ export class Repository implements RepositoryPort {
       },
     ]);
     const row = result[0]!.rows[0];
+
     return row
       ? {
-        catalogRevision: integer(row, "catalogRevision"),
-        canvases: result[1]!.rows.map(decodeCanvas),
-      }
+          catalogRevision: integer(row, "catalogRevision"),
+          canvases: result[1]!.rows.map(decodeCanvas),
+        }
       : null;
   }
+
   async navigation(user: string): Promise<Navigation> {
     const result = await this.sql.transaction([
       {
@@ -297,7 +342,9 @@ export class Repository implements RepositoryPort {
       },
     ]);
     const row = result[0]!.rows[0];
+
     if (!row) throw new Error("Navigation row missing");
+
     return {
       revision: integer(row, "revision"),
       lastWorkspaceId: nullableText(row, "lastWorkspaceId"),
@@ -308,6 +355,7 @@ export class Repository implements RepositoryPort {
       })),
     };
   }
+
   async recordNavigation(user: string, canvas: string, revision: number) {
     const result = await this.sql.transaction([
       {
@@ -319,20 +367,24 @@ export class Repository implements RepositoryPort {
         values: [canvas, canvas, user, revision, canvas, user],
       },
     ]);
+
     return result[1]!.changes;
   }
+
   async library(user: string): Promise<StoredLibrary | null> {
     const row = await this.one(
       "SELECT revision,object_key AS objectKey FROM libraries WHERE user_id=?",
       user,
     );
+
     return row
       ? {
-        revision: integer(row, "revision"),
-        objectKey: nullableText(row, "objectKey"),
-      }
+          revision: integer(row, "revision"),
+          objectKey: nullableText(row, "objectKey"),
+        }
       : null;
   }
+
   saveSnapshot(
     type: "canvas" | "library",
     id: string,
@@ -343,34 +395,37 @@ export class Repository implements RepositoryPort {
   ) {
     return type === "canvas"
       ? this.run(
-        "UPDATE canvases SET object_key=?,revision=revision+1,updated_at=? WHERE id=? AND revision=? AND workspace_id IN (SELECT id FROM workspaces WHERE user_id=?)",
-        key,
-        now,
-        id,
-        revision,
-        user,
-      )
+          "UPDATE canvases SET object_key=?,revision=revision+1,updated_at=? WHERE id=? AND revision=? AND workspace_id IN (SELECT id FROM workspaces WHERE user_id=?)",
+          key,
+          now,
+          id,
+          revision,
+          user,
+        )
       : this.run(
-        "UPDATE libraries SET object_key=?,revision=revision+1,updated_at=? WHERE user_id=? AND revision=?",
-        key,
-        now,
-        user,
-        revision,
-      );
+          "UPDATE libraries SET object_key=?,revision=revision+1,updated_at=? WHERE user_id=? AND revision=?",
+          key,
+          now,
+          user,
+          revision,
+        );
   }
+
   async userSettings(user: string) {
     const row = await this.one(
       "SELECT settings_json AS settingsJson,revision,updated_at AS updatedAt FROM user_settings WHERE user_id=?",
       user,
     );
+
     return row
       ? {
-        settingsJson: text(row, "settingsJson"),
-        revision: integer(row, "revision"),
-        updatedAt: text(row, "updatedAt"),
-      }
+          settingsJson: text(row, "settingsJson"),
+          revision: integer(row, "revision"),
+          updatedAt: text(row, "updatedAt"),
+        }
       : null;
   }
+
   async saveUserSettings(
     user: string,
     settingsJson: string,
@@ -387,8 +442,10 @@ export class Repository implements RepositoryPort {
       revision,
       revision,
     );
+
     return row ? integer(row, "revision") : undefined;
   }
+
   async objectReferenced(key: string) {
     return !!(await this.one(
       "SELECT object_key FROM canvases WHERE object_key=? UNION ALL SELECT object_key FROM libraries WHERE object_key=? LIMIT 1",
@@ -397,6 +454,7 @@ export class Repository implements RepositoryPort {
     ));
   }
 }
+
 /** Never collect fresh objects: a write may not have reached its metadata CAS yet. */
 export async function collectOrphans(
   repository: Pick<RepositoryPort, "objectReferenced">,
@@ -405,9 +463,11 @@ export async function collectOrphans(
   grace = 24 * 60 * 60 * 1000,
 ) {
   let cursor: string | undefined;
+
   do {
     const page = await objects.list(cursor);
     const abandoned: string[] = [];
+
     for (const object of page.objects)
       if (
         object.modified < now - grace &&

@@ -59,6 +59,7 @@ const getArrow = (id: string) =>
 /** global coordinates of an arrow's start/end point */
 const endpointOf = (arrow: ExcalidrawArrowElement, which: "start" | "end") => {
   const point = arrow.points[which === "start" ? 0 : arrow.points.length - 1];
+
   return [arrow.x + point[0], arrow.y + point[1]] as const;
 };
 
@@ -81,7 +82,9 @@ const bindTextAt = async (x: number, y: number, text: string) => {
   mouse.moveTo(x, y);
   mouse.clickAt(x, y);
   const editor = await getTextEditor();
+
   updateTextEditor(editor, text);
+
   return editor;
 };
 
@@ -142,6 +145,7 @@ describe("binding text to an arrow endpoint", () => {
         containerId: arrow.id,
         text: "existing",
       });
+
       API.setElements([
         { ...arrow, boundElements: [{ id: label.id, type: "text" }] },
         label,
@@ -373,6 +377,7 @@ describe("binding text to an arrow endpoint", () => {
       await bindTextAt(to[0], to[1], "label");
 
       const text = getText();
+
       expect(getArrow("arrow").endBinding).toEqual({
         elementId: text.id,
         fixedPoint,
@@ -392,6 +397,7 @@ describe("binding text to an arrow endpoint", () => {
 
       const text = getText();
       const arrow = getArrow("arrow");
+
       expect(arrow.startBinding?.elementId).toBe(text.id);
       expect(arrow.endBinding).toBeNull();
       // the arrow leaves the tip heading right, so the text sits to its left
@@ -406,6 +412,7 @@ describe("binding text to an arrow endpoint", () => {
       const tipBefore = endpointOf(getArrow("arrow"), "end");
 
       const editor = await bindTextAt(100, 100, "a label");
+
       expectPointsClose(endpointOf(getArrow("arrow"), "end"), tipBefore);
 
       // growing the text (wider + a second line) must not drag the tip
@@ -424,6 +431,7 @@ describe("binding text to an arrow endpoint", () => {
       updateTextEditor(editor, "a much longer label\nspanning two lines");
 
       const text = getText();
+
       expect(text.width).toBeGreaterThan(0);
       expectPointsClose(bottomMidOf(text), anchorBefore);
     });
@@ -442,6 +450,7 @@ describe("binding text to an arrow endpoint", () => {
       const tipBefore = endpointOf(getArrow("arrow"), "end");
 
       const editor = await bindTextAt(300, 300, "x");
+
       expectPointsClose(endpointOf(getArrow("arrow"), "end"), tipBefore);
 
       updateTextEditor(editor, "a considerably longer label");
@@ -467,6 +476,7 @@ describe("binding text to an arrow endpoint", () => {
         const tipBefore = endpointOf(getArrow("arrow"), "end");
 
         const editor = await bindTextAt(100, 100, "x");
+
         expect(getText().strokeWidth).not.toBe(arrowStroke);
         expectPointsClose(endpointOf(getArrow("arrow"), "end"), tipBefore);
 
@@ -490,9 +500,12 @@ describe("binding text to an arrow endpoint", () => {
       for (let i = 1; i <= 4; i++) {
         mouse.moveTo(x + ((toX - x) * i) / 4, y);
       }
+
       mouse.upAt(toX, y);
       const editor = await getTextEditor();
+
       updateTextEditor(editor, text);
+
       return editor;
     };
 
@@ -503,6 +516,7 @@ describe("binding text to an arrow endpoint", () => {
       await dragTextAt([300, 100], 520, "a label long enough to wrap");
 
       const text = getText();
+
       expect(text.autoResize).toBe(false);
       expect(text.textAlign).toBe("left");
       // left edge is the anchor and must be untouched by the drag
@@ -516,6 +530,7 @@ describe("binding text to an arrow endpoint", () => {
       await dragTextAt([300, 100], 80, "a label long enough to wrap");
 
       const text = getText();
+
       expect(text.autoResize).toBe(false);
       expect(text.textAlign).toBe("right");
       // the right edge is the anchor
@@ -528,6 +543,7 @@ describe("binding text to an arrow endpoint", () => {
       await dragTextAt([300, 300], 430, "a label long enough to wrap");
 
       const text = getText();
+
       expect(text.autoResize).toBe(false);
       expect(text.textAlign).toBe("center");
       expect(text.x + text.width / 2).toBeCloseTo(300, 0);
@@ -540,6 +556,7 @@ describe("binding text to an arrow endpoint", () => {
       await dragTextAt([300, 100], 150, "label");
 
       const text = getText();
+
       // treated as no drag at all — the text keeps autogrowing
       expect(text.autoResize).toBe(true);
       expect(text.x).toBeCloseTo(306, 0);
@@ -556,6 +573,7 @@ describe("binding text to an arrow endpoint", () => {
       Keyboard.exitTextEditor(await getTextEditor());
 
       const text = getText();
+
       expect(text.autoResize).toBe(false);
       const rightEdge = text.x + text.width;
 
@@ -563,6 +581,7 @@ describe("binding text to an arrow endpoint", () => {
       API.executeAction(actionTextAutoResize);
 
       const resized = getText();
+
       expect(resized.autoResize).toBe(true);
       expect(resized.x + resized.width).toBeCloseTo(rightEdge, 4);
       expectPointsClose(endpointOf(getArrow("arrow"), "end"), tipBefore);
@@ -597,6 +616,7 @@ describe("binding text to an arrow endpoint", () => {
           mode: "orbit",
         },
       });
+
       API.setElements([wrapped, fromTop]);
       const tipBefore = endpointOf(getArrow("fromTop"), "end");
 
@@ -604,10 +624,12 @@ describe("binding text to an arrow endpoint", () => {
       API.executeAction(actionTextAutoResize);
 
       const text = getText();
+
       // the box really did move out from under the arrow
       expect(text.y).not.toBeCloseTo(280, 0);
 
       const tipAfter = endpointOf(getArrow("fromTop"), "end");
+
       expect(tipAfter).not.toEqual(tipBefore);
       // still just clear of the top edge it is bound to...
       expect(tipAfter[1]).toBeLessThan(text.y);
@@ -615,6 +637,7 @@ describe("binding text to an arrow endpoint", () => {
       // exactly: the arrow is diagonal now, so the outline intersection sits
       // slightly to one side of the fixed point.
       const centre = text.x + text.width / 2;
+
       expect(Math.abs(tipAfter[0] - centre)).toBeLessThan(
         Math.abs(tipBefore[0] - centre),
       );
@@ -710,8 +733,10 @@ describe("binding text to an arrow endpoint", () => {
         )!;
 
       const editor = await bindTextAt(100, 100, "bound");
+
       Keyboard.exitTextEditor(editor);
       const textId = arrow().endBinding?.elementId;
+
       expect(textId).toBeDefined();
 
       Keyboard.undo();
@@ -739,6 +764,7 @@ describe("binding text to an arrow endpoint", () => {
         )!;
 
       const editor = await bindTextAt(100, 100, "bound");
+
       Keyboard.exitTextEditor(editor);
       const textId = arrow().endBinding?.elementId;
 
@@ -746,6 +772,7 @@ describe("binding text to an arrow endpoint", () => {
       Keyboard.redo();
 
       const text = h.elements.find((el) => el.id === textId)!;
+
       expect(text.isDeleted).toBe(false);
       expect(isTextElement(text) && text.text).toBe("bound");
       expect(arrow().endBinding?.elementId).toBe(textId);
@@ -759,6 +786,7 @@ describe("binding text to an arrow endpoint", () => {
       await bindTextAt(300, 100, "label");
 
       const text = getText();
+
       // mid-arrow click is still the "arrow label" gesture
       expect(text.containerId).toBe("arrow");
       expect(getArrow("arrow").endBinding).toBeNull();
@@ -789,6 +817,7 @@ describe("binding text to an arrow endpoint", () => {
         width: 50,
         height: 25,
       });
+
       API.setElements([
         createArrow("arrow", [100, 300], [100, 100]),
         { ...rect, boundElements: [{ id: label.id, type: "text" }] },
@@ -866,11 +895,13 @@ describe("binding text to an arrow endpoint", () => {
       // the click binds a fresh text to the endpoint; the covering text is
       // left alone
       const editor = await bindTextAt(100, 100, "bound");
+
       Keyboard.exitTextEditor(editor);
       const boundText = h.elements.find(
         (el): el is ExcalidrawTextElement =>
           el.type === "text" && el.id !== "overlap",
       )!;
+
       expect(boundText.text).toBe("bound");
       expect(getArrow("arrow").endBinding?.elementId).toBe(boundText.id);
     });
@@ -918,13 +949,16 @@ describe("binding text to an arrow endpoint", () => {
       API.setAppState({ selectedElementIds: { faraway: true } });
 
       const editor = await bindTextAt(100, 100, "fresh");
+
       Keyboard.exitTextEditor(editor);
 
       const boundTextId = getArrow("arrow").endBinding?.elementId;
+
       expect(boundTextId).toBeDefined();
       expect(boundTextId).not.toBe("faraway");
 
       const faraway = h.elements.find((el) => el.id === "faraway")!;
+
       expect(isTextElement(faraway) && faraway.text).toBe("faraway");
       expect(faraway.boundElements ?? []).toHaveLength(0);
     });
@@ -955,13 +989,16 @@ describe("binding text to an arrow endpoint", () => {
       });
 
       const editor = await bindTextAt(100, 100, "fresh");
+
       Keyboard.exitTextEditor(editor);
 
       const boundTextId = getArrow("arrow").endBinding?.elementId;
+
       expect(boundTextId).toBeDefined();
       expect(boundTextId).not.toBe("under");
 
       const under = h.elements.find((el) => el.id === "under")!;
+
       expect(isTextElement(under) && under.text).toBe("under");
       expect(under.boundElements ?? []).toHaveLength(0);
     });
@@ -970,6 +1007,7 @@ describe("binding text to an arrow endpoint", () => {
       API.setElements([createArrow("arrow", [100, 300], [100, 100])]);
 
       const editor = await bindTextAt(100, 100, "temporary");
+
       expect(getArrow("arrow").endBinding).not.toBeNull();
 
       updateTextEditor(editor, "");

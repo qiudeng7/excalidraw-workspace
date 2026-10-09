@@ -71,6 +71,7 @@ const cssInvert = (
   const invertComponent = (color: number): number => {
     // Apply the invert formula
     const inverted = color * (1 - p) + (255 - color) * p;
+
     // Round to the nearest integer and clamp to [0, 255]
     return Math.round(clamp(inverted, 0, 255));
   };
@@ -89,6 +90,7 @@ export const applyDarkModeFilter = (color: string, enable = true): string => {
   }
 
   const cached = DARK_MODE_COLORS_CACHE?.get(color);
+
   if (cached) {
     return cached;
   }
@@ -168,26 +170,33 @@ const pick = <R extends Record<string, any>, K extends readonly (keyof R)[]>(
   source: R,
   keys: K,
 ) => {
-  return keys.reduce((acc, key: K[number]) => {
-    if (key in source) {
-      acc[key] = source[key];
-    }
-    return acc;
-  }, {} as Pick<R, K[number]>) as Pick<R, K[number]>;
+  return keys.reduce(
+    (acc, key: K[number]) => {
+      if (key in source) {
+        acc[key] = source[key];
+      }
+
+      return acc;
+    },
+    {} as Pick<R, K[number]>,
+  ) as Pick<R, K[number]>;
 };
 
 export type ColorTuple = readonly [string, string, string, string, string];
 
 // used general type instead of specific type (ColorPalette) to support custom colors
 export type ColorPaletteCustom = { [key: string]: ColorTuple | string };
+
 export type ColorShadesIndexes = [number, number, number, number, number];
 
 export const MAX_CUSTOM_COLORS_USED_IN_CANVAS = 5;
+
 export const COLORS_PER_ROW = 5;
 
 export const DEFAULT_CHART_COLOR_INDEX = 4;
 
 export const DEFAULT_ELEMENT_STROKE_COLOR_INDEX = 4;
+
 export const DEFAULT_ELEMENT_BACKGROUND_COLOR_INDEX = 1;
 
 export const COLOR_PALETTE = {
@@ -212,6 +221,7 @@ export const COLOR_PALETTE = {
 } as const;
 
 export type ColorPalette = typeof COLOR_PALETTE;
+
 export type ColorPickerColor = keyof typeof COLOR_PALETTE;
 
 const COMMON_ELEMENT_SHADES = pick(COLOR_PALETTE, [
@@ -349,14 +359,17 @@ export const rgbToHex = (r: number, g: number, b: number, a?: number) => {
   const hex6 = `#${((1 << 24) + (r << 16) + (g << 8) + b)
     .toString(16)
     .slice(1)}`;
+
   if (a !== undefined && a < 1) {
     // convert alpha from 0-1 float to 0-255 int, then to 2-digit hex
     // e.g. 0.5 -> 128 -> "80"
     const alphaHex = Math.round(a * 255)
       .toString(16)
       .padStart(2, "0");
+
     return `${hex6}${alphaHex}`;
   }
+
   return hex6;
 };
 
@@ -366,10 +379,13 @@ export const rgbToHex = (r: number, g: number, b: number, a?: number) => {
  */
 export const setColorAlpha = (color: string, alpha: number): string => {
   const tc = tinycolor(color);
+
   if (!tc.isValid()) {
     return color;
   }
+
   const { r, g, b } = tc.toRgb();
+
   return rgbToHex(r, g, b, alpha);
 };
 
@@ -379,10 +395,13 @@ export const setColorAlpha = (color: string, alpha: number): string => {
  */
 export const colorToHex = (color: string): string | null => {
   const tc = tinycolor(color);
+
   if (!tc.isValid()) {
     return null;
   }
+
   const { r, g, b, a } = tc.toRgb();
+
   return rgbToHex(r, g, b, a);
 };
 
@@ -409,6 +428,7 @@ export const COLOR_OUTLINE_CONTRAST_THRESHOLD = 240;
 
 const calculateContrast = (r: number, g: number, b: number): number => {
   const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+
   return yiq;
 };
 
@@ -424,12 +444,14 @@ export const isColorDark = (color: string, threshold = 160): boolean => {
   }
 
   const tc = tinycolor(color);
+
   if (!tc.isValid()) {
     // invalid color -> assume it defaults to black
     return true;
   }
 
   const { r, g, b } = tc.toRgb();
+
   return calculateContrast(r, g, b) < threshold;
 };
 
@@ -448,12 +470,14 @@ export const normalizeInputColor = (color: string): string | null => {
   }
 
   const tc = tinycolor(color);
+
   if (tc.isValid()) {
     // testing for `#` first fixes a bug on Electron (more specfically, an
     // Obsidian popout window), where a hex color without `#` is considered valid
     if (["hex", "hex8"].includes(tc.getFormat()) && !color.startsWith("#")) {
       return `#${color}`;
     }
+
     return color;
   }
 

@@ -42,6 +42,7 @@ export const useMermaidRenderer = ({
 
   // Keeping lastAssistantMesssage in ref, so I can access it in useEffect hooks
   const lastAssistantMessageRef = useRef(lastAssistantMessage);
+
   useEffect(() => {
     lastAssistantMessageRef.current = lastAssistantMessage;
   }, [lastAssistantMessage]);
@@ -93,6 +94,7 @@ export const useMermaidRenderer = ({
       }
 
       isRenderingRef.current = false;
+
       return result.success;
     },
     [canvasRef, mermaidToExcalidrawLib, setError, theme],
@@ -112,7 +114,9 @@ export const useMermaidRenderer = ({
           );
           hasErrorOffsetRef.current = true;
         }
+
         pendingContentRef.current = content;
+
         return;
       }
 
@@ -120,11 +124,13 @@ export const useMermaidRenderer = ({
 
       if (timeSinceLastRender < throttleDelay) {
         pendingContentRef.current = content;
+
         return;
       }
 
       pendingContentRef.current = null;
       const success = await renderMermaid(content);
+
       lastRenderTimeRef.current = Date.now();
 
       if (!success) {
@@ -137,6 +143,7 @@ export const useMermaidRenderer = ({
     fn.flush = async () => {
       if (pendingContentRef.current) {
         const content = pendingContentRef.current;
+
         pendingContentRef.current = null;
         await renderMermaid(content);
         lastRenderTimeRef.current = Date.now();
@@ -178,6 +185,7 @@ export const useMermaidRenderer = ({
   // render the last message if the user navigates between the existing chats
   useEffect(() => {
     const msg = lastAssistantMessageRef.current;
+
     if (!msg?.content || msg.error) {
       return;
     }
@@ -194,13 +202,16 @@ export const useMermaidRenderer = ({
       !chatHistory.messages?.filter((msg) => msg.type === "assistant").length
     ) {
       const canvasNode = canvasRef.current;
+
       if (canvasNode) {
         const parent = canvasNode.parentElement;
+
         if (parent) {
           parent.style.background = "";
           canvasNode.replaceChildren();
         }
       }
+
       setShowPreview(false);
     } else if (!showPreview) {
       setShowPreview(true);

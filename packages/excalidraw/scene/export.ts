@@ -69,8 +69,10 @@ const truncateText = (
   if (element.width <= maxWidth) {
     return element;
   }
+
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d")!;
+
   ctx.font = getFontString({
     fontFamily: element.fontFamily,
     fontSize: element.fontSize,
@@ -87,12 +89,14 @@ const truncateText = (
     // (if ever), so it sohuld be faster this way.
     for (let i = text.length; i > 0; i--) {
       const newText = `${text.slice(0, i)}...`;
+
       if (ctx.measureText(newText).width <= maxWidth) {
         text = newText;
         break;
       }
     }
   }
+
   return newElementWith(element, { text, width: maxWidth });
 };
 
@@ -107,6 +111,7 @@ const addFrameLabelsAsTextElements = (
   opts: Pick<AppState, "exportWithDarkMode">,
 ) => {
   const nextElements: NonDeletedExcalidrawElement[] = [];
+
   for (const element of elements) {
     if (isFrameLikeElement(element)) {
       let textElement: Mutable<NonDeleted<ExcalidrawTextElement>> =
@@ -122,12 +127,14 @@ const addFrameLabelsAsTextElements = (
             : FRAME_STYLE.nameColorLightTheme,
           text: getFrameLikeTitle(element),
         });
+
       textElement.y -= textElement.height;
 
       textElement = truncateText(textElement, element.width);
 
       nextElements.push(textElement);
     }
+
     nextElements.push(element);
   }
 
@@ -139,6 +146,7 @@ const getFrameRenderingConfig = (
   frameRendering: AppState["frameRendering"] | null,
 ): AppState["frameRendering"] => {
   frameRendering = frameRendering || getDefaultAppState().frameRendering;
+
   return {
     enabled: exportingFrame ? true : frameRendering.enabled,
     outline: exportingFrame ? false : frameRendering.outline,
@@ -198,8 +206,10 @@ export const exportToCanvas = async (
     height: number,
   ) => { canvas: HTMLCanvasElement; scale: number } = (width, height) => {
     const canvas = document.createElement("canvas");
+
     canvas.width = width * appState.exportScale;
     canvas.height = height * appState.exportScale;
+
     return { canvas, scale: appState.exportScale };
   },
   loadFonts: () => Promise<void> = async () => {
@@ -213,6 +223,7 @@ export const exportToCanvas = async (
     exportingFrame ?? null,
     appState.frameRendering ?? null,
   );
+
   // for canvas export, don't clip if exporting a specific frame as it would
   // clip the corners of the content
   if (exportingFrame) {
@@ -415,6 +426,7 @@ export const exportToSvg = async (
       const cy = (y2 - y1) / 2 - (frame.y - y1);
 
       const rect = svgRoot.ownerDocument.createElementNS(SVG_NS, "rect");
+
       rect.setAttribute(
         "transform",
         `translate(${frame.x + offsetX} ${frame.y + offsetY}) rotate(${
@@ -446,6 +458,7 @@ export const exportToSvg = async (
   const delimiter = "\n      "; // 6 spaces
 
   const style = svgRoot.ownerDocument.createElementNS(SVG_NS, "style");
+
   style.classList.add("style-fonts");
   style.appendChild(
     document.createTextNode(`${delimiter}${fontFaces.join(delimiter)}`),
@@ -460,6 +473,7 @@ export const exportToSvg = async (
   // render background rect
   if (appState.exportBackground && viewBackgroundColor) {
     const rect = svgRoot.ownerDocument.createElementNS(SVG_NS, "rect");
+
     rect.setAttribute("x", "0");
     rect.setAttribute("y", "0");
     rect.setAttribute("width", `${width}`);
@@ -537,9 +551,11 @@ export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
     const match = svg.match(
       /<!-- payload-start -->\s*(.+?)\s*<!-- payload-end -->/,
     );
+
     if (!match) {
       throw new Error("INVALID");
     }
+
     const versionMatch = svg.match(/<!-- payload-version:(\d+) -->/);
     const version = versionMatch?.[1] || "1";
     const isByteString = version !== "1";
@@ -547,6 +563,7 @@ export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
     try {
       const json = base64ToString(match[1], isByteString);
       const encodedData = JSON.parse(json);
+
       if (!("encoded" in encodedData)) {
         // legacy, un-encoded scene JSON
         if (
@@ -555,14 +572,17 @@ export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
         ) {
           return json;
         }
+
         throw new Error("FAILED");
       }
+
       return decode(encodedData);
     } catch (error: any) {
       console.error(error);
       throw new Error("FAILED");
     }
   }
+
   throw new Error("INVALID");
 };
 

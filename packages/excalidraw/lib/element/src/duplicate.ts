@@ -127,9 +127,11 @@ export const duplicateElement = <TElement extends ExcalidrawElement>(
       if (!groupIdMapForOperation.has(groupId)) {
         groupIdMapForOperation.set(groupId, randomId());
       }
+
       return groupIdMapForOperation.get(groupId)!;
     },
   );
+
   return copy;
 };
 
@@ -279,6 +281,7 @@ export const duplicateElements = (
         duplicatedElements.push(newElement);
 
         acc.push(newElement);
+
         return acc;
       },
       [],
@@ -302,6 +305,7 @@ export const duplicateElements = (
 
     if (index > elementsWithDuplicates.length - 1) {
       elementsWithDuplicates.push(...castArray(elements));
+
       return;
     }
 
@@ -332,6 +336,7 @@ export const duplicateElements = (
     // -------------------------------------------------------------------------
 
     const groupId = getSelectedGroupForElement(appState, element);
+
     if (groupId) {
       const groupElements = getElementsInGroup(elements, groupId).flatMap(
         (element) =>
@@ -455,6 +460,7 @@ export const duplicateElements = (
       const origElement = origElementsMap.get(
         duplicateIdToOrigId.get(duplicateElement.id)!,
       );
+
       if (origElement) {
         Object.assign(
           duplicateElement,
@@ -558,6 +564,7 @@ export const reconcileDuplicatedElements = <
 
   for (const id of survivedIds) {
     const duplicate = duplicatesMap.get(id)!;
+
     if (isBoundToContainer(duplicate) && isVetoed(duplicate.containerId)) {
       survivedIds.delete(id);
     }
@@ -594,9 +601,11 @@ export const reconcileDuplicatedElements = <
         (binding) => !isVetoed(binding.id),
       );
     }
+
     if (duplicate.frameId && isVetoed(duplicate.frameId)) {
       updates.frameId = null;
     }
+
     if (isArrowElement(duplicate)) {
       if (
         duplicate.startBinding &&
@@ -604,6 +613,7 @@ export const reconcileDuplicatedElements = <
       ) {
         updates.startBinding = null;
       }
+
       if (duplicate.endBinding && isVetoed(duplicate.endBinding.elementId)) {
         updates.endBinding = null;
       }
@@ -637,6 +647,7 @@ const _deepCopyElement = (val: any, depth: number = 0) => {
       typeof val.constructor === "function"
         ? Object.create(Object.getPrototypeOf(val))
         : {};
+
     for (const key in val) {
       if (val.hasOwnProperty(key)) {
         // don't copy non-serializable objects like these caches. They'll be
@@ -644,18 +655,22 @@ const _deepCopyElement = (val: any, depth: number = 0) => {
         if (depth === 0 && (key === "shape" || key === "canvas")) {
           continue;
         }
+
         tmp[key] = _deepCopyElement(val[key], depth + 1);
       }
     }
+
     return tmp;
   }
 
   if (Array.isArray(val)) {
     let k = val.length;
     const arr = new Array(k);
+
     while (k--) {
       arr[k] = _deepCopyElement(val[k], depth + 1);
     }
+
     return arr;
   }
 

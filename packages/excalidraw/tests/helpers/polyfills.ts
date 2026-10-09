@@ -43,6 +43,7 @@ class DataTransferItem {
     if (this.kind === "file" && this.data instanceof File) {
       return this.data;
     }
+
     return null;
   }
 }

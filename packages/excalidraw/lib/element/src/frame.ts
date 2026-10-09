@@ -63,6 +63,7 @@ export const bindElementsToFramesAfterDuplication = (
       const nextElementId = origIdToDuplicateId.get(element.id);
       const nextFrameId = origIdToDuplicateId.get(element.frameId);
       const nextElement = nextElementId && nextElementMap.get(nextElementId);
+
       if (nextElement) {
         mutateElement(nextElement, nextElementMap, {
           frameId: nextFrameId ?? null,
@@ -119,6 +120,7 @@ export const getElementsIntersectingFrame = (
   frame: ExcalidrawFrameLikeElement,
 ) => {
   const elementsMap = arrayToMap(elements);
+
   return elements.filter((element) =>
     isElementIntersectingFrame(element, frame, elementsMap),
   );
@@ -231,6 +233,7 @@ export const groupByFrameLikes = (elements: readonly ExcalidrawElement[]) => {
 
   for (const element of elements) {
     const frameId = isFrameLikeElement(element) ? element.id : element.frameId;
+
     if (frameId && !frameElementsMap.has(frameId)) {
       frameElementsMap.set(frameId, getFrameChildren(elements, frameId));
     }
@@ -244,11 +247,13 @@ export const getFrameChildren = (
   frameId: string,
 ) => {
   const frameChildren: ExcalidrawElement[] = [];
+
   for (const element of allElements.values()) {
     if (element.frameId === frameId) {
       frameChildren.push(element);
     }
   }
+
   return frameChildren;
 };
 
@@ -272,6 +277,7 @@ export const getRootElements = <T extends ExcalidrawElement>(
   allElements: readonly T[],
 ) => {
   const frameElements = arrayToMap(getFrameLikeElements(allElements));
+
   return allElements.filter(
     (element) =>
       frameElements.has(element.id) ||
@@ -402,6 +408,7 @@ export const omitPartialGroups = (
 
   for (const element of elements) {
     let shouldOmit = false;
+
     if (element.groupIds.length > 0) {
       // if some partial group should be omitted, then all elements in that group should be omitted
       if (element.groupIds.some((gid) => checkedGroups.get(gid))) {
@@ -440,6 +447,7 @@ export const getContainingFrame = (
   if (!element.frameId) {
     return null;
   }
+
   return (elementsMap.get(element.frameId) ||
     null) as null | ExcalidrawFrameLikeElement;
 };
@@ -453,6 +461,7 @@ export const filterElementsEligibleAsFrameChildren = (
 ) => {
   const otherFrames = new Set<ExcalidrawFrameLikeElement["id"]>();
   const elementsMap = arrayToMap(elements);
+
   elements = omitGroupsContainingFrameLikes(elements);
 
   for (const element of elements) {
@@ -476,9 +485,11 @@ export const filterElementsEligibleAsFrameChildren = (
 
     if (element.groupIds.length) {
       const shallowestGroupId = element.groupIds.at(-1)!;
+
       if (!processedGroups.has(shallowestGroupId)) {
         processedGroups.add(shallowestGroupId);
         const groupElements = getElementsInGroup(elements, shallowestGroupId);
+
         if (
           groupElements.some((el) =>
             elementOverlapsWithFrame(el, frame, elementsMap),
@@ -491,6 +502,7 @@ export const filterElementsEligibleAsFrameChildren = (
       }
     } else {
       const overlaps = elementOverlapsWithFrame(element, frame, elementsMap);
+
       if (overlaps) {
         eligibleElements.push(element);
       }
@@ -577,6 +589,7 @@ export const addElementsToFrame = <T extends ElementsMapOrArray>(
     finalElementsToAdd.add(element);
 
     const boundTextElement = getBoundTextElement(element, elementsMap);
+
     if (boundTextElement && !finalElementsToAdd.has(boundTextElement)) {
       finalElementsToAdd.add(boundTextElement);
     }
@@ -653,9 +666,11 @@ export const removeElementsFromFrame = (
       _elementsToRemove.set(element.id, element);
 
       const arr = toRemoveElementsByFrame.get(element.frameId) || [];
+
       arr.push(element);
 
       const boundTextElement = getBoundTextElement(element, elementsMap);
+
       if (boundTextElement) {
         _elementsToRemove.set(boundTextElement.id, boundTextElement);
         arr.push(boundTextElement);
@@ -677,7 +692,9 @@ export const removeAllElementsFromFrame = <T extends ExcalidrawElement>(
   frame: ExcalidrawFrameLikeElement,
 ) => {
   const elementsInFrame = getFrameChildren(allElements, frame.id);
+
   removeElementsFromFrame(elementsInFrame, arrayToMap(allElements));
+
   return allElements;
 };
 
@@ -737,6 +754,7 @@ export const updateFrameMembershipOfSelectedElements = <
   if (elementsToRemove.size > 0) {
     removeElementsFromFrame(elementsToRemove, elementsMap);
   }
+
   return allElements;
 };
 
@@ -756,12 +774,14 @@ export const omitGroupsContainingFrameLikes = (
 
   for (const el of elements.values()) {
     const topMostGroupId = el.groupIds[el.groupIds.length - 1];
+
     if (topMostGroupId) {
       uniqueGroupIds.add(topMostGroupId);
     }
   }
 
   const rejectedGroupIds = new Set<string>();
+
   for (const groupId of uniqueGroupIds) {
     if (
       getElementsInGroup(allElements, groupId).some((el) =>
@@ -870,6 +890,7 @@ export const isElementInFrame = (
         if (opts?.checkedGroups) {
           return !opts.checkedGroups.has(gid);
         }
+
         return true;
       })
       .flatMap((gid) => getElementsInGroup(allElementsMap, gid)),
@@ -894,6 +915,7 @@ export const isElementInFrame = (
   for (const elementInGroup of allElementsInGroup) {
     if (isFrameLikeElement(elementInGroup)) {
       setGroupsInFrame(false);
+
       return false;
     }
   }
@@ -901,6 +923,7 @@ export const isElementInFrame = (
   for (const elementInGroup of allElementsInGroup) {
     if (elementOverlapsWithFrame(elementInGroup, frame, allElementsMap)) {
       setGroupsInFrame(true);
+
       return true;
     }
   }

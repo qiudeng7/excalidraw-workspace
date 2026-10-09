@@ -136,6 +136,7 @@ export class Fonts {
         charWidth.clearCache(getFontString(element));
 
         const container = getContainerElement(element, elementsMap);
+
         if (container) {
           ShapeCache.delete(container);
         }
@@ -243,6 +244,7 @@ export class Fonts {
     );
     const concurrency = 10;
     const fontFaces = await new PromisePool(iterator, concurrency).all();
+
     return fontFaces.flat().filter(Boolean);
   }
 
@@ -426,6 +428,7 @@ export class Fonts {
         if (isTextElement(element)) {
           families.add(element.fontFamily);
         }
+
         return families;
       }, new Set<number>()),
     );

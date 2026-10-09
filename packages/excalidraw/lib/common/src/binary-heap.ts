@@ -6,9 +6,11 @@ export class BinaryHeap<T> {
   sinkDown(idx: number) {
     const node = this.content[idx];
     const nodeScore = this.scoreFunction(node);
+
     while (idx > 0) {
       const parentN = ((idx + 1) >> 1) - 1;
       const parent = this.content[parentN];
+
       if (nodeScore < this.scoreFunction(parent)) {
         this.content[idx] = parent;
         idx = parentN; // TODO: Optimize
@@ -16,6 +18,7 @@ export class BinaryHeap<T> {
         break;
       }
     }
+
     this.content[idx] = node;
   }
 
@@ -33,6 +36,7 @@ export class BinaryHeap<T> {
       // Check left child
       if (child1N < length) {
         const child1Score = this.scoreFunction(this.content[child1N]);
+
         if (child1Score < smallestScore) {
           smallestIdx = child1N;
           smallestScore = child1Score;
@@ -42,6 +46,7 @@ export class BinaryHeap<T> {
       // Check right child
       if (child2N < length) {
         const child2Score = this.scoreFunction(this.content[child2N]);
+
         if (child2Score < smallestScore) {
           smallestIdx = child2N;
         }

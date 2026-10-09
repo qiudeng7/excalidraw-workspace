@@ -8,6 +8,7 @@ import {
 
 const MenuHint = ({ children }: { children?: React.ReactNode }) => {
   const { WelcomeScreenMenuHintTunnel } = useTunnels();
+
   return (
     <WelcomeScreenMenuHintTunnel.In>
       <div className="excalifont welcome-screen-decor welcome-screen-decor-hint welcome-screen-decor-hint--menu">
@@ -19,10 +20,12 @@ const MenuHint = ({ children }: { children?: React.ReactNode }) => {
     </WelcomeScreenMenuHintTunnel.In>
   );
 };
+
 MenuHint.displayName = "MenuHint";
 
 const ToolbarHint = ({ children }: { children?: React.ReactNode }) => {
   const { WelcomeScreenToolbarHintTunnel } = useTunnels();
+
   return (
     <WelcomeScreenToolbarHintTunnel.In>
       <div className="excalifont welcome-screen-decor welcome-screen-decor-hint welcome-screen-decor-hint--toolbar">
@@ -34,10 +37,12 @@ const ToolbarHint = ({ children }: { children?: React.ReactNode }) => {
     </WelcomeScreenToolbarHintTunnel.In>
   );
 };
+
 ToolbarHint.displayName = "ToolbarHint";
 
 const HelpHint = ({ children }: { children?: React.ReactNode }) => {
   const { WelcomeScreenHelpHintTunnel } = useTunnels();
+
   return (
     <WelcomeScreenHelpHintTunnel.In>
       <div className="excalifont welcome-screen-decor welcome-screen-decor-hint welcome-screen-decor-hint--help">
@@ -47,6 +52,7 @@ const HelpHint = ({ children }: { children?: React.ReactNode }) => {
     </WelcomeScreenHelpHintTunnel.In>
   );
 };
+
 HelpHint.displayName = "HelpHint";
 
 export { HelpHint, MenuHint, ToolbarHint };

@@ -1,4 +1,5 @@
 import type { UserSettings } from "../../shared/contracts";
+
 /** Full versioned payload only: reject unknown fields instead of storing arbitrary data. */
 export function validateUserSettings(value: unknown): value is UserSettings {
   const object = (value: unknown): value is Record<string, unknown> =>
@@ -10,6 +11,7 @@ export function validateUserSettings(value: unknown): value is UserSettings {
     object(value) &&
     keys(value, allowed) &&
     allowed.every((key) => typeof value[key] === "boolean");
+
   if (
     !object(value) ||
     !keys(value, ["version", "features", "debug"]) ||
@@ -32,6 +34,7 @@ export function validateUserSettings(value: unknown): value is UserSettings {
     ![1, 1.5, 2].includes(value.debug.sampling as number)
   )
     return false;
+
   return booleans(value.debug.renderingOptions, [
     "smoothCache",
     "highQualitySmoothing",

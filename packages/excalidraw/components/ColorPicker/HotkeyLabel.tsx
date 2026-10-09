@@ -6,6 +6,7 @@ interface HotkeyLabelProps {
   keyLabel: string | number;
   isShade?: boolean;
 }
+
 const HotkeyLabel = ({
   color,
   keyLabel,

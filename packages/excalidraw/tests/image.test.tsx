@@ -90,6 +90,7 @@ describe("image insertion", () => {
     });
     // Not placed on top of each other
     const dimensionsSet = new Set(h.elements.map((el) => `${el.x}-${el.y}`));
+
     expect(dimensionsSet.size).toEqual(h.elements.length);
   };
 
@@ -100,6 +101,7 @@ describe("image insertion", () => {
       API.loadFile("./fixtures/deer.png"),
       API.loadFile("./fixtures/smiley.png"),
     ]);
+
     await API.drop(files.map((file) => ({ kind: "file", file })));
 
     await assert();
@@ -124,6 +126,7 @@ describe("image insertion", () => {
     await setup();
 
     const fileOpenSpy = vi.spyOn(filesystemModule, "fileOpen");
+
     fileOpenSpy.mockImplementation(
       async () =>
         await Promise.all([

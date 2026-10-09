@@ -19,9 +19,11 @@ export const LoadingMessage: React.FC<{ delay?: number; theme?: Theme }> = ({
     if (!delay) {
       return;
     }
+
     const timer = setTimeout(() => {
       setIsWaiting(false);
     }, delay);
+
     return () => clearTimeout(timer);
   }, [delay]);
 

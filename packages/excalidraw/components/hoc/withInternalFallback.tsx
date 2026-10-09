@@ -32,19 +32,24 @@ export const withInternalFallback = <P,>(
 
     useLayoutEffect(() => {
       const meta = metaRef.current;
+
       setCounter((c) => {
         const next = c + 1;
+
         meta.counter = next;
 
         return next;
       });
+
       return () => {
         setCounter((c) => {
           const next = c - 1;
+
           meta.counter = next;
           if (!next) {
             meta.preferHost = false;
           }
+
           return next;
         });
       };

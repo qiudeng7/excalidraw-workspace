@@ -37,9 +37,11 @@ export class VersionedSnapshotStore<T> {
     for (const subscriber of this.subscribers) {
       subscriber(snapshot);
     }
+
     for (const waiter of this.waiters) {
       waiter(snapshot);
     }
+
     this.waiters.clear();
 
     return true;
@@ -53,6 +55,7 @@ export class VersionedSnapshotStore<T> {
     subscriber: (snapshot: VersionedSnapshot<T>) => void,
   ): () => void {
     this.subscribers.add(subscriber);
+
     return () => {
       this.subscribers.delete(subscriber);
     };

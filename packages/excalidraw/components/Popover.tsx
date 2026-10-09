@@ -63,6 +63,7 @@ export const Popover = ({
           } else {
             focusableElements[0].focus();
           }
+
           event.preventDefault();
           event.stopImmediatePropagation();
         } else if (currentIndex === 0 && event.shiftKey) {
@@ -105,9 +106,11 @@ export const Popover = ({
       ) {
         return;
       }
+
       lastInitializedPosRef.current = { top, left };
 
       const maxWidth = Math.max(0, viewportWidth - POPOVER_CONTAINER_GAP * 2);
+
       if (width >= maxWidth) {
         element.style.width = `${maxWidth}px`;
         element.style.left = `${POPOVER_CONTAINER_GAP}px`;
@@ -121,6 +124,7 @@ export const Popover = ({
       }
 
       const maxHeight = Math.max(0, viewportHeight - POPOVER_CONTAINER_GAP * 2);
+
       if (height >= maxHeight) {
         element.style.height = `${maxHeight}px`;
         element.style.top = `${POPOVER_CONTAINER_GAP}px`;
@@ -142,7 +146,9 @@ export const Popover = ({
           unstable_batchedUpdates(() => onCloseRequest(event));
         }
       };
+
       document.addEventListener("pointerdown", handler, false);
+
       return () => document.removeEventListener("pointerdown", handler, false);
     }
   }, [onCloseRequest]);

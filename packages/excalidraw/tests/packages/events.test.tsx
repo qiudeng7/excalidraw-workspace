@@ -19,6 +19,7 @@ describe("event callbacks", () => {
 
   beforeEach(async () => {
     const excalidrawAPIPromise = resolvablePromise<ExcalidrawImperativeAPI>();
+
     await render(
       <Excalidraw
         onExcalidrawAPI={(api) => excalidrawAPIPromise.resolve(api as any)}
@@ -54,6 +55,7 @@ describe("event callbacks", () => {
     );
 
     const { api, mount, initialize } = await lifecyclePromise;
+
     await expect(mount).resolves.toEqual({
       excalidrawAPI: api,
       container: expect.any(HTMLDivElement),
@@ -112,6 +114,7 @@ describe("event callbacks", () => {
     const onChange = vi.fn();
 
     const origBackgroundColor = h.state.viewBackgroundColor;
+
     excalidrawAPI.onChange(onChange);
     API.updateScene({
       appState: { viewBackgroundColor: "red" },

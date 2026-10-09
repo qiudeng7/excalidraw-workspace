@@ -87,9 +87,11 @@ const populateElements = (
         containerId,
         frameId: frameId || null,
       });
+
       if (isSelected) {
         selectedElementIds[element.id] = true;
       }
+
       return element;
     },
   );
@@ -98,6 +100,7 @@ const populateElements = (
   API.setElements(
     newElements.map((element, index, elements) => {
       const nextElement = elements[index + 1];
+
       if (
         nextElement &&
         "containerId" in nextElement &&
@@ -108,6 +111,7 @@ const populateElements = (
           boundElements: [{ type: "text", id: nextElement.id }],
         };
       }
+
       return element;
     }),
   );
@@ -152,6 +156,7 @@ const assertZindex = ({
   operations: [Actions, string[]][];
 }) => {
   const selectedElementIds = populateElements(elements, appState);
+
   operations.forEach(([action, expected]) => {
     API.executeAction(action);
     expect(h.elements.map((element) => element.id)).toEqual(expected);
@@ -1588,6 +1593,7 @@ describe("z-index reordering with broken contiguity (invariant-violating input)"
       expect(() => API.executeAction(action)).not.toThrow();
 
       const after = h.elements.map((el) => el.id);
+
       // hard contract:
       expect(after.length).toBe(before.length); // no loss
       expect(new Set(after).size).toBe(after.length); // no duplication
@@ -1607,6 +1613,7 @@ describe("z-index reordering with broken contiguity (invariant-violating input)"
       { id: "F1", type: "frame" },
       { id: "F2", type: "frame" },
     ];
+
     assertReorderPreservesElements(elements, undefined, [
       [actionBringForward, ["F2_1", "F1_2", "F1_1", "F1", "F2"]],
       [actionSendBackward, ["F1_1", "F2_1", "F1_2", "F1", "F2"]],
@@ -1623,6 +1630,7 @@ describe("z-index reordering with broken contiguity (invariant-violating input)"
       { id: "C", groupIds: ["g1"], isSelected: true },
       { id: "D" },
     ];
+
     assertReorderPreservesElements(elements, undefined, [
       // move-by-one leaves the group scattered (each run moves independently)
       [actionBringForward, ["B", "A", "D", "C"]],
@@ -1640,6 +1648,7 @@ describe("z-index reordering with broken contiguity (invariant-violating input)"
       { id: "C", groupIds: ["g1"], isSelected: true },
       { id: "D" },
     ];
+
     assertReorderPreservesElements(elements, { editingGroupId: "g1" }, [
       [actionBringForward, ["A", "B", "C", "D"]],
       [actionSendBackward, ["C", "A", "B", "D"]],
@@ -1656,6 +1665,7 @@ describe("z-index reordering with broken contiguity (invariant-violating input)"
       { id: "Y", groupIds: ["g2"], isSelected: true },
       { id: "Z" },
     ];
+
     assertReorderPreservesElements(elements, undefined, [
       [actionBringForward, ["Z", "A", "X", "C", "Y"]],
       [actionSendBackward, ["A", "X", "C", "Y", "Z"]],

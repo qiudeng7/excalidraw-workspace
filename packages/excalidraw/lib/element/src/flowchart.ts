@@ -65,6 +65,7 @@ const mergeIntervals = (intervals: Interval[]): Interval[] => {
 
   for (const interval of sorted) {
     const last = merged[merged.length - 1];
+
     if (last && interval.start <= last.end) {
       last.end = Math.max(last.end, interval.end);
     } else {
@@ -94,12 +95,15 @@ const findNearestFreeSlot = (
 
   let best = ideal;
   let bestDistance = Infinity;
+
   for (let i = 0; i < gapStarts.length; i++) {
     if (gapEnds[i] - gapStarts[i] < size) {
       continue;
     }
+
     const start = clamp(ideal, gapStarts[i], gapEnds[i] - size);
     const distance = Math.abs(start - ideal);
+
     if (distance <= bestDistance) {
       best = start;
       bestDistance = distance;
@@ -123,11 +127,13 @@ const getConnectedFlowchartNodes = (
 
   while (queue.length > 0) {
     const currentId = queue.shift()!;
+
     for (const arrow of arrows) {
       const startId = arrow.startBinding?.elementId;
       const endId = arrow.endBinding?.elementId;
 
       let neighborId: string | undefined;
+
       if (startId === currentId) {
         neighborId = endId;
       } else if (endId === currentId) {
@@ -140,6 +146,7 @@ const getConnectedFlowchartNodes = (
 
       visited.add(neighborId);
       const neighbor = elementsMap.get(neighborId);
+
       if (neighbor && isBindableElement(neighbor)) {
         connected.push(neighbor);
         queue.push(neighborId);
@@ -189,6 +196,7 @@ const placeCluster = (
       .filter((bounds) => {
         const start = horizontal ? bounds[0] : bounds[1];
         const end = horizontal ? bounds[2] : bounds[3];
+
         return start < primaryStart + nodePrimarySize && end > primaryStart;
       })
       .map((bounds) => ({
@@ -203,13 +211,13 @@ const placeCluster = (
   const anchoredStart =
     stickyCrossStart === null
       ? null
-      : [stickyCrossStart, stickyCrossStart - step]
+      : ([stickyCrossStart, stickyCrossStart - step]
           .filter((start) => intervalIsFree(start, clusterCrossSize, occupied))
           .sort(
             (a, b) =>
               Math.abs(a + clusterCrossSize / 2 - parentCrossCenter) -
               Math.abs(b + clusterCrossSize / 2 - parentCrossCenter),
-          )[0] ?? null;
+          )[0] ?? null);
 
   const crossStart =
     anchoredStart ??
@@ -221,6 +229,7 @@ const placeCluster = (
 
   const positions = Array.from({ length: count }, (_, index) => {
     const cross = crossStart + index * step;
+
     return horizontal
       ? { x: primaryStart, y: cross }
       : { x: cross, y: primaryStart };
@@ -291,6 +300,7 @@ export const addNewNodes = (
   );
 
   const nodes: NonDeletedExcalidrawElement[] = [];
+
   for (const position of positions) {
     const nextNode = cloneFlowchartNode(startNode, position.x, position.y);
     const bindingArrow = createBindingArrow(
@@ -325,16 +335,19 @@ const createBindingArrow = (
       startY = startBindingElement.y - PADDING;
       break;
     }
+
     case "down": {
       startX = startBindingElement.x + startBindingElement.width / 2;
       startY = startBindingElement.y + startBindingElement.height + PADDING;
       break;
     }
+
     case "right": {
       startX = startBindingElement.x + startBindingElement.width + PADDING;
       startY = startBindingElement.y + startBindingElement.height / 2;
       break;
     }
+
     case "left": {
       startX = startBindingElement.x - PADDING;
       startY = startBindingElement.y + startBindingElement.height / 2;
@@ -351,16 +364,19 @@ const createBindingArrow = (
       endY = endBindingElement.y + endBindingElement.height - startY + PADDING;
       break;
     }
+
     case "down": {
       endX = endBindingElement.x + endBindingElement.width / 2 - startX;
       endY = endBindingElement.y - startY - PADDING;
       break;
     }
+
     case "right": {
       endX = endBindingElement.x - startX - PADDING;
       endY = endBindingElement.y - startY + endBindingElement.height / 2;
       break;
     }
+
     case "left": {
       endX = endBindingElement.x + endBindingElement.width - startX + PADDING;
       endY = endBindingElement.y - startY + endBindingElement.height / 2;
@@ -403,6 +419,7 @@ const createBindingArrow = (
   );
 
   const changedElements = new Map<string, OrderedExcalidrawElement>();
+
   changedElements.set(
     startBindingElement.id,
     startBindingElement as OrderedExcalidrawElement,
@@ -571,6 +588,7 @@ export class FlowChartNavigator {
           this.visitedNodes.add(linkedNode.id);
           this.isExploring = true;
           this.direction = direction;
+
           return linkedNode.id;
         }
       }
@@ -591,6 +609,7 @@ export class FlowChartNavigator {
         el,
       ) => {
         let oppositeBinding;
+
         if (
           isElbowArrow(el) &&
           // we want check existence of the opposite binding, in the direction
@@ -627,6 +646,7 @@ export class FlowChartNavigator {
             heading,
           });
         }
+
         return acc;
       },
       [],

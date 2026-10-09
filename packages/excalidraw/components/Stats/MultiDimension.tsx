@@ -117,6 +117,7 @@ const resizeElementInGroup = (
       ),
       anchor: "top",
     });
+
     return;
   }
 
@@ -124,10 +125,13 @@ const resizeElementInGroup = (
     origElement,
     originalElementsMap,
   );
+
   if (boundTextElement) {
     const newFontSize = boundTextElement.fontSize * scale;
+
     updateBoundElements(latestElement, scene);
     const latestBoundTextElement = elementsMap.get(boundTextElement.id);
+
     if (latestBoundTextElement && isTextElement(latestBoundTextElement)) {
       scene.mutateElement(latestBoundTextElement, {
         fontSize: newFontSize,
@@ -196,6 +200,7 @@ const handleDimensionChange: DragInputCallbackType<
 }) => {
   const elementsMap = scene.getNonDeletedElementsMap();
   const atomicUnits = getAtomicUnits(originalElements, originalAppState);
+
   if (nextValue !== undefined) {
     for (const atomicUnit of atomicUnits) {
       const elementsInUnit = getElementsInAtomicUnit(
@@ -244,6 +249,7 @@ const handleDimensionChange: DragInputCallbackType<
         ) {
           let nextWidth =
             property === "width" ? Math.max(0, nextValue) : latestElement.width;
+
           if (property === "width") {
             if (shouldChangeByStepSize) {
               nextWidth = getStepSizedValue(nextWidth, STEP_SIZE);
@@ -256,6 +262,7 @@ const handleDimensionChange: DragInputCallbackType<
             property === "height"
               ? Math.max(0, nextValue)
               : latestElement.height;
+
           if (property === "height") {
             if (shouldChangeByStepSize) {
               nextHeight = getStepSizedValue(nextHeight, STEP_SIZE);
@@ -326,6 +333,7 @@ const handleDimensionChange: DragInputCallbackType<
       const initialHeight = y2 - y1;
       const aspectRatio = initialWidth / initialHeight;
       let nextWidth = Math.max(0, initialWidth + changeInWidth);
+
       if (property === "width") {
         if (shouldChangeByStepSize) {
           nextWidth = getStepSizedValue(nextWidth, STEP_SIZE);
@@ -335,6 +343,7 @@ const handleDimensionChange: DragInputCallbackType<
       }
 
       let nextHeight = Math.max(0, initialHeight + changeInHeight);
+
       if (property === "height") {
         if (shouldChangeByStepSize) {
           nextHeight = getStepSizedValue(nextHeight, STEP_SIZE);
@@ -369,6 +378,7 @@ const handleDimensionChange: DragInputCallbackType<
         isPropertyEditable(latestElement, property)
       ) {
         let nextWidth = Math.max(0, origElement.width + changeInWidth);
+
         if (property === "width") {
           if (shouldChangeByStepSize) {
             nextWidth = getStepSizedValue(nextWidth, STEP_SIZE);
@@ -378,6 +388,7 @@ const handleDimensionChange: DragInputCallbackType<
         }
 
         let nextHeight = Math.max(0, origElement.height + changeInHeight);
+
         if (property === "height") {
           if (shouldChangeByStepSize) {
             nextHeight = getStepSizedValue(nextHeight, STEP_SIZE);
@@ -476,10 +487,12 @@ const MultiDimension = ({
           const [x1, y1, x2, y2] = getCommonBounds(
             elementsInUnit.map((el) => el.latest),
           );
+
           return (
             Math.round((property === "width" ? x2 - x1 : y2 - y1) * 100) / 100
           );
         }
+
         const [el] = elementsInUnit;
 
         return (

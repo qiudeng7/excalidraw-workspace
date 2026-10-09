@@ -18,6 +18,7 @@ export const ButtonIconCycle = <T extends any>({
   const cycle = () => {
     const index = options.indexOf(current!);
     const next = (index + 1) % options.length;
+
     onChange(options[next].value);
   };
 

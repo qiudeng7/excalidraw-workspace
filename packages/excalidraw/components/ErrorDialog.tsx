@@ -21,6 +21,7 @@ export const ErrorDialog = ({
     if (onClose) {
       onClose();
     }
+
     // TODO: Fix the A11y issues so this is never needed since we should always focus on last active element
     excalidrawContainer?.focus();
   }, [onClose, excalidrawContainer]);

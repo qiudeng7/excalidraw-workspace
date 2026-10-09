@@ -49,6 +49,7 @@ describe("point and polygon", () => {
       pointFrom(2, 2),
       pointFrom(0, 2),
     );
+
     expect(polygonIncludesPoint(pointFrom(1, 1), poly)).toBe(true);
     expect(polygonIncludesPoint(pointFrom(3, 3), poly)).toBe(false);
   });

@@ -244,6 +244,7 @@ export class History {
 
   private static push(stack: HistoryDelta[], entry: HistoryDelta) {
     const inversedEntry = HistoryDelta.inverse(entry);
+
     return stack.push(inversedEntry);
   }
 }

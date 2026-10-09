@@ -14,7 +14,7 @@ pnpm build
 pnpm exec wrangler deploy
 ```
 
-当前在线应用继续使用 `excalidraw-demo` Worker、D1 和 `excalidraw-demo-data` bucket。Nuxt 迁移保留账户 ID、密码哈希、session cookie 与 API 地址，直接读取原数据。更新之前备份 D1 与 R2 引用对象；代码回滚仍使用原绑定，新增 schema 应保持向后兼容。
+当前在线应用使用 `excalidraw-workspace` Worker，地址为 `https://excalidraw-workspace.qiudeng.workers.dev`。D1 仍使用 `excalidraw-demo`，R2 仍使用 `excalidraw-demo-data`，账户和画布数据保持原有位置。Cookie 绑定访问域名，更换域名后需重新登录。更新之前备份 D1 与 R2 引用对象；代码回滚仍使用原绑定，新增 schema 应保持向后兼容。
 
 本地验证 Workers：
 

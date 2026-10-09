@@ -5,6 +5,7 @@ import {
   type UserSettings,
   type UserSettingsDocument,
 } from "../../shared/contracts";
+
 export type UserSettingsStatus =
   | "loading"
   | "unavailable"
@@ -13,6 +14,7 @@ export type UserSettingsStatus =
   | "saving"
   | "error"
   | "conflict";
+
 export interface UserSettingsState {
   settings: UserSettings;
   revision: number;
@@ -23,6 +25,7 @@ export interface UserSettingsState {
   cloudConflict: UserSettingsDocument | null;
 }
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
 export interface UserSettingsResource {
   readonly userId: string;
   readonly state: Readonly<UserSettingsState>;
@@ -34,6 +37,7 @@ export interface UserSettingsResource {
   keepLocal(): Promise<boolean>;
   dispose(): void;
 }
+
 /** One resource belongs to one account/session. Dispose it before changing the owner. */
 export function createUserSettingsResource(
   userId: string,
@@ -63,15 +67,18 @@ export function createUserSettingsResource(
     if (timer !== undefined) clearTimeout(timer);
     timer = undefined;
   };
+
   async function request<T>(
     method: "GET" | "PUT",
     payload?: unknown,
   ): Promise<T> {
     const capturedGeneration = generation;
+
     // Check immediately before dispatch: an old debounce must not use a new login cookie.
     if (!current(capturedGeneration))
       throw new DOMException("Settings owner changed", "AbortError");
     const controller = new AbortController();
+
     controllers.add(controller);
     try {
       const result = await api<T>("/api/user-settings", {
@@ -80,13 +87,16 @@ export function createUserSettingsResource(
         signal: controller.signal,
         ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
       });
+
       if (!current(capturedGeneration))
         throw new DOMException("Settings owner changed", "AbortError");
+
       return result;
     } finally {
       controllers.delete(controller);
     }
   }
+
   function initialize(document: UserSettingsDocument) {
     state.settings = copy(document.settings);
     state.revision = document.revision;
@@ -99,6 +109,7 @@ export function createUserSettingsResource(
     needsConflict = false;
     localVersion++;
   }
+
   async function readCloud(): Promise<boolean> {
     if (!current()) return false;
     clearTimer();
@@ -107,42 +118,52 @@ export function createUserSettingsResource(
     state.error = "";
     try {
       const document = await request<UserSettingsDocument>("GET");
+
       if (!current()) return false;
       initialize(document);
+
       return true;
     } catch (error) {
       if (!current()) return false;
       state.ready = false;
       state.status = "unavailable";
       state.error = error instanceof Error ? error.message : "未读取云端设置";
+
       return false;
     }
   }
+
   function load(): Promise<boolean> {
     // Never discard an unsaved preview through an unrelated reload action.
     if (!current() || dirty || saving) return Promise.resolve(false);
     loading ??= readCloud().finally(() => {
       loading = undefined;
     });
+
     return loading;
   }
+
   async function conflict(): Promise<boolean> {
     try {
       const document = await request<UserSettingsDocument>("GET");
+
       if (!current()) return false;
       state.cloudConflict = copy(document);
       state.status = "conflict";
       state.error =
         "设置已在其他页面更新，请选择使用云端设置或重新提交当前设置";
       needsConflict = false;
+
       return false;
     } catch (error) {
       if (!current()) return false;
       state.status = "error";
       state.error = error instanceof Error ? error.message : "无法读取云端设置";
+
       return false;
     }
   }
+
   async function drain(): Promise<boolean> {
     if (!current()) return false;
     if (needsConflict) return conflict();
@@ -151,6 +172,7 @@ export function createUserSettingsResource(
       const value = copy(state.settings);
       const version = localVersion;
       const revision = state.revision;
+
       state.status = "saving";
       state.error = "";
       try {
@@ -158,6 +180,7 @@ export function createUserSettingsResource(
           settings: value,
           revision,
         });
+
         if (!current()) return false;
         state.revision = document.revision;
         state.configured = document.configured;
@@ -169,18 +192,24 @@ export function createUserSettingsResource(
           error.code === "USER_SETTINGS_CONFLICT"
         ) {
           needsConflict = true;
+
           return conflict();
         }
+
         state.status = "error";
         state.error = error instanceof Error ? error.message : "设置保存失败";
+
         return false;
       }
     }
+
     if (!current()) return false;
     state.status = "synced";
     state.error = "";
+
     return true;
   }
+
   function flush(): Promise<boolean> {
     clearTimer();
     if (!current()) return Promise.resolve(false);
@@ -189,8 +218,10 @@ export function createUserSettingsResource(
     saving ??= drain().finally(() => {
       saving = undefined;
     });
+
     return saving;
   }
+
   function update(settings: UserSettings): boolean {
     if (!current() || !state.ready) return false;
     state.settings = copy(settings);
@@ -199,22 +230,28 @@ export function createUserSettingsResource(
     state.error = "";
     if (state.cloudConflict || needsConflict) {
       state.status = "conflict";
+
       return true;
     }
+
     state.status = saving ? "saving" : "pending";
     clearTimer();
     timer = setTimeout(() => {
       timer = undefined;
       void flush();
     }, 350);
+
     return true;
   }
+
   function useCloud(): boolean {
     if (!current() || !state.cloudConflict) return false;
     clearTimer();
     initialize(state.cloudConflict);
+
     return true;
   }
+
   function keepLocal(): Promise<boolean> {
     if (!current() || !state.cloudConflict) return Promise.resolve(false);
     state.revision = state.cloudConflict.revision;
@@ -223,11 +260,14 @@ export function createUserSettingsResource(
     needsConflict = false;
     dirty = true;
     state.status = "pending";
+
     return flush();
   }
+
   function retry(): Promise<boolean> {
     return state.ready ? flush() : load();
   }
+
   function dispose() {
     if (!alive) return;
     alive = false;
@@ -242,6 +282,7 @@ export function createUserSettingsResource(
     state.settings = createDefaultUserSettings();
     state.error = "";
   }
+
   return {
     userId,
     state: readonly(state),

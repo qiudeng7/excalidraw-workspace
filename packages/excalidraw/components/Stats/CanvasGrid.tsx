@@ -49,11 +49,13 @@ const CanvasGrid = ({
 
           if (!nextGridStep) {
             setInputValue(state.gridStep);
+
             return null;
           }
 
           nextGridStep = getNormalizedGridStep(nextGridStep);
           setInputValue(nextGridStep);
+
           return {
             gridStep: nextGridStep,
           };

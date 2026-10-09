@@ -130,6 +130,7 @@ const handlePositionChange: DragInputCallbackType<"x" | "y"> = ({
   if (nextValue !== undefined) {
     const newTopLeftX = property === "x" ? nextValue : topLeftX;
     const newTopLeftY = property === "y" ? nextValue : topLeftY;
+
     moveElement(
       newTopLeftX,
       newTopLeftY,
@@ -138,6 +139,7 @@ const handlePositionChange: DragInputCallbackType<"x" | "y"> = ({
       app.state,
       originalElementsMap,
     );
+
     return;
   }
 

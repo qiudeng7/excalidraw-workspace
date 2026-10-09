@@ -1,10 +1,12 @@
 import type { User, Workspace } from "../../shared/contracts";
 import type { RepositoryPort, StoredCanvas } from "../storage/repository";
 import { fail } from "./http";
+
 export interface OwnedResources {
   workspace(id: string, user: User): Promise<Workspace>;
   canvas(id: string, user: User): Promise<StoredCanvas>;
 }
+
 export function createOwnedResources({
   repository,
 }: {

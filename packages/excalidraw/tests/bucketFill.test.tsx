@@ -41,7 +41,9 @@ describe("bucket fill tool", () => {
     // jsdom has none (same stub as test-utils' togglePopover)
     (global as any).ResizeObserver = class ResizeObserver {
       observe() {}
+
       unobserve() {}
+
       disconnect() {}
     };
   });
@@ -60,6 +62,7 @@ describe("bucket fill tool", () => {
       roundness: null,
       backgroundColor: "transparent",
     });
+
     // commit the owner as its own history increment so the bucket fill is a
     // separate, independently-undoable step
     act(() => {
@@ -68,6 +71,7 @@ describe("bucket fill tool", () => {
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
       });
     });
+
     return rect;
   };
 
@@ -94,16 +98,19 @@ describe("bucket fill tool", () => {
       COLOR_PALETTE.transparent,
     );
     const fallbackCursor = GlobalTestState.interactiveCanvas.style.cursor;
+
     expect(decodeURIComponent(fallbackCursor)).toContain(
       `fill="${fallbackColor}"`,
     );
 
     const nextColor = "#ffec99";
+
     act(() => {
       API.setAppState({ currentItemBackgroundColor: nextColor });
     });
 
     const updatedCursor = GlobalTestState.interactiveCanvas.style.cursor;
+
     expect(updatedCursor).not.toBe(fallbackCursor);
     expect(decodeURIComponent(updatedCursor)).toContain(`fill="${nextColor}"`);
   });
@@ -129,6 +136,7 @@ describe("bucket fill tool", () => {
     const colorPicks = BUCKET_FILL_BACKGROUND_PICKS.filter(
       (color) => color !== COLOR_PALETTE.white,
     );
+
     act(() => {
       API.setAppState({ currentItemBackgroundColor: COLOR_PALETTE.white });
     });
@@ -157,6 +165,7 @@ describe("bucket fill tool", () => {
     });
 
     const eyeDropper = editorJotaiStore.get(activeEyeDropperAtom);
+
     expect(eyeDropper).not.toBeNull();
     expect(eyeDropper!.colorPickerType).toBe("elementBackground");
     expect(eyeDropper!.keepOpenOnAlt).toBe(true);
@@ -170,6 +179,7 @@ describe("bucket fill tool", () => {
     });
 
     const color = "#ff8787";
+
     act(() => {
       eyeDropper!.onSelect(color, { altKey: true } as PointerEvent);
     });
@@ -198,6 +208,7 @@ describe("bucket fill tool", () => {
 
   it("creates a unselected line polygon with the current background color", () => {
     const rect = seedRectangle();
+
     act(() => {
       // the bucket fill color is the shared shape background color
       API.setAppState({ currentItemBackgroundColor: "#ffec99" });
@@ -238,6 +249,7 @@ describe("bucket fill tool", () => {
     // pointer lifecycle, silently skipping the public callback contract
     const onPointerDown = vi.fn();
     const onPointerUp = vi.fn();
+
     await render(
       <Excalidraw
         handleKeyboardGlobally={true}
@@ -338,6 +350,7 @@ describe("bucket fill tool", () => {
     const fills = h.elements.filter(
       (el) => el.type === "line" && !el.isDeleted,
     );
+
     expect(fills).toHaveLength(1);
     expect(fills[0].backgroundColor).toBe("#ffc9c9");
 
@@ -348,12 +361,14 @@ describe("bucket fill tool", () => {
     const afterUndo = h.elements.filter(
       (el) => el.type === "line" && !el.isDeleted,
     );
+
     expect(afterUndo).toHaveLength(1);
     expect(afterUndo[0].backgroundColor).toBe("#ffec99");
   });
 
   it("restyles an orphaned fill even when no region can be derived", () => {
     const rect = seedRectangle();
+
     act(() => {
       API.setAppState({ currentItemBackgroundColor: "#ffec99" });
     });
@@ -378,6 +393,7 @@ describe("bucket fill tool", () => {
     const fills = h.elements.filter(
       (el) => el.type === "line" && !el.isDeleted,
     );
+
     expect(fills).toHaveLength(1);
     expect(fills[0].backgroundColor).toBe("#ffc9c9");
   });
@@ -398,6 +414,7 @@ describe("bucket fill tool", () => {
       y: 70,
       points: [pointFrom<LocalPoint>(0, 0), pointFrom<LocalPoint>(140, 0)],
     });
+
     act(() => {
       h.app.updateScene({
         elements: [...h.elements, splitter],
@@ -410,6 +427,7 @@ describe("bucket fill tool", () => {
     const fills = h.elements.filter(
       (el) => el.type === "line" && !el.isDeleted && el.id !== splitter.id,
     );
+
     expect(fills).toHaveLength(2);
   });
 
@@ -432,6 +450,7 @@ describe("bucket fill tool", () => {
       roundness: null,
       backgroundColor: "transparent",
     });
+
     act(() => {
       h.app.updateScene({
         elements: [first, second],
@@ -448,6 +467,7 @@ describe("bucket fill tool", () => {
     const fills = h.elements.filter(
       (el) => el.type === "line" && !el.isDeleted,
     );
+
     expect(fills).toHaveLength(2);
     expect(h.state.activeTool.type).toBe("bucketfill");
   });
@@ -457,6 +477,7 @@ describe("bucket fill tool", () => {
     selectBucketFill();
 
     const panel = document.querySelector(".selected-shape-actions");
+
     expect(panel).not.toBeNull();
     // the fill (background) color picker is shown...
     expect(panel!.querySelector('[aria-label="Background"]')).not.toBeNull();
@@ -483,6 +504,7 @@ describe("bucket fill tool", () => {
     const fill = h.elements.find(
       (el) => el.type === "line" && !el.isDeleted,
     ) as ExcalidrawLineElement | undefined;
+
     expect(fill).toBeDefined();
     expect(fill!.fillStyle).toBe("hachure");
     expect(fill!.opacity).toBe(60);
@@ -509,6 +531,7 @@ describe("bucket fill tool", () => {
     togglePopover("Background");
 
     const picker = document.querySelector(".color-picker-content")!;
+
     expect(picker).not.toBeNull();
     expect(h.state.activeTool.locked).toBe(false);
     const before = h.state.currentItemBackgroundColor;
@@ -529,6 +552,7 @@ describe("bucket fill tool", () => {
     // regression: bucket fill was originally bound to shift+f, shadowing the
     // long-standing "show fonts" shortcut for text elements
     const text = API.createElement({ type: "text", x: 20, y: 20 });
+
     act(() => {
       h.app.updateScene({
         elements: [text],
@@ -557,6 +581,7 @@ describe("bucket fill tool", () => {
     const fill = h.elements.find(
       (el) => el.type === "line" && !el.isDeleted,
     ) as ExcalidrawLineElement | undefined;
+
     expect(fill).toBeDefined();
     expect(fill!.backgroundColor).toBe("#b2f2bb");
     // the shared appState value is left untouched
@@ -582,6 +607,7 @@ describe("bucket fill tool", () => {
       roundness: null,
       backgroundColor: "transparent",
     });
+
     act(() => {
       h.app.updateScene({
         elements: [below, owner],
@@ -597,6 +623,7 @@ describe("bucket fill tool", () => {
     mouse.clickAt(75, 75);
 
     const fill = h.elements.find((el) => el.type === "line" && !el.isDeleted)!;
+
     expect(fill).toBeDefined();
     // both rectangles bound the lens, so the fill goes below the lower one
     expect(h.elements[0].id).toBe(fill.id);
@@ -626,6 +653,7 @@ describe("bucket fill tool", () => {
       roundness: null,
       backgroundColor: "transparent",
     });
+
     act(() => {
       h.app.updateScene({
         elements: [below, owner],
@@ -640,6 +668,7 @@ describe("bucket fill tool", () => {
     mouse.clickAt(75, 75);
 
     const fill = h.elements.find((el) => el.type === "line" && !el.isDeleted)!;
+
     expect(fill).toBeDefined();
     // order: below (red, covered) -> fill -> owner (transparent outline on top)
     expect(h.elements[0].id).toBe(below.id);
@@ -822,6 +851,7 @@ describe("bucket fill tool", () => {
     mouse.clickAt(80, 70);
 
     const fill = h.elements.find((el) => el.type === "line" && !el.isDeleted)!;
+
     expect(fill).toBeDefined();
 
     Keyboard.withModifierKeys({ ctrl: true }, () => {

@@ -48,6 +48,7 @@ export const actionCopyElementLink = register({
             captureUpdate: CaptureUpdateAction.EVENTUALLY,
           };
         }
+
         return {
           appState,
           elements,

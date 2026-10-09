@@ -37,5 +37,6 @@ export const roundRect = (
   if (strokeColor) {
     context.strokeStyle = strokeColor;
   }
+
   context.stroke();
 };

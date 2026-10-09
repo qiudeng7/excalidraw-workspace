@@ -116,6 +116,7 @@ export const renderRadarChart = (
             Math.sin(angle) * levelRadius,
           ),
         );
+
         points.push(pointFrom(points[0][0], points[0][1]));
 
         return newLinearElement({
@@ -138,6 +139,7 @@ export const renderRadarChart = (
   const spokes = angles.map((angle) => {
     const px = Math.cos(angle) * radius;
     const py = Math.sin(angle) * radius;
+
     return newLinearElement({
       backgroundColor: "transparent",
       ...commonProps,
@@ -157,11 +159,13 @@ export const renderRadarChart = (
     const points = angles.map((angle, axisIndex) => {
       const value = seriesData.values[axisIndex] ?? 0;
       const pointRadius = normalize(value, axisIndex) * radius;
+
       return pointFrom<LocalPoint>(
         Math.cos(angle) * pointRadius,
         Math.sin(angle) * pointRadius,
       );
     });
+
     points.push(pointFrom(points[0][0], points[0][1]));
 
     return newLinearElement({

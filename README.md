@@ -1,12 +1,12 @@
 # Excalidraw Workspace
 
-[在线使用](https://excalidraw-demo.qiudeng.workers.dev/) · [GitHub 仓库](https://github.com/qiudeng7/excalidraw-workspace) · [Changelog](https://github.com/qiudeng7/excalidraw-workspace/releases)
+[在线使用](https://excalidraw-workspace.qiudeng.workers.dev/) · [GitHub 仓库](https://github.com/qiudeng7/excalidraw-workspace) · [Changelog](https://github.com/qiudeng7/excalidraw-workspace/releases)
 
 Excalidraw Workspace 是一个开发中的在线绘图应用。使用自己的账户管理工作空间，在每个工作空间中创建多个画布，自动保存图形、文字、图片和个人素材库。它基于 Excalidraw 编辑器，默认使用更规整的线条、Nunito 字体和较短的箭头头部。
 
 ## 开始使用
 
-打开[在线应用](https://excalidraw-demo.qiudeng.workers.dev/)，注册或登录后即可绘图。侧边栏用于切换工作空间和画布，也可创建、重命名或删除它们。画布行左侧的手柄可拖拽调整顺序，触摸设备也可使用；聚焦手柄后按上、下方向键即可排序。顺序和最近打开的画布保存在账户中，刷新或换浏览器会恢复，切换工作空间时优先打开该空间最近使用的画布。空空间显示新建入口，不会自动生成画布。个人素材库在同一账户的不同画布间共享。账户之间的数据互相隔离，画布不支持多人同时协作。
+打开[在线应用](https://excalidraw-workspace.qiudeng.workers.dev/)，注册或登录后即可绘图。侧边栏用于切换工作空间和画布，也可创建、重命名或删除它们。画布行左侧的手柄可拖拽调整顺序，触摸设备也可使用；聚焦手柄后按上、下方向键即可排序。顺序和最近打开的画布保存在账户中，刷新或换浏览器会恢复，切换工作空间时优先打开该空间最近使用的画布。空空间显示新建入口，不会自动生成画布。个人素材库在同一账户的不同画布间共享。账户之间的数据互相隔离，画布不支持多人同时协作。
 
 首次访问尚未初始化的服务时，页面会引导创建管理员。管理员和普通用户均使用邮箱、密码登录；注册密码至少 12 位，邮箱只作为登录名，无需邮件验证。管理员可在侧边栏的“管理设置”中关闭或重新开放注册；关闭注册后，已有用户仍可登录。
 
@@ -106,7 +106,7 @@ pnpm exec wrangler r2 bucket create excalidraw-demo-data
 
 将创建结果中的数据库 ID 填入 [wrangler.jsonc](wrangler.jsonc) 的 `d1_databases[0].database_id`，同时核对 Worker、数据库和 bucket 名称，并将 `vars.PUBLIC_ORIGIN` 改为自己的实际访问 origin（例如 `https://draw.example.com`）；它用于写请求的来源校验。完整配置见[部署说明](docs/deployment.md)。**仓库中的数据库 ID 指向当前在线应用；部署到自己的账户时必须替换成自己的数据库 ID。** 资源名称可以自行修改，但必须与实际创建的资源和配置一致。
 
-当前在线应用继续使用 `excalidraw-demo` Worker、D1 和 `excalidraw-demo-data` R2 bucket，产品改名未迁移这些资源，因此访问地址和已有用户数据保持原有位置。
+当前在线应用使用 `excalidraw-workspace` Worker，地址为 `https://excalidraw-workspace.qiudeng.workers.dev`。D1 仍为 `excalidraw-demo`，R2 bucket 仍为 `excalidraw-demo-data`，继续使用已有账户和画布数据。更换访问域名后需要重新登录。
 
 ```sh
 pnpm db:migrate:remote

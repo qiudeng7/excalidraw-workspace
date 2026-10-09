@@ -79,10 +79,12 @@ const ShortcutIsland = (props: {
 
 function* intersperse(as: JSX.Element[][], delim: string | null) {
   let first = true;
+
   for (const x of as) {
     if (!first) {
       yield delim;
     }
+
     first = false;
     yield x;
   }

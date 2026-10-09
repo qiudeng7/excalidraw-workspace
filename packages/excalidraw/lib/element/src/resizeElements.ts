@@ -105,8 +105,10 @@ export const transformElements = (
   centerY: number,
 ): boolean => {
   const elementsMap = scene.getNonDeletedElementsMap();
+
   if (selectedElements.length === 1) {
     const [element] = selectedElements;
+
     if (transformHandleType === "rotation") {
       if (!isElbowArrow(element)) {
         rotateSingleElement(
@@ -152,9 +154,11 @@ export const transformElements = (
         );
       }
     }
+
     if (isTextElement(element)) {
       updateBoundElements(element, scene);
     }
+
     return true;
   } else if (selectedElements.length > 1) {
     if (transformHandleType === "rotation") {
@@ -168,6 +172,7 @@ export const transformElements = (
         centerX,
         centerY,
       );
+
       return true;
     } else if (transformHandleType) {
       const { nextWidth, nextHeight, flipByX, flipByY, originalBoundingBox } =
@@ -204,6 +209,7 @@ export const transformElements = (
       return true;
     }
   }
+
   return false;
 };
 
@@ -221,6 +227,7 @@ const rotateSingleElement = (
   const cx = (x1 + x2) / 2;
   const cy = (y1 + y2) / 2;
   let angle: Radians;
+
   if (isFrameLikeElement(element)) {
     angle = 0 as Radians;
   } else {
@@ -230,8 +237,10 @@ const rotateSingleElement = (
       angle = (angle + SHIFT_LOCKING_ANGLE / 2) as Radians;
       angle = (angle - (angle % SHIFT_LOCKING_ANGLE)) as Radians;
     }
+
     angle = normalizeRadians(angle as Radians);
   }
+
   const boundTextElementId = getBoundTextElementId(element);
 
   let update: ElementUpdate<NonDeletedExcalidrawElement> = {
@@ -246,6 +255,7 @@ const rotateSingleElement = (
     if (element.startBinding) {
       unbindBindingElement(element, "start", scene);
     }
+
     if (element.endBinding) {
       unbindBindingElement(element, "end", scene);
     }
@@ -263,6 +273,7 @@ const rotateSingleElement = (
         textElement,
         scene.getNonDeletedElementsMap(),
       );
+
       scene.mutateElement(textElement, {
         angle,
         x,
@@ -298,13 +309,17 @@ export const measureFontSizeFromWidth = (
   let width = element.width;
 
   const hasContainer = isBoundToContainer(element);
+
   if (hasContainer) {
     const container = getContainerElement(element, elementsMap);
+
     if (container) {
       width = getBoundTextMaxWidth(container, element);
     }
   }
+
   const nextFontSize = element.fontSize * (nextWidth / width);
+
   if (nextFontSize < MIN_FONT_SIZE) {
     return null;
   }
@@ -328,6 +343,7 @@ export const resizeSingleTextElement = (
   const metricsWidth = element.width * (nextHeight / element.height);
 
   const metrics = measureFontSizeFromWidth(element, elementsMap, metricsWidth);
+
   if (metrics === null) {
     return;
   }
@@ -354,6 +370,7 @@ export const resizeSingleTextElement = (
       x: newOrigin.x,
       y: newOrigin.y,
     });
+
     return;
   }
 
@@ -421,6 +438,7 @@ const rotateMultipleElements = (
   const elementsMap = scene.getNonDeletedElementsMap();
   let centerAngle =
     (5 * Math.PI) / 2 + Math.atan2(pointerY - centerY, pointerX - centerX);
+
   if (shouldRotateWithDiscreteAngle) {
     centerAngle += SHIFT_LOCKING_ANGLE / 2;
     centerAngle -= centerAngle % SHIFT_LOCKING_ANGLE;
@@ -467,6 +485,7 @@ const rotateMultipleElements = (
             unbindBindingElement(element, "start", scene);
           }
         }
+
         if (element.endBinding) {
           if (!rotatedElementsMap.has(element.endBinding.elementId)) {
             unbindBindingElement(element, "end", scene);
@@ -475,6 +494,7 @@ const rotateMultipleElements = (
       }
 
       const boundText = getBoundTextElement(element, elementsMap);
+
       if (boundText && !isArrowElement(element)) {
         const { x, y } = computeBoundTextPosition(
           element,
@@ -510,6 +530,7 @@ export const getResizeOffsetXY = (
   const angle = (
     selectedElements.length === 1 ? selectedElements[0].angle : 0
   ) as Radians;
+
   [x, y] = pointRotateRads(
     pointFrom(x, y),
     pointFrom(cx, cy),
@@ -563,6 +584,7 @@ export const getResizeArrowDirection = (
     (transformHandleType === "ne" && px >= 0) ||
     (transformHandleType === "sw" && px <= 0) ||
     (transformHandleType === "se" && (px > 0 || py > 0));
+
   return isResizeEnd ? "end" : "origin";
 };
 
@@ -593,6 +615,7 @@ const getResizeAnchor = (
       case "e": {
         return "west-side";
       }
+
       case "s":
         return "north-side";
       case "w":
@@ -615,6 +638,7 @@ const getResizeAnchor = (
   } else if (handleDirection === "ne") {
     return "bottom-left";
   }
+
   return "top-right";
 };
 
@@ -760,6 +784,7 @@ export const resizeSingleElement = (
   // geometry below, where crossing the opposite edge flips the element.
   const flipFactorX = nextWidth < 0 ? -1 : 1;
   const flipFactorY = nextHeight < 0 ? -1 : 1;
+
   nextWidth = Math.abs(nextWidth);
   nextHeight = Math.abs(nextHeight);
 
@@ -767,6 +792,7 @@ export const resizeSingleElement = (
   const boundTextElement = getBoundTextElement(latestElement, elementsMap);
   const isResizingStickyNote = isStickyNoteElement(latestElement);
   let minSize: { width: number; height: number } | undefined;
+
   if (isResizingStickyNote) {
     // A note must fit one line at its label's font ceiling.
     minSize = boundTextElement
@@ -797,21 +823,25 @@ export const resizeSingleElement = (
         nextWidth / origElement.width,
         nextHeight / origElement.height,
       );
+
       nextWidth = origElement.width * scale;
       nextHeight = origElement.height * scale;
     }
   }
 
   let boundTextFont: { fontSize?: number } = {};
+
   if (boundTextElement && !isResizingStickyNote) {
     const stateOfBoundTextElementAtResize = originalElementsMap.get(
       boundTextElement.id,
     ) as typeof boundTextElement | undefined;
+
     if (stateOfBoundTextElementAtResize) {
       boundTextFont = {
         fontSize: stateOfBoundTextElementAtResize.fontSize,
       };
     }
+
     if (shouldMaintainAspectRatio) {
       const updatedElement = {
         ...latestElement,
@@ -824,9 +854,11 @@ export const resizeSingleElement = (
         elementsMap,
         getBoundTextMaxWidth(updatedElement, boundTextElement),
       );
+
       if (nextFont === null) {
         return;
       }
+
       boundTextFont = {
         fontSize: nextFont.size,
       };
@@ -847,6 +879,7 @@ export const resizeSingleElement = (
 
   if (isLinearElement(origElement)) {
     const [x1, y1] = getElementBounds(origElement, originalElementsMap);
+
     previousOrigin = pointFrom<GlobalPoint>(x1, y1);
   }
 
@@ -887,6 +920,7 @@ export const resizeSingleElement = (
   if (nextWidth < 0) {
     newOrigin.x = newOrigin.x + nextWidth;
   }
+
   if (nextHeight < 0) {
     newOrigin.y = newOrigin.y + nextHeight;
   }
@@ -908,9 +942,11 @@ export const resizeSingleElement = (
   ) {
     const fontSize =
       (Math.abs(nextWidth) / latestElement.width) * boundTextElement.fontSize;
+
     if (fontSize < MIN_FONT_SIZE) {
       return;
     }
+
     boundTextFont.fontSize = fontSize;
   }
 
@@ -971,6 +1007,7 @@ export const resizeSingleElement = (
           fontSize: boundTextFont.fontSize,
         });
       }
+
       handleBindTextResize(
         latestElement,
         scene,
@@ -1038,12 +1075,15 @@ const getNextSingleWidthAndHeightFromPointer = (
   if (handleDirection.includes("e")) {
     scaleX = (rotatedPointer[0] - startTopLeft[0]) / boundsCurrentWidth;
   }
+
   if (handleDirection.includes("s")) {
     scaleY = (rotatedPointer[1] - startTopLeft[1]) / boundsCurrentHeight;
   }
+
   if (handleDirection.includes("w")) {
     scaleX = (startBottomRight[0] - rotatedPointer[0]) / boundsCurrentWidth;
   }
+
   if (handleDirection.includes("n")) {
     scaleY = (startBottomRight[1] - rotatedPointer[1]) / boundsCurrentHeight;
   }
@@ -1062,12 +1102,15 @@ const getNextSingleWidthAndHeightFromPointer = (
   if (shouldMaintainAspectRatio) {
     const widthRatio = Math.abs(nextWidth) / origElement.width;
     const heightRatio = Math.abs(nextHeight) / origElement.height;
+
     if (handleDirection.length === 1) {
       nextHeight *= widthRatio;
       nextWidth *= heightRatio;
     }
+
     if (handleDirection.length === 2) {
       const ratio = Math.max(widthRatio, heightRatio);
+
       nextWidth = origElement.width * ratio * Math.sign(nextWidth);
       nextHeight = origElement.height * ratio * Math.sign(nextHeight);
     }
@@ -1094,8 +1137,8 @@ const getNextMultipleWidthAndHeightFromPointer = (
     shouldMaintainAspectRatio?: boolean;
   } = {},
 ) => {
-  const originalElementsArray = selectedElements.map(
-    (el) => originalElementsMap.get(el.id)!,
+  const originalElementsArray = selectedElements.map((el) =>
+    originalElementsMap.get(el.id)!,
   );
 
   // getCommonBoundingBox() uses getBoundTextElement() which returns null for
@@ -1106,14 +1149,19 @@ const getNextMultipleWidthAndHeightFromPointer = (
     if (!isLinearElement(orig)) {
       return acc;
     }
+
     const textId = getBoundTextElementId(orig);
+
     if (!textId) {
       return acc;
     }
+
     const text = originalElementsMap.get(textId) ?? null;
+
     if (!isBoundToContainer(text)) {
       return acc;
     }
+
     return [
       ...acc,
       {
@@ -1262,11 +1310,12 @@ export const resizeMultipleElements = (
     ) => {
       // originalElementsMap holds snapshots of the (non-deleted) selection
       const origElement = originalElementsMap!.get(element.id) as
-        | NonDeletedExcalidrawElement
-        | undefined;
+        NonDeletedExcalidrawElement | undefined;
+
       if (origElement) {
         acc.push({ orig: origElement, latest: element });
       }
+
       return acc;
     },
     [],
@@ -1281,14 +1330,19 @@ export const resizeMultipleElements = (
       if (!isLinearElement(orig)) {
         return acc;
       }
+
       const textId = getBoundTextElementId(orig);
+
       if (!textId) {
         return acc;
       }
+
       const text = originalElementsMap!.get(textId) ?? null;
+
       if (!isBoundToContainer(text)) {
         return acc;
       }
+
       return [
         ...acc,
         {
@@ -1307,6 +1361,7 @@ export const resizeMultipleElements = (
       ...boundTextElements,
     ]);
   }
+
   const { minX, minY, maxX, maxY, midX, midY } = boundingBox;
   const width = maxX - minX;
   const height = maxY - minY;
@@ -1434,7 +1489,7 @@ export const resizeMultipleElements = (
         false,
       );
 
-      const update: typeof elementsAndUpdates[0]["update"] = {
+      const update: (typeof elementsAndUpdates)[0]["update"] = {
         x,
         y,
         width,
@@ -1459,6 +1514,7 @@ export const resizeMultipleElements = (
             ],
           };
         }
+
         if (orig.endBinding) {
           update.endBinding = {
             ...orig.endBinding,
@@ -1472,6 +1528,7 @@ export const resizeMultipleElements = (
             ],
           };
         }
+
         if (orig.fixedSegments && rescaledPoints.points) {
           update.fixedSegments = orig.fixedSegments.map((segment) => ({
             ...segment,
@@ -1490,9 +1547,11 @@ export const resizeMultipleElements = (
 
       if (isTextElement(orig)) {
         const metrics = measureFontSizeFromWidth(orig, elementsMap, width);
+
         if (!metrics) {
           return;
         }
+
         update.fontSize = metrics.size;
       }
 
@@ -1504,9 +1563,11 @@ export const resizeMultipleElements = (
       if (boundTextElement && !isStickyNoteElement(orig)) {
         if (keepAspectRatio) {
           const newFontSize = boundTextElement.fontSize * scale;
+
           if (newFontSize < MIN_FONT_SIZE) {
             return;
           }
+
           update.boundTextFontSize = newFontSize;
         } else {
           update.boundTextFontSize = boundTextElement.fontSize;
@@ -1561,6 +1622,7 @@ export const resizeMultipleElements = (
             unbindBindingElement(element, "start", scene);
           }
         }
+
         if (element.endBinding) {
           if (!resizedElementsMap.has(element.endBinding.elementId)) {
             unbindBindingElement(element, "end", scene);
@@ -1569,6 +1631,7 @@ export const resizeMultipleElements = (
       }
 
       const boundTextElement = getBoundTextElement(element, elementsMap);
+
       if (
         boundTextElement &&
         boundTextFontSize &&

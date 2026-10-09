@@ -29,6 +29,7 @@ describe("restore appState.fontTopPicks", () => {
       } as any,
       null,
     );
+
     expect(restored.fontTopPicks).toEqual([
       FONT_FAMILY["Lilita One"],
       FONT_FAMILY.Virgil,
@@ -43,6 +44,7 @@ describe("restore appState.fontTopPicks", () => {
       FONT_FAMILY["Comic Shanns"],
       FONT_FAMILY.Virgil,
     ];
+
     expect(
       restoreAppState({ fontTopPicks: many } as any, null).fontTopPicks,
     ).toEqual(many.slice(0, FONT_TOP_PICKS_SLOTS));

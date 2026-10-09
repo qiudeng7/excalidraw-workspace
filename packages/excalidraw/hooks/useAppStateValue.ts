@@ -7,17 +7,17 @@ import { getDefaultAppState } from "../appState";
 import type { AppState } from "../types";
 
 type AppStateSelector =
-  | keyof AppState
-  | (keyof AppState)[]
-  | ((appState: AppState) => unknown);
+  keyof AppState | (keyof AppState)[] | ((appState: AppState) => unknown);
 
 const getSelectedValue = (appState: AppState, selector: AppStateSelector) => {
   if (typeof selector === "function") {
     return selector(appState);
   }
+
   if (Array.isArray(selector)) {
     return appState;
   }
+
   return appState[selector];
 };
 
@@ -31,6 +31,7 @@ const getLatestValue = (
   }
 
   let appState = api?.getAppState();
+
   if (!appState) {
     if (!_internal) {
       return undefined;
@@ -71,14 +72,17 @@ export function useAppStateValue<K extends keyof AppState>(
   prop: K,
   _internal?: boolean,
 ): AppState[K];
+
 export function useAppStateValue(
   props: (keyof AppState)[],
   _internal?: boolean,
 ): AppState;
+
 export function useAppStateValue<T>(
   selector: (appState: AppState) => T,
   _internal?: boolean,
 ): T;
+
 export function useAppStateValue(
   selector: AppStateSelector,
   _internal: boolean = true,
@@ -91,6 +95,7 @@ export function useAppStateValue(
     isInitialized: boolean;
     latestValue: unknown;
   } | null>(null);
+
   if (!stateRef.current) {
     stateRef.current = {
       selector,
@@ -98,6 +103,7 @@ export function useAppStateValue(
       latestValue: getLatestValue(api, selector, _internal),
     };
   }
+
   stateRef.current.selector = selector;
   if (!stateRef.current.isInitialized && api && !api.isDestroyed) {
     stateRef.current.isInitialized = true;
@@ -106,6 +112,7 @@ export function useAppStateValue(
 
   useEffect(() => {
     const currentStateRef = stateRef.current;
+
     if (!api || api.isDestroyed || !currentStateRef) {
       return;
     }
@@ -129,14 +136,17 @@ export function useOnAppStateChange<K extends keyof AppState>(
   prop: K,
   callback: (value: AppState[K], appState: AppState) => void,
 ): undefined;
+
 export function useOnAppStateChange(
   props: (keyof AppState)[],
   callback: (props: AppState, appState: AppState) => void,
 ): undefined;
+
 export function useOnAppStateChange<T>(
   selector: (appState: AppState) => T,
   callback: (value: T, appState: AppState) => void,
 ): undefined;
+
 export function useOnAppStateChange(
   selector: AppStateSelector,
   callback: (value: any, appState: AppState) => void,
@@ -147,6 +157,7 @@ export function useOnAppStateChange(
     selector,
     callback,
   });
+
   stateRef.current.selector = selector;
   stateRef.current.callback = callback;
 

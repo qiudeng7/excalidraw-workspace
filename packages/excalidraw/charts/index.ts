@@ -19,6 +19,7 @@ export {
 } from "./charts.types";
 
 export { isSpreadsheetValidForChartType } from "./charts.helpers";
+
 export { tryParseCells, tryParseNumber, tryParseSpreadsheet };
 
 export const renderSpreadsheet = (
@@ -31,8 +32,10 @@ export const renderSpreadsheet = (
   if (chartType === "line") {
     return renderLineChart(spreadsheet, x, y, colorSeed);
   }
+
   if (chartType === "radar") {
     return renderRadarChart(spreadsheet, x, y, colorSeed);
   }
+
   return renderBarChart(spreadsheet, x, y, colorSeed);
 };

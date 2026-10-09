@@ -20,6 +20,7 @@ describe("Queue", () => {
         }, ms);
       }).then((x) => {
         calls.push(x);
+
         return x;
       });
     };

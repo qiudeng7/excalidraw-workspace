@@ -32,15 +32,10 @@ import type { Scene } from "@excalidraw/element";
 import type { AppState } from "../../types";
 
 export type StatsInputProperty =
-  | "x"
-  | "y"
-  | "width"
-  | "height"
-  | "angle"
-  | "fontSize"
-  | "gridStep";
+  "x" | "y" | "width" | "height" | "angle" | "fontSize" | "gridStep";
 
 export const SMALLEST_DELTA = 0.01;
+
 export const STEP_SIZE = 10;
 
 export const isPropertyEditable = (
@@ -50,15 +45,18 @@ export const isPropertyEditable = (
   if (property === "angle" && isFrameLikeElement(element)) {
     return false;
   }
+
   return true;
 };
 
 export const getStepSizedValue = (value: number, stepSize: number) => {
   const v = value + stepSize / 2;
+
   return v - (v % stepSize);
 };
 
 export type AtomicUnit = Record<string, true>;
+
 export const getElementsInAtomicUnit = (
   atomicUnit: AtomicUnit,
   elementsMap: ElementsMap,
@@ -137,9 +135,11 @@ export const moveElement = (
 
   const elementsMap = scene.getNonDeletedElementsMap();
   const latestElement = elementsMap.get(originalElement.id);
+
   if (!latestElement) {
     return;
   }
+
   const [cx, cy] = [
     originalElement.x + originalElement.width / 2,
     originalElement.y + originalElement.height / 2,
@@ -173,8 +173,10 @@ export const moveElement = (
     originalElement,
     originalElementsMap,
   );
+
   if (boundTextElement) {
     const latestBoundTextElement = elementsMap.get(boundTextElement.id);
+
     latestBoundTextElement &&
       scene.mutateElement(
         latestBoundTextElement,
@@ -191,6 +193,7 @@ export const moveElement = (
       originalElementsMap,
       originalElement.id,
     );
+
     originalChildren.forEach((child) => {
       const latestChildElement = elementsMap.get(child.id);
 
@@ -240,9 +243,11 @@ export const getAtomicUnits = (
   const _atomicUnits = selectedGroupIds.map((gid) => {
     return getElementsInGroup(targetElements, gid).reduce((acc, el) => {
       acc[el.id] = true;
+
       return acc;
     }, {} as AtomicUnit);
   });
+
   targetElements
     .filter((el) => !isInGroup(el))
     .forEach((el) => {
@@ -250,5 +255,6 @@ export const getAtomicUnits = (
         [el.id]: true,
       });
     });
+
   return _atomicUnits;
 };

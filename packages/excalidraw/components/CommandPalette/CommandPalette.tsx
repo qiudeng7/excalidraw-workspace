@@ -177,9 +177,11 @@ export const CommandPalette = Object.assign(
           });
         }
       };
+
       window.addEventListener(EVENT.KEYDOWN, commandPaletteShortcut, {
         capture: true,
       });
+
       return () =>
         window.removeEventListener(EVENT.KEYDOWN, commandPaletteShortcut, {
           capture: true,
@@ -257,6 +259,7 @@ function CommandPaletteInner({
 
     const getActionLabel = (action: Action) => {
       let label = "";
+
       if (action.label) {
         if (typeof action.label === "function") {
           label = t(
@@ -270,6 +273,7 @@ function CommandPaletteInner({
           label = t(action.label as unknown as TranslationKeys);
         }
       }
+
       return label;
     };
 
@@ -277,6 +281,7 @@ function CommandPaletteInner({
       if (typeof action.icon === "function") {
         return action.icon(uiAppState, app.scene.getNonDeletedElements());
       }
+
       return action.icon;
     };
 
@@ -352,6 +357,7 @@ function CommandPaletteInner({
                     elements,
                     appState,
                   );
+
                   return selectedElements.length > 0;
                 },
           }),
@@ -466,6 +472,7 @@ function CommandPaletteInner({
           viewMode: false,
           predicate: (elements, appState) => {
             const selectedElements = getSelectedElements(elements, appState);
+
             return (
               selectedElements.length > 0 &&
               canChangeStrokeColor(appState, selectedElements)
@@ -485,6 +492,7 @@ function CommandPaletteInner({
           viewMode: false,
           predicate: (elements, appState) => {
             const selectedElements = getSelectedElements(elements, appState);
+
             return (
               selectedElements.length > 0 &&
               canChangeBackgroundColor(
@@ -716,14 +724,17 @@ function CommandPaletteInner({
       if (shouldConsiderLastUsed) {
         if (index === 0) {
           setCurrentCommand(lastUsed);
+
           return;
         }
 
         if (currentCommand === lastUsed) {
           const nextItem = matchingCommands[matchingCommands.length - 1];
+
           if (nextItem) {
             setCurrentCommand(nextItem);
           }
+
           return;
         }
       }
@@ -740,6 +751,7 @@ function CommandPaletteInner({
       }
 
       const nextItem = matchingCommands[nextIndex];
+
       if (nextItem) {
         setCurrentCommand(nextItem);
       }
@@ -756,20 +768,24 @@ function CommandPaletteInner({
       if (shouldConsiderLastUsed) {
         if (!currentCommand || index === matchingCommands.length - 1) {
           setCurrentCommand(lastUsed);
+
           return;
         }
 
         if (currentCommand === lastUsed) {
           const nextItem = matchingCommands[0];
+
           if (nextItem) {
             setCurrentCommand(nextItem);
           }
+
           return;
         }
       }
 
       const nextIndex = (index + 1) % matchingCommands.length;
       const nextItem = matchingCommands[nextIndex];
+
       if (nextItem) {
         setCurrentCommand(nextItem);
       }
@@ -795,6 +811,7 @@ function CommandPaletteInner({
     // if alphanumeric keypress and we're not inside the input, focus it
     if (/^[a-zA-Z0-9]$/.test(event.key)) {
       inputRef?.current?.focus();
+
       return;
     }
 
@@ -805,6 +822,7 @@ function CommandPaletteInner({
     window.addEventListener(EVENT.KEYDOWN, handleKeyDown, {
       capture: true,
     });
+
     return () =>
       window.removeEventListener(EVENT.KEYDOWN, handleKeyDown, {
         capture: true,
@@ -818,6 +836,7 @@ function CommandPaletteInner({
 
     const getNextCommandsByCategory = (commands: CommandPaletteItem[]) => {
       const nextCommandsByCategory: Record<string, CommandPaletteItem[]> = {};
+
       for (const command of commands) {
         if (nextCommandsByCategory[command.category]) {
           nextCommandsByCategory[command.category].push(command);
@@ -855,12 +874,14 @@ function CommandPaletteInner({
         ),
       );
       setCurrentCommand(showLastUsed ? lastUsed : matchingCommands[0] || null);
+
       return;
     }
 
     const _query = deburr(
       commandSearch.toLocaleLowerCase().replace(/[<>_| -]/g, ""),
     );
+
     matchingCommands = fuzzy
       .filter(_query, matchingCommands, {
         extract: (command) => command.haystack ?? "",
@@ -967,6 +988,7 @@ function CommandPaletteInner({
     </Dialog>
   );
 }
+
 const LibraryItemIcon = ({
   id,
   elements,

@@ -64,7 +64,9 @@ const rightClickCanvas = () => {
     clientX: 5,
     clientY: 5,
   });
+
   fireEvent(GlobalTestState.interactiveCanvas, event);
+
   return event;
 };
 
@@ -73,6 +75,7 @@ const dispatchPaste = async () => {
     elements: [API.createElement({ type: "rectangle", width: 10, height: 10 })],
     files: null,
   });
+
   document.dispatchEvent(
     createPasteEvent({ types: { "text/plain": clipboardJSON } }),
   );
@@ -105,16 +108,19 @@ describe("baseline (interactive & ui enabled by default)", () => {
 
     // ctrl+wheel zooms
     const initialZoom = h.state.zoom.value;
+
     wheelZoom();
     expect(h.state.zoom.value).toBeGreaterThan(initialZoom);
 
     // plain wheel pans
     const { scrollX, scrollY } = h.state;
+
     wheelPan();
     expect([h.state.scrollX, h.state.scrollY]).not.toEqual([scrollX, scrollY]);
 
     // ctrl+"=" zooms in
     const zoomBeforeKeyboard = h.state.zoom.value;
+
     pressZoomShortcut(CODES.EQUAL);
     expect(h.state.zoom.value).toBeGreaterThan(zoomBeforeKeyboard);
 
@@ -172,6 +178,7 @@ describe("interaction={false}", () => {
 
   it("container gets the excalidraw--non-interactive class", () => {
     const container = queryContainer(".excalidraw-container")!;
+
     expect(container).not.toBe(null);
     expect(container.classList.contains("excalidraw--non-interactive")).toBe(
       true,
@@ -196,6 +203,7 @@ describe("interaction={false}", () => {
       h.app.actionManager.executeAction(actionZoomIn, "api");
     });
     const zoom = h.state.zoom.value;
+
     expect(zoom).not.toBe(1);
 
     pressZoomShortcut(CODES.EQUAL);
@@ -209,6 +217,7 @@ describe("interaction={false}", () => {
 
     // page-scroll keys are inert as well (navigation-only)
     const { scrollY } = h.state;
+
     fireEvent.keyDown(document, { key: "PageDown", code: "PageDown" });
     expect(h.state.scrollY).toBe(scrollY);
   });
@@ -233,6 +242,7 @@ describe("interaction={false}", () => {
 
   it("prevents the native context menu without opening Excalidraw's", () => {
     const event = rightClickCanvas();
+
     expect(event.defaultPrevented).toBe(true);
     expect(h.state.contextMenu).toBe(null);
     expect(UI.queryContextMenu()).toBe(null);
@@ -273,6 +283,7 @@ describe("interaction={false}", () => {
       width: 30,
       height: 30,
     });
+
     API.updateScene({ elements: [...h.elements, other] });
 
     expect(h.elements.length).toBe(2);
@@ -381,6 +392,7 @@ describe("toggling `interaction` at runtime", () => {
 
     // draw & select an element, open the context menu
     const rectangle = UI.createElement("rectangle", { x: 10, y: 10, size: 50 });
+
     expect(h.state.selectedElementIds[rectangle.id]).toBe(true);
 
     rightClickCanvas();
@@ -402,6 +414,7 @@ describe("toggling `interaction` at runtime", () => {
 
     // input is dead now
     const zoom = h.state.zoom.value;
+
     wheelZoom();
     expect(h.state.zoom.value).toBe(zoom);
 
@@ -445,6 +458,7 @@ describe("toggling `interaction` at runtime", () => {
     await waitFor(() => expect(h.state.width).toBe(200));
 
     const rectangle = API.createElement({ type: "rectangle" });
+
     API.setElements([rectangle]);
     API.setSelectedElements([rectangle]);
     expect(h.state.selectedElementIds[rectangle.id]).toBe(true);
@@ -474,11 +488,13 @@ describe("toggling `interaction` at runtime", () => {
       x: 20,
       y: 20,
     });
+
     API.setElements([text]);
     API.setSelectedElements([text]);
     Keyboard.keyPress("Enter");
 
     const editor = await getTextEditor();
+
     updateTextEditor(editor, "committed before disable");
 
     GlobalTestState.renderResult.rerender(
@@ -517,15 +533,19 @@ describe("toggling `interaction` at runtime", () => {
       width: 80,
       height: 50,
     });
+
     API.setElements([frame]);
     API.updateElement(frame, { name: "before" });
     act(() => h.setState({ editingFrame: frame.id }));
 
     const frameNameInput = await waitFor(() => {
       const input = queryContainer(".frame-name input");
+
       expect(input).not.toBe(null);
+
       return input as HTMLInputElement;
     });
+
     fireEvent.change(frameNameInput, { target: { value: "  committed  " } });
 
     GlobalTestState.renderResult.rerender(
@@ -646,6 +666,7 @@ describe("ui={false}", () => {
 
   it("container gets the excalidraw--ui-hidden class", () => {
     const container = queryContainer(".excalidraw-container")!;
+
     expect(container).not.toBe(null);
     expect(container.classList.contains("excalidraw--ui-hidden")).toBe(true);
     // ui-only mode must not force view mode / non-interactivity
@@ -731,6 +752,7 @@ describe("ui={{ enabled: ... }}", () => {
     await scrollAwayFromContent();
 
     const scrollBackButton = queryContainer(".scroll-back-to-content");
+
     expect(scrollBackButton).not.toBe(null);
     fireEvent.click(scrollBackButton!);
     await waitFor(() => expect(h.state.scrolledOutside).toBe(false));
@@ -846,6 +868,7 @@ describe("interaction={false} ui={false}", () => {
     expect(queryContainer(".dropdown-menu-button")).toBe(null);
 
     const container = queryContainer(".excalidraw-container")!;
+
     expect(container.classList.contains("excalidraw--non-interactive")).toBe(
       true,
     );
@@ -904,10 +927,12 @@ describe("interaction={{ enabled: { links } }}", () => {
       width: 120,
       height: 90,
     });
+
     API.setElements([rect]);
     if (link) {
       API.updateElement(rect, { link });
     }
+
     return rect;
   };
 
@@ -932,6 +957,7 @@ describe("interaction={{ enabled: { links } }}", () => {
     expect(queryContainer(".excalidraw--non-interactive")).not.toBe(null);
 
     const zoom = h.state.zoom.value;
+
     wheelZoom();
     expect(h.state.zoom.value).toBe(zoom);
     pressZoomShortcut(CODES.EQUAL);
@@ -1090,10 +1116,12 @@ describe("interaction={{ enabled: { navigation } }}", () => {
     expect(queryContainer(".excalidraw--navigation")).not.toBe(null);
 
     const { scrollX, scrollY } = h.state;
+
     wheelPan();
     expect([h.state.scrollX, h.state.scrollY]).not.toEqual([scrollX, scrollY]);
 
     const zoom = h.state.zoom.value;
+
     wheelZoom();
     expect(h.state.zoom.value).toBeGreaterThan(zoom);
   });
@@ -1116,6 +1144,7 @@ describe("interaction={{ enabled: { navigation } }}", () => {
 
   it("supports page-scroll keys (PageUp/PageDown)", () => {
     const { scrollY } = h.state;
+
     fireEvent.keyDown(document, { key: "PageDown", code: "PageDown" });
     expect(h.state.scrollY).toBeLessThan(scrollY);
 
@@ -1124,6 +1153,7 @@ describe("interaction={{ enabled: { navigation } }}", () => {
 
     // shift scrolls horizontally
     const { scrollX } = h.state;
+
     fireEvent.keyDown(document, {
       key: "PageDown",
       code: "PageDown",
@@ -1136,6 +1166,7 @@ describe("interaction={{ enabled: { navigation } }}", () => {
   it("supports canvas zoom & zoom-to-fit keyboard shortcuts", () => {
     // ctrl+"=" zooms in (and is prevented from zooming the browser)
     const zoom = h.state.zoom.value;
+
     expect(
       fireEvent.keyDown(document, { ctrlKey: true, code: CODES.EQUAL }),
     ).toBe(false);
@@ -1147,6 +1178,7 @@ describe("interaction={{ enabled: { navigation } }}", () => {
 
     // shift+"1" fits all elements
     const { scrollX, scrollY } = h.state;
+
     fireEvent.keyDown(document, { shiftKey: true, code: CODES.ONE });
     expect([h.state.scrollX, h.state.scrollY]).not.toEqual([scrollX, scrollY]);
   });
@@ -1188,6 +1220,7 @@ describe("interaction={{ enabled: { navigation } }}", () => {
       width: 120,
       height: 90,
     });
+
     API.setElements([rect]);
     API.updateElement(rect, { link: "https://excalidraw.com" });
 
@@ -1209,6 +1242,7 @@ describe("interaction={{ enabled: { navigation } }}", () => {
       />,
     );
     const zoom = h.state.zoom.value;
+
     wheelZoom();
     expect(h.state.zoom.value).toBe(zoom);
 
@@ -1241,10 +1275,12 @@ describe("interaction={{ enabled: { embeds / interactiveContent } }}", () => {
       width: 120,
       height: 90,
     });
+
     API.setElements([embed]);
     API.updateElement(embed, {
       link: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     });
+
     return embed;
   };
 
@@ -1602,6 +1638,7 @@ describe("interaction={{ enabled: { tools } }}", () => {
     // wheel stays with the page (no navigation enabled)
     const { scrollX, scrollY } = h.state;
     const zoom = h.state.zoom.value;
+
     wheelPan();
     wheelZoom();
     expect([h.state.scrollX, h.state.scrollY]).toEqual([scrollX, scrollY]);
@@ -1619,6 +1656,7 @@ describe("interaction={{ enabled: { tools } }}", () => {
 
     wheelPan();
     const { scrollX, scrollY } = h.state;
+
     expect([scrollX, scrollY]).not.toEqual([0, 0]);
 
     // primary-pointer drag goes to the laser, not panning

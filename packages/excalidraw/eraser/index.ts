@@ -122,9 +122,11 @@ export class EraserTrail extends AnimatedTrail {
               this.app.scene.getNonDeletedElementsMap(),
               shallowestGroupId,
             );
+
             for (const elementInGroup of elementsInGroup) {
               this.elementsToErase.delete(elementInGroup.id);
             }
+
             this.groupsToErase.delete(shallowestGroupId);
           }
 
@@ -162,6 +164,7 @@ export class EraserTrail extends AnimatedTrail {
             for (const elementInGroup of elementsInGroup) {
               this.elementsToErase.add(elementInGroup.id);
             }
+
             this.groupsToErase.add(shallowestGroupId);
           }
 
@@ -277,6 +280,7 @@ const eraserTest = (
     // between the last two points, the distanceToElement miss, so we test
     // agaist each segment of the linear element
     const segments = getElementLineSegments(element, elementsMap);
+
     for (const seg of segments) {
       if (lineSegmentsDistance(seg, pathSegment) <= tolerance) {
         return true;

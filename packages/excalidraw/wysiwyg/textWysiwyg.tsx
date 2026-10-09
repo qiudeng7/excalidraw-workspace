@@ -100,6 +100,7 @@ const getTransform = (
   const degree = (180 * angle) / Math.PI;
   const translateX = (width * (zoom.value - 1)) / 2;
   const translateY = (height * (zoom.value - 1)) / 2;
+
   return `translate(${translateX}px, ${translateY}px) scale(${zoom.value}) rotate(${degree}deg)`;
 };
 
@@ -184,7 +185,12 @@ const getLineCaretOffsetFromNativeLayout = ({
 
       positions.push(caretRect.left);
     }
-  } catch {
+  } catch (error) {
+    console.warn(
+      "Caret measurement failed; retaining native text selection",
+      error,
+    );
+
     return null;
   } finally {
     mirror.remove();
@@ -254,9 +260,12 @@ export const textWysiwyg = ({
     if (!editorBox) {
       return 0;
     }
+
     const { left, right } = app.viewport.getSidebarInsets();
+
     editorBox.style.left = `${left}px`;
     editorBox.style.right = `${right}px`;
+
     return left;
   };
   let currentTextLayout: {
@@ -277,16 +286,20 @@ export const textWysiwyg = ({
     if (!editable.style.fontFamily || !editable.style.fontSize) {
       return false;
     }
+
     const currentFont = editable.style.fontFamily.replace(/"/g, "");
+
     if (
       getFontFamilyString({ fontFamily: updatedTextElement.fontFamily }) !==
       currentFont
     ) {
       return true;
     }
+
     if (`${updatedTextElement.fontSize}px` !== editable.style.fontSize) {
       return true;
     }
+
     return false;
   };
 
@@ -303,8 +316,10 @@ export const textWysiwyg = ({
     if (!updatedTextElement) {
       return;
     }
+
     const { textAlign, verticalAlign } = updatedTextElement;
     const elementsMap = app.scene.getNonDeletedElementsMap();
+
     if (updatedTextElement && isTextElement(updatedTextElement)) {
       let coordX = updatedTextElement.x;
       let coordY = updatedTextElement.y;
@@ -329,9 +344,11 @@ export const textWysiwyg = ({
               updatedTextElement as ExcalidrawTextElementWithContainer,
               elementsMap,
             );
+
           coordX = boundTextCoords.x;
           coordY = boundTextCoords.y;
         }
+
         maxHeight = getBoundTextMaxHeight(
           container,
           updatedTextElement as ExcalidrawTextElementWithContainer,
@@ -345,6 +362,7 @@ export const textWysiwyg = ({
             updatedTextElement as ExcalidrawTextElementWithContainer,
             elementsMap,
           );
+
           coordX = x;
           coordY = y;
         } else {
@@ -354,6 +372,7 @@ export const textWysiwyg = ({
           );
 
           let originalContainerData;
+
           if (propertiesUpdated) {
             originalContainerData = updateOriginalContainerCache(
               container.id,
@@ -380,6 +399,7 @@ export const textWysiwyg = ({
               height: targetContainerHeight,
             });
             updateBoundElements(container, app.scene);
+
             return;
           } else if (
             // autoshrink container height until original container height
@@ -392,6 +412,7 @@ export const textWysiwyg = ({
               height,
               container.type,
             );
+
             app.scene.mutateElement(container, {
               height: targetContainerHeight,
             });
@@ -402,11 +423,13 @@ export const textWysiwyg = ({
               updatedTextElement as ExcalidrawTextElementWithContainer,
               elementsMap,
             );
+
             coordX = x;
             coordY = y;
           }
         }
       }
+
       const [viewportX, viewportY] = getViewportCoords(coordX, coordY);
       const angle = getTextElementAngle(updatedTextElement, container);
 
@@ -500,6 +523,7 @@ export const textWysiwyg = ({
     whiteSpace = "pre-wrap";
     wordBreak = "break-word";
   }
+
   Object.assign(editable.style, {
     position: "absolute",
     display: "inline-block",
@@ -556,8 +580,8 @@ export const textWysiwyg = ({
       layout.textAlign === "center"
         ? (layout.width - lineWidth) / 2
         : layout.textAlign === "right"
-        ? layout.width - lineWidth
-        : 0;
+          ? layout.width - lineWidth
+          : 0;
     const relativeX = localX - lineStartX;
 
     if (!line.text) {
@@ -617,6 +641,7 @@ export const textWysiwyg = ({
 
           if (parsed.elements) {
             const text = getTextFromElements(parsed.elements);
+
             if (text) {
               const { selectionStart, selectionEnd, value } = editable;
 
@@ -626,6 +651,7 @@ export const textWysiwyg = ({
                 value.slice(selectionEnd);
 
               const newPos = selectionStart + text.length;
+
               editable.selectionStart = editable.selectionEnd = newPos;
 
               editable.dispatchEvent(new Event("input"));
@@ -635,21 +661,28 @@ export const textWysiwyg = ({
           // if excalidraw elements don't contain any text elements,
           // don't paste anything
           return;
-        } catch {
-          console.warn("failed to parse excalidraw clipboard data");
+        } catch (error) {
+          console.warn(
+            "Failed to parse Excalidraw clipboard data; falling back to text",
+            error,
+          );
         }
       }
 
       dataList = dataList || (await parseDataTransferEvent(event));
 
       const textItem = dataList.findByType(MIME_TYPES.text);
+
       if (!textItem) {
         return;
       }
+
       const text = normalizeText(textItem.value);
+
       if (!text) {
         return;
       }
+
       const container = getContainerElement(
         element,
         app.scene.getNonDeletedElementsMap(),
@@ -676,20 +709,24 @@ export const textWysiwyg = ({
           value.slice(0, selectionStart) + text + value.slice(selectionEnd);
         const wrappedText = wrapText(nextText, font, maxWidth);
         const width = Math.min(getTextWidth(wrappedText, font), maxWidth);
+
         editable.style.width = `${width}px`;
       }
     };
 
     editable.oninput = () => {
       const normalized = normalizeText(editable.value);
+
       if (editable.value !== normalized) {
         const selectionStart = editable.selectionStart;
+
         editable.value = normalized;
         // put the cursor at some position close to where it was before
         // normalization (otherwise it'll end up at the end of the text)
         editable.selectionStart = selectionStart;
         editable.selectionEnd = selectionStart;
       }
+
       onChange(editable.value);
     };
   }
@@ -728,6 +765,7 @@ export const textWysiwyg = ({
       if (event.isComposing || event.keyCode === 229) {
         return;
       }
+
       submittedViaKeyboard = true;
       handleSubmit();
     } else if (
@@ -744,6 +782,7 @@ export const textWysiwyg = ({
       } else {
         indent();
       }
+
       // We must send an input event to resize the element
       editable.dispatchEvent(new Event("input"));
     }
@@ -757,6 +796,7 @@ export const textWysiwyg = ({
     const linesStartIndices = getSelectedLinesStartIndices();
 
     let value = editable.value;
+
     linesStartIndices.forEach((startIndex: number) => {
       const startValue = value.slice(0, startIndex);
       const endValue = value.slice(startIndex);
@@ -776,6 +816,7 @@ export const textWysiwyg = ({
     const removedTabs: number[] = [];
 
     let value = editable.value;
+
     linesStartIndices.forEach((startIndex) => {
       const tabMatch = value
         .slice(startIndex, startIndex + TAB_SIZE)
@@ -807,6 +848,7 @@ export const textWysiwyg = ({
         // we should reset the selectionStart to his initial value.
         editable.selectionStart = selectionStart;
       }
+
       editable.selectionEnd = Math.max(
         editable.selectionStart,
         selectionEnd - TAB_SIZE * removedTabs.length,
@@ -823,6 +865,7 @@ export const textWysiwyg = ({
     // chars before selectionStart on the same line
     const startOffset = value.slice(0, selectionStart).match(/[^\n]*$/)![0]
       .length;
+
     // put caret at the start of the line
     selectionStart = selectionStart - startOffset;
 
@@ -868,9 +911,11 @@ export const textWysiwyg = ({
     const updateElement = app.scene.getElement(
       element.id,
     ) as ExcalidrawTextElement;
+
     if (!updateElement) {
       return;
     }
+
     const container = getContainerElement(
       updateElement,
       app.scene.getNonDeletedElementsMap(),
@@ -879,6 +924,7 @@ export const textWysiwyg = ({
     if (container) {
       if (editable.value.trim()) {
         const boundTextElementId = getBoundTextElementId(container);
+
         if (!boundTextElementId || boundTextElementId !== element.id) {
           app.scene.mutateElement(container, {
             boundElements: (container.boundElements || []).concat({
@@ -1001,6 +1047,7 @@ export const textWysiwyg = ({
       }
 
       temporarilyDisableSubmit();
+
       return;
     }
 
@@ -1055,6 +1102,7 @@ export const textWysiwyg = ({
     const isPopupOpened = !!ownerDocument.activeElement?.closest(
       ".properties-content",
     );
+
     if (!isPopupOpened) {
       editable.focus({ preventScroll: true });
     }
@@ -1079,20 +1127,25 @@ export const textWysiwyg = ({
     if (!editorBox) {
       return;
     }
+
     const { scrollLeft, scrollTop } = editorBox;
+
     if (!scrollLeft && !scrollTop) {
       return;
     }
+
     editorBox.scrollLeft = 0;
     editorBox.scrollTop = 0;
     // the box only scrolls right and down (it can't go below 0)
     const panX = scrollLeft && scrollLeft + CARET_FOLLOW_PADDING;
     const panY = scrollTop && scrollTop + CARET_FOLLOW_PADDING;
+
     app.viewport.translate((state) => ({
       scrollX: state.scrollX - panX / state.zoom.value,
       scrollY: state.scrollY - panY / state.zoom.value,
     }));
   };
+
   editorBox?.addEventListener("scroll", onEditorBoxScroll);
 
   // ---------------------------------------------------------------------------
@@ -1104,11 +1157,13 @@ export const textWysiwyg = ({
     // because we need it to happen *after* the blur event from `pointerdown`)
     editable.select();
   }
+
   bindBlurEvent();
 
   // reposition wysiwyg in case of canvas is resized. Using ResizeObserver
   // is preferred so we catch changes from host, where window may not resize.
   let observer: ResizeObserver | null = null;
+
   if (canvas && "ResizeObserver" in ownerWindow) {
     observer = new ownerWindow.ResizeObserver(() => {
       updateWysiwygStyle();

@@ -53,6 +53,7 @@ export const ColorInput = ({
       } else {
         setErrorMessage(t("colorPicker.invalidColor"));
       }
+
       setInnerValue(value);
     },
     [onChange],
@@ -106,6 +107,7 @@ export const ColorInput = ({
             } else if (event.key === KEYS.ESCAPE) {
               eyeDropperTriggerRef.current?.focus();
             }
+
             event.stopPropagation();
           }}
           placeholder={placeholder}

@@ -29,21 +29,16 @@ import type {
 } from "./types";
 
 export type TransformHandleDirection =
-  | "n"
-  | "s"
-  | "w"
-  | "e"
-  | "nw"
-  | "ne"
-  | "sw"
-  | "se";
+  "n" | "s" | "w" | "e" | "nw" | "ne" | "sw" | "se";
 
 export type TransformHandleType = TransformHandleDirection | "rotation";
 
 export type TransformHandle = Bounds;
+
 export type TransformHandles = Partial<{
   [T in TransformHandleType]: TransformHandle;
 }>;
+
 export type MaybeTransformHandleType = TransformHandleType | false;
 
 const transformHandleSizes: { [k in PointerType]: number } = {
@@ -106,6 +101,7 @@ const generateTransformHandle = (
     pointFrom(cx, cy),
     angle,
   );
+
   return [xx - width / 2, yy - height / 2, width, height];
 };
 
@@ -217,6 +213,7 @@ export const getTransformHandlesFromCoords = (
   // Note: we render using "mouse" size so we should also use "mouse" size for this check
   const minimumSizeForEightHandles =
     (5 * transformHandleSizes.mouse) / zoom.value;
+
   if (Math.abs(width) > minimumSizeForEightHandles) {
     if (!omitSides.n) {
       transformHandles.n = generateTransformHandle(
@@ -229,6 +226,7 @@ export const getTransformHandlesFromCoords = (
         angle,
       );
     }
+
     if (!omitSides.s) {
       transformHandles.s = generateTransformHandle(
         x1 + width / 2 - handleWidth / 2,
@@ -241,6 +239,7 @@ export const getTransformHandlesFromCoords = (
       );
     }
   }
+
   if (Math.abs(height) > minimumSizeForEightHandles) {
     if (!omitSides.w) {
       transformHandles.w = generateTransformHandle(
@@ -253,6 +252,7 @@ export const getTransformHandlesFromCoords = (
         angle,
       );
     }
+
     if (!omitSides.e) {
       transformHandles.e = generateTransformHandle(
         x2 + dashedLineMargin - centeringOffset,
@@ -291,6 +291,7 @@ export const getTransformHandles = (
     if (element.points.length === 2) {
       // only check the last point because starting point is always (0,0)
       const [, p1] = element.points;
+
       if (p1[0] === 0 || p1[1] === 0) {
         omitSides = OMIT_SIDES_FOR_LINE_BACKSLASH;
       } else if (p1[0] > 0 && p1[1] < 0) {
@@ -309,11 +310,13 @@ export const getTransformHandles = (
       rotation: true,
     };
   }
+
   const margin = isLinearElement(element)
     ? DEFAULT_TRANSFORM_HANDLE_SPACING + 8
     : isImageElement(element)
-    ? 0
-    : DEFAULT_TRANSFORM_HANDLE_SPACING;
+      ? 0
+      : DEFAULT_TRANSFORM_HANDLE_SPACING;
+
   return getTransformHandlesFromCoords(
     getElementAbsoluteCoords(element, elementsMap, true),
     element.angle,
@@ -336,14 +339,18 @@ export const hasBoundingBox = (
   ) {
     return false;
   }
+
   if (elements.length > 1) {
     return true;
   }
+
   const element = elements[0];
+
   if (isElbowArrow(element)) {
     // Elbow arrows cannot be resized as single selected elements
     return false;
   }
+
   if (!isLinearElement(element)) {
     return true;
   }

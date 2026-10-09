@@ -38,6 +38,7 @@ export const actionSelectAll = register({
       )
       .reduce((map: Record<ExcalidrawElement["id"], true>, element) => {
         map[element.id] = true;
+
         return map;
       }, {});
 

@@ -87,12 +87,16 @@ export class AppPan {
   consumesContextMenuEvent = () => {
     if (this.secondary) {
       this.secondary.nativeMenuSeen = true;
+
       return true;
     }
+
     if (this.suppressNextContextMenu) {
       this.suppressNextContextMenu = false;
+
       return true;
     }
+
     return false;
   };
 
@@ -100,25 +104,26 @@ export class AppPan {
    * it did */
   start = (event: React.PointerEvent<HTMLElement> | MouseEvent): boolean => {
     const { app } = this;
+
     // a new press supersedes whatever the previous session left pending
     this.suppressNextContextMenu = false;
     const isSecondary = event.button === POINTER_BUTTON.SECONDARY;
-    if (
-      !(
-        this.dependencies.getPointerCount() <= 1 &&
-        (((event.button === POINTER_BUTTON.WHEEL ||
-          isSecondary ||
-          (event.button === POINTER_BUTTON.MAIN && this.spaceHeld) ||
-          isHandToolActive(app.state)) &&
-          // reachable while non-interactive when the active tool is allowed
-          // via `interaction.enabled.tools` — panning must remain gated on
-          // `navigation` then
-          (app.isInteractionEnabled() || app.isNavigationEnabled())) ||
-          (app.state.viewModeEnabled && !app.isActiveToolPointerCapturing()))
-      )
-    ) {
+
+    if (!(
+      this.dependencies.getPointerCount() <= 1 &&
+      (((event.button === POINTER_BUTTON.WHEEL ||
+        isSecondary ||
+        (event.button === POINTER_BUTTON.MAIN && this.spaceHeld) ||
+        isHandToolActive(app.state)) &&
+        // reachable while non-interactive when the active tool is allowed
+        // via `interaction.enabled.tools` — panning must remain gated on
+        // `navigation` then
+        (app.isInteractionEnabled() || app.isNavigationEnabled())) ||
+        (app.state.viewModeEnabled && !app.isActiveToolPointerCapturing()))
+    )) {
       return false;
     }
+
     this.active = true;
     this.secondary = isSecondary
       ? { engaged: false, nativeMenuSeen: false }
@@ -143,6 +148,7 @@ export class AppPan {
     if (!this.secondary) {
       app.cursor.set(CURSOR_TYPE.GRABBING);
     }
+
     const { clientX: startX, clientY: startY } = event;
     let { clientX: lastX, clientY: lastY } = event;
     const onPointerMove = withBatchedUpdatesThrottled((event: PointerEvent) => {
@@ -154,16 +160,19 @@ export class AppPan {
         ) {
           return;
         }
+
         this.secondary.engaged = true;
         app.cursor.set(CURSOR_TYPE.GRABBING);
         // pans from here on; the threshold distance is not caught up
         lastX = event.clientX;
         lastY = event.clientY;
+
         return;
       }
 
       const deltaX = lastX - event.clientX;
       const deltaY = lastY - event.clientY;
+
       lastX = event.clientX;
       lastY = event.clientY;
 
@@ -218,10 +227,12 @@ export class AppPan {
         scrollY: state.scrollY - deltaY / state.zoom.value,
       }));
     });
+
     this.pendingMoveFlush = onPointerMove.flush;
     const teardown = withBatchedUpdates(
       (upEvent?: PointerEvent | FocusEvent) => {
         const { secondary } = this;
+
         this.teardown = null;
         this.pendingMoveFlush = null;
         this.active = false;
@@ -230,9 +241,11 @@ export class AppPan {
           // a drag: the platform's `contextmenu` still to come is no click
           this.suppressNextContextMenu = true;
         }
+
         if (!this.spaceHeld) {
           app.cursor.reset();
         }
+
         app.setState(
           {
             cursorButton: "up",
@@ -247,8 +260,10 @@ export class AppPan {
                 upEvent && "clientX" in upEvent
                   ? upEvent
                   : { clientX: lastX, clientY: lastY };
+
               app.savePointer(pointer.clientX, pointer.clientY, "up");
             }
+
             app.viewport.releaseOverscroll();
           },
         );
@@ -277,12 +292,14 @@ export class AppPan {
         }
       },
     );
+
     this.teardown = teardown;
     app.ownerWindow.addEventListener(EVENT.BLUR, teardown);
     app.ownerWindow.addEventListener(EVENT.POINTER_MOVE, onPointerMove, {
       passive: true,
     });
     app.ownerWindow.addEventListener(EVENT.POINTER_UP, teardown);
+
     return true;
   };
 }

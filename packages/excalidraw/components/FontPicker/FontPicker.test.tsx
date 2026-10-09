@@ -11,7 +11,9 @@ const { h } = window;
   (global as any).ResizeObserver ||
   class ResizeObserver {
     observe() {}
+
     unobserve() {}
+
     disconnect() {}
   };
 
@@ -44,6 +46,7 @@ describe("FontPicker", () => {
         "getBoundingClientRect",
       ).mockImplementation(function (this: HTMLElement) {
         const index = this.dataset.topPickIndex;
+
         if (index != null) {
           return new DOMRect(
             Number(index) * SLOT_SPAN,
@@ -52,9 +55,11 @@ describe("FontPicker", () => {
             SLOT_SIZE,
           );
         }
+
         if (this.classList.contains("top-picks-dnd")) {
           return new DOMRect(0, 0, SLOT_SPAN * 2 + SLOT_SIZE, SLOT_SIZE);
         }
+
         return new DOMRect(0, 300, SLOT_SIZE, SLOT_SIZE);
       });
     });
@@ -91,6 +96,7 @@ describe("FontPicker", () => {
 
     const openFontPicker = async () => {
       const utils = await render(<Excalidraw handleKeyboardGlobally={true} />);
+
       Keyboard.keyPress(KEYS.T);
       act(() => {
         utils.queryByTestId("font-family-show-fonts")!.click();
@@ -100,6 +106,7 @@ describe("FontPicker", () => {
           document.querySelector('.dropdown-menu.fonts [title="Lilita One"]'),
         ).not.toBeNull(),
       );
+
       return utils;
     };
 
@@ -109,6 +116,7 @@ describe("FontPicker", () => {
       const row = document.querySelector<HTMLElement>(
         '.dropdown-menu.fonts [title="Lilita One"]',
       )!;
+
       await drag(row, { clientX: 16, clientY: 316 }, slotCenter(1));
 
       await waitFor(() =>
@@ -133,6 +141,7 @@ describe("FontPicker", () => {
       const row = document.querySelector<HTMLElement>(
         '.dropdown-menu.fonts [title="Nunito"]',
       )!;
+
       await drag(row, { clientX: 16, clientY: 316 }, slotCenter(0));
 
       expect(h.state.fontTopPicks).toBe(null);
@@ -144,6 +153,7 @@ describe("FontPicker", () => {
       const firstPick = container.querySelector<HTMLElement>(
         '.FontPicker__top-picks [data-top-pick-index="0"]',
       )!;
+
       await drag(firstPick, slotCenter(0), slotCenter(2));
 
       await waitFor(() =>
@@ -178,6 +188,7 @@ describe("FontPicker", () => {
       const row = document.querySelector<HTMLElement>(
         '.dropdown-menu.fonts [title="Nunito"]',
       )!;
+
       await drag(row, { clientX: 16, clientY: 316 }, slotCenter(0));
       expect(h.state.fontTopPicks).toEqual([FONT_FAMILY["Lilita One"]]);
 
@@ -185,6 +196,7 @@ describe("FontPicker", () => {
       const code = document.querySelector<HTMLElement>(
         '.dropdown-menu.fonts [title="Comic Shanns"]',
       )!;
+
       await drag(code, { clientX: 16, clientY: 316 }, slotCenter(1));
       await waitFor(() =>
         expect(h.state.fontTopPicks).toEqual([
@@ -202,6 +214,7 @@ describe("FontPicker", () => {
         document.querySelector<HTMLElement>(
           ".FontPicker__tip .top-picks-dnd__tip-reset",
         );
+
       // nothing to reset while the picks are the defaults
       expect(getResetLink()).toBe(null);
 

@@ -22,9 +22,11 @@ export const getColorNameAndShadeFromColor = ({
   if (!color) {
     return null;
   }
+
   for (const [colorName, colorVal] of Object.entries(palette)) {
     if (Array.isArray(colorVal)) {
       const shade = colorVal.indexOf(color);
+
       if (shade > -1) {
         return { colorName: colorName as ColorPickerColor, shade };
       }
@@ -32,6 +34,7 @@ export const getColorNameAndShadeFromColor = ({
       return { colorName: colorName as ColorPickerColor, shade: null };
     }
   }
+
   return null;
 };
 
@@ -49,6 +52,7 @@ export const isCustomColor = ({
   palette: ColorPaletteCustom;
 }) => {
   const paletteValues = Object.values(palette).flat();
+
   return !paletteValues.includes(color);
 };
 
@@ -76,9 +80,11 @@ export const getMostUsedCustomColors = (
   });
 
   const colorCountMap = new Map<string, number>();
+
   colors.forEach((element) => {
     const color =
       element[elementColorTypeMap[type] as "backgroundColor" | "strokeColor"];
+
     if (colorCountMap.has(color)) {
       colorCountMap.set(color, colorCountMap.get(color)! + 1);
     } else {
@@ -93,15 +99,10 @@ export const getMostUsedCustomColors = (
 };
 
 export type ActiveColorPickerSectionAtomType =
-  | "custom"
-  | "baseColors"
-  | "shades"
-  | "hex"
-  | null;
+  "custom" | "baseColors" | "shades" | "hex" | null;
+
 export const activeColorPickerSectionAtom =
   atom<ActiveColorPickerSectionAtomType>(null);
 
 export type ColorPickerType =
-  | "canvasBackground"
-  | "elementBackground"
-  | "elementStroke";
+  "canvasBackground" | "elementBackground" | "elementStroke";

@@ -16,4 +16,5 @@ export const SidebarTab = ({
     </RadixTabs.Content>
   );
 };
+
 SidebarTab.displayName = "SidebarTab";

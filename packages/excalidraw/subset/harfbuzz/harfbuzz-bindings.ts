@@ -52,6 +52,7 @@ function subset(
   codePoints: ReadonlySet<number>,
 ) {
   const input = hbSubsetWasm.hb_subset_input_create_or_fail();
+
   if (input === 0) {
     throw new Error(
       "hb_subset_input_create_or_fail (harfbuzz) returned zero, indicating failure",
@@ -59,6 +60,7 @@ function subset(
   }
 
   const fontBuffer = hbSubsetWasm.malloc(font.byteLength);
+
   heapu8.set(new Uint8Array(font), fontBuffer);
 
   // Create the face
@@ -70,6 +72,7 @@ function subset(
     0,
   );
   const face = hbSubsetWasm.hb_face_create(blob, 0);
+
   hbSubsetWasm.hb_blob_destroy(blob);
 
   // Do the equivalent of --font-features=*
@@ -77,6 +80,7 @@ function subset(
     input,
     6, // HB_SUBSET_SETS_LAYOUT_FEATURE_TAG
   );
+
   hbSubsetWasm.hb_set_clear(layoutFeatures);
   hbSubsetWasm.hb_set_invert(layoutFeatures);
 
@@ -99,6 +103,7 @@ function subset(
 
   // Add unicodes indices
   const inputUnicodes = hbSubsetWasm.hb_subset_input_unicode_set(input);
+
   for (const c of codePoints) {
     hbSubsetWasm.hb_set_add(inputUnicodes, c);
   }
@@ -155,6 +160,7 @@ function subset(
   // }
 
   let subset;
+
   try {
     subset = hbSubsetWasm.hb_subset_or_fail(face, input);
     if (subset === 0) {
@@ -174,6 +180,7 @@ function subset(
 
   const offset = hbSubsetWasm.hb_blob_get_data(result, 0);
   const subsetByteLength = hbSubsetWasm.hb_blob_get_length(result);
+
   if (subsetByteLength === 0) {
     hbSubsetWasm.hb_blob_destroy(result);
     hbSubsetWasm.hb_face_destroy(subset);

@@ -41,6 +41,7 @@ describe("Sidebar", () => {
       );
 
       const node = container.querySelector("#test-sidebar-content");
+
       expect(node).not.toBe(null);
     });
 
@@ -58,10 +59,12 @@ describe("Sidebar", () => {
       await waitFor(() => {
         // make sure the custom sidebar is rendered
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).not.toBe(null);
 
         // make sure only one sidebar is rendered
         const sidebars = container.querySelectorAll(".sidebar");
+
         expect(sidebars.length).toBe(1);
       });
     });
@@ -79,6 +82,7 @@ describe("Sidebar", () => {
       // -------------------------------------------------------------------------
       await waitFor(() => {
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).toBe(null);
       });
 
@@ -88,6 +92,7 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).not.toBe(null);
       });
 
@@ -97,6 +102,7 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).toBe(null);
       });
 
@@ -108,6 +114,7 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).toBe(null);
       });
 
@@ -122,6 +129,7 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).not.toBe(null);
       });
 
@@ -131,10 +139,12 @@ describe("Sidebar", () => {
 
       await waitFor(() => {
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).toBe(null);
 
         // make sure only one sidebar is rendered
         const sidebars = container.querySelectorAll(".sidebar");
+
         expect(sidebars.length).toBe(1);
       });
 
@@ -143,12 +153,14 @@ describe("Sidebar", () => {
       expect(await toggleSidebar({ name: "customSidebar" })).toBe(true);
       await waitFor(() => {
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).not.toBe(null);
       });
 
       expect(await toggleSidebar({ name: null })).toBe(false);
       await waitFor(() => {
         const node = container.querySelector("#test-sidebar-content");
+
         expect(node).toBe(null);
       });
     });
@@ -169,6 +181,7 @@ describe("Sidebar", () => {
       );
 
       const node = container.querySelector("#test-sidebar-header-content");
+
       expect(node).not.toBe(null);
       // make sure we don't render the default fallback header,
       // just the custom one
@@ -193,8 +206,10 @@ describe("Sidebar", () => {
       const { container } = await render(<CustomExcalidraw />);
 
       const sidebar = container.querySelector<HTMLElement>(".test-sidebar");
+
       expect(sidebar).not.toBe(null);
       const closeButton = queryByTestId(sidebar!, "sidebar-close");
+
       expect(closeButton).toBe(null);
     });
 
@@ -224,8 +239,10 @@ describe("Sidebar", () => {
       expect(onStateChange).toHaveBeenCalledWith({ name: "customSidebar" });
 
       const sidebar = container.querySelector<HTMLElement>(".test-sidebar");
+
       expect(sidebar).not.toBe(null);
       const closeButton = queryByTestId(sidebar!, "sidebar-close")!;
+
       expect(closeButton).not.toBe(null);
 
       fireEvent.click(closeButton);

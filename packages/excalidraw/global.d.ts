@@ -65,6 +65,7 @@ declare module "*.scss";
 interface ArrayBuffer {
   _brand?: "ArrayBuffer";
 }
+
 interface Uint8Array {
   _brand?: "Uint8Array";
 }
@@ -73,6 +74,7 @@ interface Uint8Array {
 // https://github.com/nodeca/image-blob-reduce/issues/23#issuecomment-783271848
 declare module "image-blob-reduce" {
   import type { PicaResizeOptions, Pica } from "pica";
+
   namespace ImageBlobReduce {
     interface ImageBlobReduce {
       toBlob(file: File, options: ImageBlobReduceOptions): Promise<Blob>;
@@ -109,5 +111,6 @@ interface CustomMatchers {
 
 declare namespace jest {
   interface Expect extends CustomMatchers {}
+
   interface Matchers extends CustomMatchers {}
 }

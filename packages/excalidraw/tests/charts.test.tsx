@@ -8,6 +8,7 @@ Week 1${"\t"}814
 Week 2${"\t"}10,301
 Week 3${"\t"}4,264`,
     );
+
     expect(result).toMatchSnapshot();
   });
 

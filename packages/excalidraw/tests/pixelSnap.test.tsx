@@ -17,6 +17,7 @@ type CanvasEvent = {
 /** the static canvas's element blits, in device pixels */
 const getBlits = () => {
   const context = GlobalTestState.canvas.getContext("2d") as any;
+
   return (context.__getEvents() as CanvasEvent[])
     .filter((event) => event.type === "drawImage")
     .map(({ transform: [a, b, c, d, e, f], props }) => ({
@@ -36,12 +37,15 @@ const renderAt = async (zoom: number, scrollX: number, scrollY: number) => {
     scrollX,
     scrollY,
   });
+
   return waitFor(() => {
     // the static scene renders on the next frame
     const blits = getBlits().filter(
       (blit) => Math.abs(blit.scale - zoom) < 1e-9,
     );
+
     expect(blits.length).toBeGreaterThan(0);
+
     return blits;
   });
 };
@@ -65,6 +69,7 @@ describe("element pixel snap", () => {
       API.setElements([API.createElement({ x: 10.37, y: 20.61, ...props })]);
       for (const zoom of [1, 1.5, 0.73, 2.2]) {
         const blits = await renderAt(zoom, 3.3, -7.77);
+
         for (const blit of blits) {
           expect(distanceToWholePixel(blit)).toBeLessThan(1e-6);
         }
@@ -86,6 +91,7 @@ describe("element pixel snap", () => {
         }),
       ]);
       const blits = await renderAt(1.5, 3.3, -7.77);
+
       for (const blit of blits) {
         expect(distanceToWholePixel(blit)).toBeLessThan(1e-6);
         // and it stays where the element is — a formula that divides by the
@@ -112,9 +118,12 @@ describe("element pixel snap", () => {
     });
     const [blit] = await waitFor(() => {
       const blits = getBlits();
+
       expect(blits.length).toBeGreaterThan(0);
+
       return blits;
     });
+
     expect(distanceToWholePixel(blit)).toBeGreaterThan(1e-3);
     API.setAppState({ shouldCacheIgnoreZoom: false });
   });
@@ -129,6 +138,7 @@ describe("element pixel snap", () => {
     "keeps a label at a constant device offset from its container while dragged (%s)",
     async (_, { box, label }) => {
       const offsets = new Set<string>();
+
       for (const drag of [0, 0.3, 0.4, 0.7, 1.4]) {
         API.setElements([
           API.createElement({
@@ -151,16 +161,20 @@ describe("element pixel snap", () => {
           }),
         ]);
         const blits = await renderAt(1.5, 3.3, -7.77);
+
         expect(blits).toHaveLength(2);
         for (const blit of blits) {
           expect(distanceToWholePixel(blit)).toBeLessThan(1e-6);
         }
+
         // the container's bitmap is the wider one
         const [labelBlit, boxBlit] = [...blits].sort(
           (p, q) => p.width - q.width,
         );
+
         offsets.add(`${labelBlit.x - boxBlit.x},${labelBlit.y - boxBlit.y}`);
       }
+
       expect(offsets.size).toBe(1);
     },
   );
@@ -185,9 +199,12 @@ describe("element pixel snap", () => {
     // unsnapped offset is not a whole pixel
     const [blit] = await waitFor(() => {
       const blits = getBlits();
+
       expect(blits.length).toBeGreaterThan(0);
+
       return blits;
     });
+
     expect(distanceToWholePixel(blit)).toBeGreaterThan(1e-3);
   });
 
@@ -199,6 +216,7 @@ describe("element pixel snap", () => {
         ownerWindow,
         "devicePixelRatio",
       )!;
+
       try {
         for (const devicePixelRatio of [1, 2]) {
           Object.defineProperty(ownerWindow, "devicePixelRatio", {
@@ -215,6 +233,7 @@ describe("element pixel snap", () => {
               angle: angle as any,
             };
             const element = API.createElement(props);
+
             API.setElements([element]);
             await renderAt(zoom, 3.3, -7.77);
             (GlobalTestState.canvas.getContext("2d") as any).__clearEvents();
@@ -225,9 +244,12 @@ describe("element pixel snap", () => {
             );
             const [overridden] = await waitFor(() => {
               const blits = getBlits();
+
               expect(blits).toHaveLength(1);
+
               return blits;
             });
+
             act(() => window.h.app.api.setElementRenderOverrides(null));
             API.setElements([
               API.createElement({
@@ -237,6 +259,7 @@ describe("element pixel snap", () => {
               }),
             ]);
             const [translated] = await renderAt(zoom, 3.3, -7.77);
+
             expect(overridden.x).toBeCloseTo(translated.x, 6);
             expect(overridden.y).toBeCloseTo(translated.y, 6);
             expect(overridden.scale).toBeCloseTo(translated.scale, 6);
@@ -274,9 +297,11 @@ describe("element pixel snap", () => {
       fontSize: 20,
       containerId: box.id,
     });
+
     API.setElements([box, label]);
     await renderAt(1.5, 3.3, -7.77);
     const offsets = new Set<string>();
+
     for (const translation of [0, 0.3, 0.4, 0.7, 1.4]) {
       (GlobalTestState.canvas.getContext("2d") as any).__clearEvents();
       act(() =>
@@ -286,12 +311,16 @@ describe("element pixel snap", () => {
       );
       const blits = await waitFor(() => {
         const blits = getBlits();
+
         expect(blits).toHaveLength(2);
+
         return blits;
       });
       const [labelBlit, boxBlit] = [...blits].sort((p, q) => p.width - q.width);
+
       offsets.add(`${labelBlit.x - boxBlit.x},${labelBlit.y - boxBlit.y}`);
     }
+
     expect(offsets.size).toBe(1);
   });
 });
@@ -303,11 +332,13 @@ describe("scroll pixel snap", () => {
       { scrollX: 3.3, scrollY: -7.77, zoom },
       2,
     );
+
     // 3.3 × 1.5 × 2 = 9.9 → 10;  -7.77 × 3 = -23.31 → -23
     expect(snapped.scrollX * 3).toBeCloseTo(10, 9);
     expect(snapped.scrollY * 3).toBeCloseTo(-23, 9);
 
     const whole = { scrollX: 4, scrollY: -6, zoom };
+
     expect(snapScrollToDevicePixels(whole, 2)).toBe(whole);
   });
 
@@ -327,9 +358,11 @@ describe("scroll pixel snap", () => {
     // pixels, so the only fractional term left is the scroll
     for (const zoom of [1, 1.5]) {
       const [atFirst] = await renderAt(zoom, 3.3, -7.77);
+
       expect(distanceToWholePixel(atFirst)).toBeLessThan(1e-6);
       // a tenth of a device pixel further lands on the same pixels
       const [atSecond] = await renderAt(zoom, 3.3 + 0.1 / zoom, -7.77);
+
       expect(atSecond).toEqual(atFirst);
     }
   });
@@ -339,6 +372,7 @@ describe("grid pixel snap", () => {
   /** the static canvas's path starts, in device pixels */
   const getPathStarts = () => {
     const context = GlobalTestState.canvas.getContext("2d") as any;
+
     return (context.__getEvents() as CanvasEvent[])
       .filter((event) => event.type === "moveTo")
       .map(({ transform: [a, , , d, e, f], props }) => ({
@@ -365,14 +399,18 @@ describe("grid pixel snap", () => {
         const starts = getPathStarts().filter(
           (start) => Math.abs(start.scale - zoom) < 1e-9,
         );
+
         expect(starts.length).toBeGreaterThan(0);
+
         return starts;
       });
+
       for (const line of lines) {
         // a vertical line has its x on the half pixel, a horizontal its y
         const onHalfPixel =
           Math.abs(fraction(line.x) - 0.5) < 1e-6 ||
           Math.abs(fraction(line.y) - 0.5) < 1e-6;
+
         expect(onHalfPixel).toBe(true);
       }
     }

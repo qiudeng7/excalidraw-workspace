@@ -33,6 +33,7 @@ const trackAction = (
         const shouldTrack = action.trackEvent.predicate
           ? action.trackEvent.predicate(appState, elements, value)
           : true;
+
         if (shouldTrack) {
           trackEvent(
             action.trackEvent.category,
@@ -73,6 +74,7 @@ export class ActionManager {
         return updater(actionResult);
       }
     };
+
     this.getAppState = getAppState;
     this.getElementsIncludingDeleted = getElementsIncludingDeleted;
     this.app = app;
@@ -115,6 +117,7 @@ export class ActionManager {
       if (data.length > 1) {
         console.warn("Canceling as multiple actions match this shortcut", data);
       }
+
       return false;
     }
 
@@ -133,6 +136,7 @@ export class ActionManager {
     if (this.isActionBlockedByViewportTransition(action)) {
       event.preventDefault();
       event.stopPropagation();
+
       return true;
     }
 
@@ -145,6 +149,7 @@ export class ActionManager {
     event.preventDefault();
     event.stopPropagation();
     this.updater(data[0].perform(elements, appState, value, this.app));
+
     return true;
   }
 
@@ -191,6 +196,7 @@ export class ActionManager {
     ) {
       const action = this.actions[name];
       const PanelComponent = action.PanelComponent!;
+
       PanelComponent.displayName = "PanelComponent";
       const updateData = (formState?: any) => {
         if (this.isActionBlockedByViewportTransition(action)) {

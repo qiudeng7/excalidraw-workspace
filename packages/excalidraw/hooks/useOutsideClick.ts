@@ -25,9 +25,11 @@ export function useOutsideClick<T extends HTMLElement>(
 ) {
   useEffect(() => {
     const refOwnerDocument = ref.current?.ownerDocument;
+
     if (!refOwnerDocument) {
       return;
     }
+
     const ownerDocument: Document = refOwnerDocument;
 
     function onOutsideClick(event: Event) {

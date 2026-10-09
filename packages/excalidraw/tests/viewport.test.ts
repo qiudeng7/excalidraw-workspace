@@ -55,6 +55,7 @@ describe("scrollBoundsIntoView", () => {
   it("should bring in the start of bounds that don't fit, or leave that axis", () => {
     // taller than the view
     const bounds = [100, 500, 200, 2000] as const;
+
     expect(scrollBoundsIntoView({ bounds, appState: appState() })).toEqual({
       scrollX: 0,
       scrollY: -500,

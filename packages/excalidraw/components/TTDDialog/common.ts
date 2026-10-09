@@ -31,10 +31,13 @@ export const resetPreview = ({
   if (!canvasNode) {
     return;
   }
+
   const parent = canvasNode.parentElement;
+
   if (!parent) {
     return;
   }
+
   parent.style.background = "";
   setError(null);
   canvasNode.replaceChildren();
@@ -67,10 +70,12 @@ export const convertMermaidToExcalidraw = async ({
 
   if (!mermaidDefinition) {
     resetPreview({ canvasRef, setError });
+
     return { success: false };
   }
 
   let ret;
+
   try {
     const api = await mermaidToExcalidrawLib.api;
 
@@ -87,7 +92,12 @@ export const convertMermaidToExcalidraw = async ({
         ret = await api.parseMermaidToExcalidraw(
           mermaidDefinition.replace(/"/g, "'"),
         );
-      } catch {
+      } catch (error) {
+        console.debug(
+          "Mermaid quote normalization did not resolve the parse error",
+          error,
+        );
+
         // Keep the original error so line/column references stay aligned with
         // the user's unmodified input.
         return { success: false, error: originalParseError };
@@ -95,6 +105,7 @@ export const convertMermaidToExcalidraw = async ({
     }
 
     const { elements, files = {} } = ret;
+
     setError(null);
 
     data.current = {
@@ -118,6 +129,7 @@ export const convertMermaidToExcalidraw = async ({
 
     parent.style.background = "var(--default-bg-color)";
     canvasNode.replaceChildren(canvas);
+
     return { success: true };
   } catch (err: any) {
     parent.style.background = "var(--default-bg-color)";
@@ -129,6 +141,7 @@ export const convertMermaidToExcalidraw = async ({
     return { success: false, error: err };
   }
 };
+
 export const saveMermaidDataToStorage = (mermaidDefinition: string) => {
   EditorLocalStorage.set(
     EDITOR_LS_KEYS.MERMAID_TO_EXCALIDRAW,

@@ -111,11 +111,13 @@ export const Hyperlink = ({
       if (appState.activeEmbeddable?.element === element) {
         setAppState({ activeEmbeddable: null });
       }
+
       if (!link) {
         scene.mutateElement(element, {
           link: null,
         });
         updateEmbedValidationStatus(element, false);
+
         return;
       }
 
@@ -123,6 +125,7 @@ export const Hyperlink = ({
         if (link) {
           setToast({ message: t("toast.unableToEmbed"), closable: true });
         }
+
         element.link && embeddableLinkCache.set(element.id, element.link);
         scene.mutateElement(element, {
           link,
@@ -131,17 +134,20 @@ export const Hyperlink = ({
       } else {
         const { width, height } = element;
         const embedLink = getEmbedLink(link);
+
         if (embedLink?.error instanceof URIError) {
           setToast({
             message: t("toast.unrecognizedLinkFormat"),
             closable: true,
           });
         }
+
         const ar = embedLink
           ? embedLink.intrinsicSize.w / embedLink.intrinsicSize.h
           : 1;
         const hasLinkChanged =
           embeddableLinkCache.get(element.id) !== element.link;
+
         scene.mutateElement(element, {
           ...(hasLinkChanged
             ? {
@@ -202,22 +208,27 @@ export const Hyperlink = ({
       if (isEditing) {
         return;
       }
+
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
+
       const shouldHide = shouldHideLinkPopup(
         element,
         elementsMap,
         appState,
         pointFrom(event.clientX, event.clientY),
       ) as boolean;
+
       if (shouldHide) {
         timeoutId = window.setTimeout(() => {
           setAppState({ showHyperlinkPopup: false });
         }, AUTO_HIDE_TIMEOUT);
       }
     };
+
     window.addEventListener(EVENT.POINTER_MOVE, handlePointerMove, false);
+
     return () => {
       window.removeEventListener(EVENT.POINTER_MOVE, handlePointerMove, false);
       if (timeoutId) {
@@ -237,6 +248,7 @@ export const Hyperlink = ({
     setAppState({ showHyperlinkPopup: "editor" });
   };
   const { x, y } = getCoordsForPopover(element, appState, elementsMap);
+
   if (
     appState.contextMenu ||
     appState.selectedElementsAreBeingDragged ||
@@ -272,6 +284,7 @@ export const Hyperlink = ({
             if (event[KEYS.CTRL_OR_CMD] && event.key === KEYS.K) {
               event.preventDefault();
             }
+
             if (event.key === KEYS.ENTER || event.key === KEYS.ESCAPE) {
               handleSubmit();
               setAppState({ showHyperlinkPopup: "info" });
@@ -289,6 +302,7 @@ export const Hyperlink = ({
                 EVENT.EXCALIDRAW_LINK,
                 event.nativeEvent,
               );
+
               onLinkOpen(
                 {
                   ...element,
@@ -365,6 +379,7 @@ const getCoordsForPopover = (
   );
   const x = viewportX - appState.offsetLeft - POPUP_WIDTH / 2;
   const y = viewportY - appState.offsetTop - SPACE_BOTTOM;
+
   return { x, y };
 };
 
@@ -376,12 +391,14 @@ export const getContextMenuLabel = (
   const label = isEmbeddableElement(selectedElements[0])
     ? "labels.link.editEmbed"
     : selectedElements[0]?.link
-    ? "labels.link.edit"
-    : "labels.link.create";
+      ? "labels.link.edit"
+      : "labels.link.create";
+
   return label;
 };
 
 let HYPERLINK_TOOLTIP_TIMEOUT_ID: number | null = null;
+
 export const showHyperlinkTooltip = (
   element: NonDeletedExcalidrawElement,
   appState: AppState,
@@ -390,6 +407,7 @@ export const showHyperlinkTooltip = (
   if (HYPERLINK_TOOLTIP_TIMEOUT_ID) {
     clearTimeout(HYPERLINK_TOOLTIP_TIMEOUT_ID);
   }
+
   HYPERLINK_TOOLTIP_TIMEOUT_ID = window.setTimeout(
     () => renderTooltip(element, appState, elementsMap),
     HYPERLINK_TOOLTIP_DELAY,
@@ -440,10 +458,12 @@ const renderTooltip = (
 
   IS_HYPERLINK_TOOLTIP_VISIBLE = true;
 };
+
 export const hideHyperlinkToolip = () => {
   if (HYPERLINK_TOOLTIP_TIMEOUT_ID) {
     clearTimeout(HYPERLINK_TOOLTIP_TIMEOUT_ID);
   }
+
   if (IS_HYPERLINK_TOOLTIP_VISIBLE) {
     IS_HYPERLINK_TOOLTIP_VISIBLE = false;
     getTooltipDiv().classList.remove("excalidraw-tooltip--visible");
@@ -462,11 +482,14 @@ const shouldHideLinkPopup = (
   );
 
   const threshold = 15 / appState.zoom.value;
+
   // hitbox to prevent hiding when hovered in element bounding box
   if (hitElementBoundingBox(pointFrom(sceneX, sceneY), element, elementsMap)) {
     return false;
   }
+
   const [x1, y1, x2] = getElementAbsoluteCoords(element, elementsMap);
+
   // hit box to prevent hiding when hovered in the vertical area between element and popover
   if (
     sceneX >= x1 &&
@@ -476,6 +499,7 @@ const shouldHideLinkPopup = (
   ) {
     return false;
   }
+
   // hit box to prevent hiding when hovered around popover within threshold
   const { x: popoverX, y: popoverY } = getCoordsForPopover(
     element,
@@ -491,5 +515,6 @@ const shouldHideLinkPopup = (
   ) {
     return false;
   }
+
   return true;
 };

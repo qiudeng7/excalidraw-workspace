@@ -1,5 +1,6 @@
 export const isValidMermaidSyntax = (content: string): boolean => {
   const trimmed = content.trim();
+
   if (!trimmed) {
     return false;
   }

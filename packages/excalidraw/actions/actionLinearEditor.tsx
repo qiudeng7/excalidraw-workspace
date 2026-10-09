@@ -42,6 +42,7 @@ export const actionToggleLinearEditor = register({
   },
   predicate: (elements, appState, _, app) => {
     const selectedElements = app.scene.getSelectedElements(appState);
+
     if (
       !appState.selectedLinearElement?.isEditing &&
       selectedElements.length === 1 &&
@@ -50,6 +51,7 @@ export const actionToggleLinearEditor = register({
     ) {
       return true;
     }
+
     return false;
   },
   perform(elements, appState, _, app) {
@@ -91,6 +93,7 @@ export const actionToggleLinearEditor = register({
         ? "labels.lineEditor.editArrow"
         : "labels.lineEditor.edit",
     );
+
     return (
       <IconButton
         type="button"

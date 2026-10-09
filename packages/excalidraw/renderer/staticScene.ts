@@ -102,11 +102,14 @@ const strokeGrid = (
       scale,
       maxWidthInCssPixels * devicePixels,
     );
+
     if (widthInDevicePixels < 1) {
       return { position, lineWidth: widthInDevicePixels / devicePixels };
     }
+
     const wholeWidth = Math.round(widthInDevicePixels);
     const center = wholeWidth % 2 ? 0.5 : 0;
+
     return {
       position:
         (Math.round(position * devicePixels - center) + center) / devicePixels,
@@ -120,12 +123,14 @@ const strokeGrid = (
   for (let x = offsetX; x < offsetX + width + gridSize * 2; x += gridSize) {
     const isBold =
       gridStep > 1 && Math.round(x - scrollX) % (gridStep * gridSize) === 0;
+
     // don't render regular lines when zoomed out and they're barely visible
     if (!isBold && actualGridSize < 10) {
       continue;
     }
 
     const { position, lineWidth } = snap(x, isBold ? 4 : 1);
+
     context.lineWidth = lineWidth;
     const lineDash = [lineWidth * 3, spaceWidth + (lineWidth + spaceWidth)];
 
@@ -142,11 +147,13 @@ const strokeGrid = (
   for (let y = offsetY; y < offsetY + height + gridSize * 2; y += gridSize) {
     const isBold =
       gridStep > 1 && Math.round(y - scrollY) % (gridStep * gridSize) === 0;
+
     if (!isBold && actualGridSize < 10) {
       continue;
     }
 
     const { position, lineWidth } = snap(y, isBold ? 4 : 1);
+
     context.lineWidth = lineWidth;
     const lineDash = [lineWidth * 3, spaceWidth + (lineWidth + spaceWidth)];
 
@@ -159,6 +166,7 @@ const strokeGrid = (
     context.lineTo(Math.ceil(offsetX + width + gridSize * 2), position);
     context.stroke();
   }
+
   context.restore();
 };
 
@@ -181,6 +189,7 @@ export const frameClip = (
   } else {
     context.rect(0, 0, frame.width, frame.height);
   }
+
   context.clip();
   context.translate(
     -(frame.x + appState.scrollX),
@@ -220,6 +229,7 @@ const renderLinkIcon = (
     );
     const centerX = x + width / 2;
     const centerY = y + height / 2;
+
     context.save();
     context.translate(appState.scrollX + centerX, appState.scrollY + centerY);
     context.rotate(element.angle);
@@ -240,11 +250,11 @@ const renderLinkIcon = (
         pixelRatio,
       });
       linkCanvas.width = width * pixelRatio * appState.zoom.value;
-      linkCanvas.height =
-        height * pixelRatio * appState.zoom.value;
+      linkCanvas.height = height * pixelRatio * appState.zoom.value;
       linkIconCanvasCache[canvasKey] = linkCanvas;
 
       const linkCanvasCacheContext = linkCanvas.getContext("2d")!;
+
       linkCanvasCacheContext.scale(
         pixelRatio * appState.zoom.value,
         pixelRatio * appState.zoom.value,
@@ -272,6 +282,7 @@ const renderLinkIcon = (
 
       linkCanvasCacheContext.restore();
     }
+
     context.globalAlpha = renderState.opacity;
     context.drawImage(linkCanvas, x - centerX, y - centerY, width, height);
     context.restore();
@@ -372,10 +383,13 @@ const _renderStaticScene = ({
     ) {
       return;
     }
+
     const targetFrame = getTargetFrame(element, elementsMap, appState);
+
     if (!targetFrame) {
       return;
     }
+
     const frameState = getRenderState(targetFrame);
     const frame = getRenderElementWithPositionOverride(
       targetFrame,
@@ -383,6 +397,7 @@ const _renderStaticScene = ({
     );
     const isTranslated = (state: ElementRenderState) =>
       state.offset.x !== 0 || state.offset.y !== 0;
+
     if (
       (element.frameId === frame.id &&
         (isTranslated(renderState) || isTranslated(frameState))) ||
@@ -416,6 +431,7 @@ const _renderStaticScene = ({
         const boundTextElement = getBoundTextElement(element, elementsMap);
 
         const renderState = getRenderState(element);
+
         clipElementToFrame(element, renderState);
         renderElement(
           element,
@@ -470,6 +486,7 @@ const _renderStaticScene = ({
     .forEach((element) => {
       try {
         const renderState = getRenderState(element);
+
         context.save();
         clipElementToFrame(element, renderState);
         renderElement(
@@ -498,6 +515,7 @@ const _renderStaticScene = ({
             id: element.id,
             frameId: element.frameId,
           };
+
           renderElement(
             label,
             elementsMap,
@@ -508,6 +526,7 @@ const _renderStaticScene = ({
             appState,
           );
         }
+
         if (!isExporting && renderConfig.renderLinks !== false) {
           renderLinkIcon(
             element,
@@ -518,6 +537,7 @@ const _renderStaticScene = ({
             renderConfig.pixelRatio ?? window.devicePixelRatio,
           );
         }
+
         context.restore();
       } catch (error: any) {
         console.error(error);
@@ -558,6 +578,7 @@ export const renderStaticScene = (
 ) => {
   if (throttle) {
     renderStaticSceneThrottled(renderConfig);
+
     return;
   }
 

@@ -46,6 +46,7 @@ const JSONExportModal = ({
   canvas: HTMLCanvasElement;
 }) => {
   const { onExportToBackend } = exportOpts;
+
   return (
     <div className="ExportDialog ExportDialog--json">
       <div className="ExportDialog-cards">

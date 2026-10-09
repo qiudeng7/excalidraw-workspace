@@ -39,7 +39,11 @@ const getLineBreakRegex = () => {
   if (!cachedLineBreakRegex) {
     try {
       cachedLineBreakRegex = getLineBreakRegexAdvanced();
-    } catch {
+    } catch (error) {
+      console.warn(
+        "Advanced line-break matching is unavailable; using the basic pattern",
+        error,
+      );
       cachedLineBreakRegex = getLineBreakRegexSimple();
     }
   }
@@ -106,7 +110,7 @@ const CJK = {
    *         ↑ BREAK AFTER "」"
    */
   // eslint-disable-next-line prettier/prettier
-  OPENING:/（［｛〈《｟｢「『【〖〔〘〚＜〝/u,
+  OPENING: /（［｛〈《｟｢「『【〖〔〘〚＜〝/u,
   CLOSING: /）］｝〉》｠｣」』】〗〕〙〛＞。．，、〟‥？！：；・〜〞/u,
   /**
    * Currency symbols break before, not after
@@ -248,6 +252,7 @@ const Break = {
    */
   On: (...regexes: RegExp[]) => {
     const joined = Regex.join(...regexes);
+
     return Regex.build(`([${joined}])`);
   },
   /**
@@ -256,6 +261,7 @@ const Break = {
   Before: (...regexes: RegExp[]) => {
     const joined = Regex.join(...regexes);
     const builder = () => Regex.build(`(?=[${joined}])`);
+
     return Break.Chain(builder) as Omit<
       ReturnType<typeof Break.Chain>,
       "FollowedBy"
@@ -267,6 +273,7 @@ const Break = {
   After: (...regexes: RegExp[]) => {
     const joined = Regex.join(...regexes);
     const builder = () => Regex.build(`(?<=[${joined}])`);
+
     return Break.Chain(builder) as Omit<
       ReturnType<typeof Break.Chain>,
       "PreceededBy"
@@ -278,6 +285,7 @@ const Break = {
   BeforeMany: (...regexes: RegExp[]) => {
     const joined = Regex.join(...regexes);
     const builder = () => Regex.build(`(?<![${joined}])(?=[${joined}])`);
+
     return Break.Chain(builder) as Omit<
       ReturnType<typeof Break.Chain>,
       "FollowedBy"
@@ -289,6 +297,7 @@ const Break = {
   AfterMany: (...regexes: RegExp[]) => {
     const joined = Regex.join(...regexes);
     const builder = () => Regex.build(`(?<=[${joined}])(?![${joined}])`);
+
     return Break.Chain(builder) as Omit<
       ReturnType<typeof Break.Chain>,
       "PreceededBy"
@@ -300,6 +309,7 @@ const Break = {
   NotBefore: (...regexes: RegExp[]) => {
     const joined = Regex.join(...regexes);
     const builder = () => Regex.build(`(?![${joined}])`);
+
     return Break.Chain(builder) as Omit<
       ReturnType<typeof Break.Chain>,
       "NotFollowedBy"
@@ -311,6 +321,7 @@ const Break = {
   NotAfter: (...regexes: RegExp[]) => {
     const joined = Regex.join(...regexes);
     const builder = () => Regex.build(`(?<![${joined}])`);
+
     return Break.Chain(builder) as Omit<
       ReturnType<typeof Break.Chain>,
       "NotPrecededBy"
@@ -328,6 +339,7 @@ const Break = {
       const root = rootBuilder();
       const preceeded = Break.After(...regexes).Build();
       const builder = () => Regex.and(preceeded, root);
+
       return Break.Chain(builder) as Omit<
         ReturnType<typeof Break.Chain>,
         "PreceededBy"
@@ -340,6 +352,7 @@ const Break = {
       const root = rootBuilder();
       const followed = Break.Before(...regexes).Build();
       const builder = () => Regex.and(root, followed);
+
       return Break.Chain(builder) as Omit<
         ReturnType<typeof Break.Chain>,
         "FollowedBy"
@@ -352,6 +365,7 @@ const Break = {
       const root = rootBuilder();
       const notPreceeded = Break.NotAfter(...regexes).Build();
       const builder = () => Regex.and(notPreceeded, root);
+
       return Break.Chain(builder) as Omit<
         ReturnType<typeof Break.Chain>,
         "NotPrecededBy"
@@ -364,6 +378,7 @@ const Break = {
       const root = rootBuilder();
       const notFollowed = Break.NotBefore(...regexes).Build();
       const builder = () => Regex.and(root, notFollowed);
+
       return Break.Chain(builder) as Omit<
         ReturnType<typeof Break.Chain>,
         "NotFollowedBy"
@@ -516,6 +531,7 @@ const wrapLine = (
       if (!currentLine) {
         currentLineStart = tokenStart;
       }
+
       currentLine = testLine;
       currentLineEnd = tokenEnd;
       currentLineWidth = testLineWidth;
@@ -566,6 +582,7 @@ const wrapLine = (
       font,
       maxWidth,
     );
+
     lines.push(trailingLine);
   }
 
@@ -613,6 +630,7 @@ const wrapWord = (
       if (!currentLine) {
         currentLineStart = charStart;
       }
+
       currentLine = currentLine + char;
       currentLineEnd = charEnd;
       currentLineWidth = testLineWidth;

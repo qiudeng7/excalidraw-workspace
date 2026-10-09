@@ -173,11 +173,7 @@ export const DEFAULT_BUCKET_FILL_OPTIONS: BucketFillOptions = {
 };
 
 export type BucketFillFailureReason =
-  | "no_owner"
-  | "open_region"
-  | "too_complex"
-  | "too_small"
-  | "invalid_polygon";
+  "no_owner" | "open_region" | "too_complex" | "too_small" | "invalid_polygon";
 
 /**
  * Where the generated fill element belongs in the scene order, expressed
@@ -235,9 +231,11 @@ const projectParam = (
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const len2 = dx * dx + dy * dy;
+
   if (len2 === 0) {
     return 0;
   }
+
   return ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / len2;
 };
 
@@ -259,18 +257,23 @@ const forEachCellAlongSegment = (
   const dy = b[1] - a[1];
   const fromCx = Math.floor((minX - inflate) / cellSize);
   const toCx = Math.floor((maxX + inflate) / cellSize);
+
   for (let cx = fromCx; cx <= toCx; cx++) {
     // y-extent of the segment over this column's (inflated) x-interval
     let y0 = a[1];
     let y1 = b[1];
+
     if (dx !== 0) {
       const t0 = (Math.max(minX, cx * cellSize - inflate) - a[0]) / dx;
       const t1 = (Math.min(maxX, (cx + 1) * cellSize + inflate) - a[0]) / dx;
+
       y0 = a[1] + t0 * dy;
       y1 = a[1] + t1 * dy;
     }
+
     const fromCy = Math.floor((Math.min(y0, y1) - inflate) / cellSize);
     const toCy = Math.floor((Math.max(y0, y1) + inflate) / cellSize);
+
     for (let cy = fromCy; cy <= toCy; cy++) {
       visit(cx, cy);
     }
@@ -285,9 +288,11 @@ const perpendicularDistance = (
   const dx = b[0] - a[0];
   const dy = b[1] - a[1];
   const len = Math.hypot(dx, dy);
+
   if (len === 0) {
     return pointDistance(p, a);
   }
+
   return Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / len;
 };
 
@@ -300,22 +305,28 @@ const subtractIntervals = (
   cuts: [number, number][],
 ): [number, number][] => {
   let result = base;
+
   for (const [c0, c1] of cuts) {
     const next: [number, number][] = [];
+
     for (const [b0, b1] of result) {
       if (c1 <= b0 || c0 >= b1) {
         next.push([b0, b1]);
         continue;
       }
+
       if (c0 > b0) {
         next.push([b0, c0]);
       }
+
       if (c1 < b1) {
         next.push([c1, b1]);
       }
     }
+
     result = next;
   }
+
   return result;
 };
 
@@ -362,9 +373,11 @@ const lineElementIdealSegments = (
     ),
   );
   const segments: LineSegment<GlobalPoint>[] = [];
+
   for (let i = 0; i < points.length - 1; i++) {
     segments.push(lineSegment(points[i], points[i + 1]));
   }
+
   return segments;
 };
 
@@ -392,9 +405,11 @@ const freedrawIdealSegments = (
     ),
   );
   const segments: LineSegment<GlobalPoint>[] = [];
+
   for (let i = 0; i < points.length - 1; i++) {
     segments.push(lineSegment(points[i], points[i + 1]));
   }
+
   return segments;
 };
 
@@ -417,10 +432,12 @@ const clipSegmentToVisible = (
   margin: number,
 ): [GlobalPoint, GlobalPoint][] => {
   let intervals: [number, number][] = [[0, 1]];
+
   for (const coverer of coverers) {
     if (intervals.length === 0) {
       break;
     }
+
     const hits = intersectElementWithLineSegment(
       coverer,
       elementsMap,
@@ -435,13 +452,17 @@ const clipSegmentToVisible = (
       1,
     ];
     const covered: [number, number][] = [];
+
     for (let k = 0; k < breaks.length - 1; k++) {
       const t0 = breaks[k];
       const t1 = breaks[k + 1];
+
       if (t1 - t0 < 1e-9) {
         continue;
       }
+
       const mid = pointAtParam(a, b, (t0 + t1) / 2);
+
       if (
         isPointInElement(mid, coverer, elementsMap) &&
         distanceToElement(coverer, elementsMap, mid) > margin
@@ -449,10 +470,12 @@ const clipSegmentToVisible = (
         covered.push([t0, t1]);
       }
     }
+
     if (covered.length) {
       intervals = subtractIntervals(intervals, covered);
     }
   }
+
   return intervals
     .filter(
       ([t0, t1]) =>
@@ -483,9 +506,11 @@ class NodeStore {
   getOrCreate(p: GlobalPoint): number {
     const cx = Math.floor(p[0] / this.cellSize);
     const cy = Math.floor(p[1] / this.cellSize);
+
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const bucket = this.cells.get(this.cellKey(cx + dx, cy + dy));
+
         if (bucket) {
           for (const idx of bucket) {
             if (pointDistance(this.nodes[idx], p) <= this.eps) {
@@ -495,15 +520,19 @@ class NodeStore {
         }
       }
     }
+
     const idx = this.nodes.length;
+
     this.nodes.push(p);
     const key = this.cellKey(cx, cy);
     const bucket = this.cells.get(key);
+
     if (bucket) {
       bucket.push(idx);
     } else {
       this.cells.set(key, [idx]);
     }
+
     return idx;
   }
 
@@ -521,9 +550,11 @@ class NodeStore {
     const toCx = Math.floor((p[0] + radius) / this.cellSize);
     const fromCy = Math.floor((p[1] - radius) / this.cellSize);
     const toCy = Math.floor((p[1] + radius) / this.cellSize);
+
     for (let cx = fromCx; cx <= toCx; cx++) {
       for (let cy = fromCy; cy <= toCy; cy++) {
         const bucket = this.cells.get(this.cellKey(cx, cy));
+
         if (bucket) {
           for (const index of bucket) {
             visit(index);
@@ -558,6 +589,7 @@ export const rendersOpaqueFill = (element: ExcalidrawElement): boolean => {
   ) {
     return false;
   }
+
   // open strokes never paint their background
   if (
     (isLineElement(element) || isFreeDrawElement(element)) &&
@@ -565,6 +597,7 @@ export const rendersOpaqueFill = (element: ExcalidrawElement): boolean => {
   ) {
     return false;
   }
+
   return true;
 };
 
@@ -621,12 +654,15 @@ const isClosedOwnerCandidate = (element: ExcalidrawElement): boolean => {
   if (!FILL_BOUNDARY_TYPES.has(element.type)) {
     return false;
   }
+
   if (isLineElement(element)) {
     return element.polygon && isValidPolygon(element.points);
   }
+
   if (isFreeDrawElement(element)) {
     return isPathALoop(element.points);
   }
+
   return true;
 };
 
@@ -648,6 +684,7 @@ const findOwner = (
 ): NonDeletedExcalidrawElement | null => {
   for (let i = elements.length - 1; i >= 0; i--) {
     const element = elements[i];
+
     // fill-compatible paint is deliberately never an OWNER (unlike its
     // boundary / coverer roles): re-clicking a filled region should either
     // restyle the paint (app layer) or re-derive the region from the
@@ -659,13 +696,16 @@ const findOwner = (
     if (!rendersAnyMark(element) || isBucketFillCompatible(element)) {
       continue;
     }
+
     if (!isClosedOwnerCandidate(element)) {
       continue;
     }
+
     if (isPointInElement(point, element, elementsMap)) {
       return element;
     }
   }
+
   return null;
 };
 
@@ -742,17 +782,22 @@ const buildFaces = (
     // with roundness: null) and leave the region open.
     const a = store.getOrCreate(segment[0]);
     const b = store.getOrCreate(segment[1]);
+
     if (!nodeElement.has(a)) {
       nodeElement.set(a, elementId);
     }
+
     if (!nodeElement.has(b)) {
       nodeElement.set(b, elementId);
     }
+
     if (a === b) {
       continue;
     }
+
     const pa = store.nodes[a];
     const pb = store.nodes[b];
+
     segments.push({
       a,
       b,
@@ -781,34 +826,43 @@ const buildFaces = (
   const byMinX = segments
     .map((_, index) => index)
     .sort((a, b) => segments[a].box[0] - segments[b].box[0]);
+
   for (let oi = 0; oi < byMinX.length; oi++) {
     const i = byMinX[oi];
     const si = segments[i];
     const sweepMaxX = si.box[2] + eps;
+
     for (let oj = oi + 1; oj < byMinX.length; oj++) {
       const j = byMinX[oj];
       const sj = segments[j];
+
       if (sj.box[0] > sweepMaxX) {
         break;
       }
+
       if (!doBoundsIntersect(expandBounds(si.box, eps), sj.box)) {
         continue;
       }
+
       const intersection = lineSegmentIntersectionPoints(
         segLines[i],
         segLines[j],
         eps,
       );
+
       if (!intersection) {
         continue;
       }
+
       const node = store.getOrCreate(intersection);
+
       // intersection nodes need a source too — one may end up a loose end
       // (after visibility clipping) and get bridged, and bridge attribution
       // reads `nodeElement`
       if (!nodeElement.has(node)) {
         nodeElement.set(node, si.elementId);
       }
+
       si.splits.push({
         node,
         t: projectParam(si.pa, si.pb, store.nodes[node]),
@@ -834,19 +888,23 @@ const buildFaces = (
   let sceneMinY = Infinity;
   let sceneMaxX = -Infinity;
   let sceneMaxY = -Infinity;
+
   for (const s of segments) {
     sceneMinX = Math.min(sceneMinX, s.box[0]);
     sceneMinY = Math.min(sceneMinY, s.box[1]);
     sceneMaxX = Math.max(sceneMaxX, s.box[2]);
     sceneMaxY = Math.max(sceneMaxY, s.box[3]);
   }
+
   const sceneSpan = Math.max(sceneMaxX - sceneMinX, sceneMaxY - sceneMinY, 0);
   const segCellSize = Math.max(eps * 2, sceneSpan / 128);
   const segGrid = new Map<string, number[]>();
+
   segments.forEach((s, index) => {
     forEachCellAlongSegment(s.pa, s.pb, eps, segCellSize, (cx, cy) => {
       const key = `${cx}:${cy}`;
       const bucket = segGrid.get(key);
+
       if (bucket) {
         bucket.push(index);
       } else {
@@ -868,18 +926,24 @@ const buildFaces = (
     const bucket = segGrid.get(
       `${Math.floor(q[0] / segCellSize)}:${Math.floor(q[1] / segCellSize)}`,
     );
+
     if (!bucket) {
       continue;
     }
+
     for (const index of bucket) {
       const segment = segments[index];
+
       if (n === segment.a || n === segment.b) {
         continue;
       }
+
       const t = projectParam(segment.pa, segment.pb, q);
+
       if (t <= 0 || t >= 1) {
         continue;
       }
+
       if (distanceToLineSegment(q, segLines[index]) <= eps) {
         segment.splits.push({ node: n, t });
       }
@@ -894,6 +958,7 @@ const buildFaces = (
   const edgeKey = (u: number, v: number) => (u < v ? `${u}-${v}` : `${v}-${u}`);
   const link = (u: number, v: number) => {
     const list = adjacency.get(u);
+
     if (list) {
       list.push(v);
     } else {
@@ -904,19 +969,24 @@ const buildFaces = (
     if (u === v) {
       return;
     }
+
     if (pointDistance(store.nodes[u], store.nodes[v]) < eps) {
       return;
     }
+
     const key = edgeKey(u, v);
     const owners = edgeToElements.get(key);
+
     if (owners) {
       owners.add(elementId);
     } else {
       edgeToElements.set(key, new Set([elementId]));
     }
+
     if (edgeSet.has(key)) {
       return;
     }
+
     edgeSet.add(key);
     link(u, v);
     link(v, u);
@@ -924,14 +994,17 @@ const buildFaces = (
 
   for (const segment of segments) {
     const byNode = new Map<number, number>();
+
     for (const split of segment.splits) {
       if (!byNode.has(split.node)) {
         byNode.set(split.node, split.t);
       }
     }
+
     const ordered = [...byNode.entries()]
       .map(([node, t]) => ({ node, t }))
       .sort((a, b) => a.t - b.t);
+
     for (let k = 0; k < ordered.length - 1; k++) {
       addEdge(ordered[k].node, ordered[k + 1].node, segment.elementId);
     }
@@ -965,11 +1038,13 @@ const buildFaces = (
   const isDanglingEnd = (node: number): boolean =>
     new Set(adjacency.get(node) ?? []).size === 1;
   const looseEnds: number[] = [];
+
   for (const node of adjacency.keys()) {
     if (isDanglingEnd(node)) {
       looseEnds.push(node);
     }
   }
+
   if (looseEnds.length > 0) {
     // spatial hash of live edges, updated as bridging splits edges / adds
     // connectors. Cells are at least `bridgeRadius` wide so any edge within
@@ -983,6 +1058,7 @@ const buildFaces = (
     const edgeGrid = new Map<string, { u: number; v: number }[]>();
     const insertLiveEdge = (u: number, v: number) => {
       const edge = { u, v };
+
       forEachCellAlongSegment(
         store.nodes[u],
         store.nodes[v],
@@ -991,6 +1067,7 @@ const buildFaces = (
         (cx, cy) => {
           const key = `${cx}:${cy}`;
           const bucket = edgeGrid.get(key);
+
           if (bucket) {
             bucket.push(edge);
           } else {
@@ -999,19 +1076,26 @@ const buildFaces = (
         },
       );
     };
+
     for (const key of edgeSet) {
       const [u, v] = key.split("-").map(Number);
+
       insertLiveEdge(u, v);
     }
+
     const unlink = (u: number, v: number) => {
       const key = edgeKey(u, v);
+
       edgeSet.delete(key);
       const owners = edgeToElements.get(key);
+
       edgeToElements.delete(key);
       const listU = adjacency.get(u);
       const listV = adjacency.get(v);
+
       listU?.splice(listU.indexOf(v), 1);
       listV?.splice(listV.indexOf(u), 1);
+
       return owners;
     };
 
@@ -1020,6 +1104,7 @@ const buildFaces = (
       if (!isDanglingEnd(loose)) {
         continue;
       }
+
       const p = store.nodes[loose];
       const neighbours = adjacency.get(loose) ?? [];
 
@@ -1028,11 +1113,14 @@ const buildFaces = (
       // same point and `addEdge` refuses such degenerate edges anyway
       let bestNode = -1;
       let bestNodeDistance = Infinity;
+
       store.forEachInRadius(p, bridgeRadius, (n) => {
         if (n === loose || neighbours.includes(n)) {
           return;
         }
+
         const distance = pointDistance(p, store.nodes[n]);
+
         if (
           distance >= eps &&
           distance <= bridgeRadius &&
@@ -1053,28 +1141,37 @@ const buildFaces = (
       // an edge spans multiple cells, so it can show up in several of the 9
       // inspected buckets
       const seenEdges = new Set<string>();
+
       for (let dcx = -1; dcx <= 1; dcx++) {
         for (let dcy = -1; dcy <= 1; dcy++) {
           const bucket = edgeGrid.get(`${looseCx + dcx}:${looseCy + dcy}`);
+
           if (!bucket) {
             continue;
           }
+
           for (const edge of bucket) {
             const key = edgeKey(edge.u, edge.v);
+
             if (seenEdges.has(key)) {
               continue;
             }
+
             seenEdges.add(key);
             if (!edgeSet.has(key) || edge.u === loose || edge.v === loose) {
               continue;
             }
+
             const eu = store.nodes[edge.u];
             const ev = store.nodes[edge.v];
             const t = projectParam(eu, ev, p);
+
             if (t <= 0 || t >= 1) {
               continue;
             }
+
             const distance = distanceToLineSegment(p, lineSegment(eu, ev));
+
             if (distance <= bridgeRadius && distance < bestEdgeDistance) {
               bestEdgeDistance = distance;
               bestEdge = edge;
@@ -1087,12 +1184,14 @@ const buildFaces = (
       const bridgeElement =
         // every node gets a source at creation; the fallback is defensive
         nodeElement.get(loose) ?? segments[0].elementId;
+
       if (bestEdge && bestEdgeDistance < bestNodeDistance) {
         // split the edge at the projection (a point ON the stroke) and
         // connect the loose end to it
         const eu = store.nodes[bestEdge.u];
         const ev = store.nodes[bestEdge.v];
         const projection = store.getOrCreate(pointAtParam(eu, ev, bestEdgeT));
+
         if (projection === bestEdge.u || projection === bestEdge.v) {
           // projection merged into an endpoint — plain node bridge
           addEdge(loose, projection, bridgeElement);
@@ -1107,12 +1206,15 @@ const buildFaces = (
                 .next().value ?? bridgeElement,
             );
           }
+
           const owners =
             unlink(bestEdge.u, bestEdge.v) ?? new Set([bridgeElement]);
+
           for (const owner of owners) {
             addEdge(bestEdge.u, projection, owner);
             addEdge(projection, bestEdge.v, owner);
           }
+
           insertLiveEdge(bestEdge.u, projection);
           insertLiveEdge(projection, bestEdge.v);
           addEdge(loose, projection, bridgeElement);
@@ -1130,14 +1232,18 @@ const buildFaces = (
   // hole) — used to tell true islands from same-component subdivisions
   const componentOf = new Map<number, number>();
   let componentCount = 0;
+
   for (const start of adjacency.keys()) {
     if (componentOf.has(start)) {
       continue;
     }
+
     const queue = [start];
+
     componentOf.set(start, componentCount);
     while (queue.length) {
       const node = queue.pop()!;
+
       for (const neighbour of adjacency.get(node) ?? []) {
         if (!componentOf.has(neighbour)) {
           componentOf.set(neighbour, componentCount);
@@ -1145,6 +1251,7 @@ const buildFaces = (
         }
       }
     }
+
     componentCount++;
   }
 
@@ -1156,11 +1263,14 @@ const buildFaces = (
     );
   const sortedOut = new Map<number, number[]>();
   const positionOf = new Map<number, Map<number, number>>();
+
   for (const [node, neighbours] of adjacency) {
     const unique = Array.from(new Set(neighbours));
+
     unique.sort((p, q) => angleOf(node, p) - angleOf(node, q));
     sortedOut.set(node, unique);
     const positions = new Map<number, number>();
+
     unique.forEach((neighbour, index) => positions.set(neighbour, index));
     positionOf.set(node, positions);
   }
@@ -1169,15 +1279,18 @@ const buildFaces = (
   const visited = new Set<string>();
   const faces: Face[] = [];
   const maxSteps = edgeSet.size * 2 + 4;
+
   for (const [node, neighbours] of adjacency) {
     for (const first of neighbours) {
       if (visited.has(`${node}->${first}`)) {
         continue;
       }
+
       const ring: number[] = [];
       let from = node;
       let to = first;
       let steps = 0;
+
       while (steps++ <= maxSteps) {
         visited.add(`${from}->${to}`);
         ring.push(from);
@@ -1187,24 +1300,29 @@ const buildFaces = (
         // reverse (twin) direction
         const nextPosition = (twinPosition - 1 + outs.length) % outs.length;
         const next = outs[nextPosition];
+
         from = to;
         to = next;
         if (from === node && to === first) {
           break;
         }
       }
+
       if (ring.length >= 3) {
         const contributors = new Set<string>();
+
         for (let k = 0; k < ring.length; k++) {
           const owners = edgeToElements.get(
             edgeKey(ring[k], ring[(k + 1) % ring.length]),
           );
+
           if (owners) {
             for (const id of owners) {
               contributors.add(id);
             }
           }
         }
+
         faces.push({
           ring: ring.map((index) => store.nodes[index]),
           contributors,
@@ -1254,6 +1372,7 @@ const selectFaceFromArrangement = (
   // element order/position — see the overlapping-islands regression tests).
   const outerSign = 1;
   const areaOf = new Map<Face, number>();
+
   for (const face of faces) {
     // negated: polygonSignedArea is CCW-positive, while the invariant above
     // is stated in the opposite (bounded-faces-negative) convention
@@ -1262,18 +1381,24 @@ const selectFaceFromArrangement = (
 
   let best: Face | null = null;
   let bestArea = Infinity;
+
   for (const face of faces) {
     const area = areaOf.get(face)!;
+
     if (Math.sign(area) === outerSign) {
       continue;
     }
+
     const absArea = Math.abs(area);
+
     if (absArea < options.minArea) {
       continue;
     }
+
     if (!polygonIncludesPointNonZero(point, face.ring)) {
       continue;
     }
+
     if (absArea < bestArea) {
       bestArea = absArea;
       best = face;
@@ -1283,6 +1408,7 @@ const selectFaceFromArrangement = (
   if (!best) {
     return null;
   }
+
   const selected = best;
 
   const islandCandidates = faces.filter(
@@ -1316,14 +1442,17 @@ const selectFaceFromArrangement = (
 
 const dedupeConsecutive = (pts: GlobalPoint[], eps: number): GlobalPoint[] => {
   const out: GlobalPoint[] = [];
+
   for (const p of pts) {
     if (out.length === 0 || pointDistance(out[out.length - 1], p) >= eps) {
       out.push(p);
     }
   }
+
   while (out.length > 1 && pointDistance(out[0], out[out.length - 1]) < eps) {
     out.pop();
   }
+
   return out;
 };
 
@@ -1334,14 +1463,18 @@ const removeCollinear = (
   if (pts.length <= 3) {
     return pts;
   }
+
   const out: GlobalPoint[] = [];
+
   for (let i = 0; i < pts.length; i++) {
     const prev = out[out.length - 1] ?? pts[pts.length - 1];
     const next = pts[(i + 1) % pts.length];
+
     if (perpendicularDistance(pts[i], prev, next) >= tolerance) {
       out.push(pts[i]);
     }
   }
+
   return out.length >= 3 ? out : pts;
 };
 
@@ -1355,6 +1488,7 @@ const simplifyRing = (
   budget: number,
 ): GlobalPoint[] | null => {
   const pts = dedupeConsecutive(ring, options.snapEpsilon);
+
   if (pts.length < 3) {
     return null;
   }
@@ -1363,15 +1497,18 @@ const simplifyRing = (
   // uses (identical default tolerance), escalating until under the point cap
   let tolerance = 0.75;
   let simplified = simplify(pts, tolerance) as GlobalPoint[];
+
   while (simplified.length > budget && tolerance < 1e6) {
     tolerance *= 2;
     simplified = simplify(pts, tolerance) as GlobalPoint[];
   }
+
   if (simplified.length > budget) {
     return null;
   }
 
   simplified = removeCollinear(simplified, 0.05);
+
   return simplified.length >= 3 ? simplified : null;
 };
 
@@ -1400,9 +1537,11 @@ const spliceHoleIntoRing = (
   let bestRingIndex = 0;
   let bestHoleIndex = 0;
   let bestDistance = Infinity;
+
   for (let i = 0; i < ring.length; i++) {
     for (let j = 0; j < oriented.length; j++) {
       const distance = pointDistance(ring[i], oriented[j]);
+
       if (distance < bestDistance) {
         bestDistance = distance;
         bestRingIndex = i;
@@ -1412,12 +1551,15 @@ const spliceHoleIntoRing = (
   }
 
   const out: GlobalPoint[] = ring.slice(0, bestRingIndex + 1);
+
   // full hole loop, ending back on its attachment vertex
   for (let k = 0; k <= oriented.length; k++) {
     out.push(oriented[(bestHoleIndex + k) % oriented.length]);
   }
+
   out.push(ring[bestRingIndex]);
   out.push(...ring.slice(bestRingIndex + 1));
+
   return out;
 };
 
@@ -1436,6 +1578,7 @@ const finalizePolygon = (
   options: BucketFillOptions,
 ): { scenePoints: GlobalPoint[]; splicedHoleIndices: number[] } | null => {
   let ring = simplifyRing(outerRing, options, options.maxGeneratedPoints);
+
   if (!ring) {
     return null;
   }
@@ -1445,16 +1588,21 @@ const finalizePolygon = (
     .map((holeRing, index) => ({ holeRing, index }))
     .sort((a, b) => polygonArea(b.holeRing, 0) - polygonArea(a.holeRing, 0));
   const splicedHoleIndices: number[] = [];
+
   for (const { holeRing, index } of byAreaDesc) {
     // a spliced hole costs its own points + 2 bridge duplicates
     const budget = options.maxGeneratedPoints - ring.length - 2;
+
     if (budget < 3) {
       break;
     }
+
     const hole = simplifyRing(holeRing, options, budget);
+
     if (!hole) {
       continue;
     }
+
     ring = spliceHoleIntoRing(ring, hole);
     splicedHoleIndices.push(index);
   }
@@ -1483,6 +1631,7 @@ export const computeBucketFillPolygon = (args: {
   const owner = findOwner(point, elements, elementsMap);
 
   const indexOf = new Map<string, number>();
+
   elements.forEach((element, i) => indexOf.set(element.id, i));
 
   // 2+3. collect boundary segments within `candidateBounds`, tagged with
@@ -1529,8 +1678,9 @@ export const computeBucketFillPolygon = (args: {
       const segments = isLineElement(element)
         ? lineElementIdealSegments(element, elementsMap)
         : isFreeDrawElement(element)
-        ? freedrawIdealSegments(element, elementsMap)
-        : getElementLineSegments(element, elementsMap);
+          ? freedrawIdealSegments(element, elementsMap)
+          : getElementLineSegments(element, elementsMap);
+
       // freedraw and non-polygon line loops render as closed once their
       // endpoints are within LINE_CONFIRM_THRESHOLD (isPathALoop), but their
       // segment chain leaves that closure gap open — bridge it explicitly so
@@ -1545,10 +1695,12 @@ export const computeBucketFillPolygon = (args: {
       ) {
         const first = segments[0][0];
         const last = segments[segments.length - 1][1];
+
         if (pointDistance(first, last) >= options.snapEpsilon) {
           segments.push(lineSegment(last, first));
         }
       }
+
       for (const segment of segments) {
         // enforce the segment budget WHILE collecting: without this, a huge
         // scene does all the expensive visibility clipping before the cap
@@ -1556,16 +1708,19 @@ export const computeBucketFillPolygon = (args: {
         if (rawSegments.length > options.maxBoundarySegments) {
           return;
         }
+
         // keep sub-epsilon segments: buildFaces collapses them via node
         // merging without breaking the chain (see note there); only true
         // zero-length degenerates are noise
         if (segmentLength(segment) === 0) {
           continue;
         }
+
         if (coverersAbove.length === 0) {
           rawSegments.push({ segment, elementId: element.id });
           continue;
         }
+
         for (const [a, b] of clipSegmentToVisible(
           segment[0],
           segment[1],
@@ -1581,12 +1736,15 @@ export const computeBucketFillPolygon = (args: {
         }
       }
     };
+
     for (const element of primary ? [primary, ...boundaries] : boundaries) {
       if (rawSegments.length > options.maxBoundarySegments) {
         break;
       }
+
       collect(element);
     }
+
     return rawSegments.length > options.maxBoundarySegments
       ? null
       : rawSegments;
@@ -1596,14 +1754,17 @@ export const computeBucketFillPolygon = (args: {
     rawSegments: SourceSegment[],
   ): FaceSelection | null | "too_complex" => {
     const faces = buildFaces(rawSegments, options);
+
     if (!faces) {
       return "too_complex";
     }
+
     return selectFaceFromArrangement(faces, point, options);
   };
 
   // 4. resolve the face under the click
   let selection: FaceSelection | null = null;
+
   if (owner) {
     const pad = options.gapTolerance + 2 + Math.max(owner.strokeWidth ?? 1, 1);
     const searchBounds = expandBounds(
@@ -1611,16 +1772,21 @@ export const computeBucketFillPolygon = (args: {
       pad,
     );
     const rawSegments = collectSegments(searchBounds, owner);
+
     if (!rawSegments) {
       return { ok: false, reason: "too_complex" };
     }
+
     const selected = buildAndSelect(rawSegments);
+
     if (selected === "too_complex") {
       return { ok: false, reason: "too_complex" };
     }
+
     if (!selected) {
       return { ok: false, reason: "open_region" };
     }
+
     selection = selected;
   } else {
     // owner-less fallback: search an expanding box around the click. A face
@@ -1632,10 +1798,13 @@ export const computeBucketFillPolygon = (args: {
       (count, element) => count + (isEligibleBoundary(element) ? 1 : 0),
       0,
     );
+
     if (totalEligible === 0) {
       return { ok: false, reason: "no_owner" };
     }
+
     let radius = options.fallbackSearchRadius;
+
     for (let attempt = 0; attempt < 4 && !selection; attempt++, radius *= 2) {
       const box: Bounds = [
         point[0] - radius,
@@ -1657,22 +1826,28 @@ export const computeBucketFillPolygon = (args: {
       // the frontier heuristic below only exists to approximate exactly
       // this condition
       const isFinalAttempt = attempt === 3 || inRange === totalEligible;
+
       if (inRange === 0) {
         // empty at this radius — the region may still lie farther out, so
         // keep growing (a distant enclosure, e.g. a huge line square whose
         // strokes are all beyond the first box)
         continue;
       }
+
       const rawSegments = collectSegments(box, null);
+
       // the fallback is speculative — never toast on its failures. Over the
       // segment cap counts as a failure, not a "too complex" complaint.
       if (!rawSegments) {
         return { ok: false, reason: "no_owner" };
       }
+
       const selected = buildAndSelect(rawSegments);
+
       if (selected === "too_complex") {
         return { ok: false, reason: "no_owner" };
       }
+
       if (
         selected &&
         (isFinalAttempt ||
@@ -1686,17 +1861,20 @@ export const computeBucketFillPolygon = (args: {
       ) {
         selection = selected;
       }
+
       if (!selection && isFinalAttempt) {
         // nothing more can enter range — no point burning further builds
         break;
       }
     }
+
     if (!selection) {
       // no enclosed region under the pointer — stay silent like `no_owner`;
       // clicking open canvas shouldn't nag
       return { ok: false, reason: "no_owner" };
     }
   }
+
   const { face, holes } = selection;
 
   // 5. simplify and validate. Note the returned ring may be a keyhole path
@@ -1707,10 +1885,13 @@ export const computeBucketFillPolygon = (args: {
     holes.map((hole) => hole.ring),
     options,
   );
+
   if (!finalized) {
     return { ok: false, reason: "invalid_polygon" };
   }
+
   const { scenePoints, splicedHoleIndices } = finalized;
+
   if (polygonArea(scenePoints, 0) < options.minArea) {
     return { ok: false, reason: "too_small" };
   }
@@ -1718,6 +1899,7 @@ export const computeBucketFillPolygon = (args: {
   // spliced islands genuinely bound the visible fill, so they join the
   // boundary metadata (and, via the app layer, group inheritance)
   const contributors = new Set<string>(face.contributors);
+
   for (const index of splicedHoleIndices) {
     for (const id of holes[index].contributors) {
       contributors.add(id);
@@ -1753,6 +1935,7 @@ export const computeBucketFillPolygon = (args: {
   const participantIds = new Set<string>(
     owner ? [owner.id, ...contributors] : contributors,
   );
+
   for (const hole of holes) {
     for (const id of hole.contributors) {
       participantIds.add(id);
@@ -1764,6 +1947,7 @@ export const computeBucketFillPolygon = (args: {
     getBoundsFromPoints(scenePoints);
   const markInsideRegion = (element: ExcalidrawElement): boolean => {
     const [minX, minY, maxX, maxY] = getElementBounds(element, elementsMap);
+
     if (
       maxX < regionMinX ||
       minX > regionMaxX ||
@@ -1772,12 +1956,15 @@ export const computeBucketFillPolygon = (args: {
     ) {
       return false;
     }
+
     const samples: GlobalPoint[] = [
       pointFrom<GlobalPoint>((minX + maxX) / 2, (minY + maxY) / 2),
     ];
+
     if (isLinearElement(element) || isFreeDrawElement(element)) {
       const center = elementCenterPoint(element, elementsMap);
       const step = Math.max(1, Math.floor(element.points.length / 8));
+
       for (let i = 0; i < element.points.length; i += step) {
         samples.push(
           pointRotateRads(
@@ -1791,6 +1978,7 @@ export const computeBucketFillPolygon = (args: {
         );
       }
     }
+
     return samples.some((sample) => polygonIncludesPoint(sample, fillRegion));
   };
 
@@ -1803,6 +1991,7 @@ export const computeBucketFillPolygon = (args: {
    */
   const paintOverlapsRegion = (element: ExcalidrawElement): boolean => {
     const [minX, minY, maxX, maxY] = getElementBounds(element, elementsMap);
+
     if (
       maxX < regionMinX ||
       minX > regionMaxX ||
@@ -1811,27 +2000,34 @@ export const computeBucketFillPolygon = (args: {
     ) {
       return false;
     }
+
     if (isPointInElement(point, element, elementsMap)) {
       return true;
     }
+
     const outline = getElementLineSegments(element, elementsMap);
     const outlineStep = Math.max(1, Math.floor(outline.length / 16));
+
     for (let i = 0; i < outline.length; i += outlineStep) {
       if (polygonIncludesPoint(outline[i][0], fillRegion)) {
         return true;
       }
     }
+
     const ringStep = Math.max(1, Math.floor(scenePoints.length / 16));
+
     for (let i = 0; i < scenePoints.length; i += ringStep) {
       if (isPointInElement(scenePoints[i], element, elementsMap)) {
         return true;
       }
     }
+
     return false;
   };
 
   let lowestAbove: ExcalidrawElement | null = null;
   let covering: ExcalidrawElement | null = null;
+
   for (const element of elements) {
     // the coverer constraint is evaluated for EVERY element, not just the
     // `mustStayAbove` ones: an opaque element overlapping the region away
@@ -1841,13 +2037,16 @@ export const computeBucketFillPolygon = (args: {
     if (rendersOpaqueFill(element) && paintOverlapsRegion(element)) {
       covering = element;
     }
+
     const mustStayAbove =
       participantIds.has(element.id) ||
       (rendersAnyMark(element) && markInsideRegion(element));
+
     if (mustStayAbove) {
       lowestAbove = lowestAbove ?? element;
     }
   }
+
   // a face always has contributors from `elements`, so a participant exists;
   // the last-element fallback is defensive only
   const insertion: BucketFillInsertion = covering
@@ -1888,6 +2087,7 @@ export const isRestylableFill = (args: {
   elementsMap: ElementsMap;
 }): boolean => {
   const { hitElement, scenePoints, elementsMap } = args;
+
   if (!isBucketFillCompatible(hitElement)) {
     return false;
   }

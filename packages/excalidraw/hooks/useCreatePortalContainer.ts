@@ -50,6 +50,7 @@ export const useCreatePortalContainer = (opts?: {
         event.dataTransfer.dropEffect = "none";
       }
     };
+
     if (!opts?.parentSelector) {
       div.addEventListener(EVENT.DRAG_OVER, onFileDrag);
       div.addEventListener(EVENT.DROP, onFileDrag);

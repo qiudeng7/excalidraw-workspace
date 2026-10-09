@@ -26,10 +26,12 @@ interface NewElementCanvasProps {
 
 const NewElementCanvas = (props: NewElementCanvasProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
   useEffect(() => {
     if (!canvasRef.current) {
       return;
     }
+
     renderNewElementScene(
       {
         canvas: canvasRef.current,

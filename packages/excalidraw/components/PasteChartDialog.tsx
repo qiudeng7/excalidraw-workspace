@@ -52,6 +52,7 @@ const ChartPreviewBtn = (props: {
   useLayoutEffect(() => {
     if (!props.spreadsheet) {
       setChartElements(null);
+
       return;
     }
 
@@ -62,11 +63,14 @@ const ChartPreviewBtn = (props: {
       0,
       props.colorSeed,
     );
+
     if (!elements) {
       setChartElements(null);
       previewRef.current?.replaceChildren();
+
       return;
     }
+
     setChartElements(elements);
     let svg: SVGSVGElement;
     const previewNode = previewRef.current!;
@@ -146,6 +150,7 @@ const PlainTextPreviewBtn = (props: {
           skipInliningFonts: true,
         },
       );
+
       svg.querySelector(".style-fonts")?.remove();
       previewNode.replaceChildren();
       previewNode.appendChild(svg);
@@ -208,6 +213,7 @@ export const PasteChartDialog = ({
       x: 0,
       y: 0,
     });
+
     onInsertElements([textElement]);
     trackEvent("paste", "chart", "plaintext");
     onClose();

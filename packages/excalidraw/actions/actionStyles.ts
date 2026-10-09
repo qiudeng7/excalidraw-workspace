@@ -56,17 +56,21 @@ export const actionCopyStyles = register({
   perform: (elements, appState, formData, app) => {
     const elementsCopied = [];
     const element = elements.find((el) => appState.selectedElementIds[el.id]);
+
     elementsCopied.push(element);
     if (element && hasBoundTextElement(element)) {
       const boundTextElement = getBoundTextElement(
         element,
         app.scene.getNonDeletedElementsMap(),
       );
+
       elementsCopied.push(boundTextElement);
     }
+
     if (element) {
       copiedStyles = JSON.stringify(elementsCopied);
     }
+
     return {
       appState: {
         ...appState,
@@ -88,6 +92,7 @@ export const actionPasteStyles = register({
     const elementsCopied = JSON.parse(copiedStyles);
     const pastedElement = elementsCopied[0];
     const boundTextElement = elementsCopied[1];
+
     if (!isExcalidrawElement(pastedElement)) {
       return { elements, captureUpdate: CaptureUpdateAction.EVENTUALLY };
     }
@@ -109,12 +114,15 @@ export const actionPasteStyles = register({
         elements.map((element) => {
           if (selectedElementIds.includes(element.id)) {
             let elementStylesToCopyFrom = pastedElement;
+
             if (isTextElement(element) && element.containerId) {
               elementStylesToCopyFrom = boundTextElement;
             }
+
             if (!elementStylesToCopyFrom) {
               return element;
             }
+
             let newElement = newElementWith(element, {
               backgroundColor: elementStylesToCopyFrom?.backgroundColor,
               strokeWidth: elementStylesToCopyFrom?.strokeWidth,
@@ -143,18 +151,21 @@ export const actionPasteStyles = register({
               const fontFamily = sourceText.fontFamily || DEFAULT_FONT_FAMILY;
               let container = null;
               const containerId = newElement.containerId;
+
               if (containerId) {
                 container =
                   selectedElements.find(
                     (element) => element.id === containerId,
                   ) || null;
               }
+
               const newTextElement = newElementWith(newElement, {
                 ...getBaseFontSizeUpdate(newElement, fontSize, elementsMap),
                 fontFamily,
                 textAlign: sourceText.textAlign || DEFAULT_TEXT_ALIGN,
                 lineHeight: sourceText.lineHeight || getLineHeight(fontFamily),
               });
+
               newElement = newTextElement;
 
               if (isStickyNoteBoundText(newTextElement, elementsMap)) {
@@ -198,6 +209,7 @@ export const actionPasteStyles = register({
 
             return newElement;
           }
+
           return element;
         }),
         elementsMap,
@@ -209,6 +221,7 @@ export const actionPasteStyles = register({
     // a restyled note may have grown or shrunk — arrows bound to it follow
     for (const element of nextElements) {
       const prev = elementsMap.get(element.id);
+
       if (
         isStickyNoteElement(element) &&
         isNonDeletedElement(element) &&

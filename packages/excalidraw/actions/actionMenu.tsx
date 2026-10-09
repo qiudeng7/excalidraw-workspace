@@ -16,6 +16,7 @@ export const actionShortcuts = register({
     if (appState.openDialog?.name === "help") {
       focusContainer();
     }
+
     return {
       appState: {
         ...appState,

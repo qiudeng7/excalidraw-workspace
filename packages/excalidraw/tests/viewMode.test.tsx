@@ -51,6 +51,7 @@ describe("view mode", () => {
 
     pointerTypes.forEach((pointerType) => {
       const pointer = pointerType;
+
       pointer.reset();
       pointer.move(100, 100);
       pointer.click();
@@ -138,11 +139,13 @@ describe("view mode", () => {
       x: 20,
       y: 20,
     });
+
     API.setElements([text]);
     API.setSelectedElements([text]);
     Keyboard.keyPress(KEYS.ENTER);
 
     const editor = await getTextEditor();
+
     updateTextEditor(editor, "committed before view mode");
 
     GlobalTestState.renderResult.rerender(
@@ -166,15 +169,19 @@ describe("view mode", () => {
       width: 80,
       height: 50,
     });
+
     API.setElements([frame]);
     API.updateElement(frame, { name: "before" });
     API.setAppState({ editingFrame: frame.id });
 
     const frameNameInput = await waitFor(() => {
       const input = queryContainer(".frame-name input");
+
       expect(input).not.toBe(null);
+
       return input as HTMLInputElement;
     });
+
     fireEvent.change(frameNameInput, { target: { value: "  committed  " } });
 
     API.setAppState({ viewModeEnabled: true });

@@ -20,6 +20,7 @@ export const roundToStep = (
   func: "round" | "floor" | "ceil" = "round",
 ): number => {
   const factor = 1 / step;
+
   return Math[func](value * factor) / factor;
 };
 

@@ -15,7 +15,9 @@ const isSameColor = (a: string, b: string) => {
   if (a.toLowerCase() === b.toLowerCase()) {
     return true;
   }
+
   const aHex = colorToHex(a);
+
   return aHex !== null && aHex === colorToHex(b);
 };
 
@@ -24,6 +26,7 @@ const createColorGhost: CreateTopPicksGhost<string> = ({
   sourceEl,
 }) => {
   const swatch = document.createElement("div");
+
   swatch.className = "excalidraw-color-dnd-ghost-swatch";
   if (isTransparent(color)) {
     swatch.classList.add("is-transparent");
@@ -32,9 +35,11 @@ const createColorGhost: CreateTopPicksGhost<string> = ({
     // rather than CSS-filtering them) — sample the rendered color so the
     // ghost matches what the user picked up
     const rendered = getComputedStyle(sourceEl).backgroundColor;
+
     swatch.style.backgroundColor =
       rendered && rendered !== "rgba(0, 0, 0, 0)" ? rendered : color;
   }
+
   return { content: swatch, rect: sourceEl.getBoundingClientRect() };
 };
 

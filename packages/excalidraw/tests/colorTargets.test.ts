@@ -21,7 +21,7 @@ const appState = (overrides: Partial<AppState> = {}): AppState =>
     selectedElementIds: {},
     editingTextElement: null,
     ...overrides,
-  } as AppState);
+  }) as AppState;
 
 describe("resolveColorTarget", () => {
   const note = API.createElement({ type: "stickynote", id: "note" });
@@ -35,6 +35,7 @@ describe("resolveColorTarget", () => {
 
   it("follows the active tool when nothing is targeted", () => {
     const regular = resolveColorTarget(appState(), elements, "strokeColor");
+
     expect(regular.kind).toBe("regular");
     expect(regular.appStateKeys).toEqual(["currentItemStrokeColor"]);
     expect(regular.topPicks).toBe(DEFAULT_ELEMENT_STROKE_PICKS);
@@ -51,6 +52,7 @@ describe("resolveColorTarget", () => {
       elements,
       "backgroundColor",
     );
+
     expect(sticky.kind).toBe("sticky");
     expect(sticky.appStateKeys).toEqual([
       "currentItemStickynoteBackgroundColor",
@@ -66,6 +68,7 @@ describe("resolveColorTarget", () => {
       elements,
       "strokeColor",
     );
+
     expect(target.kind).toBe("sticky");
     expect(target.appStateKeys).toEqual(["currentItemStickynoteStrokeColor"]);
   });
@@ -76,6 +79,7 @@ describe("resolveColorTarget", () => {
       elements,
       "strokeColor",
     );
+
     expect(target.kind).toBe("mixed");
     expect(target.appStateKeys).toEqual([
       "currentItemStrokeColor",
@@ -93,6 +97,7 @@ describe("resolveColorTarget", () => {
       elements,
       "strokeColor",
     );
+
     expect(target.kind).toBe("sticky");
   });
 
@@ -102,6 +107,7 @@ describe("resolveColorTarget", () => {
       elements,
       "strokeColor",
     );
+
     expect(
       getColorTargetAppStateUpdates(stickyStroke, COLOR_PALETTE.transparent),
     ).toEqual({ currentItemStickynoteStrokeColor: COLOR_PALETTE.black });
@@ -111,6 +117,7 @@ describe("resolveColorTarget", () => {
       elements,
       "backgroundColor",
     );
+
     expect(
       getColorTargetAppStateUpdates(
         stickyBackground,
@@ -123,6 +130,7 @@ describe("resolveColorTarget", () => {
       elements,
       "backgroundColor",
     );
+
     expect(
       getColorTargetAppStateUpdates(regular, COLOR_PALETTE.transparent),
     ).toEqual({ currentItemBackgroundColor: COLOR_PALETTE.transparent });

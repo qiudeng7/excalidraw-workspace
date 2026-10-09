@@ -8,6 +8,7 @@ import "./FooterCenter.scss";
 const FooterCenter = ({ children }: { children?: React.ReactNode }) => {
   const { FooterCenterTunnel } = useTunnels();
   const appState = useUIAppState();
+
   return (
     <FooterCenterTunnel.In>
       <div

@@ -101,6 +101,7 @@ const LibraryMenuContent = memo(
               });
             }
           }
+
           const nextItems: LibraryItems = [
             {
               status: "unpublished",
@@ -110,11 +111,13 @@ const LibraryMenuContent = memo(
             },
             ...libraryItems,
           ];
+
           onAddToLibrary();
           library.setLibrary(nextItems).catch(() => {
             setAppState({ errorMessage: t("alerts.errorAddingToLibrary") });
           });
         };
+
         addToLibrary(elements, libraryItemsData.libraryItems);
       },
       [onAddToLibrary, library, setAppState, libraryItemsData.libraryItems],
@@ -222,13 +225,17 @@ const usePendingElementsMemo = (
           !isShallowEqual(prev.selectedElementIds, appState.selectedElementIds)
         ) {
           selectedElementVersions.current.clear();
+
           return getPendingElements(elements, appState.selectedElementIds);
         }
+
         // otherwise we need to check whether selected elements changed
         // ---------------------------------------------------------------------
         const elementsMap = app.scene.getNonDeletedElementsMap();
+
         for (const id of Object.keys(appState.selectedElementIds)) {
           const currVersion = elementsMap.get(id)?.version;
+
           if (
             currVersion &&
             currVersion !== selectedElementVersions.current.get(id)
@@ -241,6 +248,7 @@ const usePendingElementsMemo = (
             return getPendingElements(elements, appState.selectedElementIds);
           }
         }
+
         // nothing changed
         // ---------------------------------------------------------------------
         return prev;
@@ -274,6 +282,7 @@ export const LibraryMenu = memo(() => {
   useEffect(() => {
     const ownerDocument = app.ownerDocument;
     const ownerWindow = app.ownerWindow;
+
     return addEventListener(
       ownerDocument,
       EVENT.KEYDOWN,
@@ -283,6 +292,7 @@ export const LibraryMenu = memo(() => {
           event.target instanceof ownerWindow.HTMLElement
         ) {
           const target = event.target;
+
           if (target.closest(`.${CLASSES.SIDEBAR}`)) {
             // stop propagation so that we don't prevent it downstream
             // (default browser behavior is to clear search input on ESC)
@@ -303,6 +313,7 @@ export const LibraryMenu = memo(() => {
           } else if (selectedItems.length > 0) {
             const { x, y } = app.viewport.lastPosition;
             const elementUnderCursor = ownerDocument.elementFromPoint(x, y);
+
             // also deselect elements if sidebar doesn't have focus but the
             // cursor is over it
             if (elementUnderCursor?.closest(`.${CLASSES.SIDEBAR}`)) {

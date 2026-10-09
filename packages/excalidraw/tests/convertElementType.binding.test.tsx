@@ -55,6 +55,7 @@ describe("convert element type keeps bound arrows attached", () => {
           } as FixedPointBinding,
           startBinding: null,
         });
+
         API.setElements([
           { ...shape, boundElements: [{ id: arrow.id, type: "arrow" }] },
           arrow,
@@ -83,6 +84,7 @@ describe("convert element type keeps bound arrows attached", () => {
           h.app.scene.getNonDeletedElementsMap(),
           globalEnd,
         );
+
         expect(distance).toBeLessThanOrEqual(getBindingGap(converted) + 1);
       },
     );

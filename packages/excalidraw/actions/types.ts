@@ -15,11 +15,7 @@ import type {
 import type React from "react";
 
 export type ActionSource =
-  | "ui"
-  | "keyboard"
-  | "contextMenu"
-  | "api"
-  | "commandPalette";
+  "ui" | "keyboard" | "contextMenu" | "api" | "commandPalette";
 
 /** if false, the action should be prevented */
 export type ActionResult =
@@ -40,6 +36,7 @@ type ActionFn<TData = any> = (
 ) => ActionResult | Promise<ActionResult>;
 
 export type UpdaterFn = (res: ActionResult) => void;
+
 export type ActionFilterFn = (action: Action) => void;
 
 export type ActionName =

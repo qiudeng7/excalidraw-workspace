@@ -54,6 +54,7 @@ describe("parseClipboard()", () => {
         }),
       ),
     );
+
     expect(clipboardData.elements).toEqual([rect]);
   });
 
@@ -62,6 +63,7 @@ describe("parseClipboard()", () => {
 
     let json;
     let clipboardData;
+
     // -------------------------------------------------------------------------
     json = serializeAsClipboardJSON({ elements: [rect], files: null });
     clipboardData = await parseClipboard(
@@ -91,6 +93,7 @@ describe("parseClipboard()", () => {
 
   it("should parse <image> `src` urls out of text/html", async () => {
     let clipboardData;
+
     // -------------------------------------------------------------------------
     clipboardData = await parseClipboard(
       await parseDataTransferEvent(
@@ -139,6 +142,7 @@ describe("parseClipboard()", () => {
         }),
       ),
     );
+
     expect(clipboardData.mixedContent).toEqual([
       {
         type: "text",

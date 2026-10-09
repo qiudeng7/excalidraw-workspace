@@ -31,9 +31,14 @@ export const ShareableLinkDialog = ({
   const copyRoomLink = async () => {
     try {
       await copyTextToSystemClipboard(link);
-    } catch (e) {
+      onCopy();
+    } catch (error) {
+      console.error("Failed to copy shareable link", error);
       setErrorMessage(t("errors.copyToSystemClipboardFailed"));
+
+      return;
     }
+
     setJustCopied(true);
 
     if (timerRef.current) {
@@ -47,6 +52,7 @@ export const ShareableLinkDialog = ({
     ref.current?.select();
   };
   const { onCopy, copyStatus } = useCopyStatus();
+
   return (
     <Dialog onCloseRequest={onCloseRequest} title={false} size="small">
       <div className="ShareableLinkDialog">
@@ -66,7 +72,6 @@ export const ShareableLinkDialog = ({
             icon={copyIcon}
             status={copyStatus}
             onClick={() => {
-              onCopy();
               copyRoomLink();
             }}
           />

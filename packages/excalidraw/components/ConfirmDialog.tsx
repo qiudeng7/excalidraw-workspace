@@ -18,6 +18,7 @@ interface Props extends Omit<DialogProps, "onCloseRequest"> {
   confirmText?: string;
   cancelText?: string;
 }
+
 const ConfirmDialog = (props: Props) => {
   const {
     onConfirm,
@@ -78,4 +79,5 @@ const ConfirmDialog = (props: Props) => {
     </Dialog>
   );
 };
+
 export default ConfirmDialog;

@@ -130,6 +130,7 @@ const focusPointUpdate = (
       bindableElement &&
       adjacentBinding &&
       currentBinding.elementId === adjacentBinding.elementId;
+
     if (switchToInsideBinding || boundToSameElement) {
       currentBinding = {
         ...currentBinding,
@@ -171,6 +172,7 @@ const focusPointUpdate = (
       // Same shape bound on both ends
       const boundToSameElementAfterUpdate =
         bindableElement && adjacentBinding.elementId === bindableElement.id;
+
       if (boundToSameElementAfterUpdate) {
         adjacentBinding = {
           ...adjacentBinding,
@@ -265,8 +267,8 @@ export const handleFocusPointDrag = (
       switchToInsideBinding && arrow[bindingField]?.mode === "orbit"
         ? "inside"
         : !switchToInsideBinding && arrow[bindingField]?.mode === "inside"
-        ? "orbit"
-        : null;
+          ? "orbit"
+          : null;
 
     // If no existing binding, create it
     if (!arrow[bindingField] || newMode) {
@@ -301,6 +303,7 @@ export const handleFocusPointDrag = (
     // Not hovering any bindable element, move the arrow endpoint
     const pointUpdates: PointsPositionUpdates = new Map();
     const pointIndex = isStartBinding ? 0 : arrow.points.length - 1;
+
     pointUpdates.set(pointIndex, {
       point: LinearElementEditor.createPointAt(
         arrow,
@@ -358,6 +361,7 @@ export const handleFocusPointPointerDown = (
   // Check start binding focus point
   if (arrow.startBinding?.elementId) {
     const bindableElement = elementsMap.get(arrow.startBinding.elementId);
+
     if (
       bindableElement &&
       isBindableElement(bindableElement) &&
@@ -368,6 +372,7 @@ export const handleFocusPointPointerDown = (
         bindableElement,
         elementsMap,
       );
+
       if (
         isFocusPointVisible(
           focusPoint,
@@ -394,6 +399,7 @@ export const handleFocusPointPointerDown = (
   // Check end binding focus point (only if start not already hit)
   if (arrow.endBinding?.elementId) {
     const bindableElement = elementsMap.get(arrow.endBinding.elementId);
+
     if (
       bindableElement &&
       isBindableElement(bindableElement) &&
@@ -404,6 +410,7 @@ export const handleFocusPointPointerDown = (
         bindableElement,
         elementsMap,
       );
+
       if (
         isFocusPointVisible(
           focusPoint,
@@ -447,6 +454,7 @@ export const handleFocusPointPointerUp = (
     linearElementEditor.elementId,
     scene.getNonDeletedElementsMap(),
   );
+
   invariant(arrow, "Arrow must be in the scene");
 
   // Clean up
@@ -471,6 +479,7 @@ export const handleFocusPointPointerUp = (
           isBindableElement(element) &&
           element.boundElements?.find(({ id }) => id === arrow.id),
       );
+
   if (oldBoundElement) {
     scene.mutateElement(oldBoundElement, {
       boundElements: oldBoundElement.boundElements?.filter(
@@ -482,6 +491,7 @@ export const handleFocusPointPointerUp = (
   // Record the new bound element
   const boundElement =
     boundElementId && scene.getNonDeletedElementsMap().get(boundElementId);
+
   if (boundElement) {
     scene.mutateElement(boundElement, {
       boundElements: [
@@ -515,6 +525,7 @@ export const handleFocusPointHover = (
   // Check start binding focus point
   if (arrow.startBinding?.elementId) {
     const bindableElement = elementsMap.get(arrow.startBinding.elementId);
+
     if (
       bindableElement &&
       isBindableElement(bindableElement) &&
@@ -525,6 +536,7 @@ export const handleFocusPointHover = (
         bindableElement,
         elementsMap,
       );
+
       if (
         isFocusPointVisible(
           focusPoint,
@@ -544,6 +556,7 @@ export const handleFocusPointHover = (
   // Check end binding focus point (only if start not already hovered)
   if (arrow.endBinding?.elementId) {
     const bindableElement = elementsMap.get(arrow.endBinding.elementId);
+
     if (
       bindableElement &&
       isBindableElement(bindableElement) &&
@@ -554,6 +567,7 @@ export const handleFocusPointHover = (
         bindableElement,
         elementsMap,
       );
+
       if (
         isFocusPointVisible(
           focusPoint,

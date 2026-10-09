@@ -14,11 +14,13 @@ import type { ExcalidrawImperativeAPI } from "../types";
 describe("cross-document rendering", () => {
   it("scopes listeners, fonts, and portals to ownerDocument", async () => {
     const iframe = document.createElement("iframe");
+
     document.body.append(iframe);
 
     const ownerDocument = iframe.contentDocument!;
     const ownerWindow = iframe.contentWindow! as Window & typeof globalThis;
     const mountNode = ownerDocument.createElement("div");
+
     ownerDocument.body.append(mountNode);
 
     const fonts = {
@@ -29,8 +31,10 @@ describe("cross-document rendering", () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     };
+
     Object.defineProperty(ownerDocument, "fonts", { value: fonts });
     const addEventListener = vi.fn();
+
     Object.defineProperties(ownerWindow, {
       addEventListener: { value: addEventListener },
       removeEventListener: { value: vi.fn() },
@@ -54,6 +58,7 @@ describe("cross-document rendering", () => {
       "addEventListener",
     );
     let unmount: (() => void) | null = null;
+
     try {
       let api: ExcalidrawImperativeAPI | null = null;
       const renderResult = renderReact(
@@ -66,6 +71,7 @@ describe("cross-document rendering", () => {
         />,
         { container: mountNode, baseElement: ownerDocument.body },
       );
+
       unmount = renderResult.unmount;
       const { container } = renderResult;
 
@@ -97,6 +103,7 @@ describe("cross-document rendering", () => {
       const messageHandler = addEventListener.mock.calls.find(
         ([eventName]) => eventName === "message",
       )?.[1] as EventListener | undefined;
+
       expect(typeof messageHandler).toBe("function");
       expect(() =>
         messageHandler!(
@@ -108,6 +115,7 @@ describe("cross-document rendering", () => {
       ).not.toThrow();
 
       const excalidrawContainer = container.querySelector(".excalidraw")!;
+
       fireEvent.pointerEnter(excalidrawContainer);
       expect(ownerDocument.documentElement.style.overscrollBehaviorX).toBe(
         "none",

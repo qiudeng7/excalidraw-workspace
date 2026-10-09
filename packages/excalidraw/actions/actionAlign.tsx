@@ -41,6 +41,7 @@ export const alignActionsPredicate = (
   app: AppClassProperties,
 ) => {
   const selectedElements = app.scene.getSelectedElements(appState);
+
   return (
     getSelectedElementsByGroup(
       selectedElements,

@@ -59,6 +59,7 @@ export const ToolPopover = ({
     const unsubscribe = app.onPointerDownEmitter.on(() => {
       setIsPopupOpen(false);
     });
+
     return () => unsubscribe?.();
   }, [app]);
 

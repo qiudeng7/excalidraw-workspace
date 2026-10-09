@@ -14,6 +14,7 @@ import type { RemoteExcalidrawElement } from "../../data/reconcile";
 import type { AppState } from "../../types";
 
 type Id = string;
+
 type ElementLike = {
   id: string;
   version: number;
@@ -28,8 +29,10 @@ const createElement = (opts: { uid: string } | ElementLike) => {
   let id: string;
   let version: number | null;
   let versionNonce: number | null = null;
+
   if ("uid" in opts) {
     const match = opts.uid.match(/^(\w+)(?::(\d+))?$/)!;
+
     id = match[1];
     version = match[2] ? parseInt(match[2]) : null;
     uid = version ? `${id}:${version}` : id;
@@ -37,6 +40,7 @@ const createElement = (opts: { uid: string } | ElementLike) => {
     ({ id, version, versionNonce } = opts);
     uid = id;
   }
+
   return {
     uid,
     id,
@@ -58,9 +62,11 @@ const idsToElements = (ids: (Id | ElementLike)[], cache: Cache = {}) => {
         versionNonce,
         ...cached,
       } as ExcalidrawElement;
+
       // @ts-ignore
       cache[uid] = elem;
       acc.push(elem);
+
       return acc;
     }, [] as ExcalidrawElement[]),
   );
@@ -381,6 +387,7 @@ describe("elements reconciliation", () => {
       versionNonce: 1,
       index: "a0",
     };
+
     testIdentical([el1, el2], [el2, el1], ["A", "B"]);
   });
 });

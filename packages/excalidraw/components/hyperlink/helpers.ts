@@ -50,6 +50,7 @@ export const getLinkHandleFromCoords = (
     pointFrom(centerX, centerY),
     angle,
   );
+
   return [
     rotatedX - linkWidth / 2,
     rotatedY - linkHeight / 2,
@@ -76,6 +77,7 @@ export const isPointHittingLinkIcon = (
     x < linkX + threshold + linkWidth &&
     y > linkY - threshold &&
     y < linkY + linkHeight + threshold;
+
   return hitLink;
 };
 
@@ -89,6 +91,7 @@ export const isPointHittingLink = (
   if (!element.link || appState.selectedElementIds[element.id]) {
     return false;
   }
+
   if (
     !isMobile &&
     appState.viewModeEnabled &&
@@ -96,6 +99,7 @@ export const isPointHittingLink = (
   ) {
     return true;
   }
+
   return isPointHittingLinkIcon(
     element,
     elementsMap,

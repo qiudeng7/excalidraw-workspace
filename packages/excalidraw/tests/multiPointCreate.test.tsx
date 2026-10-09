@@ -48,6 +48,7 @@ describe("remove shape in non linear elements", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("rectangle");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
@@ -64,9 +65,11 @@ describe("remove shape in non linear elements", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("ellipse");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
+
     fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
     fireEvent.pointerUp(canvas, { clientX: 30, clientY: 30 });
 
@@ -79,9 +82,11 @@ describe("remove shape in non linear elements", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("diamond");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
+
     fireEvent.pointerDown(canvas, { clientX: 30, clientY: 20 });
     fireEvent.pointerUp(canvas, { clientX: 30, clientY: 30 });
 
@@ -96,9 +101,11 @@ describe("multi point mode in linear elements", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("arrow");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
+
     // first point is added on pointer down
     fireEvent.pointerDown(canvas, { clientX: 30, clientY: 30 });
 
@@ -142,9 +149,11 @@ describe("multi point mode in linear elements", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("line");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
+
     // first point is added on pointer down
     fireEvent.pointerDown(canvas, { clientX: 30, clientY: 30 });
 
@@ -187,9 +196,11 @@ describe("multi point mode in linear elements", () => {
     const { getByToolName, container } = await render(<Excalidraw />);
     // select tool
     const tool = getByToolName("line");
+
     fireEvent.click(tool);
 
     const canvas = container.querySelector("canvas.interactive")!;
+
     // first point is added on pointer down
     fireEvent.pointerDown(canvas, { clientX: 30, clientY: 30 });
 

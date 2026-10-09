@@ -38,6 +38,7 @@ export class DrawShapeTrail implements Trail {
           1.25,
           4,
         );
+
         return size;
       },
     } as Partial<LaserPointerOptions>;
@@ -61,6 +62,7 @@ export class DrawShapeTrail implements Trail {
 
   getCurrentPoints(): GlobalPoint[] {
     const currentTrail = this.trail.getCurrentTrail();
+
     if (!currentTrail) {
       return [];
     }

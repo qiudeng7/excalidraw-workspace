@@ -89,6 +89,7 @@ describe("principalCoords", () => {
     // The canonical form of a horizontal spread is the same spread, whatever
     // was done to it in between.
     const us = coords.map(([u]) => u).sort((a, b) => a - b);
+
     expect(coords.every(([, v]) => Math.abs(v) < 1e-9)).toBe(true);
     expect(Math.abs(us[0])).toBeCloseTo(Math.abs(us[us.length - 1]));
     expect(Math.abs(us[0])).toBeCloseTo(1.65, 1);
@@ -192,6 +193,7 @@ describe("kurtosis", () => {
     );
     const project = (pts: GlobalPoint[]) => {
       const axes = principalAxes(pts);
+
       return kurtosis(principalCoords(pts, axes).map(([u]) => u));
     };
 

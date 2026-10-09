@@ -49,6 +49,7 @@ export const ContextMenu = React.memo(
       ) {
         acc.push(item);
       }
+
       return acc;
     }, []);
 
@@ -76,11 +77,13 @@ export const ContextMenu = React.memo(
               ) {
                 return null;
               }
+
               return <hr key={idx} className="context-menu-item-separator" />;
             }
 
             const actionName = item.name;
             let label = "";
+
             if (item.label) {
               if (typeof item.label === "function") {
                 label = t(

@@ -66,6 +66,7 @@ export const LibraryDropdownMenuButton: React.FC<{
     const title = selectedItems.length
       ? t("confirmDialog.removeItemsFromLib")
       : t("confirmDialog.resetLibrary");
+
     return (
       <ConfirmDialog
         onConfirm={() => {
@@ -74,6 +75,7 @@ export const LibraryDropdownMenuButton: React.FC<{
           } else {
             resetLibrary();
           }
+
           setShowRemoveLibAlert(false);
         }}
         onCancel={() => {
@@ -147,6 +149,7 @@ export const LibraryDropdownMenuButton: React.FC<{
     setShowPublishLibraryDialog(false);
     setPublishLibSuccess({ url: data.url, authorName: data.authorName });
     const nextLibItems = libraryItems.slice();
+
     nextLibItems.forEach((libItem) => {
       if (selectedItems.includes(libItem.id)) {
         libItem.status = "published";
@@ -172,8 +175,10 @@ export const LibraryDropdownMenuButton: React.FC<{
     } catch (error: any) {
       if (error?.name === "AbortError") {
         console.warn(error);
+
         return;
       }
+
       setAppState({ errorMessage: t("errors.importLibraryError") });
     }
   };
@@ -182,6 +187,7 @@ export const LibraryDropdownMenuButton: React.FC<{
     const libraryItems = itemsSelected
       ? items
       : await library.getLatestLibrary();
+
     saveLibraryAsJSON(libraryItems)
       .catch(muteFSAbortError)
       .catch((error) => {
@@ -294,6 +300,7 @@ export const LibraryDropdownMenu = ({
     const nextItems = libraryItems.filter(
       (item) => !selectedItems.includes(item.id),
     );
+
     library.setLibrary(nextItems).catch(() => {
       setAppState({ errorMessage: t("alerts.errorRemovingFromLibrary") });
     });

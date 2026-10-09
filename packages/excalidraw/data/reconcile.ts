@@ -40,6 +40,7 @@ export const shouldDiscardRemoteElement = (
   ) {
     return true;
   }
+
   return false;
 };
 

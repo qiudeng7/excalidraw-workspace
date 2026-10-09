@@ -152,6 +152,7 @@ export const mergeLibraryItems = (
   otherItems: LibraryItems,
 ): LibraryItems => {
   const newItems = [];
+
   for (const item of otherItems) {
     if (isUniqueItem(localItems, item)) {
       newItems.push(item);
@@ -189,6 +190,7 @@ const createLibraryUpdate = (
 
   for (const item of nextLibraryItems) {
     const prevItem = prevItemsMap.get(item.id);
+
     if (!prevItem) {
       update.addedItems.set(item.id, item);
     } else if (getLibraryItemHash(prevItem) !== getLibraryItemHash(item)) {
@@ -233,6 +235,7 @@ class Library {
       });
       try {
         const prevLibraryItems = this.prevLibraryItems;
+
         this.prevLibraryItems = cloneLibraryItems(this.currLibraryItems);
 
         const nextLibraryItems = cloneLibraryItems(this.currLibraryItems);
@@ -276,12 +279,18 @@ class Library {
       try {
         const libraryItems = await (this.getLastUpdateTask() ||
           this.currLibraryItems);
+
         if (this.updateQueue.length > 0) {
           resolve(this.getLatestLibrary());
         } else {
           resolve(cloneLibraryItems(libraryItems));
         }
       } catch (error) {
+        console.error(
+          "Library update failed; retaining the current library",
+          error,
+        );
+
         return resolve(this.currLibraryItems);
       }
     });
@@ -324,9 +333,11 @@ class Library {
           } else {
             nextItems = restoreLibraryItems(source, defaultStatus);
           }
+
           if (this.app.unmounted) {
             throw new AbortError();
           }
+
           const confirmed =
             !prompt ||
             (await new Promise<boolean>((complete) => {
@@ -339,10 +350,12 @@ class Library {
                   if (!this.app.unmounted) {
                     this.app.triggerRender();
                   }
+
                   complete(confirmed);
                 },
               });
             }));
+
           if (confirmed) {
             if (prompt) {
               // focus container if we've prompted. We focus conditionally
@@ -402,8 +415,10 @@ class Library {
       .catch((error) => {
         if (error.name === "AbortError") {
           console.warn("Library update aborted by user");
+
           return this.currLibraryItems;
         }
+
         throw error;
       })
       .finally(() => {
@@ -433,8 +448,10 @@ export const distributeLibraryItemsOnSquareGrid = (
       .slice(row * ITEMS_PER_ROW, row * ITEMS_PER_ROW + ITEMS_PER_ROW)
       .reduce((acc, item) => {
         const { height } = getCommonBoundingBox(item.elements);
+
         return Math.max(acc, height);
       }, 0);
+
     return maxHeight;
   };
 
@@ -442,17 +459,22 @@ export const distributeLibraryItemsOnSquareGrid = (
     let index = 0;
     let currCol = 0;
     let maxWidth = 0;
+
     for (const item of libraryItems) {
       if (index % ITEMS_PER_ROW === 0) {
         currCol = 0;
       }
+
       if (currCol === targetCol) {
         const { width } = getCommonBoundingBox(item.elements);
+
         maxWidth = Math.max(maxWidth, width);
       }
+
       index++;
       currCol++;
     }
+
     return maxWidth;
   };
 
@@ -477,11 +499,13 @@ export const distributeLibraryItemsOnSquareGrid = (
     if (col === 0) {
       maxHeightCurrRow = getMaxHeightPerRow(row);
     }
+
     maxWidthCurrCol = getMaxWidthPerCol(col);
 
     const { minX, minY, width, height } = getCommonBoundingBox(item.elements);
     const offsetCenterX = (maxWidthCurrCol - width) / 2;
     const offsetCenterY = (maxHeightCurrRow - height) / 2;
+
     resElements.push(
       // eslint-disable-next-line no-loop-func
       ...item.elements.map((element) => ({
@@ -518,8 +542,7 @@ export const validateLibraryUrl = (
    * @returns `true` if the URL is valid, throws otherwise.
    */
   validator:
-    | ((libraryUrl: string) => boolean)
-    | string[] = ALLOWED_LIBRARY_URLS,
+    ((libraryUrl: string) => boolean) | string[] = ALLOWED_LIBRARY_URLS,
 ): true => {
   if (
     typeof validator === "function"
@@ -572,6 +595,7 @@ class AdapterTransaction {
       new Promise<LibraryItems>(async (resolve, reject) => {
         try {
           const data = await adapter.load({ source });
+
           resolve(restoreLibraryItems(data?.libraryItems || [], "published"));
         } catch (error: any) {
           reject(error);
@@ -590,6 +614,7 @@ class AdapterTransaction {
     fn: (transaction: AdapterTransaction) => Promise<T>,
   ) => {
     const transaction = new AdapterTransaction(adapter);
+
     return AdapterTransaction.queue.push(() => fn(transaction));
   };
 
@@ -721,6 +746,7 @@ export const useHandleLibrary = (
   const { excalidrawAPI } = opts;
 
   const optsRef = useRef(opts);
+
   optsRef.current = opts;
 
   const isLibraryLoadedRef = useRef(false);
@@ -750,6 +776,7 @@ export const useHandleLibrary = (
 
           const request = await fetch(libraryUrl);
           const blob = await request.blob();
+
           resolve(blob);
         } catch (error: any) {
           reject(error);
@@ -786,10 +813,12 @@ export const useHandleLibrary = (
       } finally {
         if (window.location.hash.includes(URL_HASH_KEYS.addLibrary)) {
           const hash = new URLSearchParams(window.location.hash.slice(1));
+
           hash.delete(URL_HASH_KEYS.addLibrary);
           window.history.replaceState({}, APP_NAME, `#${hash.toString()}`);
         } else if (window.location.search.includes(URL_QUERY_KEYS.addLibrary)) {
           const query = new URLSearchParams(window.location.search);
+
           query.delete(URL_QUERY_KEYS.addLibrary);
           window.history.replaceState({}, APP_NAME, `?${query.toString()}`);
         }
@@ -798,6 +827,7 @@ export const useHandleLibrary = (
     const onHashChange = (event: HashChangeEvent) => {
       event.preventDefault();
       const libraryUrlTokens = parseLibraryTokensFromUrl();
+
       if (libraryUrlTokens) {
         event.stopImmediatePropagation();
         // If hash changed and it contains library url, import it and replace
@@ -869,6 +899,7 @@ export const useHandleLibrary = (
           promiseTry(migrationAdapter.load)
             .then(async (libraryData) => {
               let restoredData: LibraryItems | null = null;
+
               try {
                 // if no library data to migrate, assume no migration needed
                 // and skip persisting to new data store, as well as well
@@ -888,6 +919,7 @@ export const useHandleLibrary = (
                   adapter,
                   createLibraryUpdate([], restoredData),
                 );
+
                 try {
                   await migrationAdapter.clear();
                 } catch (error: any) {
@@ -895,12 +927,14 @@ export const useHandleLibrary = (
                     `couldn't delete legacy library data: ${error.message}`,
                   );
                 }
+
                 // migration suceeded, load migrated data
                 return nextItems;
               } catch (error: any) {
                 console.error(
                   `couldn't migrate legacy library data: ${error.message}`,
                 );
+
                 // migration failed, load data from previous store, if any
                 return restoredData;
               }
@@ -908,6 +942,7 @@ export const useHandleLibrary = (
             // errors caught during `migrationAdapter.load()`
             .catch((error: any) => {
               console.error(`error during library migration: ${error.message}`);
+
               // as a default, load latest library from current data source
               return AdapterTransaction.getLibraryItems(adapter, "load");
             }),
@@ -923,7 +958,9 @@ export const useHandleLibrary = (
         .updateLibrary({
           libraryItems: initDataPromise.then((libraryItems) => {
             const _libraryItems = libraryItems || [];
+
             lastSavedLibraryItemsHash = getLibraryItemsHash(_libraryItems);
+
             return _libraryItems;
           }),
           // merge with current library items because we may have already
@@ -938,6 +975,7 @@ export const useHandleLibrary = (
     // ---------------------------------------------- data source datapter -----
 
     window.addEventListener(EVENT.HASHCHANGE, onHashChange);
+
     return () => {
       window.removeEventListener(EVENT.HASHCHANGE, onHashChange);
     };
@@ -966,6 +1004,7 @@ export const useHandleLibrary = (
           // isn't stable
           const adapter =
             ("adapter" in optsRef.current && optsRef.current.adapter) || null;
+
           try {
             if (adapter) {
               if (

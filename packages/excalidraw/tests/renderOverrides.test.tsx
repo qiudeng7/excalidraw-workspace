@@ -57,12 +57,15 @@ describe("setElementRenderOverrides", () => {
     const rendering = vi.spyOn(StaticScene, "renderStaticScene");
     const submit = (snapshot: ElementRenderOverrides | null) => {
       act(() => h.app.api.setElementRenderOverrides(snapshot));
+
       // Equivalent snapshots need not render, but the published state remains
       // available for checking snapshot ownership and identity.
       // eslint-disable-next-line dot-notation -- inspect private state without triggering a render
       return h.app["elementRenderOverrides"];
     };
+
     onChange.mockClear();
+
     return { element: h.elements[0], onChange, rendering, submit, ...mounted };
   };
 
@@ -71,6 +74,7 @@ describe("setElementRenderOverrides", () => {
     const value = { opacity: 25, offset: { x: 100, y: 20 } };
     const input = new Map([[element.id, value]]);
     const published = submit(input);
+
     value.opacity = 99;
     value.offset.x = 999;
     input.clear();
@@ -80,6 +84,7 @@ describe("setElementRenderOverrides", () => {
     });
 
     const next = submit(new Map([[element.id, { offset: { x: 10, y: 0 } }]]));
+
     expect(
       Element.resolveElementRenderState(
         element,
@@ -98,6 +103,7 @@ describe("setElementRenderOverrides", () => {
   it("rejects an invalid snapshot atomically and clamps finite opacity", async () => {
     const { element, submit, rendering } = await setup();
     const previous = submit(new Map([[element.id, { opacity: 200 }]]));
+
     expect(previous.get(element.id)?.opacity).toBe(100);
     rendering.mockClear();
     expect(() =>
@@ -118,6 +124,7 @@ describe("setElementRenderOverrides", () => {
   it("drops empty entries and rejects null offsets without replacing the snapshot", async () => {
     const { element, submit, rendering } = await setup();
     const snapshot = submit(new Map([[element.id, {}]]));
+
     expect(snapshot.size).toBe(0);
     rendering.mockClear();
     expect(() =>
@@ -134,6 +141,7 @@ describe("setElementRenderOverrides", () => {
     const { element, submit, rendering, onChange } = await setup();
     const renders = vi.spyOn(h.app, "render");
     const empty = submit(null);
+
     expect(submit(new Map())).toBe(empty);
     expect(submit(new Map([[element.id, {}]]))).toBe(empty);
     expect(renders).not.toHaveBeenCalled();
@@ -143,6 +151,7 @@ describe("setElementRenderOverrides", () => {
     renders.mockClear();
     rendering.mockClear();
     const cleared = submit(null);
+
     expect(cleared.size).toBe(0);
     expect(renders).toHaveBeenCalledTimes(1);
     expect(rendering).toHaveBeenCalledTimes(1);
@@ -160,11 +169,13 @@ describe("setElementRenderOverrides", () => {
       [element.id, value],
     ]);
     const first = submit(input);
+
     rendering.mockClear();
 
     value.opacity = 60;
     value.offset.x = 30;
     const changed = submit(input);
+
     expect(changed).not.toBe(first);
     expect(changed.get(element.id)).toEqual({
       opacity: 60,
@@ -187,6 +198,7 @@ describe("setElementRenderOverrides", () => {
   it("preserves a pending visual update when followed by an equivalent snapshot", async () => {
     const { element, rendering, onChange } = await setup();
     const input = new Map([[element.id, { opacity: 50 }]]);
+
     act(() => {
       h.app.api.setElementRenderOverrides(input);
       h.app.api.setElementRenderOverrides(new Map(input));
@@ -204,6 +216,7 @@ describe("setElementRenderOverrides", () => {
     "does not repaint for unrelated updates with a %s snapshot",
     async (kind) => {
       const { element, submit, rendering } = await setup();
+
       submit(
         new Map([
           [
@@ -211,8 +224,8 @@ describe("setElementRenderOverrides", () => {
             kind === "translation"
               ? { offset: { x: 10, y: 0 } }
               : kind === "empty"
-              ? {}
-              : { opacity: 0 },
+                ? {}
+                : { opacity: 0 },
           ],
         ]),
       );
@@ -234,11 +247,13 @@ describe("setElementRenderOverrides", () => {
     const commit = vi.spyOn(h.store, "commit");
     const subscriber = vi.fn();
     const unsubscribe = h.app.api.onChange(subscriber);
+
     for (let opacity = 0; opacity <= 100; opacity += 20) {
       submit(
         new Map([[element.id, { opacity, offset: { x: opacity, y: 0 } }]]),
       );
     }
+
     expect(rendering).toHaveBeenCalledTimes(6);
     expect(h.elements).toBe(elements);
     expect(JSON.stringify(h.elements)).toBe(before);
@@ -253,6 +268,7 @@ describe("setElementRenderOverrides", () => {
 
   it("still commits document changes batched with visual updates", async () => {
     const { element, onChange } = await setup();
+
     act(() => {
       h.app.api.setElementRenderOverrides(
         new Map([[element.id, { opacity: 0 }]]),
@@ -265,6 +281,7 @@ describe("setElementRenderOverrides", () => {
 
   it("does not skip ordinary forceUpdate calls after a visual-only commit", async () => {
     const { element, submit, onChange } = await setup();
+
     submit(new Map([[element.id, { opacity: 0 }]]));
     submit(new Map([[element.id, { opacity: 0 }]]));
     expect(onChange).not.toHaveBeenCalled();
@@ -278,6 +295,7 @@ describe("setElementRenderOverrides", () => {
       (await exportToSvg(h.app.api.getSceneElements(), h.state, null))
         .outerHTML;
     const before = await exportScene();
+
     submit(
       new Map([[element.id, { opacity: 0, offset: { x: 1000, y: 1000 } }]]),
     );
@@ -286,12 +304,14 @@ describe("setElementRenderOverrides", () => {
 
   it("clears on reset and ignores submissions after unmount", async () => {
     const { element, submit, rendering, unmount } = await setup();
+
     submit(new Map([[element.id, { opacity: 0 }]]));
     act(() => h.app.api.resetScene());
     expect(
       rendering.mock.lastCall![0].renderConfig.elementRenderOverrides,
     ).toHaveLength(0);
     const api = h.app.api;
+
     unmount();
     rendering.mockClear();
     expect(() =>
@@ -303,6 +323,7 @@ describe("setElementRenderOverrides", () => {
   it("keeps frame-name editing on document geometry while the frame is translated", async () => {
     mockBoundingClientRect();
     const { onChange, submit } = await setup();
+
     await waitFor(() => expect(h.state.width).toBe(200));
     const frame = API.createElement({
       type: "frame",
@@ -312,6 +333,7 @@ describe("setElementRenderOverrides", () => {
       width: 80,
       height: 50,
     });
+
     API.setElements([frame]);
     API.updateElement(frame, { name: "  Draft  " });
     act(() => h.setState({ editingFrame: frame.id }));
@@ -321,10 +343,13 @@ describe("setElementRenderOverrides", () => {
       );
     const nameElement = await waitFor(() => {
       const element = query(".frame-name");
+
       expect(element?.querySelector("input")).not.toBe(null);
+
       return element!;
     });
     const documentLeft = nameElement.style.left;
+
     onChange.mockClear();
 
     // A render-only offset that puts the frame far off-screen must neither
@@ -360,6 +385,7 @@ describe("setElementRenderOverrides", () => {
         bottom: 1030,
       });
       const { onChange, submit } = await setup();
+
       await waitFor(() => expect(h.state.width).toBe(1200));
       const frame = API.createElement({
         type,
@@ -369,6 +395,7 @@ describe("setElementRenderOverrides", () => {
         width: 200,
         height: 80,
       });
+
       API.setElements([frame]);
       API.updateElement(frame, { name: "Frame title" });
       act(() =>
@@ -384,7 +411,9 @@ describe("setElementRenderOverrides", () => {
           GlobalTestState.renderResult.container.querySelector<HTMLElement>(
             ".frame-name",
           );
+
         expect(element).not.toBe(null);
+
         return element!;
       });
       // JSDOM has no layout: measure the rendered CSS position, including
@@ -397,6 +426,7 @@ describe("setElementRenderOverrides", () => {
           const left = h.state.offsetLeft + parseFloat(title.style.left);
           const bottom =
             h.state.offsetTop + h.state.height - parseFloat(title.style.bottom);
+
           return {
             x: left,
             y: bottom - height,
@@ -410,12 +440,14 @@ describe("setElementRenderOverrides", () => {
           };
         });
       const cache = h.app.frameNameBoundsCache;
+
       cache._cache.clear();
       const documentBounds = cache.get(frame)!;
       const point = {
         x: documentBounds.x + documentBounds.width / 2,
         y: documentBounds.y + documentBounds.height / 2,
       };
+
       expect(h.app.hitElement(point.x, point.y, frame, false)).toBe(true);
       cache._cache.clear();
       onChange.mockClear();
@@ -424,6 +456,7 @@ describe("setElementRenderOverrides", () => {
       // First measurement happens with a translated title (unless editing).
       submit(new Map([[frame.id, { offset: { x: 120, y: 150 } }]]));
       const bounds = cache.get(frame);
+
       expect(bounds).toEqual(documentBounds);
       measure.mockClear();
       submit(new Map([[frame.id, { offset: { x: 140, y: 160 } }]]));
@@ -448,6 +481,7 @@ describe("setElementRenderOverrides", () => {
       ]),
       new Map(),
     );
+
     expect([...first]).toEqual([["a", { x: 1, y: 2 }]]);
     expect(
       getElementRenderOffsets(
@@ -488,6 +522,7 @@ describe("setElementRenderOverrides", () => {
     const set = vi.spyOn(Map.prototype, "set");
     const next = getElementRenderOffsets(fade, first);
     const writes = set.mock.calls.length;
+
     set.mockRestore();
 
     expect(next).toBe(first);
@@ -527,6 +562,7 @@ describe("setElementRenderOverrides", () => {
       new Map(entries.map(([id, offset]) => [id, { offset }])),
       previous,
     );
+
     expect(next).not.toBe(previous);
     expect([...next]).toEqual(entries);
     expect([...previous]).toEqual([
@@ -554,6 +590,7 @@ describe("render override geometry", () => {
       selectedElements: [],
     });
     const canvas = document.createElement("canvas");
+
     canvas.width = canvas.height = 500;
     const context = canvas.getContext("2d")!;
     const renderConfig: StaticCanvasRenderConfig = {
@@ -578,7 +615,9 @@ describe("render override geometry", () => {
         ...state,
         selectedElements: scene.getSelectedElements(state),
       });
+
       offsets = getElementRenderOffsets(overrides, offsets);
+
       return offsets.size
         ? renderer.getVisibleElementsWithRenderOffsets(
             visibleElements,
@@ -602,6 +641,7 @@ describe("render override geometry", () => {
           elementRenderOverrides: overrides,
         },
       });
+
     return {
       scene,
       renderer,
@@ -624,6 +664,7 @@ describe("render override geometry", () => {
     });
     const { renderer, appState, visibleWith } = setup([rect]);
     const overrides = new Map([[rect.id, { offset: { x: -300, y: 0 } }]]);
+
     expect(visibleWith(overrides)).toContain(rect);
     expect(
       renderer.getRenderableElements({ ...appState, selectedElements: [] })
@@ -644,6 +685,7 @@ describe("render override geometry", () => {
     const { renderer, appState, scene, visibleWith } = setup([rect]);
     const overrides = new Map([[rect.id, { offset: { x: -300, y: 0 } }]]);
     const visible = visibleWith(overrides);
+
     expect(visible).toContain(rect);
     expect(visibleWith(overrides, { ...appState, cursorButton: "down" })).toBe(
       visible,
@@ -663,11 +705,13 @@ describe("render override geometry", () => {
     expect(visibleWith(new Map())).not.toContain(rect);
 
     const moved = { ...rect, x: 1200 };
+
     scene.replaceAllElements([moved], { skipValidation: true });
     const changed = renderer.getRenderableElements({
       ...appState,
       selectedElements: [],
     });
+
     expect(visibleWith(overrides, appState, changed.elementsMap)).not.toContain(
       moved,
     );
@@ -703,6 +747,7 @@ describe("render override geometry", () => {
     const moving = visibleWith(
       new Map([[rects[3].id, { opacity: 50, offset: { x: 5, y: 0 } }]]),
     );
+
     expect(moving).toBe(documentVisible);
     expect(inViewport).toHaveBeenCalledTimes(1);
     expect(inViewport.mock.calls[0][0]).toBe(rects[3]);
@@ -741,6 +786,7 @@ describe("render override geometry", () => {
       selectedElementIds: { [a.id]: true },
       frameToHighlight: frame,
     };
+
     expect(ids(selected)).toEqual(["a", "b", "frame", "child"]);
     expect(ids({ ...selected, selectedElementsAreBeingDragged: true })).toEqual(
       ["b", "frame", "child", "a"],
@@ -775,6 +821,7 @@ describe("render override geometry", () => {
     };
     const ids = (overrides: ElementRenderOverrides) =>
       visibleWith(overrides, dragging).map((element) => element.id);
+
     expect(ids(new Map())).toEqual(["b", "a", "frame"]);
     // the frame leaves the view: back to plain scene order, like a full
     // recalculation would produce
@@ -807,6 +854,7 @@ describe("render override geometry", () => {
         visibleWith(new Map([[id, { offset: { x: offsetX, y: 0 } }]])).map(
           (element) => element.id,
         );
+
       expect(ids(-590)).toEqual(sceneIds);
       expect(ids(-580)).toEqual(sceneIds);
       expect(ids(-570)).toEqual(sceneIds);
@@ -820,6 +868,7 @@ describe("render override geometry", () => {
     const c = API.createElement({ type: "rectangle", id: "c", x: 600, y: 60 });
     const d = API.createElement({ type: "rectangle", id: "d", x: 10, y: 60 });
     const { visibleWith } = setup([a, b, c, d]);
+
     expect(
       visibleWith(
         new Map([
@@ -859,13 +908,16 @@ describe("render override geometry", () => {
       ...appState,
       selectedElements: [],
     }).visibleElements;
+
     expect(documentVisible).toEqual([arrow]);
     const walk = vi.spyOn(elementsMap, "values");
+
     for (const x of [10, 20, 30]) {
       expect(visibleWith(new Map([[arrow.id, { offset: { x, y: 0 } }]]))).toBe(
         documentVisible,
       );
     }
+
     expect(walk).not.toHaveBeenCalled();
   });
 
@@ -895,6 +947,7 @@ describe("render override geometry", () => {
       });
       const { renderer, appState, visibleWith } = setup([container, label]);
       const visible = visibleWith;
+
       expect(visible(new Map())).toEqual([]);
       // The container comes into view through its offset; the label is drawn
       // with it, so its own (document, off-screen) entry stays out and any
@@ -965,25 +1018,32 @@ describe("render override geometry", () => {
         frameId: frame.id,
       });
       const { context, draw } = setup([container, label, frame]);
+
       draw(new Map());
       const bitmap = Element.elementWithCanvasCache.get(label)!;
+
       expect(bitmap).toBeDefined();
       const original = JSON.stringify([container, label, frame]);
       const paints: { x: number; y: number; alpha: number }[] = [];
       const drawImage = vi.mocked(context.drawImage).getMockImplementation()!;
+
       vi.spyOn(context, "drawImage").mockImplementation((...args) => {
         const [source, x, y] = args;
+
         if (source === bitmap.canvas) {
           const t = context.getTransform();
+
           paints.push({
             x: t.a * x + t.c * y + t.e,
             y: t.b * x + t.d * y + t.f,
             alpha: context.globalAlpha,
           });
         }
+
         drawImage.call(context, ...args);
       });
       const offset = { x: 20, y: 10 };
+
       draw(new Map());
       draw(new Map([[container.id, { offset }]]));
       draw(
@@ -1002,12 +1062,14 @@ describe("render override geometry", () => {
       draw(new Map());
       expect(paints).toHaveLength(6);
       const [baseline] = paints;
+
       expect(baseline.alpha).toBe(0.35);
       const translated = {
         x: baseline.x + offset.x,
         y: baseline.y + offset.y,
         alpha: baseline.alpha,
       };
+
       expect(paints.slice(1)).toEqual([
         translated,
         translated,
@@ -1029,6 +1091,7 @@ describe("render override geometry", () => {
     });
     const { elementsMap, renderConfig, visibleWith } = setup([label]);
     const overrides = new Map([[label.id, { offset: { x: -400, y: 10 } }]]);
+
     expect(
       Element.resolveElementRenderState(label, elementsMap, {
         ...renderConfig,
@@ -1058,6 +1121,7 @@ describe("render override geometry", () => {
     const { draw, context } = setup([rect, frame]);
     const clip = vi.spyOn(context, "clip");
     const translate = vi.spyOn(context, "translate");
+
     draw(
       new Map([
         [rect.id, { offset: { x: -60, y: 0 } }],
@@ -1071,6 +1135,7 @@ describe("render override geometry", () => {
   it("multiplies overridden frame and child opacities", () => {
     const frame = API.createElement({ type: "frame", id: "frame" });
     const rect = API.createElement({ type: "rectangle", frameId: frame.id });
+
     expect(
       Element.resolveElementRenderState(
         rect,
@@ -1106,10 +1171,12 @@ describe("render override geometry", () => {
     });
     const { draw } = setup([embed, frame]);
     const renderElement = vi.spyOn(Element, "renderElement");
+
     draw(new Map([[embed.id, { opacity: 0, offset: { x: 20, y: 0 } }]]));
     const label = renderElement.mock.calls.find(
       ([element]) => element.type === "text",
     )?.[0];
+
     expect(label).toMatchObject({ id: embed.id, frameId: frame.id });
   });
 
@@ -1140,11 +1207,14 @@ describe("render override geometry", () => {
       const { context, draw } = setup([arrow, label]);
       const holes: number[] = [];
       const rect = vi.mocked(context.rect).getMockImplementation()!;
+
       vi.spyOn(context, "rect").mockImplementation((x, y, width, height) => {
         if (width === label.width + BOUND_TEXT_PADDING * 2) {
           const transform = context.getTransform();
+
           holes.push(transform.a * x + transform.c * y + transform.e);
         }
+
         rect.call(context, x, y, width, height);
       });
       draw(new Map());
@@ -1170,13 +1240,16 @@ describe("render override geometry", () => {
       link: "https://example.com",
     };
     const { draw } = setup([arrow]);
+
     draw(new Map());
     const bitmap = Element.elementWithCanvasCache.get(arrow);
     const shape = Element.ShapeCache.get(arrow, null);
     const generateShape = vi.spyOn(Element.ShapeCache, "generateElementShape");
+
     for (const x of [10, 20, 0]) {
       draw(new Map([[arrow.id, { offset: { x, y: 0 }, opacity: 40 }]]));
     }
+
     expect(bitmap).toBeDefined();
     expect(shape).toBeDefined();
     expect(Element.elementWithCanvasCache.get(arrow)).toBe(bitmap);
@@ -1209,6 +1282,7 @@ describe("render override geometry", () => {
       frame,
       sibling,
     ]);
+
     appState.openDialog = {
       name: "elementLinkSelector",
       sourceElementId: sibling.id,
@@ -1217,6 +1291,7 @@ describe("render override geometry", () => {
     renderConfig.elementsPendingErasure.add(child.id);
     const alphas: number[] = [];
     const drawImage = vi.mocked(context.drawImage).getMockImplementation()!;
+
     vi.spyOn(context, "drawImage").mockImplementation((...args) => {
       alphas.push(context.globalAlpha);
       drawImage.call(context, ...args);
@@ -1228,6 +1303,7 @@ describe("render override geometry", () => {
       ]),
     );
     const erasedAlpha = (0.25 * ELEMENT_READY_TO_ERASE_OPACITY) / 100;
+
     expect(alphas).toEqual([
       erasedAlpha * DEFAULT_REDUCED_GLOBAL_ALPHA,
       erasedAlpha,
@@ -1255,12 +1331,15 @@ describe("render override geometry", () => {
       },
     };
     const { context, draw, appState } = setup([image]);
+
     appState.croppingElementId = image.id;
     const paints: { x: number; y: number; alpha: number }[] = [];
     const drawImage = vi.mocked(context.drawImage).getMockImplementation()!;
+
     vi.spyOn(context, "drawImage").mockImplementation((...args) => {
       const [, x, y] = args;
       const t = context.getTransform();
+
       paints.push({
         x: t.a * x + t.c * y + t.e,
         y: t.b * x + t.d * y + t.f,

@@ -17,9 +17,11 @@ export const getMermaidInactiveParticipant = (
   message: string,
 ): string | null => {
   const match = message.match(MERMAID_INACTIVE_PARTICIPANT_ERROR);
+
   if (!match?.[1]) {
     return null;
   }
+
   return match[1].trim();
 };
 
@@ -31,6 +33,7 @@ const getInactiveParticipantLineNumber = (
   sourceText: string,
 ): number | null => {
   const participant = getMermaidInactiveParticipant(message);
+
   if (!participant) {
     return null;
   }
@@ -39,11 +42,13 @@ const getInactiveParticipantLineNumber = (
     `^\\s*deactivate\\s+${escapeRegExp(participant)}(?:\\s+%%.*)?\\s*$`,
   );
   const lines = sourceText.split(/\r?\n/);
+
   for (let index = lines.length - 1; index >= 0; index--) {
     if (deactivatePattern.test(lines[index])) {
       return index + 1;
     }
   }
+
   return null;
 };
 
@@ -52,12 +57,15 @@ export const getMermaidErrorLineNumber = (
   sourceText?: string,
 ): number | null => {
   const match = message.match(MERMAID_SYNTAX_ERROR_LINE);
+
   if (!match) {
     if (!sourceText) {
       return null;
     }
+
     return getInactiveParticipantLineNumber(message, sourceText);
   }
+
   return Number.parseInt(match[1], 10);
 };
 
@@ -82,24 +90,28 @@ export const getMermaidSyntaxErrorGuidance = (
   if (sourceText) {
     const openBrackets = countMatches(sourceText, /\[/g);
     const closeBrackets = countMatches(sourceText, /\]/g);
+
     if (openBrackets !== closeBrackets) {
       likelyCauses.push("Unbalanced square brackets in a node label.");
     }
 
     const openParens = countMatches(sourceText, /\(/g);
     const closeParens = countMatches(sourceText, /\)/g);
+
     if (openParens !== closeParens) {
       likelyCauses.push("Unbalanced parentheses in a node shape.");
     }
 
     const openBraces = countMatches(sourceText, /\{/g);
     const closeBraces = countMatches(sourceText, /\}/g);
+
     if (openBraces !== closeBraces) {
       likelyCauses.push("Unbalanced braces in a decision node.");
     }
 
     const subgraphCount = countMatches(sourceText, /^\s*subgraph\b/gm);
     const endCount = countMatches(sourceText, /^\s*end\s*$/gm);
+
     if (subgraphCount > endCount) {
       likelyCauses.push("A block is missing an `end` statement.");
     }

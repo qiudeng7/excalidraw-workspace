@@ -59,6 +59,7 @@ const handleDimensionChange: DragInputCallbackType<
   const elementsMap = scene.getNonDeletedElementsMap();
   const origElement = originalElements[0];
   const latestElement = elementsMap.get(origElement.id);
+
   if (origElement && latestElement) {
     const keepAspectRatio =
       shouldKeepAspectRatio || _shouldKeepAspectRatio(origElement);
@@ -130,6 +131,7 @@ const handleDimensionChange: DragInputCallbackType<
           width: nextCrop.width / (crop.naturalWidth / uncroppedWidth),
           height: nextCrop.height / (crop.naturalHeight / uncroppedHeight),
         });
+
         return;
       }
 
@@ -171,16 +173,16 @@ const handleDimensionChange: DragInputCallbackType<
         property === "width"
           ? nextValue
           : keepAspectRatio
-          ? nextValue * aspectRatio
-          : origElement.width,
+            ? nextValue * aspectRatio
+            : origElement.width,
         MIN_WIDTH_OR_HEIGHT,
       );
       const nextHeight = Math.max(
         property === "height"
           ? nextValue
           : keepAspectRatio
-          ? nextValue / aspectRatio
-          : origElement.height,
+            ? nextValue / aspectRatio
+            : origElement.height,
         MIN_WIDTH_OR_HEIGHT,
       );
 
@@ -224,6 +226,7 @@ const handleDimensionChange: DragInputCallbackType<
       const changeInHeight = property === "height" ? accumulatedChange : 0;
 
       let nextWidth = Math.max(0, origElement.width + changeInWidth);
+
       if (property === "width") {
         if (shouldChangeByStepSize) {
           nextWidth = getStepSizedValue(nextWidth, STEP_SIZE);
@@ -233,6 +236,7 @@ const handleDimensionChange: DragInputCallbackType<
       }
 
       let nextHeight = Math.max(0, origElement.height + changeInHeight);
+
       if (property === "height") {
         if (shouldChangeByStepSize) {
           nextHeight = getStepSizedValue(nextHeight, STEP_SIZE);
@@ -333,12 +337,16 @@ const DimensionDragInput = ({
   ) {
     const { width: uncroppedWidth, height: uncroppedHeight } =
       getUncroppedWidthAndHeight(element);
+
     if (property === "width") {
       const ratio = uncroppedWidth / element.crop.naturalWidth;
+
       value = round(element.crop.width * ratio, 2);
     }
+
     if (property === "height") {
       const ratio = uncroppedHeight / element.crop.naturalHeight;
+
       value = round(element.crop.height * ratio, 2);
     }
   }

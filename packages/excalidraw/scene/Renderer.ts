@@ -133,8 +133,10 @@ export class Renderer {
           (visible ? added : removed).add(element);
         }
       };
+
       for (const [id, offset] of offsets) {
         const element = elementsMap.get(id);
+
         // A bound label's own offset is ignored, and it needs no entry of
         // its own: the static renderer draws it with its container and skips
         // its entry, so its document visibility can stay as it is.
@@ -144,6 +146,7 @@ export class Renderer {
         ) {
           continue;
         }
+
         update(element, isVisible(element, offset));
       }
 
@@ -154,6 +157,7 @@ export class Renderer {
       const needsFrameReordering =
         frameToHighlight &&
         getCommonFrameId(selectedElements) !== frameToHighlight.id;
+
       if (!added.size && !needsFrameReordering) {
         return visibleElements.filter((element) => !removed.has(element));
       }
@@ -162,6 +166,7 @@ export class Renderer {
       // ordering also needs rebuilding on removals, since the anchoring frame
       // may have left the view.
       const result: NonDeletedExcalidrawElement[] = [];
+
       for (const element of elementsMap.values()) {
         if (
           added.has(element) ||
@@ -170,6 +175,7 @@ export class Renderer {
           result.push(element);
         }
       }
+
       return needsFrameReordering
         ? this.sortSelectedElementsIntoHighlightedFrame({
             visibleElements: result,
@@ -190,10 +196,12 @@ export class Renderer {
     visibleElements: readonly NonDeletedExcalidrawElement[],
   ) {
     let set = this.visibleSets.get(visibleElements);
+
     if (!set) {
       set = new Set(visibleElements);
       this.visibleSets.set(visibleElements, set);
     }
+
     return set;
   }
 
@@ -217,6 +225,7 @@ export class Renderer {
     width: AppState["width"];
   }): readonly NonDeletedExcalidrawElement[] {
     const visibleElements: NonDeletedExcalidrawElement[] = [];
+
     for (const element of elementsMap.values()) {
       if (
         isElementInViewport(
@@ -236,6 +245,7 @@ export class Renderer {
         visibleElements.push(element);
       }
     }
+
     return visibleElements;
   }
 
@@ -266,6 +276,7 @@ export class Renderer {
         elementsMap.set(element.id, element);
       }
     }
+
     return { elementsMap, newElementCanvasElement };
   }
 

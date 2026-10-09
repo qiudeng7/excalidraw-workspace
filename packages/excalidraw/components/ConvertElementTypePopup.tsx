@@ -164,6 +164,7 @@ const ConvertElementTypePopup = ({ app }: { app: App }) => {
   useEffect(() => {
     if (selectedElements.length === 0) {
       app.updateEditorAtom(convertElementTypePopupAtom, null);
+
       return;
     }
 
@@ -217,12 +218,12 @@ const Panel = ({
           (element) => element.type === genericElements[0].type,
         )
       : conversionType === "linear"
-      ? linearElements.every(
-          (element) =>
-            getLinearElementSubType(element) ===
-            getLinearElementSubType(linearElements[0]),
-        )
-      : false;
+        ? linearElements.every(
+            (element) =>
+              getLinearElementSubType(element) ===
+              getLinearElementSubType(linearElements[0]),
+          )
+        : false;
 
   const [panelPosition, setPanelPosition] = useState({ x: 0, y: 0 });
   const positionRef = useRef("");
@@ -234,8 +235,8 @@ const Panel = ({
     );
     const newPositionRef = `
       ${app.state.scrollX}${app.state.scrollY}${app.state.offsetTop}${
-      app.state.offsetLeft
-    }${app.state.zoom.value}${elements.map((el) => el.id).join(",")}`;
+        app.state.offsetLeft
+      }${app.state.zoom.value}${elements.map((el) => el.id).join(",")}`;
 
     if (newPositionRef === positionRef.current) {
       return;
@@ -250,6 +251,7 @@ const Panel = ({
         elements[0],
         app.scene.getNonDeletedElementsMap(),
       );
+
       bottomLeft = pointRotateRads(
         pointFrom(x1, y2),
         pointFrom(cx, cy),
@@ -257,6 +259,7 @@ const Panel = ({
       );
     } else {
       const { minX, maxY } = getCommonBoundingBox(elements);
+
       bottomLeft = pointFrom(minX, maxY);
     }
 
@@ -274,6 +277,7 @@ const Panel = ({
         linearElement.id,
         getConvertibleType(linearElement),
       );
+
       if (!LINEAR_ELEMENT_CONVERSION_CACHE.has(cacheKey)) {
         LINEAR_ELEMENT_CONVERSION_CACHE.set(cacheKey, linearElement);
       }
@@ -287,6 +291,7 @@ const Panel = ({
           element,
           app.scene.getNonDeletedElementsMap(),
         );
+
         if (boundText) {
           FONT_SIZE_CONVERSION_CACHE.set(element.id, {
             fontSize: boundText.fontSize,
@@ -305,12 +310,12 @@ const Panel = ({
           ["elbowArrow", elbowArrowIcon],
         ]
       : conversionType === "generic"
-      ? [
-          ["rectangle", RectangleIcon],
-          ["diamond", DiamondIcon],
-          ["ellipse", EllipseIcon],
-        ]
-      : [];
+        ? [
+            ["rectangle", RectangleIcon],
+            ["diamond", DiamondIcon],
+            ["ellipse", EllipseIcon],
+          ]
+        : [];
 
   return (
     <div
@@ -349,14 +354,15 @@ const Panel = ({
               if (isSelected) {
                 return;
               }
+
               if (app.state.activeTool.type !== type) {
                 trackEvent("convertElementType", type, "ui");
               }
+
               convertElementTypes(app, {
                 conversionType,
                 nextType: type as
-                  | ConvertibleGenericTypes
-                  | ConvertibleLinearTypes,
+                  ConvertibleGenericTypes | ConvertibleLinearTypes,
               });
               panelRef.current?.focus();
             }}
@@ -388,6 +394,7 @@ export const adjustBoundTextSize = (
   );
 
   let nextFontSize = boundText.fontSize;
+
   while (
     (metrics.width > maxWidth || metrics.height > maxHeight) &&
     nextFontSize > 0
@@ -397,6 +404,7 @@ export const adjustBoundTextSize = (
       ...boundText,
       fontSize: nextFontSize,
     };
+
     metrics = measureText(
       boundText.text,
       getFontString(_updatedTextElement),
@@ -463,6 +471,7 @@ export const convertElementTypes = (
 
       for (const element of convertibleGenericElements) {
         const convertedElement = convertElementType(element, nextType, app);
+
         convertedElements[convertedElement.id] = convertedElement;
       }
 
@@ -488,6 +497,7 @@ export const convertElementTypes = (
           element,
           app.scene.getNonDeletedElementsMap(),
         );
+
         if (boundText) {
           if (FONT_SIZE_CONVERSION_CACHE.get(element.id)) {
             mutateElement(boundText, app.scene.getNonDeletedElementsMap(), {
@@ -527,6 +537,7 @@ export const convertElementTypes = (
       );
 
       const index = commonSubType ? LINEAR_TYPES.indexOf(commonSubType) : -1;
+
       nextType =
         LINEAR_TYPES[
           (index + LINEAR_TYPES.length + advancement) % LINEAR_TYPES.length
@@ -556,6 +567,7 @@ export const convertElementTypes = (
           convertedElements.push(cachedElement);
         } else {
           const converted = convertElementType(element, nextType, app);
+
           nextElementsMap.set(converted.id, converted);
           convertedElements.push(converted);
         }
@@ -568,11 +580,14 @@ export const convertElementTypes = (
         if (isLinearElement(element)) {
           if (isElbowArrow(element)) {
             const nextPoints = convertLineToElbow(element);
+
             if (nextPoints.length < 2) {
               // skip if not enough points to form valid segments
               continue;
             }
+
             const fixedSegments: FixedSegment[] = [];
+
             for (let i = 1; i < nextPoints.length - 2; i++) {
               fixedSegments.push({
                 start: nextPoints[i],
@@ -580,6 +595,7 @@ export const convertElementTypes = (
                 index: i + 1,
               });
             }
+
             const updates = updateElbowArrowPoints(
               element,
               app.scene.getNonDeletedElementsMap(),
@@ -588,6 +604,7 @@ export const convertElementTypes = (
                 fixedSegments,
               },
             );
+
             mutateElement(element, app.scene.getNonDeletedElementsMap(), {
               ...updates,
               endArrowhead: "arrow",
@@ -607,6 +624,7 @@ export const convertElementTypes = (
 
             if (similarCachedLinearElement) {
               const points = similarCachedLinearElement.points;
+
               app.scene.mutateElement(element, {
                 points,
               });
@@ -646,11 +664,13 @@ export const getConversionTypeFromElements = (
   }
 
   let canBeLinear = false;
+
   for (const element of elements) {
     if (isConvertibleGenericType(element.type)) {
       // generic type conversion have preference
       return "generic";
     }
+
     if (isEligibleLinearElement(element)) {
       canBeLinear = true;
     }
@@ -688,10 +708,9 @@ const filterGenericConvetibleElements = <T extends ExcalidrawElement>(
           | ExcalidrawDiamondElement
           | ExcalidrawEllipseElement
         >
-      :
-          | ExcalidrawRectangleElement
-          | ExcalidrawDiamondElement
-          | ExcalidrawEllipseElement
+      : | ExcalidrawRectangleElement
+        | ExcalidrawDiamondElement
+        | ExcalidrawEllipseElement
   >;
 
 const filterLinearConvertibleElements = <T extends ExcalidrawElement>(
@@ -736,20 +755,21 @@ const convertLineToElbow = (line: ExcalidrawLinearElement): LocalPoint[] => {
 
   // 2. drop obviously colinear middle points
   const trimmed: LocalPoint[] = [ortho[0]];
+
   for (let i = 1; i < ortho.length - 1; ++i) {
-    if (
-      !(
-        (isVert(ortho[i - 1], ortho[i]) && isVert(ortho[i], ortho[i + 1])) ||
-        (isHorz(ortho[i - 1], ortho[i]) && isHorz(ortho[i], ortho[i + 1]))
-      )
-    ) {
+    if (!(
+      (isVert(ortho[i - 1], ortho[i]) && isVert(ortho[i], ortho[i + 1])) ||
+      (isHorz(ortho[i - 1], ortho[i]) && isHorz(ortho[i], ortho[i + 1]))
+    )) {
       trimmed.push(ortho[i]);
     }
   }
+
   trimmed.push(ortho[ortho.length - 1]);
 
   // 3. collapse micro “jogs” (V-H-V / H-V-H whose short leg < SNAP)
   const clean: LocalPoint[] = [trimmed[0]];
+
   for (let i = 1; i < trimmed.length - 1; ++i) {
     const a = clean[clean.length - 1];
     const b = trimmed[i];
@@ -757,6 +777,7 @@ const convertLineToElbow = (line: ExcalidrawLinearElement): LocalPoint[] => {
 
     const v1 = isVert(a, b);
     const v2 = isVert(b, c);
+
     if (v1 !== v2) {
       const d1 = dist(a, b);
       const d2 = dist(b, c);
@@ -791,13 +812,17 @@ const convertLineToElbow = (line: ExcalidrawLinearElement): LocalPoint[] => {
             }
           }
         }
+
         // *b* is gone, don’t add it
         continue;
       }
     }
+
     clean.push(b);
   }
+
   clean.push(trimmed[trimmed.length - 1]);
+
   return clean;
 };
 
@@ -844,6 +869,7 @@ const convertElementType = <
     if (!isProdEnv()) {
       throw Error(`Invalid conversion from ${element.type} to ${targetType}.`);
     }
+
     return element;
   }
 
@@ -881,6 +907,7 @@ const convertElementType = <
           }),
         );
       }
+
       case "sharpArrow": {
         return bumpVersion(
           newArrowElement({
@@ -893,6 +920,7 @@ const convertElementType = <
           }),
         );
       }
+
       case "curvedArrow": {
         return bumpVersion(
           newArrowElement({
@@ -907,6 +935,7 @@ const convertElementType = <
           }),
         );
       }
+
       case "elbowArrow": {
         return bumpVersion(
           newArrowElement({
@@ -955,6 +984,7 @@ const getConvertibleType = (
   if (isLinearElement(element)) {
     return getLinearElementSubType(element);
   }
+
   return element.type;
 };
 

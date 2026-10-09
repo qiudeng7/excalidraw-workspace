@@ -10,6 +10,7 @@ import {
 const DropdownMenuSub = ({ children }: { children?: React.ReactNode }) => {
   const MenuTriggerComp = getSubMenuTriggerComponent(children);
   const MenuContentComp = getSubMenuContentComponent(children);
+
   return (
     <DropdownMenuPrimitive.Sub>
       {MenuTriggerComp}

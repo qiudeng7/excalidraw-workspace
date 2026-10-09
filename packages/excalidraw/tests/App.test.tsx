@@ -25,6 +25,7 @@ describe("Test <App/>", () => {
     };
 
     const originalContext = global.HTMLCanvasElement.prototype.getContext("2d");
+
     //@ts-ignore
     global.HTMLCanvasElement.prototype.getContext = (contextId) => {
       return {

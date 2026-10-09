@@ -71,6 +71,7 @@ export const removeLastAssistantMessage = (chatHistory: TChat.ChatHistory) => {
       messages: chatHistory.messages.filter((_, idx) => idx !== lastMsgIdx),
     };
   }
+
   return chatHistory;
 };
 

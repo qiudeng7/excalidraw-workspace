@@ -18,6 +18,7 @@ export const mockThrottleRAF: typeof throttleRAFType = <T extends unknown[]>(
   }) as ThrottledFn<T>;
 
   ret.flush = () => {};
+
   ret.cancel = () => {};
 
   return ret;
@@ -91,6 +92,7 @@ export const mockMultipleHTMLImageElements = (
         super();
 
         const size = _sizes.shift();
+
         if (!size) {
           throw new Error("Insufficient sizes");
         }

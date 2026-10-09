@@ -96,6 +96,7 @@ const checkpoint = (name: string) => {
     selectedLinearElement,
     ...strippedAppState
   } = h.state;
+
   expect(strippedAppState).toMatchSnapshot(`[${name}] appState`);
   expect(h.elements.length).toMatchSnapshot(`[${name}] number of elements`);
 
@@ -175,6 +176,7 @@ describe("history", () => {
       } catch (e) {
         expect(e).toBeInstanceOf(Error);
       }
+
       // we popped the entry, even though it is corrupted, so the user could perform subsequent undo/redo and would not be stuck on this entry forever
       expect(API.getUndoStack().length).toBe(0);
       // we pushed the entr, as we don't want just lose it and throw it away - it might be perfectly valid on subsequent redo
@@ -195,6 +197,7 @@ describe("history", () => {
       } catch (e) {
         expect(e).toBeInstanceOf(Error);
       }
+
       expect(API.getUndoStack().length).toBe(1); // vice versa for redo
       expect(API.getRedoStack().length).toBe(0); // vice versa for undo
       expect(h.elements).toEqual([
@@ -253,6 +256,7 @@ describe("history", () => {
 
     it("should not modify anything on unrelated appstate change", async () => {
       const rect = API.createElement({ type: "rectangle" });
+
       await render(
         <Excalidraw
           handleKeyboardGlobally={true}
@@ -340,6 +344,7 @@ describe("history", () => {
       await render(<Excalidraw handleKeyboardGlobally={true} />);
 
       const rect = UI.createElement("rectangle", { x: 10 });
+
       togglePopover("Background");
       UI.clickOnTestId("color-red");
       UI.clickOnTestId("color-blue");
@@ -520,12 +525,14 @@ describe("history", () => {
 
       const undoAction = createUndoAction(h.history);
       const redoAction = createRedoAction(h.history);
+
       // noop
       API.executeAction(undoAction);
       expect(h.elements).toEqual([
         expect.objectContaining({ id: "A", isDeleted: false }),
       ]);
       const rectangle = UI.createElement("rectangle");
+
       expect(h.elements).toEqual([
         expect.objectContaining({ id: "A" }),
         expect.objectContaining({ id: rectangle.id }),
@@ -600,6 +607,7 @@ describe("history", () => {
 
       const undoAction = createUndoAction(h.history);
       const redoAction = createRedoAction(h.history);
+
       API.executeAction(undoAction);
 
       expect(API.getSnapshot()).toEqual([
@@ -628,6 +636,7 @@ describe("history", () => {
       await render(<Excalidraw handleKeyboardGlobally={true} />);
 
       const link = "https://www.youtube.com/watch?v=gkGMXY0wekg";
+
       await API.drop([
         {
           kind: "string",
@@ -2010,6 +2019,7 @@ describe("history", () => {
       expect(redoButton).toBeDisabled();
 
       const rectangle = UI.createElement("rectangle");
+
       expect(h.elements).toEqual([
         expect.objectContaining({ id: "A" }),
         expect.objectContaining({ id: rectangle.id }),
@@ -2059,6 +2069,7 @@ describe("history", () => {
       // -----------------------------------------------------------------------
 
       const rectangle = UI.createElement("rectangle");
+
       expect(h.elements).toEqual([
         expect.objectContaining({ id: "A" }),
         expect.objectContaining({ id: rectangle.id }),
@@ -2360,6 +2371,7 @@ describe("history", () => {
       const modifiedArrow = h.elements.filter(
         (el) => el.type === "arrow",
       )[0] as ExcalidrawElbowArrowElement;
+
       expect(modifiedArrow.points).toCloselyEqualPoints([
         [0, 0],
         [178.9, 0],
@@ -2640,6 +2652,7 @@ describe("history", () => {
       const rect1 = UI.createElement("rectangle", { x: 10 });
 
       const rect2 = UI.createElement("rectangle", { x: 20 });
+
       togglePopover("Background");
       UI.clickOnTestId("color-red");
 
@@ -5156,11 +5169,13 @@ describe("history", () => {
         {
           // no need to be strict about points, hence the rounding
           const points = (h.elements[2] as ExcalidrawLinearElement).points[1];
+
           expect([
             roundToNearestHundred(points[0]),
             roundToNearestHundred(points[1]),
           ]).toEqual([500, -400]);
         }
+
         expect(h.elements).toEqual(
           expect.arrayContaining([
             expect.objectContaining({

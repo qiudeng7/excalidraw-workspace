@@ -123,6 +123,7 @@ const distanceToEllipseElement = (
   p: GlobalPoint,
 ): number => {
   const center = elementCenterPoint(element, elementsMap);
+
   return ellipseDistanceFromPoint(
     // Instead of rotating the ellipse, rotate the point to the inverse angle
     pointRotateRads(p, center, -element.angle as Radians),
@@ -139,6 +140,7 @@ const distanceToLinearOrFreeDraElement = (
     element,
     elementsMap,
   );
+
   return Math.min(
     ...lines.map((s) => distanceToLineSegment(p, s)),
     ...curves.map((a) => curvePointDistance(a, p)),
@@ -165,6 +167,7 @@ const distanceToFreeDrawElement = (
   }
 
   const polygon = lines.map((line) => line[0]);
+
   if (polygonIncludesPointNonZero(p, polygon)) {
     return 0;
   }

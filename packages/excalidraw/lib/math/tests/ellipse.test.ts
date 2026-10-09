@@ -15,6 +15,7 @@ import type { Ellipse, GlobalPoint } from "../src/types";
 describe("point and ellipse", () => {
   it("point on ellipse", () => {
     const target: Ellipse<GlobalPoint> = ellipse(pointFrom(1, 2), 2, 1);
+
     [
       pointFrom(1, 3),
       pointFrom(1, 1),
@@ -41,6 +42,7 @@ describe("point and ellipse", () => {
 
   it("point in ellipse", () => {
     const target: Ellipse<GlobalPoint> = ellipse(pointFrom(0, 0), 2, 1);
+
     [
       pointFrom(0, 1),
       pointFrom(0, -1),

@@ -56,6 +56,7 @@ export const renderBarChart = (
       const barHeight = (value / max) * layout.chartHeight;
       const barColor =
         series.length > 1 ? seriesColors[seriesIndex] : backgroundColor;
+
       return newElement({
         backgroundColor: barColor,
         ...commonProps,

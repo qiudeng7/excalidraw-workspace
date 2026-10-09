@@ -112,6 +112,7 @@ const createNote = ({
     textAlign: "center",
     verticalAlign: "middle",
   });
+
   return { note, label };
 };
 
@@ -128,6 +129,7 @@ const layoutNotes = (...ids: string[]) => {
 
 const arrowEndY = (id: string) => {
   const arrow = getElement<ExcalidrawArrowElement>(id);
+
   return arrow.y + arrow.points[arrow.points.length - 1][1];
 };
 
@@ -161,6 +163,7 @@ describe("sticky notes", () => {
         mode: "orbit",
       },
     });
+
     API.setElements([note, label, arrow]);
     layoutNotes(note.id);
 
@@ -168,19 +171,23 @@ describe("sticky notes", () => {
       note.id,
     ).height;
     const endYBefore = arrowEndY(arrow.id);
+
     expect(heightBefore).toBe(DEFAULT_STICKY_NOTE_SIZE);
 
     mouse.doubleClickAt(note.x + note.width / 2, note.y + note.height / 2);
     const editor = await getTextEditor();
+
     updateTextEditor(editor, LONG_TEXT);
 
     const grown = getElement<ExcalidrawStickyNoteElement>(note.id);
+
     expect(grown.height).toBeGreaterThan(heightBefore);
     expect(grown.baseHeight).toBe(DEFAULT_STICKY_NOTE_SIZE);
     // the bottom edge moved by the growth, and so did the arrow's end (the
     // orbit ring re-solves the exact contact point, hence the tolerance)
     const growth = grown.height - heightBefore;
     const endDelta = arrowEndY(arrow.id) - endYBefore;
+
     expect(Math.abs(endDelta - growth)).toBeLessThan(10);
 
     Keyboard.keyPress(KEYS.ESCAPE, editor);
@@ -207,6 +214,7 @@ describe("sticky notes", () => {
       text: LONG_TEXT,
       fontSize: 28,
     });
+
     API.setElements([note, text]);
     API.setSelectedElements([note, text]);
 
@@ -214,6 +222,7 @@ describe("sticky notes", () => {
 
     const label = getElement<ExcalidrawTextElement>(text.id);
     const grown = getElement<ExcalidrawStickyNoteElement>(note.id);
+
     expect(label.containerId).toBe(note.id);
     expect(label.baseFontSize).toBe(28);
     expect(label.fontSize).toBe(STICKY_NOTE_MIN_FONT_SIZE);
@@ -225,6 +234,7 @@ describe("sticky notes", () => {
 
     const freed = getElement<ExcalidrawTextElement>(text.id);
     const emptied = getElement<ExcalidrawStickyNoteElement>(note.id);
+
     expect(freed.containerId).toBe(null);
     // the ceiling is cleared for good (`undefined` would be skipped by the mutator)
     expect(freed.baseFontSize).toBe(null);
@@ -240,12 +250,14 @@ describe("sticky notes", () => {
       fontSize: 10,
     });
     const target = createNote({ id: "target", text: LONG_TEXT, fontSize: 28 });
+
     API.setElements([source.note, source.label, target.note, target.label]);
     layoutNotes(source.note.id, target.note.id);
 
     const grownHeight = getElement<ExcalidrawStickyNoteElement>(
       target.note.id,
     ).height;
+
     expect(grownHeight).toBeGreaterThan(DEFAULT_STICKY_NOTE_SIZE);
 
     API.setSelectedElements([getElement(source.note.id)]);
@@ -255,12 +267,14 @@ describe("sticky notes", () => {
 
     const note = getElement<ExcalidrawStickyNoteElement>(target.note.id);
     const label = getElement<ExcalidrawTextElement>(target.label.id);
+
     // the user's ceiling was copied, not the source's fitted size
     expect(label.baseFontSize).toBe(10);
     // the note shrank with its smaller label, and the pair is self-consistent
     // (no phantom container: the returned note carries the new layout)
     expect(note.height).toBeLessThan(grownHeight);
     const layout = getStickyNoteLayout(note, label);
+
     expect(note.height).toBeCloseTo(layout.container.height);
     expect(label.fontSize).toBe(layout.text!.fontSize);
     expect(label.y).toBeCloseTo(layout.text!.y);
@@ -280,6 +294,7 @@ describe("sticky notes", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([note, label, rectangle]);
     layoutNotes(note.id);
     const noteBefore = getElement<ExcalidrawStickyNoteElement>(note.id);
@@ -304,6 +319,7 @@ describe("sticky notes", () => {
       text: "hi",
       fontSize: 28,
     });
+
     API.setElements([note, label]);
     layoutNotes(note.id);
     API.setSelectedElements([getElement(note.id)]);
@@ -347,6 +363,7 @@ describe("sticky notes", () => {
         width: 100,
         height: 100,
       });
+
       API.setElements([note, label, rectangle]);
       layoutNotes(note.id);
       API.setSelectedElements([getElement(note.id), getElement(rectangle.id)]);
@@ -375,6 +392,7 @@ describe("sticky notes", () => {
       const note = h.elements.find(
         (element) => element.type === "stickynote",
       ) as ExcalidrawStickyNoteElement;
+
       expect(note.backgroundColor).toBe(COLOR_PALETTE.pink[1]);
       expect(note.strokeColor).toBe(COLOR_PALETTE.black);
       Keyboard.keyPress(KEYS.ESCAPE, await getTextEditor());
@@ -400,6 +418,7 @@ describe("sticky notes", () => {
         fontSize: 20,
         strokeColor: COLOR_PALETTE.transparent,
       });
+
       API.setElements([note, text]);
       API.setSelectedElements([note, text]);
 
@@ -430,6 +449,7 @@ describe("sticky notes", () => {
         fontSize: 20,
         strokeColor: RED,
       });
+
       API.setElements([note, text]);
       API.setSelectedElements([note, text]);
 
@@ -445,16 +465,19 @@ describe("sticky notes", () => {
         text: "hi",
         fontSize: 28,
       });
+
       API.setElements([note, label]);
       layoutNotes(note.id);
       API.setSelectedElements([getElement(note.id)]);
 
       const backgroundBefore = getElement(note.id).backgroundColor;
+
       // Shift+S opens the stroke eyedropper (`I` would pick the background)
       Keyboard.withModifierKeys({ shift: true }, () => {
         Keyboard.keyPress("s");
       });
       const eyeDropper = editorJotaiStore.get(activeEyeDropperAtom);
+
       expect(eyeDropper).not.toBeNull();
       act(() => {
         eyeDropper!.onSelect(RED, { altKey: false } as PointerEvent);
@@ -488,17 +511,21 @@ describe("sticky notes", () => {
           mode: "orbit",
         },
       });
+
       API.setElements([note, label, arrow]);
       layoutNotes(note.id);
+
       return { note, label, arrow };
     };
     const noteBottom = (id: string) => {
       const note = getElement<ExcalidrawStickyNoteElement>(id);
+
       return note.y + note.height;
     };
 
     it("follow the note back to its base height on unbind", () => {
       const { note, arrow } = createNoteWithArrow(LONG_TEXT);
+
       expect(getElement(note.id).height).toBeGreaterThan(
         DEFAULT_STICKY_NOTE_SIZE,
       );
@@ -536,6 +563,7 @@ describe("sticky notes", () => {
       });
 
       const after = getElement<ExcalidrawStickyNoteElement>(note.id);
+
       expect(after.baseHeight).toBe(DEFAULT_STICKY_NOTE_SIZE);
       expect(after.height).toBeCloseTo(heightBefore);
       // the arrow pass ran after the content correction, not before it
@@ -546,6 +574,7 @@ describe("sticky notes", () => {
       // 12 lines at a 12px ceiling fit the base height; at 20 they don't
       const twelveLines = Array(12).fill("abcdefghij").join("\n");
       const { note, label, arrow } = createNoteWithArrow(twelveLines, 12);
+
       expect(getElement(note.id).height).toBe(DEFAULT_STICKY_NOTE_SIZE);
       const gap = arrowEndY(arrow.id) - noteBottom(note.id);
 
@@ -594,6 +623,7 @@ describe("sticky notes", () => {
         text: "hi",
         fontSize: 28,
       });
+
       API.setElements([note, label]);
       layoutNotes(note.id);
       const shapeDefault = h.state.currentItemStrokeColor;
@@ -616,6 +646,7 @@ describe("sticky notes", () => {
         text: "hi",
         fontSize: 28,
       });
+
       API.setElements([note, label]);
       layoutNotes(note.id);
       const shapeDefault = h.state.currentItemBackgroundColor;
@@ -627,6 +658,7 @@ describe("sticky notes", () => {
       // the label is the styles panel's target and has no fill of its own,
       // yet the background picker stays available and shows the note's fill
       const elementsMap = h.app.scene.getNonDeletedElementsMap();
+
       expect(
         getShapeActionPredicates(
           h.state,
@@ -641,6 +673,7 @@ describe("sticky notes", () => {
       const activeSwatches = Array.from(
         document.querySelectorAll(".color-picker__top-picks .active"),
       ).map((button) => button.getAttribute("title"));
+
       expect(backgroundPicker).not.toBeNull();
       expect(activeSwatches).toContain(noteBackground);
 
@@ -669,6 +702,7 @@ describe("sticky notes", () => {
         text: "hi",
         fontSize: 28,
       });
+
       API.setElements([text]);
 
       mouse.doubleClickAt(text.x + text.width / 2, text.y + text.height / 2);
@@ -691,6 +725,7 @@ describe("sticky notes", () => {
         text: "hi",
         fontSize: 28,
       });
+
       API.setElements([note, label]);
       layoutNotes(note.id);
       API.setSelectedElements([getElement(note.id)]);
@@ -703,12 +738,14 @@ describe("sticky notes", () => {
       const backdrop = document.querySelector(
         ".excalidraw-eye-dropper-backdrop",
       )!;
+
       expect(backdrop).not.toBeNull();
       // the pick applies live only while the pointer is held down
       fireEvent.pointerDown(backdrop, { clientX: 150, clientY: 150 });
       fireEvent.pointerMove(window, { clientX: 150, clientY: 150 });
 
       const picked = getElement(label.id).strokeColor;
+
       expect(picked).not.toBe(COLOR_PALETTE.black);
       expect(getElement(note.id).strokeColor).toBe(picked);
       fireEvent.keyDown(backdrop, { key: KEYS.ESCAPE });
@@ -724,6 +761,7 @@ describe("sticky notes", () => {
         fontSize: 28,
       });
       const target = createNote({ id: "target", text: "hi", fontSize: 10 });
+
       API.setElements([source.note, source.label, target.note, target.label]);
       layoutNotes(source.note.id, target.note.id);
 
@@ -765,6 +803,7 @@ describe("sticky notes", () => {
         strokeColor: RED,
       });
       const target = createNote({ id: "target", text: "hi", fontSize: 20 });
+
       API.setElements([rectangle, rectangleLabel, target.note, target.label]);
       layoutNotes(target.note.id);
 
@@ -788,6 +827,7 @@ describe("sticky notes", () => {
         text: "plain",
         fontSize: 20,
       });
+
       API.setElements([text]);
       // what generic binding repair can leave behind
       act(() => {
@@ -806,6 +846,7 @@ describe("sticky notes", () => {
       API.executeAction(actionIncreaseFontSize);
 
       const after = getElement<ExcalidrawTextElement>(text.id);
+
       expect(after.fontSize).toBe(22);
       expect(after.baseFontSize).toBe(28);
     });
@@ -816,6 +857,7 @@ describe("sticky notes", () => {
         text: LONG_TEXT,
         fontSize: 28,
       });
+
       API.setElements([note, label]);
       layoutNotes(note.id);
       API.setSelectedElements([getElement(note.id)]);
@@ -827,6 +869,7 @@ describe("sticky notes", () => {
       const notes = h.elements.filter(
         (element) => element.type === "stickynote" && !element.isDeleted,
       ) as ExcalidrawStickyNoteElement[];
+
       expect(notes).toHaveLength(2);
       const copy = notes.find((candidate) => candidate.id !== note.id)!;
       const copyLabel = h.elements.find(
@@ -834,6 +877,7 @@ describe("sticky notes", () => {
           element.type === "text" &&
           (element as ExcalidrawTextElement).containerId === copy.id,
       ) as ExcalidrawTextElement;
+
       expect(copy.baseHeight).toBe(DEFAULT_STICKY_NOTE_SIZE);
       expect(copy.height).toBeCloseTo(getElement(note.id).height);
       expect(copyLabel.baseFontSize).toBe(28);
@@ -857,6 +901,7 @@ describe("sticky notes", () => {
       const note = h.elements.find(
         (element) => element.type === "stickynote" && !element.isDeleted,
       ) as ExcalidrawStickyNoteElement;
+
       expect(note.width).toBe(DEFAULT_STICKY_NOTE_SIZE);
       expect(note.height).toBe(DEFAULT_STICKY_NOTE_SIZE);
 
@@ -865,10 +910,12 @@ describe("sticky notes", () => {
         h.elements.filter(
           (element) => element.type === "stickynote" && !element.isDeleted,
         );
+
       Keyboard.undo();
       if (liveNotes().length) {
         Keyboard.undo();
       }
+
       expect(liveNotes()).toHaveLength(0);
     });
   });
@@ -883,13 +930,16 @@ describe("sticky notes", () => {
       mouse.downAt(300, 300);
       mouse.up();
       const editor = await getTextEditor();
+
       // the editor arms its submit-on-blur a tick after the pointer-up
       await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
       return editor;
     };
 
     it("undoes an abandoned note when the editor is escaped", async () => {
       const editor = await createNoteByClick();
+
       expect(API.getUndoStack()).toHaveLength(1);
 
       Keyboard.keyPress(KEYS.ESCAPE, editor);
@@ -925,6 +975,7 @@ describe("sticky notes", () => {
 
     it("skips empty-label cleanup after a font change captures creation", async () => {
       const editor = await createNoteByClick();
+
       // Changing the empty label's baseFontSize is invisible too.
       act(() => {
         h.app.actionManager.executeAction(actionChangeFontSize, "ui", 28);
@@ -944,12 +995,14 @@ describe("sticky notes", () => {
 
     it("undoes typing separately from creating the note", async () => {
       const editor = await createNoteByClick();
+
       updateTextEditor(editor, "hello");
       Keyboard.keyPress(KEYS.ESCAPE, editor);
 
       const label = h.elements.find(
         (element) => element.type === "text" && !element.isDeleted,
       ) as ExcalidrawTextElement;
+
       expect(label.text).toBe("hello");
       expect(API.getUndoStack()).toHaveLength(2);
       Keyboard.undo();
@@ -971,9 +1024,11 @@ describe("sticky notes", () => {
         text: "hi",
         fontSize: 28,
       });
+
       API.setElements([note, label]);
       layoutNotes(note.id);
       API.setSelectedElements([getElement(note.id)]);
+
       return { note: getElement<ExcalidrawStickyNoteElement>(note.id), label };
     };
     const ceiling = (id: string) =>
@@ -981,9 +1036,11 @@ describe("sticky notes", () => {
 
     it("resizes proportionally from a corner by default and scales the ceiling", () => {
       const { note, label } = setup();
+
       UI.resize(note, "se", [50, 0]);
 
       const resized = getElement<ExcalidrawStickyNoteElement>(note.id);
+
       expect(resized.width).toBeGreaterThan(DEFAULT_STICKY_NOTE_SIZE);
       expect(resized.height).toBeCloseTo(resized.width);
       expect(resized.baseHeight).toBeCloseTo(resized.height);
@@ -994,9 +1051,11 @@ describe("sticky notes", () => {
 
     it("resizes freely from a corner with Shift, leaving the ceiling alone", () => {
       const { note, label } = setup();
+
       UI.resize(note, "se", [50, 0], { shift: true });
 
       const resized = getElement<ExcalidrawStickyNoteElement>(note.id);
+
       expect(resized.width).toBe(DEFAULT_STICKY_NOTE_SIZE + 50);
       expect(resized.height).toBe(DEFAULT_STICKY_NOTE_SIZE);
       expect(ceiling(label.id)).toBe(28);
@@ -1004,9 +1063,11 @@ describe("sticky notes", () => {
 
     it("resizes an edge freely by default, keeping the base height and ceiling", () => {
       const { note, label } = setup();
+
       UI.resize(note, "e", [50, 0]);
 
       const resized = getElement<ExcalidrawStickyNoteElement>(note.id);
+
       expect(resized.width).toBe(DEFAULT_STICKY_NOTE_SIZE + 50);
       expect(resized.height).toBe(DEFAULT_STICKY_NOTE_SIZE);
       expect(resized.baseHeight).toBe(DEFAULT_STICKY_NOTE_SIZE);
@@ -1017,11 +1078,13 @@ describe("sticky notes", () => {
       const { note, label } = setup();
       // `note` is the live element; keep the pre-resize position to compare
       const { x: originalX, y: originalY } = note;
+
       // the SE corner dragged 400px up and left: past the NW corner
       UI.resize(note, "se", [-400, -400]);
 
       const resized = getElement<ExcalidrawStickyNoteElement>(note.id);
       const resizedLabel = getElement<ExcalidrawTextElement>(label.id);
+
       // proportional: 150px past the corner on both axes → a 150 square,
       // mirrored so its bottom-right sits on the original top-left
       expect(resized.width).toBeCloseTo(150);
@@ -1048,30 +1111,37 @@ describe("sticky notes", () => {
         "mouse",
         {},
       )[handle]!;
+
       mouse.reset();
       mouse.downAt(x + width / 2, y + height / 2);
       mouse.moveTo(x + width / 2 + 30, y + height / 2 + 30);
       const hint =
         h.app.ownerDocument.querySelector(".HintViewer")?.textContent ?? "";
+
       mouse.up();
+
       return hint;
     };
 
     it("hints that a corner is proportional and Shift frees it", () => {
       const { note } = setup();
+
       expect(hintWhileDragging(note, "se")).toContain("resize freely");
     });
 
     it("hints that an edge is free and Shift constrains it", () => {
       const { note } = setup();
+
       expect(hintWhileDragging(note, "e")).toContain("constrain proportions");
     });
 
     it("constrains an edge with Shift and scales the ceiling", () => {
       const { note, label } = setup();
+
       UI.resize(note, "e", [50, 0], { shift: true });
 
       const resized = getElement<ExcalidrawStickyNoteElement>(note.id);
+
       expect(resized.width).toBeGreaterThan(DEFAULT_STICKY_NOTE_SIZE);
       expect(resized.height).toBeCloseTo(resized.width);
       expect(ceiling(label.id)).toBeCloseTo(
@@ -1095,6 +1165,7 @@ describe("sticky notes", () => {
         clientY: 1,
       });
       const contextMenu = UI.queryContextMenu();
+
       fireEvent.click(queryByTestId(contextMenu!, "stats")!);
     };
     const statsInput = (label: string) =>
@@ -1116,6 +1187,7 @@ describe("sticky notes", () => {
         width: 100,
         height: DEFAULT_STICKY_NOTE_SIZE,
       });
+
       API.setElements([note, label, rectangle]);
       layoutNotes(note.id);
       openStats();
@@ -1123,6 +1195,7 @@ describe("sticky notes", () => {
       API.setSelectedElements([getElement(note.id)]);
       UI.updateInput(statsInput("W"), "400");
       let updated = getElement<ExcalidrawStickyNoteElement>(note.id);
+
       expect(updated.width).toBe(400);
       expect(updated.baseHeight).toBe(DEFAULT_STICKY_NOTE_SIZE);
 
@@ -1131,6 +1204,7 @@ describe("sticky notes", () => {
       // shows "Mixed"); group scaling is uniform
       API.executeAction(actionGroup);
       const groupWidth = statsInput("W");
+
       UI.updateInput(groupWidth, String(Number(groupWidth.value) * 2));
       updated = getElement<ExcalidrawStickyNoteElement>(note.id);
       expect(updated.width).toBe(800);
@@ -1162,11 +1236,13 @@ describe("sticky notes", () => {
         { exportBackground: false, viewBackgroundColor: "#ffffff" },
         {},
       );
+
       expect(
         [...svg.querySelectorAll("text")].map((text) => text.textContent),
       ).toEqual(["7 Mar 2025"]);
 
       const canvas = await exportToCanvas({ elements, files: {} });
+
       expect(canvas.getContext("2d")?.fillText).toHaveBeenCalledWith(
         "7 Mar 2025",
         expect.any(Number),

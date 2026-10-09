@@ -79,9 +79,11 @@ export const resizeTest = <Point extends GlobalPoint | LocalPoint>(
   const filter = Object.keys(transformHandles).filter((key) => {
     const transformHandle =
       transformHandles[key as Exclude<TransformHandleType, "rotation">]!;
+
     if (!transformHandle) {
       return false;
     }
+
     return isInsideTransformHandle(transformHandle, x, y);
   });
 
@@ -137,22 +139,30 @@ export const getElementWithTransformHandleType = (
   elementsMap: ElementsMap,
   editorInterface: EditorInterface,
 ) => {
-  return elements.reduce((result, element) => {
-    if (result) {
-      return result;
-    }
-    const transformHandleType = resizeTest(
-      element,
-      elementsMap,
-      appState,
-      scenePointerX,
-      scenePointerY,
-      zoom,
-      pointerType,
-      editorInterface,
-    );
-    return transformHandleType ? { element, transformHandleType } : null;
-  }, null as { element: NonDeletedExcalidrawElement; transformHandleType: MaybeTransformHandleType } | null);
+  return elements.reduce(
+    (result, element) => {
+      if (result) {
+        return result;
+      }
+
+      const transformHandleType = resizeTest(
+        element,
+        elementsMap,
+        appState,
+        scenePointerX,
+        scenePointerY,
+        zoom,
+        pointerType,
+        editorInterface,
+      );
+
+      return transformHandleType ? { element, transformHandleType } : null;
+    },
+    null as {
+      element: NonDeletedExcalidrawElement;
+      transformHandleType: MaybeTransformHandleType;
+    } | null,
+  );
 };
 
 export const getTransformHandleTypeFromCoords = <
@@ -176,6 +186,7 @@ export const getTransformHandleTypeFromCoords = <
   const found = Object.keys(transformHandles).find((key) => {
     const transformHandle =
       transformHandles[key as Exclude<TransformHandleType, "rotation">]!;
+
     return (
       transformHandle &&
       isInsideTransformHandle(transformHandle, scenePointerX, scenePointerY)
@@ -219,10 +230,13 @@ export const getTransformHandleTypeFromCoords = <
 const RESIZE_CURSORS = ["ns", "nesw", "ew", "nwse"];
 const rotateResizeCursor = (cursor: string, angle: number) => {
   const index = RESIZE_CURSORS.indexOf(cursor);
+
   if (index >= 0) {
     const a = Math.round(angle / (Math.PI / 4));
+
     cursor = RESIZE_CURSORS[(index + a) % RESIZE_CURSORS.length];
   }
+
   return cursor;
 };
 
@@ -254,6 +268,7 @@ export const getCursorForResizingElement = (resizingElement: {
       } else {
         cursor = "nwse";
       }
+
       break;
     case "ne":
     case "sw":
@@ -262,6 +277,7 @@ export const getCursorForResizingElement = (resizingElement: {
       } else {
         cursor = "nesw";
       }
+
       break;
     case "rotation":
       return "grab";

@@ -95,6 +95,7 @@ export const actionClearCanvas = register({
   },
   perform: (elements, appState, _, app) => {
     app.imageCache.clear();
+
     return {
       elements: elements.map((element) =>
         newElementWith(element, { isDeleted: true }),
@@ -147,6 +148,7 @@ export const actionZoomIn = register({
         appState,
       ),
     };
+
     return {
       appState: nextState,
       captureUpdate: CaptureUpdateAction.EVENTUALLY,
@@ -154,6 +156,7 @@ export const actionZoomIn = register({
   },
   PanelComponent: ({ updateData }) => {
     const zoomValue = useAppStateValue((appState) => appState.zoom.value);
+
     return (
       <Tooltip
         label={`${t("buttons.zoomIn")} — ${getShortcutKey("CtrlOrCmd++")}`}
@@ -199,6 +202,7 @@ export const actionZoomOut = register({
         appState,
       ),
     };
+
     return {
       appState: nextState,
       captureUpdate: CaptureUpdateAction.EVENTUALLY,
@@ -206,6 +210,7 @@ export const actionZoomOut = register({
   },
   PanelComponent: ({ updateData }) => {
     const zoomValue = useAppStateValue((appState) => appState.zoom.value);
+
     return (
       <Tooltip
         label={`${t("buttons.zoomOut")} — ${getShortcutKey("CtrlOrCmd+-")}`}
@@ -256,6 +261,7 @@ export const actionResetZoom = register({
         appState,
       ),
     };
+
     return {
       appState: nextState,
       captureUpdate: CaptureUpdateAction.EVENTUALLY,
@@ -263,6 +269,7 @@ export const actionResetZoom = register({
   },
   PanelComponent: ({ updateData }) => {
     const zoomValue = useAppStateValue((appState) => appState.zoom.value);
+
     return (
       <Tooltip
         label={t("buttons.resetZoom")}
@@ -321,14 +328,15 @@ export const actionZoomToFitSelectionInViewport = register({
     const bounds = selectedElements.length
       ? getCommonBounds(getNonDeletedElements(selectedElements))
       : appState.scrollConstraints
-      ? getScrollConstraintsBounds(appState.scrollConstraints)
-      : getCommonBounds(getNonDeletedElements(elements));
+        ? getScrollConstraintsBounds(appState.scrollConstraints)
+        : getCommonBounds(getNonDeletedElements(elements));
     const result = zoomToFitBounds({
       bounds,
       appState,
       fit: "scale-down",
       canvasOffsets: app.viewport.getOffsets(),
     });
+
     return {
       ...result,
       // re-clamp so the fit can't escape an active scroll/zoom lock
@@ -364,14 +372,15 @@ export const actionZoomToFitSelection = register({
     const bounds = selectedElements.length
       ? getCommonBounds(getNonDeletedElements(selectedElements))
       : appState.scrollConstraints
-      ? getScrollConstraintsBounds(appState.scrollConstraints)
-      : getCommonBounds(getNonDeletedElements(elements));
+        ? getScrollConstraintsBounds(appState.scrollConstraints)
+        : getCommonBounds(getNonDeletedElements(elements));
     const result = zoomToFitBounds({
       bounds,
       appState,
       fit: "contain",
       canvasOffsets: app.viewport.getOffsets(),
     });
+
     return {
       ...result,
       // re-clamp so the fit can't escape an active scroll/zoom lock
@@ -409,6 +418,7 @@ export const actionZoomToFit = register({
       fit: "scale-down",
       canvasOffsets: app.viewport.getOffsets(),
     });
+
     return {
       ...result,
       // re-clamp so the fit can't escape an active scroll/zoom lock
@@ -443,6 +453,7 @@ export const actionToggleTheme = register<AppState["theme"]>({
 
     if (app.props.onThemeChange) {
       app.props.onThemeChange(nextTheme);
+
       return false;
     }
 

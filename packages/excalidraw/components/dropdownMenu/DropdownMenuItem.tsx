@@ -59,6 +59,7 @@ const DropdownMenuItem = ({
     </DropdownMenuPrimitive.Item>
   );
 };
+
 DropdownMenuItem.displayName = "DropdownMenuItem";
 
 export const DropDownMenuItemBadgeType = {
@@ -112,6 +113,7 @@ export const DropDownMenuItemBadge = ({
     </div>
   );
 };
+
 DropDownMenuItemBadge.displayName = "DropdownMenuItemBadge";
 
 DropdownMenuItem.Badge = DropDownMenuItemBadge;

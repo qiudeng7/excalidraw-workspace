@@ -12,6 +12,7 @@ export const getSizeFromPoints = (
 ) => {
   const xs = points.map((point) => point[0]);
   const ys = points.map((point) => point[1]);
+
   return {
     width: Math.max(...xs) - Math.min(...xs),
     height: Math.max(...ys) - Math.min(...ys),
@@ -36,10 +37,12 @@ export const rescalePoints = <Point extends GlobalPoint | LocalPoint>(
   const scaledPoints = points.map((point): Point => {
     const newCoordinate = point[dimension] * scale;
     const newPoint = [...point];
+
     newPoint[dimension] = newCoordinate;
     if (newCoordinate < nextMinCoordinate) {
       nextMinCoordinate = newCoordinate;
     }
+
     return newPoint as Point;
   });
 
@@ -77,5 +80,6 @@ export const getGridPoint = (
       Math.round(y / gridSize) * gridSize,
     );
   }
+
   return pointFrom<GlobalPoint>(x, y);
 };

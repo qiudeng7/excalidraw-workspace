@@ -166,6 +166,7 @@ export const getVerticalOffset = (
     (lineHeightPx - fontSizeEm * ascender + fontSizeEm * descender) / 2;
 
   const verticalOffset = fontSizeEm * ascender + lineGap;
+
   return verticalOffset;
 };
 

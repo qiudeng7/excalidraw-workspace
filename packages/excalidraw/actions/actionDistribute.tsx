@@ -34,6 +34,7 @@ import type { AppClassProperties, AppState, UIAppState } from "../types";
 
 const enableActionGroup = (appState: UIAppState, app: AppClassProperties) => {
   const selectedElements = app.scene.getSelectedElements(appState);
+
   return (
     getSelectedElementsByGroup(
       selectedElements,

@@ -6,6 +6,7 @@ import { resolve } from "node:path";
 import { nodeStorage } from "../../server/storage/node";
 import { handleApi } from "../../server/services/api";
 import { createDefaultUserSettings } from "../../shared/contracts";
+
 test(`node: isolated user settings, initial CAS, validation and independent revisions`, async () => {
   const directory = await mkdtemp(resolve(tmpdir(), "settings-"));
   let close: () => unknown;
@@ -14,6 +15,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
     "repository" | "objects"
   >;
   const node = await nodeStorage(directory);
+
   storage = node;
   close = () => node.close();
   const request = async (
@@ -45,13 +47,16 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
         waitUntil: (p) => pending.push(p),
       },
     );
+
     await Promise.all(pending);
+
     return {
       status: response.status,
       body: (await response.json()) as any,
       cookie: response.headers.get("set-cookie")?.split(";")[0],
     };
   };
+
   try {
     const alice = await request("/setup", "POST", {
       email: "alice@example.com",
@@ -61,11 +66,13 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
       email: "bob@example.com",
       password: "strong-password-123",
     });
+
     assert.equal(alice.status, 200);
     assert.equal(bob.status, 200);
     assert.equal((await request("/user-settings")).status, 401);
     const settings = createDefaultUserSettings();
     const original = { settings, revision: 0, configured: false };
+
     assert.deepEqual(
       (await request("/user-settings", "GET", undefined, alice.cookie)).body,
       original,
@@ -101,10 +108,12 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
         ),
       ),
     );
+
     assert.deepEqual(saves.map((row) => row.status).sort(), [200, 409]);
     const saved = (
       await request("/user-settings", "GET", undefined, alice.cookie)
     ).body;
+
     assert.equal(saved.revision, 1);
     assert.equal(saved.configured, true);
     assert.deepEqual(saved, saves.find((row) => row.status === 200)!.body);
@@ -152,9 +161,11 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
         bob.cookie,
         alice.body.user.id,
       );
+
       assert.equal(changed.status, 401);
       assert.equal(changed.body.error.code, "SESSION_CHANGED");
     }
+
     assert.deepEqual(
       (await request("/user-settings", "GET", undefined, bob.cookie)).body,
       original,
@@ -173,9 +184,11 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
         bob.cookie,
         alice.body.user.id,
       );
+
       assert.equal(changed.status, 401);
       assert.equal(changed.body.error.code, "SESSION_CHANGED");
     }
+
     assert.deepEqual(
       (await request("/library", "GET", undefined, alice.cookie)).body,
       { items: [], revision: 0 },
@@ -185,6 +198,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
       { items: [], revision: 0 },
     );
     const next = structuredClone(saved.settings);
+
     next.debug.sampling = 2;
     next.debug.renderingOptions.directText = true;
     assert.equal(
@@ -215,8 +229,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
       0,
     );
     assert.equal(
-      (await request("/library", "GET", undefined, alice.cookie)).body
-        .revision,
+      (await request("/library", "GET", undefined, alice.cookie)).body.revision,
       0,
     );
     const workspace = (
@@ -230,6 +243,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
         alice.cookie,
       )
     ).body;
+
     assert.equal(catalog.catalogRevision, 0);
     assert.equal(catalog.canvases[0].revision, 0);
   } finally {

@@ -11,12 +11,10 @@ import { tablerCheckIcon } from "./icons";
 import "./FilledButton.scss";
 
 export type ButtonVariant = "filled" | "outlined" | "icon";
+
 export type ButtonColor =
-  | "primary"
-  | "danger"
-  | "warning"
-  | "muted"
-  | "success";
+  "primary" | "danger" | "warning" | "muted" | "success";
+
 export type ButtonSize = "medium" | "large";
 
 export type FilledButtonProps = {
@@ -63,6 +61,7 @@ export const FilledButton = forwardRef<HTMLButtonElement, FilledButtonProps>(
         const timer = window.setTimeout(() => {
           setIsLoading(true);
         }, 50);
+
         try {
           await ret;
         } catch (error: any) {
@@ -79,6 +78,7 @@ export const FilledButton = forwardRef<HTMLButtonElement, FilledButtonProps>(
     };
 
     const _status = isLoading ? "loading" : status;
+
     color = _status === "success" ? "success" : color;
 
     return (

@@ -133,6 +133,7 @@ describe("ColorInput error handling", () => {
       observe() {}
 
       unobserve() {}
+
       disconnect() {}
     };
 
@@ -140,6 +141,7 @@ describe("ColorInput error handling", () => {
     const canvasBgButton = container.querySelector(
       '[data-openpopup="canvasBackground"]',
     ) as HTMLButtonElement;
+
     expect(canvasBgButton).toBeTruthy();
     fireEvent.click(canvasBgButton);
 
@@ -148,6 +150,7 @@ describe("ColorInput error handling", () => {
       const colorInput = container.querySelector(
         ".color-picker-input",
       ) as HTMLInputElement;
+
       expect(colorInput).toBeTruthy();
     });
 
@@ -165,6 +168,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeTruthy();
       expect(errorMessage.textContent).toContain(
         "Hex code must be 3, 4, 6, or 8 characters",
@@ -183,6 +187,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeTruthy();
       expect(errorMessage.textContent).toContain(
         "Hex code must be 3, 4, 6, or 8 characters",
@@ -201,6 +206,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeTruthy();
       expect(errorMessage.textContent).toContain("Not a valid color");
     });
@@ -217,6 +223,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeTruthy();
       expect(errorMessage.textContent).toContain("Not a valid color");
     });
@@ -258,6 +265,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeFalsy();
     });
   });
@@ -273,6 +281,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeTruthy();
     });
 
@@ -284,6 +293,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeFalsy();
     });
   });
@@ -299,6 +309,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeTruthy();
     });
 
@@ -310,6 +321,7 @@ describe("ColorInput error handling", () => {
       const errorMessage = document.querySelector(
         ".color-picker__error-message",
       ) as HTMLElement;
+
       expect(errorMessage).toBeFalsy();
     });
   });

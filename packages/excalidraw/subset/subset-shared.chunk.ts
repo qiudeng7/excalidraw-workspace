@@ -28,9 +28,11 @@ export const subsetToBase64 = async (
 ): Promise<string> => {
   try {
     const buffer = await subsetToBinary(arrayBuffer, codePoints);
+
     return toBase64(buffer);
   } catch (e) {
     console.error("Skipped glyph subsetting", e);
+
     // Fallback to encoding whole font in case of errors
     return toBase64(arrayBuffer);
   }
@@ -74,6 +76,7 @@ export const toBase64 = async (arrayBuffer: ArrayBuffer) => {
     // as we care only about turning individual bytes into codepoints,
     // not about multi-byte unicode characters
     const byteString = String.fromCharCode(...new Uint8Array(arrayBuffer));
+
     base64 = btoa(byteString);
   }
 

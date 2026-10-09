@@ -58,6 +58,7 @@ describe("Test dragCreate", () => {
       const { getByToolName, container } = await render(<Excalidraw />);
       // select tool
       const tool = getByToolName("rectangle");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -92,6 +93,7 @@ describe("Test dragCreate", () => {
       const { getByToolName, container } = await render(<Excalidraw />);
       // select tool
       const tool = getByToolName("ellipse");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -127,6 +129,7 @@ describe("Test dragCreate", () => {
       const { getByToolName, container } = await render(<Excalidraw />);
       // select tool
       const tool = getByToolName("diamond");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -161,6 +164,7 @@ describe("Test dragCreate", () => {
       const { getByToolName, container } = await render(<Excalidraw />);
       // select tool
       const tool = getByToolName("arrow");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -199,6 +203,7 @@ describe("Test dragCreate", () => {
       const { getByToolName, container } = await render(<Excalidraw />);
       // select tool
       const tool = getByToolName("line");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -241,6 +246,7 @@ describe("Test dragCreate", () => {
 
     it("places a clicked note on the grid", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       API.setAppState({ gridModeEnabled: true, gridSize: 20 });
       fireEvent.click(getByToolName("stickynote"));
 
@@ -254,9 +260,11 @@ describe("Test dragCreate", () => {
 
     it("switches back to selection and starts editing when tool is unlocked", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       fireEvent.click(getByToolName("stickynote"));
 
       const canvas = container.querySelector("canvas.interactive")!;
+
       createDefaultStickyNote(canvas);
 
       await getTextEditor();
@@ -279,10 +287,12 @@ describe("Test dragCreate", () => {
 
     it("keeps sticky note tool active without editing when tool is locked", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       fireEvent.click(getByToolName("stickynote"));
       fireEvent.click(getByToolName("lock"));
 
       const canvas = container.querySelector("canvas.interactive")!;
+
       createDefaultStickyNote(canvas);
 
       await waitFor(() => {
@@ -303,9 +313,11 @@ describe("Test dragCreate", () => {
 
     it("treats a wobble under the drag threshold as a click", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       fireEvent.click(getByToolName("stickynote"));
 
       const canvas = container.querySelector("canvas.interactive")!;
+
       fireEvent.pointerDown(canvas, { clientX: 300, clientY: 300 });
       fireEvent.pointerMove(canvas, { clientX: 306, clientY: 305 });
       fireEvent.pointerUp(canvas, { clientX: 306, clientY: 305 });
@@ -315,6 +327,7 @@ describe("Test dragCreate", () => {
       const stickyNote = h.elements.find(
         (element) => element.type === "stickynote",
       ) as ExcalidrawStickyNoteElement;
+
       expect(stickyNote.width).toBe(DEFAULT_STICKY_NOTE_SIZE);
       expect(stickyNote.height).toBe(DEFAULT_STICKY_NOTE_SIZE);
       expect(stickyNote.baseHeight).toBe(DEFAULT_STICKY_NOTE_SIZE);
@@ -322,9 +335,11 @@ describe("Test dragCreate", () => {
 
     it("previews a drag at its true size and snaps to the minimum on release", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       fireEvent.click(getByToolName("stickynote"));
 
       const canvas = container.querySelector("canvas.interactive")!;
+
       fireEvent.pointerDown(canvas, { clientX: 300, clientY: 300 });
       fireEvent.pointerMove(canvas, { clientX: 320, clientY: 320 });
 
@@ -332,6 +347,7 @@ describe("Test dragCreate", () => {
       const draft = h.elements.find(
         (element) => element.type === "stickynote",
       ) as ExcalidrawStickyNoteElement;
+
       expect(draft.width).toBe(20);
       expect(draft.height).toBe(20);
 
@@ -345,6 +361,7 @@ describe("Test dragCreate", () => {
       const stickyNote = h.elements.find(
         (element) => element.type === "stickynote",
       ) as ExcalidrawStickyNoteElement;
+
       expect(stickyNote.x).toBe(300);
       expect(stickyNote.y).toBe(300);
       expect(stickyNote.width).toBe(25 + STICKY_NOTE_BODY_INSET_Y);
@@ -354,12 +371,14 @@ describe("Test dragCreate", () => {
 
     it("sizes the minimum note to fit one line at a large font ceiling", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       // a 60px line (48 × 1.25) plus padding and the date footer high — and as
       // wide, since a plain drag is proportional
       API.setAppState({ currentItemFontSize: 48 });
       fireEvent.click(getByToolName("stickynote"));
 
       const canvas = container.querySelector("canvas.interactive")!;
+
       fireEvent.pointerDown(canvas, { clientX: 300, clientY: 300 });
       fireEvent.pointerMove(canvas, { clientX: 320, clientY: 320 });
       fireEvent.pointerUp(canvas, { clientX: 320, clientY: 320 });
@@ -368,6 +387,7 @@ describe("Test dragCreate", () => {
       const stickyNote = h.elements.find(
         (element) => element.type === "stickynote",
       ) as ExcalidrawStickyNoteElement;
+
       expect(stickyNote.width).toBe(60 + STICKY_NOTE_BODY_INSET_Y);
       expect(stickyNote.height).toBe(60 + STICKY_NOTE_BODY_INSET_Y);
 
@@ -384,14 +404,17 @@ describe("Test dragCreate", () => {
 
     it("drags out a square note by default and keeps it square through the snap", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       fireEvent.click(getByToolName("stickynote"));
       const canvas = container.querySelector("canvas.interactive")!;
+
       fireEvent.pointerDown(canvas, { clientX: 300, clientY: 300 });
       // an uneven drag: proportional by default, so the draft is square
       fireEvent.pointerMove(canvas, { clientX: 340, clientY: 320 });
       const draft = h.elements.find(
         (element) => element.type === "stickynote",
       ) as ExcalidrawStickyNoteElement;
+
       expect([draft.width, draft.height]).toEqual([40, 40]);
 
       fireEvent.pointerUp(canvas, { clientX: 340, clientY: 320 });
@@ -399,14 +422,17 @@ describe("Test dragCreate", () => {
 
       // the two minimums differ; the square survives the snap
       const note = h.elements.find((element) => element.type === "stickynote")!;
+
       expect(note.width).toBe(25 + STICKY_NOTE_BODY_INSET_Y);
       expect(note.height).toBe(25 + STICKY_NOTE_BODY_INSET_Y);
     });
 
     it("drags out a free-form note with Shift", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       fireEvent.click(getByToolName("stickynote"));
       const canvas = container.querySelector("canvas.interactive")!;
+
       fireEvent.pointerDown(canvas, {
         clientX: 300,
         clientY: 300,
@@ -420,6 +446,7 @@ describe("Test dragCreate", () => {
       const draft = h.elements.find(
         (element) => element.type === "stickynote",
       ) as ExcalidrawStickyNoteElement;
+
       expect([draft.width, draft.height]).toEqual([40, 20]);
 
       fireEvent.pointerUp(canvas, {
@@ -431,15 +458,18 @@ describe("Test dragCreate", () => {
 
       // each side snaps to its own minimum
       const note = h.elements.find((element) => element.type === "stickynote")!;
+
       expect(note.width).toBe(STICKY_NOTE_MIN_SIZE);
       expect(note.height).toBe(25 + STICKY_NOTE_BODY_INSET_Y);
     });
 
     it("keeps the origin corner fixed when a drag toward the top-left snaps to the minimum", async () => {
       const { getByToolName, container } = await render(<Excalidraw />);
+
       fireEvent.click(getByToolName("stickynote"));
 
       const canvas = container.querySelector("canvas.interactive")!;
+
       fireEvent.pointerDown(canvas, { clientX: 300, clientY: 300 });
       fireEvent.pointerMove(canvas, { clientX: 280, clientY: 280 });
       fireEvent.pointerUp(canvas, { clientX: 280, clientY: 280 });
@@ -448,6 +478,7 @@ describe("Test dragCreate", () => {
       const stickyNote = h.elements.find(
         (element) => element.type === "stickynote",
       ) as ExcalidrawStickyNoteElement;
+
       // the bottom-right corner is where the pointer went down
       expect(stickyNote.x + stickyNote.width).toBe(300);
       expect(stickyNote.y + stickyNote.height).toBe(300);
@@ -467,6 +498,7 @@ describe("Test dragCreate", () => {
       const { getByToolName, container } = await render(<Excalidraw />);
       // select tool
       const tool = getByToolName("rectangle");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -489,6 +521,7 @@ describe("Test dragCreate", () => {
       const { getByToolName, container } = await render(<Excalidraw />);
       // select tool
       const tool = getByToolName("ellipse");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -511,6 +544,7 @@ describe("Test dragCreate", () => {
       const { getByToolName, container } = await render(<Excalidraw />);
       // select tool
       const tool = getByToolName("diamond");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -535,6 +569,7 @@ describe("Test dragCreate", () => {
       );
       // select tool
       const tool = getByToolName("arrow");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;
@@ -569,6 +604,7 @@ describe("Test dragCreate", () => {
       );
       // select tool
       const tool = getByToolName("line");
+
       fireEvent.click(tool);
 
       const canvas = container.querySelector("canvas.interactive")!;

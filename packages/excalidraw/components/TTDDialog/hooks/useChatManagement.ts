@@ -53,6 +53,7 @@ export const useChatManagement = ({
 
   const resetChatState = useCallback(async () => {
     const newSessionId = await createNewChatId();
+
     setChatHistory({
       id: newSessionId,
       messages: [],
@@ -64,6 +65,7 @@ export const useChatManagement = ({
   const onRestoreChat = useCallback(
     (chat: SavedChat) => {
       const restoredChat = restoreChat(chat);
+
       applyChatToState(restoredChat);
 
       setIsMenuOpen(false);
@@ -81,6 +83,7 @@ export const useChatManagement = ({
       if (isDeletingActiveChat) {
         if (updatedChats.length > 0) {
           const nextChat = updatedChats[0];
+
           applyChatToState(nextChat);
         } else {
           await resetChatState();

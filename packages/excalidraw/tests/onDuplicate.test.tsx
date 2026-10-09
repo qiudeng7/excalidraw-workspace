@@ -104,6 +104,7 @@ const paste = async (elements: readonly NonDeletedExcalidrawElement[]) => {
     elements,
     files: null,
   });
+
   Keyboard.withModifierKeys({ ctrl: true }, () => {
     Keyboard.keyPress(KEYS.V);
     document.dispatchEvent(
@@ -115,6 +116,7 @@ const paste = async (elements: readonly NonDeletedExcalidrawElement[]) => {
 const altDrag = (element: ExcalidrawElement, offset: number) => {
   const x = element.x + element.width / 2;
   const y = element.y + element.height / 2;
+
   Keyboard.withModifierKeys({ alt: true }, () => {
     mouse.downAt(x, y);
     mouse.moveTo(x + offset / 2, y + offset / 2);
@@ -145,6 +147,7 @@ describe("props.onDuplicate returning new objects for duplicates", () => {
 
   it("duplicate action", () => {
     const rectangle = API.createElement({ type: "rectangle" });
+
     API.setElements([rectangle]);
     API.setSelectedElements([rectangle]);
 
@@ -170,6 +173,7 @@ describe("props.onDuplicate returning new objects for duplicates", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([rectangle]);
 
     mouse.select(rectangle);
@@ -189,6 +193,7 @@ describe("props.onDuplicate returning new objects for duplicates", () => {
 
   it("alt-drag of a container with bound text", () => {
     const [container, text] = API.createTextContainer();
+
     API.setElements([container, text]);
 
     expect([container.x, container.y, text.x, text.y]).toEqual([0, 0, 0, 0]);
@@ -223,6 +228,7 @@ describe("props.onDuplicate returning new objects for duplicates", () => {
   it("paste over a frame", async () => {
     const frame = createFrame();
     const [container, text] = API.createTextContainer();
+
     API.setElements([frame]);
 
     mouse.moveTo(200, 200);
@@ -270,6 +276,7 @@ describe("props.onDuplicate changing already measured duplicates", () => {
         if (!isDuplicate(element, prevElements)) {
           return element;
         }
+
         return element.type === "arrow"
           ? newElementWith(element, {
               strokeColor: "#ff0000",
@@ -300,6 +307,7 @@ describe("props.onDuplicate changing already measured duplicates", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([frame]);
 
     mouse.moveTo(200, 200);
@@ -312,6 +320,7 @@ describe("props.onDuplicate changing already measured duplicates", () => {
     const elementsMap = h.app.scene.getNonDeletedElementsMap();
     const getWidth = (element: ExcalidrawElement) => {
       const [x1, , x2] = getElementBounds(element, elementsMap);
+
       return Math.round(x2 - x1);
     };
 
@@ -342,6 +351,7 @@ describe("props.onDuplicate vetoing duplicates", () => {
       width: 100,
       height: 100,
     });
+
     return [rectangle1, rectangle2] as const;
   };
 
@@ -352,6 +362,7 @@ describe("props.onDuplicate vetoing duplicates", () => {
 
     it("duplicate action", () => {
       const [rectangle1, rectangle2] = createRectangles();
+
       API.setElements([rectangle1, rectangle2]);
       API.setSelectedElements([rectangle1, rectangle2]);
 
@@ -368,6 +379,7 @@ describe("props.onDuplicate vetoing duplicates", () => {
 
     it("alt-drag leaves the original behind", () => {
       const [rectangle1, rectangle2] = createRectangles();
+
       API.setElements([rectangle1, rectangle2]);
       API.setSelectedElements([rectangle1, rectangle2]);
 
@@ -383,6 +395,7 @@ describe("props.onDuplicate vetoing duplicates", () => {
     it("paste over a frame", async () => {
       const [rectangle1, rectangle2] = createRectangles();
       const frame = createFrame();
+
       API.setElements([frame]);
 
       mouse.moveTo(200, 200);
@@ -412,6 +425,7 @@ describe("props.onDuplicate vetoing duplicates", () => {
 
     it("duplicate action", () => {
       const [rectangle1, rectangle2] = createRectangles();
+
       API.setElements([rectangle1, rectangle2]);
       API.setSelectedElements([rectangle1, rectangle2]);
 
@@ -429,6 +443,7 @@ describe("props.onDuplicate vetoing duplicates", () => {
 
     it("alt-drag moves the originals", () => {
       const [rectangle1, rectangle2] = createRectangles();
+
       API.setElements([rectangle1, rectangle2]);
       API.setSelectedElements([rectangle1, rectangle2]);
 
@@ -444,6 +459,7 @@ describe("props.onDuplicate vetoing duplicates", () => {
     it("paste over a frame", async () => {
       const [rectangle1, rectangle2] = createRectangles();
       const frame = createFrame();
+
       API.setElements([frame]);
 
       mouse.moveTo(200, 200);
@@ -465,6 +481,7 @@ describe("props.onDuplicate data", () => {
   const getCall = () => {
     expect(onDuplicate).toHaveBeenCalledTimes(1);
     const [nextElements, prevElements, data] = onDuplicate.mock.calls[0];
+
     return { nextElements, prevElements, ...data };
   };
 
@@ -476,6 +493,7 @@ describe("props.onDuplicate data", () => {
   it("duplicate action", () => {
     const [container, text] = API.createTextContainer();
     const rectangle = API.createElement({ type: "rectangle" });
+
     API.setElements([container, text, rectangle]);
     API.setSelectedElements([container]);
 
@@ -527,6 +545,7 @@ describe("props.onDuplicate data", () => {
       width: 100,
       height: 100,
     });
+
     API.setElements([rectangle]);
 
     mouse.select(rectangle);
@@ -546,6 +565,7 @@ describe("props.onDuplicate data", () => {
 
   it("paste supplies the pasted elements as originals", async () => {
     const rectangle = API.createElement({ id: "rectangle", type: "rectangle" });
+
     API.setElements([rectangle]);
 
     await paste([rectangle]);
@@ -557,6 +577,7 @@ describe("props.onDuplicate data", () => {
     const { prevElements, originalElements, origIdToDuplicateId } = getCall();
 
     const original = originalElements.get(rectangle.id)!;
+
     expect(prevElements).toEqual([rectangle]);
     // the pasted element, not the scene element it was copied from
     expect(original).not.toBe(rectangle);
@@ -577,6 +598,7 @@ describe("reconcileDuplicatedElements()", () => {
       duplicatedElements.find(
         (element) => (element as any)[ORIG_ID] === origId,
       )!;
+
     return { duplicatedElements, byOrigId };
   };
 

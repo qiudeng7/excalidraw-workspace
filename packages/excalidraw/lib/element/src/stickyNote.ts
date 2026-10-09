@@ -104,6 +104,7 @@ export const getColorTargetElement = (
   ) {
     return elementsMap.get(element.containerId!) ?? element;
   }
+
   return element;
 };
 
@@ -118,18 +119,21 @@ export const getColorUpdate = (
       ? { backgroundColor: normalizeStickyNoteBackgroundColor(color) }
       : { strokeColor: normalizeStickyNoteStrokeColor(color) };
   }
+
   if (
     property === "strokeColor" &&
     isTextElement(element) &&
     isStickyNoteBoundText(element, elementsMap)
   ) {
     const container = elementsMap.get(element.containerId!);
+
     return {
       strokeColor: isTransparent(color)
         ? normalizeStickyNoteStrokeColor(container?.strokeColor)
         : color,
     };
   }
+
   return property === "backgroundColor"
     ? { backgroundColor: color }
     : { strokeColor: color };
@@ -149,18 +153,23 @@ export const syncStickyNoteInk = <T extends ExcalidrawElement>(
 ): readonly T[] => {
   const elementsMap = arrayToMap(elements);
   const inkById = new Map<string, string>();
+
   for (const container of elements) {
     if (!isStickyNoteElement(container) || container.isDeleted) {
       continue;
     }
+
     const label = getBoundTextElement(container, elementsMap);
+
     if (!label || label.strokeColor === container.strokeColor) {
       continue;
     }
+
     const containerChanged =
       prevElementsMap.get(container.id)?.strokeColor !== container.strokeColor;
     const labelChanged =
       prevElementsMap.get(label.id)?.strokeColor !== label.strokeColor;
+
     if (
       isTransparent(label.strokeColor) ||
       (containerChanged && !labelChanged)
@@ -176,11 +185,14 @@ export const syncStickyNoteInk = <T extends ExcalidrawElement>(
       );
     }
   }
+
   if (!inkById.size) {
     return elements;
   }
+
   return elements.map((element) => {
     const strokeColor = inkById.get(element.id);
+
     return strokeColor === undefined
       ? element
       : (newElementWith(element as ExcalidrawElement, { strokeColor }) as T);
@@ -204,6 +216,7 @@ const pointAtDistance = (
   }
 
   const ratio = Math.min(distance / length, 1);
+
   return {
     x: from.x + dx * ratio,
     y: from.y + dy * ratio,
@@ -297,12 +310,10 @@ export const getStickyNotePathCommands = (
   if (!radius && liftedCorner === -1) {
     return [
       { type: "move", point: points[0] },
-      ...points.slice(1).map(
-        (point): StickyNotePathCommand => ({
-          type: "line",
-          point,
-        }),
-      ),
+      ...points.slice(1).map((point): StickyNotePathCommand => ({
+        type: "line",
+        point,
+      })),
     ];
   }
 
@@ -328,6 +339,7 @@ export const getStickyNotePathCommands = (
       };
       const start = pointAtDistance(point, prev, reach);
       const end = pointAtDistance(point, next, reach);
+
       return [
         { type: "line", point: start },
         {
@@ -380,6 +392,7 @@ export const normalizeStickyNoteFontSize = (fontSize: number) => {
   if (!Number.isFinite(fontSize)) {
     return STICKY_NOTE_FALLBACK_FONT_SIZE;
   }
+
   return Math.min(STICKY_NOTE_MAX_FONT_SIZE, Math.max(MIN_FONT_SIZE, fontSize));
 };
 
@@ -407,7 +420,7 @@ export const getBaseFontSize = (
   elementsMap: ElementsMap,
 ) => {
   return isStickyNoteBoundText(textElement, elementsMap)
-    ? textElement.baseFontSize ?? textElement.fontSize
+    ? (textElement.baseFontSize ?? textElement.fontSize)
     : textElement.fontSize;
 };
 
@@ -451,12 +464,16 @@ export const getStickyNoteDateLabel = (
   if (created === null || !Number.isFinite(created)) {
     return null;
   }
+
   const date = new Date(created);
+
   if (Number.isNaN(date.getTime())) {
     return null;
   }
+
   const label = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
   const year = date.getFullYear();
+
   return short || year === new Date(now).getFullYear()
     ? label
     : `${label} ${year}`;
@@ -478,15 +495,18 @@ export const getStickyNoteFooter = (
   ) {
     return null;
   }
+
   const text = getStickyNoteDateLabel(element.created, {
     short:
       element.width - STICKY_NOTE_PADDING * 2 <
       STICKY_NOTE_FOOTER.minBodyWidthForYear,
     now,
   });
+
   if (!text) {
     return null;
   }
+
   return {
     text,
     x: element.width - STICKY_NOTE_PADDING,
@@ -508,6 +528,7 @@ export const getStickyNoteMinSize = ({
   const lineHeightPx = Math.ceil(
     normalizeStickyNoteFontSize(fontSize) * getLineHeight(fontFamily),
   );
+
   return {
     width: Math.max(
       STICKY_NOTE_MIN_SIZE,
@@ -610,14 +631,17 @@ const fitStickyNoteFont = (
   const fits = new Map<number, FontFit>();
   const at = (index: number) => {
     let result = fits.get(index);
+
     if (!result) {
       result = fit(sizeAt(index));
       fits.set(index, result);
     }
+
     return result;
   };
   const doesFit = (index: number) => {
     const result = at(index);
+
     return result.width <= maxWidth && result.height <= maxHeight;
   };
 
@@ -636,27 +660,33 @@ const fitStickyNoteFont = (
   // binary search for the smallest index (largest font) that fits
   let lo: number;
   let hi: number;
+
   if (doesFit(warm)) {
     if (warm === 0 || !doesFit(warm - 1)) {
       return at(warm);
     }
+
     lo = 0;
     hi = warm - 1;
   } else {
     if (warm === steps) {
       return at(steps);
     }
+
     lo = warm + 1;
     hi = steps;
   }
+
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
+
     if (doesFit(mid)) {
       hi = mid;
     } else {
       lo = mid + 1;
     }
   }
+
   return at(lo);
 };
 
@@ -703,6 +733,7 @@ export const getStickyNoteLayout = (
   const fit = (fontSize: number): FontFit => {
     const font = getFontString({ fontFamily, fontSize });
     const text = wrapText(originalText, font, maxWidth);
+
     return { text, fontSize, ...measureText(text, font, lineHeight) };
   };
 
@@ -791,7 +822,7 @@ export const getStickyNoteResizeIntent = (
     : container;
   const origText = getBoundTextElement(origSticky, originalElementsMap);
   const ceiling = origText
-    ? origText.baseFontSize ?? origText.fontSize
+    ? (origText.baseFontSize ?? origText.fontSize)
     : undefined;
 
   if (flip) {
@@ -812,13 +843,13 @@ export const getStickyNoteResizeIntent = (
     anchor: fromCenter
       ? "center"
       : handleDirection.includes("n")
-      ? "bottom"
-      : proportional &&
-        isSideHandle &&
-        (handleDirection === "e" || handleDirection === "w")
-      ? // Shift+E/W holds the opposite side's midpoint, i.e. the vertical center
-        "center"
-      : "top",
+        ? "bottom"
+        : proportional &&
+            isSideHandle &&
+            (handleDirection === "e" || handleDirection === "w")
+          ? // Shift+E/W holds the opposite side's midpoint, i.e. the vertical center
+            "center"
+          : "top",
   };
 };
 
@@ -853,6 +884,7 @@ export const updateStickyNoteLayout = (
   if (textElement && layout.text) {
     scene.mutateElement(textElement, layout.text);
   }
+
   if (bindings !== false && !container.isDeleted) {
     updateBoundElements(
       container as NonDeletedExcalidrawElement,
@@ -883,6 +915,7 @@ const hasStickyNoteLayoutInputChanged = (
 ) => {
   const prevContainer = prevElementsMap.get(container.id);
   const prevText = textElement ? prevElementsMap.get(textElement.id) : null;
+
   if (
     !prevContainer ||
     (textElement && !prevText) ||
@@ -891,6 +924,7 @@ const hasStickyNoteLayoutInputChanged = (
   ) {
     return true;
   }
+
   return (
     STICKY_NOTE_LAYOUT_INPUTS.container.some(
       (key) => (prevContainer as any)[key] !== container[key],
@@ -918,30 +952,38 @@ export const relayoutStickyNotes = <T extends ExcalidrawElement>(
   if (!affectedIds.size) {
     return elements;
   }
+
   const elementsMap = arrayToMap(elements);
   const containerIds = new Set<ExcalidrawElement["id"]>();
+
   for (const id of affectedIds) {
     const element = elementsMap.get(id);
+
     if (!element || element.isDeleted) {
       continue;
     }
+
     if (isStickyNoteElement(element)) {
       containerIds.add(element.id);
     } else if (isTextElement(element) && element.containerId) {
       const container = elementsMap.get(element.containerId);
+
       if (container && !container.isDeleted && isStickyNoteElement(container)) {
         containerIds.add(container.id);
       }
     }
   }
+
   if (!containerIds.size) {
     return elements;
   }
 
   const replacements = new Map<ExcalidrawElement["id"], T>();
+
   for (const id of containerIds) {
     const container = elementsMap.get(id) as ExcalidrawStickyNoteElement;
     const textElement = getBoundTextElement(container, elementsMap);
+
     if (
       opts?.prevElementsMap &&
       !hasStickyNoteLayoutInputChanged(
@@ -952,20 +994,26 @@ export const relayoutStickyNotes = <T extends ExcalidrawElement>(
     ) {
       continue;
     }
+
     const layout = getStickyNoteLayout(container, textElement);
     const nextContainer = newElementWith(container, layout.container);
+
     if (nextContainer !== container) {
       replacements.set(id, nextContainer as unknown as T);
     }
+
     if (textElement && layout.text) {
       const nextText = newElementWith(textElement, layout.text);
+
       if (nextText !== textElement) {
         replacements.set(textElement.id, nextText as unknown as T);
       }
     }
   }
+
   if (!replacements.size) {
     return elements;
   }
+
   return elements.map((element) => replacements.get(element.id) ?? element);
 };

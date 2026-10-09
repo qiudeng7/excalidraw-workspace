@@ -54,12 +54,15 @@ describe("UserList", () => {
 
     const currentUserPill =
       container.querySelector<HTMLElement>(".UserList__pill");
+
     expect(currentUserPill).not.toBeNull();
 
     // Radix Popover measures its content when opened.
     (global as any).ResizeObserver = class ResizeObserver {
       observe() {}
+
       unobserve() {}
+
       disconnect() {}
     };
     fireEvent.click(currentUserPill!);
@@ -69,6 +72,7 @@ describe("UserList", () => {
       const dropdownCollaborators = dropdown?.querySelectorAll(
         ".UserList__collaborator",
       );
+
       expect(dropdownCollaborators).toHaveLength(2);
       expect(
         dropdown?.querySelectorAll(".UserList__collaborator.is-current-user"),

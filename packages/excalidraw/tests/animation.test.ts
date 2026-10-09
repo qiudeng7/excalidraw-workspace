@@ -20,8 +20,10 @@ describe("AnimationController", () => {
 
   it("starts a new animation after the previous last animation was cancelled", async () => {
     let firstFrames = 0;
+
     AnimationController.start(FIRST_KEY, () => {
       firstFrames++;
+
       return { keep: true };
     });
 
@@ -31,8 +33,10 @@ describe("AnimationController", () => {
     await vi.runOnlyPendingTimersAsync();
 
     let secondFrames = 0;
+
     AnimationController.start(SECOND_KEY, () => {
       secondFrames++;
+
       return secondFrames === 1 ? { keep: true } : null;
     });
 
@@ -57,6 +61,7 @@ describe("AnimationController", () => {
 
       AnimationController.start(SECOND_KEY, () => {
         secondFrames++;
+
         return { keep: true };
       });
       AnimationController.cancel(SECOND_KEY);
@@ -77,6 +82,7 @@ describe("AnimationController", () => {
     AnimationController.start(FIRST_KEY, () => {
       frames++;
       AnimationController.cancel(FIRST_KEY);
+
       return { keep: true };
     });
 
@@ -102,6 +108,7 @@ describe("AnimationController", () => {
 
     const replacement = ({ state }: { state?: { keep: true } }) => {
       replacementFrames++;
+
       return state ? null : { keep: true as const };
     };
 
@@ -109,6 +116,7 @@ describe("AnimationController", () => {
       originalFrames++;
       AnimationController.cancel(FIRST_KEY);
       AnimationController.start(FIRST_KEY, replacement);
+
       return { keep: true };
     });
 
@@ -138,6 +146,7 @@ describe("AnimationController", () => {
 
     const replacement = ({ state }: { state?: { keep: true } }) => {
       replacementFrames++;
+
       return state ? null : { keep: true as const };
     };
 
@@ -149,6 +158,7 @@ describe("AnimationController", () => {
       originalFrames++;
       AnimationController.cancel(FIRST_KEY);
       AnimationController.start(FIRST_KEY, replacement);
+
       return null;
     });
 

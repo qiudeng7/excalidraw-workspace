@@ -29,9 +29,11 @@ export function linesIntersectAt<Point extends GlobalPoint | LocalPoint>(
   const A2 = b[1][1] - b[0][1];
   const B2 = b[0][0] - b[1][0];
   const D = A1 * B2 - A2 * B1;
+
   if (D !== 0) {
     const C1 = A1 * a[0][0] + B1 * a[0][1];
     const C2 = A2 * b[0][0] + B2 * b[0][1];
+
     return pointFrom<Point>((C1 * B2 - C2 * B1) / D, (A1 * C2 - A2 * C1) / D);
   }
 

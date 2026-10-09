@@ -54,6 +54,7 @@ beforeEach(async () => {
   });
 
   const image = API.createElement({ type: "image", width: 200, height: 100 });
+
   API.setElements([image]);
   API.setAppState({
     selectedElementIds: {
@@ -86,6 +87,7 @@ const compareCrops = (cropA: ImageCrop, cropB: ImageCrop) => {
 describe("Enter and leave the crop editor", () => {
   it("enter the editor by double clicking", () => {
     const image = h.elements[0];
+
     expect(h.state.croppingElementId).toBe(null);
     mouse.doubleClickOn(image);
     expect(h.state.croppingElementId).not.toBe(null);
@@ -94,6 +96,7 @@ describe("Enter and leave the crop editor", () => {
 
   it("enter the editor by pressing enter", () => {
     const image = h.elements[0];
+
     expect(h.state.croppingElementId).toBe(null);
     Keyboard.keyDown(KEYS.ENTER);
     expect(h.state.croppingElementId).not.toBe(null);
@@ -102,6 +105,7 @@ describe("Enter and leave the crop editor", () => {
 
   it("leave the editor by clicking outside", () => {
     const image = h.elements[0];
+
     Keyboard.keyDown(KEYS.ENTER);
     expect(h.state.croppingElementId).not.toBe(null);
 
@@ -111,6 +115,7 @@ describe("Enter and leave the crop editor", () => {
 
   it("leave the editor by pressing escape", () => {
     const image = h.elements[0];
+
     mouse.doubleClickOn(image);
     expect(h.state.croppingElementId).not.toBe(null);
 
@@ -232,6 +237,7 @@ describe("Cropping and other features", async () => {
     ]);
     Keyboard.keyDown(KEYS.ESCAPE);
     const duplicatedImage = duplicateElement(null, new Map(), image);
+
     act(() => {
       h.app.scene.insertElement(duplicatedImage);
     });
@@ -274,6 +280,7 @@ describe("Cropping and other features", async () => {
     ]);
     const cropBeforeResizing = image.crop;
     const cropBeforeResizingCloned = cloneJSON(image.crop) as ImageCrop;
+
     expect(cropBeforeResizing).not.toBe(null);
 
     UI.crop(image, "e", naturalWidth, naturalHeight, [200, 0]);
@@ -358,6 +365,7 @@ describe("Cropping and other features", async () => {
     expect(svgHeight).toBeDefined();
 
     const exportedSvgRatio = Number(svgWidth) / Number(svgHeight);
+
     expect(widthToHeightRatio).toBeCloseTo(exportedSvgRatio);
   });
 });

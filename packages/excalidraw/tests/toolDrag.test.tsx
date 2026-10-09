@@ -61,6 +61,7 @@ describe("dragging a tool out of the toolbar", () => {
 
     fireEvent.pointerMove(window, { ...POINTER, clientX: 300, clientY: 260 });
     const preview = h.app.toolDrag.preview!;
+
     expect(preview).not.toBeNull();
     expect(preview.type).toBe("stickynote");
     expect([preview.width, preview.height]).toEqual([
@@ -81,12 +82,14 @@ describe("dragging a tool out of the toolbar", () => {
 
     expect(h.app.toolDrag.preview).toBeNull();
     const [note] = liveNotes();
+
     expect(liveNotes()).toHaveLength(1);
     // centered on the pointer, at the default size
     const center = viewportCoordsToSceneCoords(
       { clientX: 400, clientY: 350 },
       h.state,
     );
+
     expect(note.x + note.width / 2).toBeCloseTo(center.x);
     expect(note.y + note.height / 2).toBeCloseTo(center.y);
     expect(note.width).toBe(DEFAULT_STICKY_NOTE_SIZE);
@@ -153,6 +156,7 @@ describe("dragging a tool out of the toolbar", () => {
 
   it("keeps a plain click selecting the tool", () => {
     const button = stickyButton();
+
     fireEvent.pointerDown(button, { ...POINTER, button: 0 });
     fireEvent.pointerUp(button, { ...POINTER, button: 0 });
     fireEvent.click(button);

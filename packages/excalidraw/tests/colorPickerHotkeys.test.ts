@@ -105,6 +105,7 @@ describe("color picker hotkeys", () => {
 
     // up from row 2 / column 0 wraps past the excluded cell to row 3
     let onChange = vi.fn();
+
     expect(
       colorPickerKeyNavHandler({
         ...handlerArgs("ArrowUp", palette, onChange, excluded),

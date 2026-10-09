@@ -29,12 +29,14 @@ const UnlockPopup = ({
   activeLockedId: NonNullable<AppState["activeLockedId"]>;
 }) => {
   const candidateElement = app.scene.getElement(activeLockedId);
+
   // SAFETY: This should never happen, but log it just in case
   if (candidateElement && !isNonDeletedElement(candidateElement)) {
     console.error(
       "[NONDELETED][INVARIANT] UnlockPopup: activeLockedId points to a deleted element",
     );
   }
+
   const element: NonDeletedExcalidrawElement | null =
     candidateElement && isNonDeletedElement(candidateElement)
       ? candidateElement
@@ -67,6 +69,7 @@ const UnlockPopup = ({
       onClick={() => {
         flushSync(() => {
           const groupIds = selectGroupsFromGivenElements(elements, app.state);
+
           app.setState({
             selectedElementIds: elements.reduce(
               (acc, element) => ({

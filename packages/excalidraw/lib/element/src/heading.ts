@@ -29,15 +29,20 @@ import { getCenterForBounds } from "./bounds";
 import type { ExcalidrawBindableElement } from "./types";
 
 export const HEADING_RIGHT = [1, 0] as Heading;
+
 export const HEADING_DOWN = [0, 1] as Heading;
+
 export const HEADING_LEFT = [-1, 0] as Heading;
+
 export const HEADING_UP = [0, -1] as Heading;
+
 export type Heading = [1, 0] | [0, 1] | [-1, 0] | [0, -1];
 
 export const vectorToHeading = (vec: Vector): Heading => {
   const [x, y] = vec;
   const absX = Math.abs(x);
   const absY = Math.abs(y);
+
   if (x > absY) {
     return HEADING_RIGHT;
   } else if (x <= -absY) {
@@ -45,6 +50,7 @@ export const vectorToHeading = (vec: Vector): Heading => {
   } else if (y > absX) {
     return HEADING_DOWN;
   }
+
   return HEADING_UP;
 };
 
@@ -194,6 +200,7 @@ const headingForPointFromDiamondElement = (
     ) > 0
   ) {
     const p = element.width > element.height ? top : right;
+
     return headingForPoint(p, midPoint);
   } else if (
     vectorCross(
@@ -206,6 +213,7 @@ const headingForPointFromDiamondElement = (
     ) > 0
   ) {
     const p = element.width > element.height ? bottom : right;
+
     return headingForPoint(p, midPoint);
   } else if (
     vectorCross(
@@ -218,10 +226,12 @@ const headingForPointFromDiamondElement = (
     ) > 0
   ) {
     const p = element.width > element.height ? bottom : left;
+
     return headingForPoint(p, midPoint);
   }
 
   const p = element.width > element.height ? top : left;
+
   return headingForPoint(p, midPoint);
 };
 
@@ -268,16 +278,16 @@ export const headingForPointFromElement = <Point extends GlobalPoint>(
   )
     ? HEADING_UP
     : triangleIncludesPoint<Point>(
-        [topRight, bottomRight, midPoint] as Triangle<Point>,
-        p,
-      )
-    ? HEADING_RIGHT
-    : triangleIncludesPoint<Point>(
-        [bottomRight, bottomLeft, midPoint] as Triangle<Point>,
-        p,
-      )
-    ? HEADING_DOWN
-    : HEADING_LEFT;
+          [topRight, bottomRight, midPoint] as Triangle<Point>,
+          p,
+        )
+      ? HEADING_RIGHT
+      : triangleIncludesPoint<Point>(
+            [bottomRight, bottomLeft, midPoint] as Triangle<Point>,
+            p,
+          )
+        ? HEADING_DOWN
+        : HEADING_LEFT;
 };
 
 export const flipHeading = (h: Heading): Heading =>

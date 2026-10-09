@@ -59,6 +59,7 @@ export const isToolIcon = (
   target: Element | EventTarget | null,
 ): target is HTMLElement => {
   const targetWindow = getTargetWindow(target);
+
   return (
     !!targetWindow &&
     target instanceof targetWindow.HTMLElement &&
@@ -75,6 +76,7 @@ export const isInputLike = (
   | HTMLBRElement
   | HTMLDivElement => {
   const targetWindow = getTargetWindow(target);
+
   return (
     !!targetWindow &&
     ((target instanceof targetWindow.HTMLElement &&
@@ -88,6 +90,7 @@ export const isInputLike = (
 
 export const isInteractive = (target: Element | EventTarget | null) => {
   const targetWindow = getTargetWindow(target);
+
   return (
     isInputLike(target) ||
     (!!targetWindow &&
@@ -99,11 +102,9 @@ export const isInteractive = (target: Element | EventTarget | null) => {
 export const isWritableElement = (
   target: Element | EventTarget | null,
 ): target is
-  | HTMLInputElement
-  | HTMLTextAreaElement
-  | HTMLBRElement
-  | HTMLDivElement => {
+  HTMLInputElement | HTMLTextAreaElement | HTMLBRElement | HTMLDivElement => {
   const targetWindow = getTargetWindow(target);
+
   return (
     !!targetWindow &&
     ((target instanceof targetWindow.HTMLElement &&
@@ -132,6 +133,7 @@ export const getFontFamilyString = ({
         .join("")}`;
     }
   }
+
   return WINDOWS_EMOJI_FALLBACK_FONT;
 };
 
@@ -165,18 +167,22 @@ export const debounce = <T extends any[]>(
       fn(...args);
     }, timeout);
   };
+
   ret.flush = () => {
     clearTimeout(handle);
     if (lastArgs) {
       const _lastArgs = lastArgs;
+
       lastArgs = null;
       fn(..._lastArgs);
     }
   };
+
   ret.cancel = () => {
     lastArgs = null;
     clearTimeout(handle);
   };
+
   return ret;
 };
 
@@ -189,6 +195,7 @@ export const throttleRAF = <T extends any[]>(fn: (...args: T) => void) => {
     timerId = window.requestAnimationFrame(() => {
       timerId = null;
       const args = lastArgs;
+
       lastArgs = null;
 
       if (args) {
@@ -203,16 +210,19 @@ export const throttleRAF = <T extends any[]>(fn: (...args: T) => void) => {
       scheduleFunc();
     }
   };
+
   ret.flush = () => {
     if (timerId !== null) {
       cancelAnimationFrame(timerId);
       timerId = null;
     }
+
     if (lastArgs) {
       fn(...lastArgs);
       lastArgs = null;
     }
   };
+
   ret.cancel = () => {
     lastArgs = null;
     if (timerId !== null) {
@@ -220,6 +230,7 @@ export const throttleRAF = <T extends any[]>(fn: (...args: T) => void) => {
       timerId = null;
     }
   };
+
   return ret;
 };
 
@@ -241,19 +252,24 @@ export const chunk = <T extends any>(
   if (!array.length || size < 1) {
     return [];
   }
+
   let index = 0;
   let resIndex = 0;
   const result = Array(Math.ceil(array.length / size));
+
   while (index < array.length) {
     result[resIndex++] = array.slice(index, (index += size));
   }
+
   return result;
 };
 
 export const selectNode = (node: Element) => {
   const selection = window.getSelection();
+
   if (selection) {
     const range = document.createRange();
+
     range.selectNodeContents(node);
     selection.removeAllRanges();
     selection.addRange(range);
@@ -262,6 +278,7 @@ export const selectNode = (node: Element) => {
 
 export const removeSelection = () => {
   const selection = window.getSelection();
+
   if (selection) {
     selection.removeAllRanges();
   }
@@ -354,6 +371,7 @@ export const sceneCoordsToViewportCoords = (
 ) => {
   const x = (sceneX + scrollX) * zoom.value + offsetLeft;
   const y = (sceneY + scrollY) * zoom.value + offsetTop;
+
   return { x, y };
 };
 
@@ -365,6 +383,7 @@ const RS_LTR_CHARS =
   "\u2C00-\uFB1C\uFDFE-\uFE6F\uFEFD-\uFFFF";
 const RS_RTL_CHARS = "\u0591-\u07FF\uFB1D-\uFDFD\uFE70-\uFEFC";
 const RE_RTL_CHECK = new RegExp(`^[^${RS_LTR_CHARS}]*[${RS_RTL_CHARS}]`);
+
 /**
  * Checks whether first directional character is RTL. Meaning whether it starts
  *  with RTL characters, or indeterminate (numbers etc.) characters followed by
@@ -377,6 +396,7 @@ export const tupleToCoors = (
   xyTuple: readonly [number, number],
 ): { x: number; y: number } => {
   const [x, y] = xyTuple;
+
   return { x, y };
 };
 
@@ -384,8 +404,10 @@ export const tupleToCoors = (
 export const muteFSAbortError = (error?: Error) => {
   if (error?.name === "AbortError") {
     console.warn(error);
+
     return;
   }
+
   throw error;
 };
 
@@ -397,13 +419,16 @@ export const findIndex = <T>(
   if (fromIndex < 0) {
     fromIndex = array.length + fromIndex;
   }
+
   fromIndex = Math.min(array.length, Math.max(fromIndex, 0));
   let index = fromIndex - 1;
+
   while (++index < array.length) {
     if (cb(array[index], index, array)) {
       return index;
     }
   }
+
   return -1;
 };
 
@@ -415,13 +440,16 @@ export const findLastIndex = <T>(
   if (fromIndex < 0) {
     fromIndex = array.length + fromIndex;
   }
+
   fromIndex = Math.min(array.length - 1, Math.max(fromIndex, 0));
   let index = fromIndex + 1;
+
   while (--index > -1) {
     if (cb(array[index], index, array)) {
       return index;
     }
   }
+
   return -1;
 };
 
@@ -432,10 +460,12 @@ export const mapFind = <T, K>(
 ): K | undefined => {
   for (let idx = 0; idx < collection.length; idx++) {
     const result = iteratee(collection[idx], idx);
+
     if (result != null) {
       return result;
     }
   }
+
   return undefined;
 };
 
@@ -445,6 +475,7 @@ export type ResolvablePromise<T> = Promise<T> & {
     : (value: MaybePromise<Awaited<T>>) => void;
   reject: (error: Error) => void;
 };
+
 export const resolvablePromise = <T>() => {
   let resolve!: any;
   let reject!: any;
@@ -452,8 +483,10 @@ export const resolvablePromise = <T>() => {
     resolve = _resolve;
     reject = _reject;
   });
+
   (promise as any).resolve = resolve;
   (promise as any).reject = reject;
+
   return promise as ResolvablePromise<T>;
 };
 
@@ -467,11 +500,13 @@ export const nFormatter = (num: number, digits: number): string => {
   ];
   const rx = /\.0+$|(\.[0-9]*[1-9])0+$/;
   let index;
+
   for (index = si.length - 1; index > 0; index--) {
     if (num >= si[index].value) {
       break;
     }
   }
+
   return (
     (num / si[index].value).toFixed(digits).replace(rx, "$1") + si[index].symbol
   );
@@ -488,16 +523,20 @@ export const getVersion = () => {
 export const supportsEmoji = () => {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
+
   if (!ctx) {
     return false;
   }
+
   const offset = 12;
+
   ctx.fillStyle = "#f00";
   ctx.textBaseline = "top";
   ctx.font = "32px Arial";
   // Modernizr used 🐨, but it is sort of supported on Windows 7.
   // Luckily 😀 isn't supported.
   ctx.fillText("😀", 0, 0);
+
   return ctx.getImageData(offset, offset, 1, 1).data[0] !== 0;
 };
 
@@ -507,12 +546,15 @@ export const getNearestScrollableContainer = (
   const ownerDocument = element.ownerDocument;
   const ownerWindow = ownerDocument.defaultView ?? window;
   let parent = element.parentElement;
+
   while (parent) {
     if (parent === ownerDocument.body) {
       return ownerDocument;
     }
+
     const { overflowY } = ownerWindow.getComputedStyle(parent);
     const hasScrollableContent = parent.scrollHeight > parent.clientHeight;
+
     if (
       hasScrollableContent &&
       (overflowY === "auto" ||
@@ -521,18 +563,23 @@ export const getNearestScrollableContainer = (
     ) {
       return parent;
     }
+
     parent = parent.parentElement;
   }
+
   return ownerDocument;
 };
 
 export const focusNearestParent = (element: HTMLInputElement) => {
   let parent = element.parentElement;
+
   while (parent) {
     if (parent.tabIndex > -1) {
       parent.focus();
+
       return;
     }
+
     parent = parent.parentElement;
   }
 };
@@ -561,10 +608,15 @@ export const arrayToMap = <T extends { id: string } | string>(
   if (items instanceof Map) {
     return items;
   }
-  return items.reduce((acc: Map<string, T>, element) => {
-    acc.set(typeof element === "string" ? element : element.id, element);
-    return acc;
-  }, new Map() as Map<string, T>);
+
+  return items.reduce(
+    (acc: Map<string, T>, element) => {
+      acc.set(typeof element === "string" ? element : element.id, element);
+
+      return acc;
+    },
+    new Map() as Map<string, T>,
+  );
 };
 
 export const arrayToMapWithIndex = <T extends { id: string }>(
@@ -572,6 +624,7 @@ export const arrayToMapWithIndex = <T extends { id: string }>(
 ) =>
   elements.reduce((acc, element: T, idx) => {
     acc.set(element.id, [element, idx]);
+
     return acc;
   }, new Map<string, [element: T, index: number]>());
 
@@ -582,10 +635,14 @@ export const arrayToObject = <T>(
   array: readonly T[],
   groupBy?: (value: T) => string | number,
 ) =>
-  array.reduce((acc, value, idx) => {
-    acc[groupBy ? groupBy(value) : idx] = value;
-    return acc;
-  }, {} as { [key: string]: T });
+  array.reduce(
+    (acc, value, idx) => {
+      acc[groupBy ? groupBy(value) : idx] = value;
+
+      return acc;
+    },
+    {} as { [key: string]: T },
+  );
 
 /** Doubly linked node */
 export type Node<T> = T & {
@@ -603,12 +660,14 @@ export const arrayToList = <T>(array: readonly T[]): Node<T>[] =>
     // no-op for first item, we don't want circular references on a single item
     if (index !== 0) {
       const prevNode = acc[index - 1];
+
       node.prev = prevNode;
       prevNode.next = node;
 
       if (index === array.length - 1) {
         // make the references circular and connect head & tail
         const firstNode = acc[0];
+
         node.next = firstNode;
         firstNode.prev = node;
       }
@@ -661,8 +720,10 @@ export const updateObject = <T extends Record<string, any>>(
   updates: Partial<T>,
 ): T => {
   let didChange = false;
+
   for (const key in updates) {
     const value = (updates as any)[key];
+
     if (typeof value !== "undefined") {
       if (
         (obj as any)[key] === value &&
@@ -671,6 +732,7 @@ export const updateObject = <T extends Record<string, any>>(
       ) {
         continue;
       }
+
       didChange = true;
     }
   }
@@ -687,6 +749,7 @@ export const updateObject = <T extends Record<string, any>>(
 
 export const isPrimitive = (val: any) => {
   const type = typeof val;
+
   return val == null || (type !== "object" && type !== "function");
 };
 
@@ -694,6 +757,11 @@ export const getFrame = () => {
   try {
     return window.self === window.top ? "top" : "iframe";
   } catch (error) {
+    console.debug(
+      "Cannot access the parent window; treating it as an iframe",
+      error,
+    );
+
     return "iframe";
   }
 };
@@ -736,6 +804,7 @@ const _defaultIsShallowComparatorFallback = (a: any, b: any): boolean => {
   ) {
     return true;
   }
+
   return a === b;
 };
 
@@ -764,6 +833,7 @@ export const isShallowEqual = <
 ) => {
   const aKeys = Object.keys(objA);
   const bKeys = Object.keys(objB);
+
   if (aKeys.length !== bKeys.length) {
     if (debug) {
       console.warn(
@@ -773,6 +843,7 @@ export const isShallowEqual = <
         objB,
       );
     }
+
     return false;
   }
 
@@ -781,6 +852,7 @@ export const isShallowEqual = <
       const ret =
         objA[key] === objB[key] ||
         _defaultIsShallowComparatorFallback(objA[key], objB[key]);
+
       if (!ret) {
         if (debug) {
           console.warn(
@@ -790,9 +862,11 @@ export const isShallowEqual = <
             objB[key],
           );
         }
+
         return false;
       }
     }
+
     return true;
   }
 
@@ -813,6 +887,7 @@ export const isShallowEqual = <
         objB[key],
       );
     }
+
     return ret;
   });
 };
@@ -848,8 +923,10 @@ export const assertNever = (
   if (!message) {
     return value;
   }
+
   if (softAssert) {
     console.error(message);
+
     return value;
   }
 
@@ -876,12 +953,14 @@ export const memoize = <T extends Record<string, any>, R extends any>(
 
     if (lastArgs) {
       let argsAreEqual = true;
+
       for (const [key, value] of currentArgs) {
         if (lastArgs.get(key) !== value) {
           argsAreEqual = false;
           break;
         }
       }
+
       if (argsAreEqual) {
         return lastResult;
       }
@@ -913,8 +992,8 @@ export const isMemberOf = <T extends string>(
   return collection instanceof Set || collection instanceof Map
     ? collection.has(value as T)
     : "includes" in collection
-    ? collection.includes(value as T)
-    : collection.hasOwnProperty(value);
+      ? collection.includes(value as T)
+      : collection.hasOwnProperty(value);
 };
 
 export const cloneJSON = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
@@ -926,6 +1005,7 @@ export const updateStable = <T extends any[] | Record<string, any>>(
   if (isShallowEqual(prevValue, nextValue)) {
     return prevValue;
   }
+
   return nextValue;
 };
 
@@ -936,12 +1016,14 @@ export function addEventListener<K extends keyof WindowEventMap>(
   listener: (this: Window, ev: WindowEventMap[K]) => any,
   options?: boolean | AddEventListenerOptions,
 ): UnsubscribeCallback;
+
 export function addEventListener(
   target: Window & typeof globalThis,
   type: string,
   listener: (this: Window, ev: Event) => any,
   options?: boolean | AddEventListenerOptions,
 ): UnsubscribeCallback;
+
 // Document
 export function addEventListener<K extends keyof DocumentEventMap>(
   target: Document,
@@ -949,12 +1031,14 @@ export function addEventListener<K extends keyof DocumentEventMap>(
   listener: (this: Document, ev: DocumentEventMap[K]) => any,
   options?: boolean | AddEventListenerOptions,
 ): UnsubscribeCallback;
+
 export function addEventListener(
   target: Document,
   type: string,
   listener: (this: Document, ev: Event) => any,
   options?: boolean | AddEventListenerOptions,
 ): UnsubscribeCallback;
+
 // FontFaceSet (document.fonts)
 export function addEventListener<K extends keyof FontFaceSetEventMap>(
   target: FontFaceSet,
@@ -962,6 +1046,7 @@ export function addEventListener<K extends keyof FontFaceSetEventMap>(
   listener: (this: FontFaceSet, ev: FontFaceSetEventMap[K]) => any,
   options?: boolean | AddEventListenerOptions,
 ): UnsubscribeCallback;
+
 // HTMLElement / mix
 export function addEventListener<K extends keyof HTMLElementEventMap>(
   target:
@@ -975,6 +1060,7 @@ export function addEventListener<K extends keyof HTMLElementEventMap>(
   listener: (this: HTMLDivElement, ev: HTMLElementEventMap[K]) => any,
   options?: boolean | AddEventListenerOptions,
 ): UnsubscribeCallback;
+
 // implem
 export function addEventListener(
   /**
@@ -996,7 +1082,9 @@ export function addEventListener(
   if (!target) {
     return () => {};
   }
+
   target?.addEventListener?.(type, listener, options);
+
   return () => {
     target?.removeEventListener?.(type, listener, options);
   };
@@ -1045,35 +1133,38 @@ export type HasBrand<T> = {
   [K in keyof T]: K extends `~brand${infer _}` | "_brand" ? true : never;
 }[keyof T];
 
-type RemoveAllBrands<T> = HasBrand<T> extends true
-  ? {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      [K in keyof T as K extends `~brand~${infer _}` | "_brand"
-        ? never
-        : K]: T[K];
-    }
-  : T;
+type RemoveAllBrands<T> =
+  HasBrand<T> extends true
+    ? {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        [
+          K in keyof T as K extends `~brand~${infer _}` | "_brand" ? never : K
+        ]: T[K];
+      }
+    : T;
 
 // For accepting values - uses loose matching for branded types
 // Preserves readonly modifier: mutable array requires mutable input
-type UnbrandForValue<T> = T extends Map<infer E, infer F>
-  ? Map<UnbrandForValue<E>, UnbrandForValue<F>>
-  : T extends Set<infer E>
-  ? Set<UnbrandForValue<E>>
-  : T extends readonly any[]
-  ? T extends any[]
-    ? unknown[] // mutable array - require mutable input
-    : readonly unknown[] // readonly array - accept readonly input
-  : RemoveAllBrands<T>;
+type UnbrandForValue<T> =
+  T extends Map<infer E, infer F>
+    ? Map<UnbrandForValue<E>, UnbrandForValue<F>>
+    : T extends Set<infer E>
+      ? Set<UnbrandForValue<E>>
+      : T extends readonly any[]
+        ? T extends any[]
+          ? unknown[] // mutable array - require mutable input
+          : readonly unknown[] // readonly array - accept readonly input
+        : RemoveAllBrands<T>;
 
 // For return types - preserves array element unbranding
-export type Unbrand<T> = T extends Map<infer E, infer F>
-  ? Map<Unbrand<E>, Unbrand<F>>
-  : T extends Set<infer E>
-  ? Set<Unbrand<E>>
-  : T extends readonly (infer E)[]
-  ? Array<Unbrand<E>>
-  : RemoveAllBrands<T>;
+export type Unbrand<T> =
+  T extends Map<infer E, infer F>
+    ? Map<Unbrand<E>, Unbrand<F>>
+    : T extends Set<infer E>
+      ? Set<Unbrand<E>>
+      : T extends readonly (infer E)[]
+        ? Array<Unbrand<E>>
+        : RemoveAllBrands<T>;
 
 export type CombineBrands<BrandedType, CurrentType> =
   BrandedType extends readonly (infer BE)[]
@@ -1085,8 +1176,8 @@ export type CombineBrands<BrandedType, CurrentType> =
 export type CombineBrandsIfNeeded<T, Required> = [T] extends [Required]
   ? T[]
   : HasBrand<T> extends true
-  ? CombineBrands<T, Required>[]
-  : Required[];
+    ? CombineBrands<T, Required>[]
+    : Required[];
 
 /**
  * Makes type into a branded type, ensuring that value is assignable to
@@ -1097,9 +1188,11 @@ export type CombineBrandsIfNeeded<T, Required> = [T] extends [Required]
 export function toBrandedType<BrandedType>(
   value: UnbrandForValue<BrandedType>,
 ): BrandedType;
+
 export function toBrandedType<BrandedType, CurrentType>(
   value: CurrentType,
 ): CombineBrands<BrandedType, CurrentType>;
+
 export function toBrandedType(value: unknown) {
   return value;
 }
@@ -1122,7 +1215,9 @@ export const isAnyTrue = (...args: boolean[]): boolean =>
 export const safelyParseJSON = (json: string): Record<string, any> | null => {
   try {
     return JSON.parse(json);
-  } catch {
+  } catch (error) {
+    console.debug("Input is not valid JSON", error);
+
     return null;
   }
 };
@@ -1153,8 +1248,8 @@ export const sizeOf = (
   return isReadonlyArray(value)
     ? value.length
     : value instanceof Map || value instanceof Set
-    ? value.size
-    : Object.keys(value).length;
+      ? value.size
+      : Object.keys(value).length;
 };
 
 export const reduceToCommonValue = <T, R = T>(
@@ -1171,6 +1266,7 @@ export const reduceToCommonValue = <T, R = T>(
 
   for (const item of collection) {
     const value = valueExtractor(item);
+
     if ((commonValue === null || commonValue === value) && value != null) {
       commonValue = value;
     } else {
@@ -1197,11 +1293,15 @@ export const getFeatureFlag = <F extends keyof FEATURE_FLAGS>(
   if (!featureFlags) {
     try {
       const serializedFlags = localStorage.getItem(FEATURE_FLAGS_STORAGE_KEY);
+
       if (serializedFlags) {
         const flags = JSON.parse(serializedFlags);
+
         featureFlags = flags ?? DEFAULT_FEATURE_FLAGS;
       }
-    } catch {}
+    } catch (error) {
+      console.warn("Could not read feature flags; using defaults", error);
+    }
   }
 
   return (featureFlags || DEFAULT_FEATURE_FLAGS)[flag];

@@ -63,6 +63,7 @@ const MenuContent = ({
     if (!open || !menuNode) {
       return;
     }
+
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === KEYS.ESCAPE) {
         event.preventDefault();
@@ -78,7 +79,9 @@ const MenuContent = ({
     };
 
     const ownerDocument = menuNode.ownerDocument;
+
     ownerDocument.addEventListener(EVENT.KEYDOWN, onKeyDown, option);
+
     return () => {
       ownerDocument.removeEventListener(EVENT.KEYDOWN, onKeyDown, option);
     };
@@ -112,6 +115,7 @@ const MenuContent = ({
     </DropdownMenuContentPropsContext.Provider>
   );
 };
+
 MenuContent.displayName = "DropdownMenuContent";
 
 export default MenuContent;

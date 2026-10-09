@@ -44,14 +44,19 @@ const getApplicableTextElements = (
       if (!el || isInGroup(el)) {
         return acc;
       }
+
       if (isTextElement(el)) {
         acc.push(el);
+
         return acc;
       }
+
       if (hasBoundTextElement(el)) {
         const boundTextElement = getBoundTextElement(el, elementsMap);
+
         if (boundTextElement) {
           acc.push(boundTextElement);
+
           return acc;
         }
       }
@@ -111,9 +116,11 @@ const handleFontSizeChange: DragInputCallbackType<
         originalFontSize + changeInFontSize,
         MIN_FONT_SIZE,
       );
+
       if (shouldChangeByStepSize) {
         nextFontSize = getStepSizedValue(nextFontSize, STEP_SIZE);
       }
+
       scene.mutateElement(
         latestElement,
         getBaseFontSizeUpdate(latestElement, nextFontSize, elementsMap),

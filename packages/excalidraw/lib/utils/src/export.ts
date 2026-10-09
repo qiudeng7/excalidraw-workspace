@@ -58,6 +58,7 @@ export const exportToCanvas = ({
   const restoredAppState = restoreAppState(appState, null);
 
   const { exportBackground, viewBackgroundColor } = restoredAppState;
+
   return _exportToCanvas(
     restoredElements,
     { ...restoredAppState, offsetTop: 0, offsetLeft: 0, width: 0, height: 0 },
@@ -79,7 +80,7 @@ export const exportToCanvas = ({
         const scale =
           maxWidthOrHeight < max
             ? maxWidthOrHeight / max
-            : appState?.exportScale ?? 1;
+            : (appState?.exportScale ?? 1);
 
         canvas.width = width * scale;
         canvas.height = height * scale;
@@ -141,6 +142,7 @@ export const exportToBlob = async (
         if (!blob) {
           return reject(new Error("couldn't export to blob"));
         }
+
         if (
           blob &&
           mimeType === MIME_TYPES.png &&
@@ -159,6 +161,7 @@ export const exportToBlob = async (
             ),
           });
         }
+
         resolve(blob);
       },
       mimeType,
@@ -211,6 +214,7 @@ export const exportToClipboard = async (
 ) => {
   if (opts.type === "svg") {
     const svg = await exportToSvg(opts);
+
     await copyTextToSystemClipboard(svg.outerHTML);
   } else if (opts.type === "png") {
     await copyBlobToClipboardAsPng(exportToBlob(opts));

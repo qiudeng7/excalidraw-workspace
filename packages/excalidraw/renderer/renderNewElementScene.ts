@@ -104,6 +104,7 @@ export const renderNewElementScene = (
 ) => {
   if (throttle) {
     renderNewElementSceneThrottled(renderConfig);
+
     return;
   }
 

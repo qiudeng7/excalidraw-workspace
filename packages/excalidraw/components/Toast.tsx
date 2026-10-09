@@ -40,6 +40,7 @@ const ToastComponent = ({
     if (!shouldAutoClose) {
       return;
     }
+
     timerRef.current = window.setTimeout(() => onClose(), duration);
   }, [onClose, duration, shouldAutoClose]);
 
@@ -47,7 +48,9 @@ const ToastComponent = ({
     if (!shouldAutoClose) {
       return;
     }
+
     scheduleTimeout();
+
     return () => clearTimeout(timerRef.current);
   }, [scheduleTimeout, message, duration, shouldAutoClose]);
 
@@ -55,6 +58,7 @@ const ToastComponent = ({
     ? () => clearTimeout(timerRef?.current)
     : undefined;
   const onMouseLeave = shouldAutoClose ? scheduleTimeout : undefined;
+
   return (
     <div
       className="Toast"

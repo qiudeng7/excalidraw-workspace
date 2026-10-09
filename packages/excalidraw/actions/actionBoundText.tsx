@@ -69,8 +69,10 @@ export const actionUnbindText = register({
   perform: (elements, appState, _, app) => {
     const selectedElements = app.scene.getSelectedElements(appState);
     const elementsMap = app.scene.getNonDeletedElementsMap();
+
     selectedElements.forEach((element) => {
       const boundTextElement = getBoundTextElement(element, elementsMap);
+
       if (boundTextElement) {
         const { width, height } = measureText(
           boundTextElement.originalText,
@@ -80,12 +82,14 @@ export const actionUnbindText = register({
         const originalContainerHeight = getOriginalContainerHeightFromCache(
           element.id,
         );
+
         resetOriginalContainerCache(element.id);
         const { x, y } = computeBoundTextPosition(
           element,
           boundTextElement,
           elementsMap,
         );
+
         app.scene.mutateElement(boundTextElement as ExcalidrawTextElement, {
           containerId: null,
           width,
@@ -113,6 +117,7 @@ export const actionUnbindText = register({
         }
       }
     });
+
     return {
       elements,
       appState,
@@ -134,11 +139,13 @@ export const actionBindText = register({
         isTextElement(selectedElements[1]);
 
       let bindingContainer;
+
       if (isTextBindableContainer(selectedElements[0])) {
         bindingContainer = selectedElements[0];
       } else if (isTextBindableContainer(selectedElements[1])) {
         bindingContainer = selectedElements[1];
       }
+
       if (
         textElement &&
         bindingContainer &&
@@ -150,6 +157,7 @@ export const actionBindText = register({
         return true;
       }
     }
+
     return false;
   },
   perform: (elements, appState, _, app) => {
@@ -168,6 +176,7 @@ export const actionBindText = register({
       textElement = selectedElements[1] as ExcalidrawTextElement;
       container = selectedElements[0] as ExcalidrawTextContainer;
     }
+
     // a note and its label share one ink: the text the user styled wins,
     // unless it is transparent (a note's label never is)
     const stickyInk = isStickyNoteElement(container)
@@ -175,12 +184,15 @@ export const actionBindText = register({
         ? container.strokeColor
         : textElement.strokeColor
       : null;
+
     app.scene.mutateElement(textElement, {
       containerId: container.id,
       verticalAlign: VERTICAL_ALIGN.MIDDLE,
       textAlign: TEXT_ALIGN.CENTER,
       autoResize: true,
-      angle: (isArrowElement(container) ? 0 : container?.angle ?? 0) as Radians,
+      angle: (isArrowElement(container)
+        ? 0
+        : (container?.angle ?? 0)) as Radians,
       labelPosition: isArrowElement(container)
         ? DEFAULT_BOUND_TEXT_LABEL_POSITION
         : null,
@@ -202,6 +214,7 @@ export const actionBindText = register({
       ...(stickyInk ? { strokeColor: stickyInk } : null),
     });
     const originalContainerHeight = container.height;
+
     redrawTextBoundingBox(textElement, container, app.scene);
     // overwritting the cache with original container height so
     // it can be restored when unbind
@@ -224,11 +237,13 @@ const pushTextAboveContainer = (
   const textElementIndex = updatedElements.findIndex(
     (ele) => ele.id === textElement.id,
   );
+
   updatedElements.splice(textElementIndex, 1);
 
   const containerIndex = updatedElements.findIndex(
     (ele) => ele.id === container.id,
   );
+
   updatedElements.splice(containerIndex + 1, 0, textElement);
   syncMovedIndices(updatedElements, arrayToMap([container, textElement]));
 
@@ -244,11 +259,13 @@ const pushContainerBelowText = (
   const containerIndex = updatedElements.findIndex(
     (ele) => ele.id === container.id,
   );
+
   updatedElements.splice(containerIndex, 1);
 
   const textElementIndex = updatedElements.findIndex(
     (ele) => ele.id === textElement.id,
   );
+
   updatedElements.splice(textElementIndex, 0, container);
   syncMovedIndices(updatedElements, arrayToMap([container, textElement]));
 
@@ -264,6 +281,7 @@ export const actionWrapTextInContainer = register({
     const someTextElements = selectedElements.some(
       (el) => isTextElement(el) && !isBoundToContainer(el),
     );
+
     return selectedElements.length > 0 && someTextElements;
   },
   perform: (elements, appState, _, app) => {
@@ -321,6 +339,7 @@ export const actionWrapTextInContainer = register({
           const linearElements = updatedElements.filter((ele) =>
             linearElementIds.includes(ele.id),
           ) as ExcalidrawLinearElement[];
+
           linearElements.forEach((ele) => {
             let startBinding = ele.startBinding;
             let endBinding = ele.endBinding;

@@ -66,6 +66,7 @@ export class AppBucketFill {
    */
   handlePointerUp = () => {
     const scenePointer = this.pending;
+
     this.pending = null;
     if (scenePointer) {
       this.fill(scenePointer);
@@ -110,12 +111,14 @@ export class AppBucketFill {
         );
       },
     };
+
     this.temporaryEyeDropper = eyeDropper;
     this.app.updateEditorAtom(activeEyeDropperAtom, eyeDropper);
   };
 
   closeTemporaryEyeDropper = () => {
     const eyeDropper = this.temporaryEyeDropper;
+
     this.temporaryEyeDropper = null;
     if (
       eyeDropper &&
@@ -133,6 +136,7 @@ export class AppBucketFill {
     const backgroundColor = this.getBucketFillBackgroundColor(
       this.app.state.currentItemBackgroundColor,
     );
+
     if (
       element.backgroundColor === backgroundColor &&
       element.fillStyle === this.app.state.currentItemFillStyle &&
@@ -140,6 +144,7 @@ export class AppBucketFill {
     ) {
       return;
     }
+
     this.app.scene.mutateElement(element, {
       backgroundColor,
       fillStyle: this.app.state.currentItemFillStyle,
@@ -177,8 +182,10 @@ export class AppBucketFill {
       // the sensible outcome, and beats a toast
       if (hitElement && isBucketFillCompatible(hitElement)) {
         this.restyle(hitElement);
+
         return;
       }
+
       if (result.reason === "too_complex") {
         this.app.setToast({
           message: t("bucketfill.tooComplex"),
@@ -194,6 +201,7 @@ export class AppBucketFill {
           duration: 3000,
         });
       }
+
       // "no_owner" stays silent — clicking empty canvas shouldn't nag
       return;
     }
@@ -210,6 +218,7 @@ export class AppBucketFill {
       })
     ) {
       this.restyle(hitElement);
+
       return;
     }
 
@@ -228,10 +237,10 @@ export class AppBucketFill {
       ? isFrameLikeElement(owner)
         ? owner.id
         : owner.frameId
-      : this.app.getTopLayerFrameAtSceneCoords(scenePointer)?.id ?? null;
+      : (this.app.getTopLayerFrameAtSceneCoords(scenePointer)?.id ?? null);
     const groupIds = owner
       ? owner.groupIds
-      : result.boundaryElementIds
+      : (result.boundaryElementIds
           .map((id) => elementsMap.get(id)?.groupIds)
           .filter((groupIds): groupIds is string[] => !!groupIds)
           .reduce(
@@ -240,7 +249,7 @@ export class AppBucketFill {
                 ? groupIds
                 : common.filter((groupId) => groupIds.includes(groupId)),
             null as string[] | null,
-          ) ?? [];
+          ) ?? []);
 
     const fill = newLinearElement({
       type: "line",
@@ -269,13 +278,14 @@ export class AppBucketFill {
     const anchorIndex = this.app.scene
       .getElementsIncludingDeleted()
       .findIndex((el) => el.id === result.insertion.elementId);
+
     this.app.scene.insertElementsAtIndex(
       [fill],
       anchorIndex < 0
         ? null
         : result.insertion.placement === "above"
-        ? anchorIndex + 1
-        : anchorIndex,
+          ? anchorIndex + 1
+          : anchorIndex,
     );
 
     // Keep the bucket fill tool active and do NOT select the new fill, so the

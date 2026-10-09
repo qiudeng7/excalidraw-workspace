@@ -60,6 +60,7 @@ export const redrawTextBoundingBox = (
     // may be an uncommitted clone (font actions clone before install), so it
     // is passed explicitly instead of looked up in the scene
     updateStickyNoteLayout(container, scene, { text: textElement });
+
     return;
   }
 
@@ -108,6 +109,7 @@ export const redrawTextBoundingBox = (
   if (textElement.autoResize) {
     boundTextUpdates.width = metrics.width;
   }
+
   boundTextUpdates.height = metrics.height;
 
   if (container) {
@@ -122,6 +124,7 @@ export const redrawTextBoundingBox = (
         metrics.height,
         container.type,
       );
+
       scene.mutateElement(container, { height: nextHeight });
       updateOriginalContainerCache(container.id, nextHeight);
     }
@@ -131,6 +134,7 @@ export const redrawTextBoundingBox = (
         metrics.width,
         container.type,
       );
+
       scene.mutateElement(container, { width: nextWidth });
     }
 
@@ -164,15 +168,20 @@ export const handleBindTextResize = (
     // resize callers pass their intents to `updateStickyNoteLayout` directly
     // and own the bound-arrow pass; this is the fallback for generic callers
     updateStickyNoteLayout(container, scene, { bindings: false });
+
     return;
   }
+
   const elementsMap = scene.getNonDeletedElementsMap();
   const boundTextElementId = getBoundTextElementId(container);
+
   if (!boundTextElementId) {
     return;
   }
+
   resetOriginalContainerCache(container.id);
   const textElement = getBoundTextElement(container, elementsMap);
+
   if (textElement && textElement.text) {
     if (!container) {
       return;
@@ -184,6 +193,7 @@ export const handleBindTextResize = (
     const maxWidth = getBoundTextMaxWidth(container, textElement);
     const maxHeight = getBoundTextMaxHeight(container, textElement);
     let containerHeight = container.height;
+
     if (
       shouldMaintainAspectRatio ||
       (transformHandleType !== "n" && transformHandleType !== "s")
@@ -195,14 +205,17 @@ export const handleBindTextResize = (
           maxWidth,
         );
       }
+
       const metrics = measureText(
         text,
         getFontString(textElement),
         textElement.lineHeight,
       );
+
       nextHeight = metrics.height;
       nextWidth = metrics.width;
     }
+
     // increase height in case text element height exceeds
     if (nextHeight > maxHeight) {
       containerHeight = computeContainerDimensionForBoundText(
@@ -225,8 +238,8 @@ export const handleBindTextResize = (
             shouldResizeFromCenter
               ? "center"
               : shouldResizeFromTop
-              ? "bottom"
-              : "top",
+                ? "bottom"
+                : "top",
           )),
       });
     }
@@ -258,12 +271,14 @@ export const computeBoundTextPosition = (
       elementsMap,
     );
   }
+
   const containerCoords = getContainerCoords(container);
   const maxContainerHeight = getBoundTextMaxHeight(container, boundTextElement);
   const maxContainerWidth = getBoundTextMaxWidth(container, boundTextElement);
 
   let x;
   let y;
+
   if (boundTextElement.verticalAlign === VERTICAL_ALIGN.TOP) {
     y = containerCoords.y;
   } else if (boundTextElement.verticalAlign === VERTICAL_ALIGN.BOTTOM) {
@@ -274,6 +289,7 @@ export const computeBoundTextPosition = (
     // padded note while it stays clear of the footer, and only push it up
     // against the body's bottom once it would overlap
     const paddedHeight = container.height - STICKY_NOTE_PADDING * 2;
+
     y =
       containerCoords.y +
       Math.min(
@@ -285,6 +301,7 @@ export const computeBoundTextPosition = (
       containerCoords.y +
       (maxContainerHeight / 2 - boundTextElement.height / 2);
   }
+
   if (boundTextElement.textAlign === TEXT_ALIGN.LEFT) {
     x = containerCoords.x;
   } else if (boundTextElement.textAlign === TEXT_ALIGN.RIGHT) {
@@ -293,6 +310,7 @@ export const computeBoundTextPosition = (
     x =
       containerCoords.x + (maxContainerWidth / 2 - boundTextElement.width / 2);
   }
+
   const angle = (container.angle ?? 0) as Radians;
 
   if (angle !== 0) {
@@ -336,6 +354,7 @@ export const getBoundTextElement = (
   if (!element) {
     return null;
   }
+
   const boundTextElementId = getBoundTextElementId(element);
 
   if (boundTextElementId) {
@@ -351,6 +370,7 @@ export const getBoundTextElement = (
 
     return boundTextElement;
   }
+
   return null;
 };
 
@@ -364,9 +384,11 @@ export const getContainerElement = <
   if (!element) {
     return null;
   }
+
   if (element.containerId) {
     return (elementsMap.get(element.containerId) || null) as R | null;
   }
+
   return null;
 };
 
@@ -405,11 +427,13 @@ export const getContainerCoords = (container: ExcalidrawElement) => {
     offsetX += (container.width / 2) * (1 - Math.sqrt(2) / 2);
     offsetY += (container.height / 2) * (1 - Math.sqrt(2) / 2);
   }
+
   // The derivation of coordinates is explained in https://github.com/excalidraw/excalidraw/pull/6265
   if (container.type === "diamond") {
     offsetX += container.width / 4;
     offsetY += container.height / 4;
   }
+
   return {
     x: container.x + offsetX,
     y: container.y + offsetY,
@@ -423,9 +447,11 @@ export const getTextElementAngle = (
   if (isArrowElement(container)) {
     return 0;
   }
+
   if (!container) {
     return textElement.angle;
   }
+
   return container.angle;
 };
 
@@ -458,10 +484,13 @@ export const getTextElementWithAccuratePosition = <
   if (!textElement.containerId) {
     return textElement;
   }
+
   const container = elementsMap.get(textElement.containerId);
+
   if (!container || !isArrowElement(container)) {
     return textElement;
   }
+
   return {
     ...textElement,
     ...LinearElementEditor.getBoundTextElementPosition(
@@ -479,11 +508,14 @@ export const shouldAllowVerticalAlign = (
   return selectedElements.some((element) => {
     if (isBoundToContainer(element)) {
       const container = getContainerElement(element, elementsMap);
+
       if (isArrowElement(container)) {
         return false;
       }
+
       return true;
     }
+
     return false;
   });
 };
@@ -495,9 +527,11 @@ export const suppportsHorizontalAlign = (
   return selectedElements.some((element) => {
     if (isBoundToContainer(element)) {
       const container = getContainerElement(element, elementsMap);
+
       if (isArrowElement(container)) {
         return false;
       }
+
       return true;
     }
 
@@ -528,12 +562,15 @@ export const computeContainerDimensionForBoundText = (
   if (containerType === "ellipse") {
     return Math.round(((dimension + padding) / Math.sqrt(2)) * 2);
   }
+
   if (containerType === "arrow") {
     return dimension + padding * 8;
   }
+
   if (containerType === "diamond") {
     return 2 * (dimension + padding);
   }
+
   return dimension + padding;
 };
 
@@ -542,23 +579,28 @@ export const getBoundTextMaxWidth = (
   boundTextElement: ExcalidrawTextElement | null,
 ) => {
   const { width } = container;
+
   if (isArrowElement(container)) {
     const minWidth =
       (boundTextElement?.fontSize ?? DEFAULT_FONT_SIZE) *
       ARROW_LABEL_FONT_SIZE_TO_MIN_WIDTH_RATIO;
+
     return Math.max(ARROW_LABEL_WIDTH_FRACTION * width, minWidth);
   }
+
   if (container.type === "ellipse") {
     // The width of the largest rectangle inscribed inside an ellipse is
     // Math.round((ellipse.width / 2) * Math.sqrt(2)) which is derived from
     // equation of an ellipse -https://github.com/excalidraw/excalidraw/pull/6172
     return Math.round((width / 2) * Math.sqrt(2)) - BOUND_TEXT_PADDING * 2;
   }
+
   if (container.type === "diamond") {
     // The width of the largest rectangle inscribed inside a rhombus is
     // Math.round(width / 2) - https://github.com/excalidraw/excalidraw/pull/6265
     return Math.round(width / 2) - BOUND_TEXT_PADDING * 2;
   }
+
   return (
     width -
     (isStickyNoteElement(container)
@@ -573,28 +615,35 @@ export const getBoundTextMaxHeight = (
   boundTextElement: ExcalidrawTextElementWithContainer,
 ) => {
   const { height } = container;
+
   if (isStickyNoteElement(container)) {
     // the label body ends above the creation-date footer
     return Math.max(0, height - STICKY_NOTE_BODY_INSET_Y);
   }
+
   if (isArrowElement(container)) {
     const containerHeight = height - BOUND_TEXT_PADDING * 8 * 2;
+
     if (containerHeight <= 0) {
       return boundTextElement.height;
     }
+
     return height;
   }
+
   if (container.type === "ellipse") {
     // The height of the largest rectangle inscribed inside an ellipse is
     // Math.round((ellipse.height / 2) * Math.sqrt(2)) which is derived from
     // equation of an ellipse - https://github.com/excalidraw/excalidraw/pull/6172
     return Math.round((height / 2) * Math.sqrt(2)) - BOUND_TEXT_PADDING * 2;
   }
+
   if (container.type === "diamond") {
     // The height of the largest rectangle inscribed inside a rhombus is
     // Math.round(height / 2) - https://github.com/excalidraw/excalidraw/pull/6265
     return Math.round(height / 2) - BOUND_TEXT_PADDING * 2;
   }
+
   return height - BOUND_TEXT_PADDING * 2;
 };
 
@@ -608,9 +657,11 @@ export const getTextFromElements = (
       if (isTextElement(element)) {
         acc.push(element.text);
       }
+
       return acc;
     }, [])
     .join(separator);
+
   return text;
 };
 

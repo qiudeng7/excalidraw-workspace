@@ -196,6 +196,7 @@ export function lineSegmentClosestParameter<
   const dot = A * C + B * D;
   const len_sq = C * C + D * D;
   let param = 0;
+
   if (len_sq !== 0) {
     param = dot / len_sq;
   }

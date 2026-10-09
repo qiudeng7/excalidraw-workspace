@@ -102,6 +102,7 @@ const StatsDragInput = <
     lastUpdatedValue: string;
     updatePending: boolean;
   }>(null!);
+
   if (!stateRef.current) {
     stateRef.current = {
       originalAppState: cloneJSON(appState),
@@ -113,6 +114,7 @@ const StatsDragInput = <
 
   useEffect(() => {
     const inputValue = value.toString();
+
     setInputValue(inputValue);
     stateRef.current.lastUpdatedValue = inputValue;
   }, [value]);
@@ -125,14 +127,17 @@ const StatsDragInput = <
     if (!stateRef.current.updatePending) {
       return false;
     }
+
     stateRef.current.updatePending = false;
 
     const parsed = Number(updatedValue);
+
     // Number.isFinite also rejects "Infinity"/"1e999", which `isNaN` lets
     // through — non-finite values corrupt element geometry (NaN/Infinity
     // don't survive the JSON round-trip on save)
     if (!Number.isFinite(parsed)) {
       setInputValue(value.toString());
+
       return;
     }
 
@@ -152,9 +157,11 @@ const StatsDragInput = <
       // carry the change they apply. A typed value is applied once, so the
       // scene at this point still is the original.
       const originalElementsMap: ElementsMap = new Map();
+
       for (const element of app.scene.getNonDeletedElements()) {
         originalElementsMap.set(element.id, deepCopyElement(element));
       }
+
       dragInputCallback({
         accumulatedChange: 0,
         instantChange: 0,
@@ -183,6 +190,7 @@ const StatsDragInput = <
       onPointerMove: (event: PointerEvent) => void;
     }>
   >({});
+
   callbacksRef.current.handleInputValue = handleInputValue;
 
   // make sure that clicking on canvas (which umounts the component)
@@ -190,8 +198,10 @@ const StatsDragInput = <
   useEffect(() => {
     const input = inputRef.current;
     const callbacks = callbacksRef.current;
+
     return () => {
       const nextValue = input?.value;
+
       if (nextValue) {
         callbacks.handleInputValue?.(
           nextValue,
@@ -242,6 +252,7 @@ const StatsDragInput = <
             ownerDocument.body.classList.add("excalidraw-cursor-resize");
 
             let startValue = Number(inputRef.current.value);
+
             if (isNaN(startValue)) {
               startValue = 0;
             }
@@ -255,6 +266,7 @@ const StatsDragInput = <
               .getNonDeletedElements()
               .reduce((acc: ElementsMap, element) => {
                 acc.set(element.id, deepCopyElement(element));
+
                 return acc;
               }, new Map());
 
@@ -371,6 +383,7 @@ const StatsDragInput = <
         onKeyDown={(event) => {
           if (editable) {
             const eventTarget = event.currentTarget;
+
             if (
               eventTarget instanceof ownerWindow.HTMLInputElement &&
               event.key === KEYS.ENTER

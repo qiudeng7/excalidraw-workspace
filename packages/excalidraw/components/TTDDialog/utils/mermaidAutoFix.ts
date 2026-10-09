@@ -7,9 +7,11 @@ import {
 
 const getErrorLineIndex = (message: string, sourceText: string) => {
   const lineNumber = getMermaidErrorLineNumber(message, sourceText);
+
   if (lineNumber == null) {
     return null;
   }
+
   return lineNumber - 1;
 };
 
@@ -21,12 +23,17 @@ const replaceLineAt = (
   if (index < 0 || index >= lines.length) {
     return null;
   }
+
   const nextLine = transform(lines[index]);
+
   if (nextLine === lines[index]) {
     return null;
   }
+
   const nextLines = [...lines];
+
   nextLines[index] = nextLine;
+
   return nextLines.join("\n");
 };
 
@@ -34,6 +41,7 @@ const stripTrailingTokenAfterShape = (line: string) => {
   const alphaTailMatch = line.match(
     /^(.*(?:\[[^\]]*]|\([^)]*\)|\{[^}]*}|"(?:[^"]*)"|'(?:[^']*)'))([A-Za-z]+)\s*$/,
   );
+
   if (alphaTailMatch) {
     return alphaTailMatch[1];
   }
@@ -41,6 +49,7 @@ const stripTrailingTokenAfterShape = (line: string) => {
   const punctuationTailMatch = line.match(
     /^(.*(?:\[[^\]]*]|\([^)]*\)|\{[^}]*}|"(?:[^"]*)"|'(?:[^']*)'))([,;:])\s*$/,
   );
+
   if (punctuationTailMatch) {
     return punctuationTailMatch[1];
   }
@@ -88,7 +97,9 @@ const removeAllDeactivateForParticipant = (
     if (!pattern.test(line)) {
       return true;
     }
+
     removedAny = true;
+
     return false;
   });
 
@@ -105,6 +116,7 @@ const appendMissingEnds = (sourceText: string) => {
   }
 
   const endings = Array.from({ length: missingCount }, () => "end").join("\n");
+
   return `${sourceText.trimEnd()}\n${endings}`;
 };
 
@@ -125,11 +137,13 @@ export const getMermaidAutoFixCandidates = (
     if (!candidate || candidate === sourceText || seen.has(candidate)) {
       return;
     }
+
     seen.add(candidate);
     candidates.push(candidate);
   };
 
   const inactiveParticipant = getMermaidInactiveParticipant(errorMessage);
+
   if (inactiveParticipant) {
     addCandidate(
       removeLastDeactivateForParticipant(sourceText, inactiveParticipant),
@@ -168,6 +182,7 @@ export const getMermaidAutoFixCandidates = (
     addCandidate(appendMissingEnds(sourceText));
 
     const normalizedQuotes = normalizeSmartQuotes(sourceText);
+
     addCandidate(normalizedQuotes === sourceText ? null : normalizedQuotes);
   }
 

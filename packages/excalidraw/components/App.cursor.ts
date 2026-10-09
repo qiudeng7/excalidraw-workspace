@@ -52,8 +52,7 @@ export class AppCursor {
   } | null = null;
 
   private eraserCanvasCache:
-    | (HTMLCanvasElement & { theme?: AppState["theme"] })
-    | null = null;
+    (HTMLCanvasElement & { theme?: AppState["theme"] }) | null = null;
   private eraserPreviewDataURL: DataURL | null = null;
 
   constructor(private app: App) {}
@@ -96,6 +95,7 @@ export class AppCursor {
     activeTool: AppState["activeTool"] = this.app.state.activeTool,
   ) => {
     const canvas = this.canvas;
+
     if (!canvas) {
       return;
     }
@@ -115,6 +115,7 @@ export class AppCursor {
           )
         : undefined;
     const memo = this.toolCursorMemo;
+
     if (
       memo?.canvas === canvas &&
       memo.type === activeTool.type &&
@@ -142,6 +143,7 @@ export class AppCursor {
         this.app.state.theme === THEME.LIGHT
           ? laserPointerCursorDataURL_lightMode
           : laserPointerCursorDataURL_darkMode;
+
       this.set(`url(${url}), auto`);
     } else if (!["image", "custom"].includes(activeTool.type)) {
       this.set(CURSOR_TYPE.CROSSHAIR);
@@ -176,6 +178,7 @@ export class AppCursor {
     }
 
     const pointerType = (lastEvent as PointerEvent).pointerType;
+
     if (pointerType && pointerType !== "mouse") {
       return;
     }
@@ -206,11 +209,13 @@ export class AppCursor {
 
     if (!this.eraserCanvasCache || this.eraserCanvasCache.theme !== theme) {
       const isDarkTheme = theme === THEME.DARK;
+
       this.eraserCanvasCache = document.createElement("canvas");
       this.eraserCanvasCache.theme = theme;
       this.eraserCanvasCache.height = cursorImageSizePx;
       this.eraserCanvasCache.width = cursorImageSizePx;
       const context = this.eraserCanvasCache.getContext("2d")!;
+
       context.lineWidth = 1;
       context.beginPath();
       context.arc(

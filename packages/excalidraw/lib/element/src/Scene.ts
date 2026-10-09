@@ -43,6 +43,7 @@ import type {
 import type { AppState } from "@excalidraw/excalidraw/types";
 
 type SceneStateCallback = () => void;
+
 type SceneStateCallbackRemover = () => void;
 
 type SelectionHash = string & { __brand: "selectionHash" };
@@ -52,6 +53,7 @@ const getNonDeletedElements = <T extends ExcalidrawElement>(
 ) => {
   const elementsMap = new Map() as NonDeletedSceneElementsMap;
   const elements: NonDeleted<T>[] = [];
+
   for (const element of allElements) {
     if (!element.isDeleted) {
       elements.push(element as NonDeleted<T>);
@@ -61,6 +63,7 @@ const getNonDeletedElements = <T extends ExcalidrawElement>(
       );
     }
   }
+
   return { elementsMap, elements };
 };
 
@@ -90,14 +93,16 @@ const hashSelectionOpts = (
   type _ = Assert<
     SameType<
       Required<HashableKeys>,
-      Pick<Required<HashableKeys>, typeof keys[number]>
+      Pick<Required<HashableKeys>, (typeof keys)[number]>
     >
   >;
 
   let hash = "";
+
   for (const key of keys) {
     hash += `${key}:${opts[key] ? "1" : "0"}`;
   }
+
   return hash as SelectionHash;
 };
 
@@ -193,11 +198,13 @@ export class Scene {
     const hash = hashSelectionOpts(opts);
 
     const elements = opts?.elements || this.nonDeletedElements;
+
     if (
       this.selectedElementsCache.elements === elements &&
       this.selectedElementsCache.selectedElementIds === opts.selectedElementIds
     ) {
       const cached = this.selectedElementsCache.cache.get(hash);
+
       if (cached) {
         return cached;
       }
@@ -235,9 +242,11 @@ export class Scene {
     id: ExcalidrawElement["id"],
   ): NonDeleted<ExcalidrawElement> | null {
     const element = this.getElement(id);
+
     if (element && isNonDeletedElement(element)) {
       return element;
     }
+
     return null;
   }
 
@@ -259,14 +268,18 @@ export class Scene {
     let didChange = false;
     const newElements = this.elements.map((element) => {
       const nextElement = iteratee(element);
+
       if (nextElement !== element) {
         didChange = true;
       }
+
       return nextElement;
     });
+
     if (didChange) {
       this.replaceAllElements(newElements);
     }
+
     return didChange;
   }
 
@@ -290,9 +303,11 @@ export class Scene {
       if (isFrameLikeElement(element)) {
         nextFrameLikes.push(element);
       }
+
       this.elementsMap.set(element.id, element);
     });
     const nonDeletedElements = getNonDeletedElements(this.elements);
+
     this.nonDeletedElements = nonDeletedElements.elements;
     this.nonDeletedElementsMap = nonDeletedElements.elementsMap;
 
@@ -321,6 +336,7 @@ export class Scene {
       if (!this.callbacks.has(cb)) {
         throw new Error();
       }
+
       this.callbacks.delete(cb);
     };
   }
@@ -390,9 +406,11 @@ export class Scene {
     if (!element) {
       return null;
     }
+
     if (element.containerId) {
       return this.getElement(element.containerId) || null;
     }
+
     return null;
   };
 
@@ -400,6 +418,7 @@ export class Scene {
     const elementsMap = this.getNonDeletedElementsMap();
     // first check if the id is an element
     const el = elementsMap.get(id);
+
     if (el) {
       return [el];
     }

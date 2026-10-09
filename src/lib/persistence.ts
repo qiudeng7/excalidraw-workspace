@@ -6,6 +6,7 @@ interface Draft<T> {
   value: T;
   updatedAt?: string;
 }
+
 export interface OtherDraft<T> extends Draft<T> {
   key: string;
 }
@@ -16,15 +17,19 @@ const newTabId = () =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
 let tabScope: Promise<string> | undefined;
+
 function getTabScope() {
   return (tabScope ??= (async () => {
     let previous: string | null = null;
+
     try {
       previous = sessionStorage.getItem("excalidraw-draft-tab");
-    } catch {
-      /* A fresh scope still preserves other drafts. */
+    } catch (error) {
+      console.warn("无法读取标签页标识，将使用新的草稿作用域", error);
     }
+
     let id = previous || newTabId();
+
     if (navigator.locks) {
       const claim = (candidate: string) =>
         new Promise<boolean>((resolve, reject) => {
@@ -40,6 +45,7 @@ function getTabScope() {
             )
             .catch(reject);
         });
+
       if (!(await claim(id))) {
         id = newTabId();
         await claim(id);
@@ -48,29 +54,36 @@ function getTabScope() {
       // Never risk sharing a key when this browser cannot detect cloned sessions.
       id = newTabId();
     }
+
     try {
       sessionStorage.setItem("excalidraw-draft-tab", id);
-    } catch {
-      /* Other drafts can be downloaded on next visit. */
+    } catch (error) {
+      console.warn("无法保存标签页标识，下次访问需从其他草稿恢复", error);
     }
+
     return id;
   })());
 }
+
 let database: Promise<IDBDatabase> | undefined;
+
 function db() {
   return (database ??= new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open("excalidraw-account-drafts", 1);
+
     request.onupgradeneeded = () => request.result.createObjectStore("drafts");
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   }));
 }
+
 async function storage<T>(
   key: string,
   operation: "get" | "put" | "delete",
   value?: Draft<T>,
 ): Promise<Draft<T> | undefined> {
   const database = await db();
+
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(
       "drafts",
@@ -83,6 +96,7 @@ async function storage<T>(
         : operation === "put"
           ? store.put(value, key)
           : store.delete(key);
+
     transaction.oncomplete = () =>
       resolve(operation === "get" ? request.result : undefined);
     transaction.onerror = () => reject(transaction.error);
@@ -95,14 +109,18 @@ async function otherDrafts<T>(
   currentKey: string,
 ): Promise<OtherDraft<T>[]> {
   const database = await db();
+
   return new Promise((resolve, reject) => {
     const transaction = database.transaction("drafts", "readonly");
     const result: OtherDraft<T>[] = [];
     const request = transaction.objectStore("drafts").openCursor();
+
     request.onsuccess = () => {
       const cursor = request.result;
+
       if (!cursor) return;
       const key = String(cursor.key);
+
       // Include the earlier, unscoped format for a safe migration.
       if (
         key !== currentKey &&
@@ -111,6 +129,7 @@ async function otherDrafts<T>(
         result.push({ ...cursor.value, key });
       cursor.continue();
     };
+
     transaction.oncomplete = () =>
       resolve(
         result.sort((a, b) =>
@@ -132,6 +151,7 @@ export interface PersistentResourceOptions<T> {
   scopeId?: string;
   ownerId?: string;
 }
+
 /** Scene/library save port; settings keep their distinct conflict-resolution state machine. */
 export interface SaveResource<T> {
   readonly value: T;
@@ -147,6 +167,7 @@ export interface SaveResource<T> {
   discardDraft(): Promise<void>;
   dispose(): void;
 }
+
 export class PersistentResource<T> implements SaveResource<T> {
   value: T;
   revision: number;
@@ -165,7 +186,17 @@ export class PersistentResource<T> implements SaveResource<T> {
   private path: string;
   private field: string;
   private changed: (message?: string) => void;
-  constructor({ key, path, field, value, revision, changed, scopeId, ownerId }: PersistentResourceOptions<T>) {
+
+  constructor({
+    key,
+    path,
+    field,
+    value,
+    revision,
+    changed,
+    scopeId,
+    ownerId,
+  }: PersistentResourceOptions<T>) {
     this.ownerId = ownerId;
     this.prefix = key;
     this.key = (scopeId ? Promise.resolve(scopeId) : getTabScope()).then(
@@ -177,9 +208,11 @@ export class PersistentResource<T> implements SaveResource<T> {
     this.value = value;
     this.revision = revision;
   }
+
   async restore() {
     try {
       const draft = await storage<T>(await this.key, "get");
+
       if (this.disposed) return;
       if (draft) {
         this.value = draft.value;
@@ -192,12 +225,14 @@ export class PersistentResource<T> implements SaveResource<T> {
             : undefined,
         );
       }
-    } catch {
+    } catch (error) {
       if (this.disposed) return;
+      console.warn("无法恢复本地草稿", error);
       this.storageError = true;
       this.changed("浏览器无法暂存草稿，请保持联网，离开前确认保存成功。");
     }
   }
+
   private persist() {
     const draft = this.dirty
       ? {
@@ -210,16 +245,19 @@ export class PersistentResource<T> implements SaveResource<T> {
     const snapshot = draft
       ? (JSON.parse(JSON.stringify(draft)) as Draft<T>)
       : undefined;
+
     this.writes = this.writes
       .then(async () =>
         storage(await this.key, snapshot ? "put" : "delete", snapshot),
       )
-      .catch(() => {
+      .catch((error) => {
+        console.warn("无法暂存本地草稿", error);
         this.storageError = true;
         if (!this.disposed)
           this.changed("浏览器无法暂存草稿，请保持页面打开并重试保存。");
       });
   }
+
   update(value: T) {
     if (this.disposed) return;
     this.value = value;
@@ -229,13 +267,18 @@ export class PersistentResource<T> implements SaveResource<T> {
     this.changed();
     this.schedule();
   }
+
   schedule(delay = 700) {
     clearTimeout(this.timer);
     if (!this.disposed && !this.conflict)
       this.timer = setTimeout(() => {
-        void this.flush().catch(() => {});
+        void this.flush().catch((error) => {
+          // save() already reports failures and decides whether another retry is safe.
+          if (!this.disposed) console.warn("自动保存未完成，草稿仍保留", error);
+        });
       }, delay);
   }
+
   async flush(): Promise<void> {
     if (this.disposed)
       throw new DOMException("Resource disposed", "AbortError");
@@ -245,8 +288,10 @@ export class PersistentResource<T> implements SaveResource<T> {
     if (this.saving) {
       await this.saving;
       if (this.dirty) return this.flush();
+
       return;
     }
+
     if (!this.dirty) return;
     this.saving = this.save();
     try {
@@ -254,13 +299,17 @@ export class PersistentResource<T> implements SaveResource<T> {
     } finally {
       this.saving = undefined;
     }
+
     if (this.dirty) return this.flush();
   }
+
   private async save() {
     const generation = this.generation;
     const value = this.value;
+
     this.changed();
     const controller = new AbortController();
+
     this.activeRequest = controller;
     try {
       if (this.disposed)
@@ -276,6 +325,7 @@ export class PersistentResource<T> implements SaveResource<T> {
         ]),
         body: JSON.stringify({ revision: this.revision, [this.field]: value }),
       });
+
       if (this.disposed)
         throw new DOMException("Resource disposed", "AbortError");
       this.revision = saved.revision;
@@ -308,22 +358,30 @@ export class PersistentResource<T> implements SaveResource<T> {
       if (this.activeRequest === controller) this.activeRequest = undefined;
     }
   }
+
   /** Explicit save also writes an unchanged snapshot, using the usual revision protection. */
   async saveNow() {
     this.update(this.value);
     await this.flush();
   }
+
   async findOtherDrafts() {
     return otherDrafts<T>(this.prefix, await this.key);
   }
+
   async discardDraft() {
     clearTimeout(this.timer);
-    if (this.saving) await this.saving.catch(() => {});
+    if (this.saving)
+      await this.saving.catch((error) => {
+        // Explicit discard waits for the failed write to settle before deleting its draft.
+        console.warn("待处理保存失败，继续执行用户确认的草稿丢弃", error);
+      });
     await this.writes;
     await storage(await this.key, "delete");
     this.dirty = false;
     this.conflict = false;
   }
+
   dispose() {
     this.disposed = true;
     clearTimeout(this.timer);

@@ -39,6 +39,7 @@ const findOption = <T,>(
 ) => {
   for (const section of sections) {
     const option = section.options.find(predicate);
+
     if (option) {
       return option;
     }
@@ -103,11 +104,13 @@ function Picker<T>({
       const nextIndex = event.shiftKey
         ? (allOptions.length + index - 1) % allOptions.length
         : (index + 1) % allOptions.length;
+
       onChange(allOptions[nextIndex].value);
     } else if (isArrowKey(event.key)) {
       // Arrow navigation
       const isRTL = getLanguage().rtl;
       const index = allOptions.findIndex((option) => option.value === value);
+
       if (index !== -1) {
         const length = allOptions.length;
         let nextIndex = index;
@@ -142,10 +145,13 @@ function Picker<T>({
               event.preventDefault();
               event.nativeEvent.stopImmediatePropagation();
               event.stopPropagation();
+
               return;
             }
+
             break;
           }
+
           // Go the previous row
           case KEYS.ARROW_UP: {
             const currentRowIndex = navigationRows.findIndex((row) =>
@@ -170,20 +176,24 @@ function Picker<T>({
               event.preventDefault();
               event.nativeEvent.stopImmediatePropagation();
               event.stopPropagation();
+
               return;
             }
+
             break;
           }
         }
 
         onChange(allOptions[nextIndex].value);
       }
+
       event.preventDefault();
     } else if (event.key === KEYS.ESCAPE || event.key === KEYS.ENTER) {
       // Close on escape or enter
       event.preventDefault();
       onClose();
     }
+
     event.nativeEvent.stopImmediatePropagation();
     event.stopPropagation();
   };

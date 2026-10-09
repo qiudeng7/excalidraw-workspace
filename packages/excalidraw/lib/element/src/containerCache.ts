@@ -14,7 +14,9 @@ export const updateOriginalContainerCache = (
 ) => {
   const data =
     originalContainerCache[id] || (originalContainerCache[id] = { height });
+
   data.height = height;
+
   return data;
 };
 

@@ -221,6 +221,7 @@ export class AppArrowText {
         pointerCoords.x,
         pointerCoords.y,
       );
+
       if (updatedEditor) {
         pointerDownState.drag.hasOccurred = true;
         this.app.setState({

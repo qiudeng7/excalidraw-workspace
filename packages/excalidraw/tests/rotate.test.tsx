@@ -56,6 +56,7 @@ test("unselected bound arrows update when rotating their target elements", async
   const text = UI.createElement("text", {
     position: 220,
   });
+
   await UI.editText(text, "test");
   const textArrow = UI.createElement("arrow", {
     x: 360,

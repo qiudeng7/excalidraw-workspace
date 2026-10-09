@@ -108,6 +108,7 @@ describe("flow chart creation", () => {
     const firstChildNode = h.elements.filter(
       (el) => el.type === "rectangle" && el.id !== initialNode.id,
     )[0];
+
     expect(firstChildNode).not.toBe(null);
     expect(firstChildNode.id).toBe(Object.keys(h.state.selectedElementIds)[0]);
 
@@ -128,6 +129,7 @@ describe("flow chart creation", () => {
         el.id !== initialNode.id &&
         el.id !== firstChildNode.id,
     )[0];
+
     expect(secondChildNode).not.toBe(null);
     expect(secondChildNode.id).toBe(Object.keys(h.state.selectedElementIds)[0]);
 
@@ -165,6 +167,7 @@ describe("flow chart creation", () => {
       width: 400,
       height: 300,
     });
+
     API.setElements([parent]);
     API.setSelectedElements([parent]);
 
@@ -179,14 +182,17 @@ describe("flow chart creation", () => {
     const children = h.elements.filter(
       (el) => el.type === "rectangle" && el.id !== parent.id,
     );
+
     expect(children.length).toBe(4);
 
     // all siblings should sit on the same row (no vertical misalignment)
     const ys = new Set(children.map((c) => c.y));
+
     expect(ys.size).toBe(1);
 
     // no two siblings should overlap horizontally
     const sorted = [...children].sort((a, b) => a.x - b.x);
+
     for (let i = 1; i < sorted.length; i++) {
       expect(sorted[i].x).toBeGreaterThanOrEqual(
         sorted[i - 1].x + sorted[i - 1].width,
@@ -203,6 +209,7 @@ describe("flow chart creation", () => {
       width: 400,
       height: 300,
     });
+
     API.setElements([parent]);
 
     // hold the modifier and press down N times to create a batch at once
@@ -222,9 +229,10 @@ describe("flow chart creation", () => {
     const children = h.elements.filter(
       (el) => el.type === "rectangle" && el.id !== parent.id,
     );
+
     expect(children.length).toBe(5);
 
-    const overlaps = (a: typeof children[0], b: typeof children[0]) =>
+    const overlaps = (a: (typeof children)[0], b: (typeof children)[0]) =>
       a.x < b.x + b.width &&
       a.x + a.width > b.x &&
       a.y < b.y + b.height &&
@@ -247,6 +255,7 @@ describe("flow chart creation", () => {
       width: 200,
       height: 100,
     });
+
     API.setElements([parent]);
 
     // two right-children stack into a column to the right of the parent
@@ -260,6 +269,7 @@ describe("flow chart creation", () => {
     const rightChildren = h.elements
       .filter((el) => el.type === "rectangle" && el.id !== parent.id)
       .sort((a, b) => a.y - b.y);
+
     expect(rightChildren.length).toBe(2);
     const [upper, lower] = rightChildren;
 
@@ -278,6 +288,7 @@ describe("flow chart creation", () => {
         el.id !== upper.id &&
         el.id !== lower.id,
     )[0];
+
     expect(newChild).toBeTruthy();
 
     const overlaps = (a: typeof newChild, b: typeof lower) =>
@@ -322,11 +333,13 @@ describe("flow chart band-search placement", () => {
         width: 200,
         height: 100,
       });
+
       API.setElements([parent]);
 
       addChild(parent, key);
 
       const [child] = children(parent);
+
       expect(child).toBeTruthy();
       expect(child.x).toBe(x);
       expect(child.y).toBe(y);
@@ -340,12 +353,14 @@ describe("flow chart band-search placement", () => {
       width: 200,
       height: 100,
     });
+
     API.setElements([parent]);
 
     addChild(parent, KEYS.ARROW_DOWN);
     addChild(parent, KEYS.ARROW_DOWN);
 
     const [c1, c2] = children(parent).sort((a, b) => a.x - b.x);
+
     expect([c1.x, c2.x]).toEqual([0, 300]);
 
     // widen the gap between the siblings so a third child fits in between
@@ -356,6 +371,7 @@ describe("flow chart band-search placement", () => {
     const c3 = children(parent).find(
       (el) => el.id !== c1.id && el.id !== c2.id,
     )!;
+
     expect({ x: c3.x, y: c3.y }).toEqual({ x: 300, y: 200 });
 
     // the obstacles were not moved
@@ -370,6 +386,7 @@ describe("flow chart band-search placement", () => {
       width: 200,
       height: 100,
     });
+
     API.setElements([parent]);
     API.setSelectedElements([parent]);
 
@@ -400,15 +417,18 @@ describe("flow chart band-search placement", () => {
       width: 200,
       height: 100,
     });
+
     API.setElements([parent]);
 
     // box in the space right of the parent, leaving room for a single node
     addChild(parent, KEYS.ARROW_RIGHT);
     const [c1] = children(parent);
+
     API.updateElement(c1, { y: -300 });
 
     addChild(parent, KEYS.ARROW_RIGHT);
     const c2 = children(parent).find((el) => el.id !== c1.id)!;
+
     expect({ x: c2.x, y: c2.y }).toEqual({ x: 300, y: 0 });
     API.updateElement(c2, { y: 300 });
 
@@ -483,6 +503,7 @@ describe("flow chart navigation", () => {
 
     // all the way to the right, gets us to the last node
     const rightMostNode = h.elements[h.elements.length - 2];
+
     expect(rightMostNode);
     expect(rightMostNode.type).toBe("rectangle");
     Keyboard.withModifierKeys({ alt: true }, () => {
@@ -634,6 +655,7 @@ describe("flow chart navigation", () => {
 
     // last node should be the one that's selected
     const rightMostNode = h.elements[h.elements.length - 2];
+
     expect(rightMostNode.type).toBe("rectangle");
     expect(h.state.selectedElementIds[rightMostNode.id]).toBe(true);
 
@@ -650,6 +672,7 @@ describe("flow chart navigation", () => {
 
     // going any direction takes us to the predecessor as well
     const predecessorToRightMostNode = h.elements[h.elements.length - 4];
+
     expect(predecessorToRightMostNode.type).toBe("rectangle");
 
     API.setSelectedElements([rightMostNode] as NonDeletedExcalidrawElement[]);

@@ -171,12 +171,15 @@ export const TOGGLE_TOOLS: readonly (ToolType | "custom")[] = (
 
 export const getToolLetter = (type: ToolbarToolType) => {
   const { letterKey, shiftKey } = TOOLS[type];
+
   if (!letterKey) {
     return letterKey;
   }
+
   const letter = capitalizeString(
     typeof letterKey === "string" ? letterKey : letterKey[0],
   );
+
   return shiftKey ? getShortcutKey(`Shift+${letter}`) : letter;
 };
 
@@ -184,6 +187,7 @@ export const getToolLetter = (type: ToolbarToolType) => {
 export const getToolShortcut = (type: ToolbarToolType) => {
   const letter = getToolLetter(type);
   const { numericKey } = TOOLS[type];
+
   return letter && numericKey != null
     ? `${letter} ${t("helpDialog.or")} ${numericKey}`
     : `${letter || numericKey}`;
@@ -201,10 +205,12 @@ export const findShapeByKey = (
 
   for (const type of Object.keys(TOOLS) as ToolbarToolType[]) {
     const { letterKey, numericKey, shiftKey: requiresShift } = TOOLS[type];
+
     // shift-bound tools require shift; plain-bound ones require its absence
     if (shiftKey !== Boolean(requiresShift)) {
       continue;
     }
+
     if (
       (numericKey != null && key === numericKey) ||
       (letterKey &&
@@ -219,6 +225,7 @@ export const findShapeByKey = (
         : type;
     }
   }
+
   return null;
 };
 
@@ -308,6 +315,7 @@ const createToolButton = (
 
           if (behavior?.onSelect) {
             behavior.onSelect(app, { pointerType });
+
             return;
           }
 
@@ -326,16 +334,27 @@ const createToolButton = (
 };
 
 export const HandToolButton = createToolButton("hand");
+
 export const RectangleToolButton = createToolButton("rectangle");
+
 export const DiamondToolButton = createToolButton("diamond");
+
 export const EllipseToolButton = createToolButton("ellipse");
+
 export const ArrowToolButton = createToolButton("arrow");
+
 export const LineToolButton = createToolButton("line");
+
 export const FreedrawToolButton = createToolButton("freedraw");
+
 export const TextToolButton = createToolButton("text");
+
 export const StickyNoteToolButton = createToolButton("stickynote");
+
 export const ImageToolButton = createToolButton("image");
+
 export const EraserToolButton = createToolButton("eraser");
+
 export const FrameToolButton = createToolButton("frame");
 
 /**
@@ -348,6 +367,7 @@ export const SelectionToolButton = createToolButton("selection", {
       // pointer-clicking the active selection tool switches to lasso;
       // keyboard/AT activation stays on selection
       app.setActiveTool({ type: "lasso" });
+
       return;
     }
 
@@ -446,7 +466,7 @@ export const FreedrawToolPopover = ({
   ] as const;
 
   const [lastDrawingTool, setLastDrawingTool] = useState<
-    typeof DRAWING_TOOLS[number]["type"]
+    (typeof DRAWING_TOOLS)[number]["type"]
   >(activeTool.type === "autoshape" ? "autoshape" : "freedraw");
 
   useEffect(() => {

@@ -197,6 +197,7 @@ describe("deleting selected elements when frame selected should keep children + 
       type: "rectangle",
       frameId: f1.id,
     });
+
     API.setElements([f1, r1]);
 
     API.setSelectedElements([f1, r1]);

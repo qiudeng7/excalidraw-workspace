@@ -54,6 +54,7 @@ describe("ElementsDelta", () => {
         newElementWith(container, { boundElements: [] }),
         newElementWith(label, { isDeleted: true }),
       ]) as SceneElementsMap;
+
       return { container, label, before, after };
     };
 
@@ -62,11 +63,13 @@ describe("ElementsDelta", () => {
       (type) => {
         const { before, after, container, label } = boundText(type);
         const [deleted, deletionIsVisible] = apply(before, after);
+
         expect(deletionIsVisible).toBe(false);
         expect(deleted.get(label.id)?.isDeleted).toBe(true);
         expect(deleted.get(container.id)?.boundElements).toEqual([]);
 
         const [restored, restorationIsVisible] = apply(after, before);
+
         expect(restorationIsVisible).toBe(false);
         expect(restored.get(label.id)?.isDeleted).toBe(false);
         expect(restored.get(container.id)?.boundElements).toEqual([
@@ -77,6 +80,7 @@ describe("ElementsDelta", () => {
 
     it("keeps deletion and restoration of nonempty labels visible", () => {
       const { before, after } = boundText("stickynote", "hello");
+
       expect(apply(before, after)[1]).toBe(true);
       expect(apply(after, before)[1]).toBe(true);
     });
@@ -130,6 +134,7 @@ describe("ElementsDelta", () => {
 
     it("keeps an arrow's empty-label gap visible", () => {
       const { before, after } = boundText("arrow");
+
       expect(apply(before, after)[1]).toBe(true);
       expect(apply(after, before)[1]).toBe(true);
     });
@@ -153,6 +158,7 @@ describe("ElementsDelta", () => {
       ]) as SceneElementsMap;
 
       const [elements, isVisible] = apply(before, after);
+
       expect(elements.get(container.id)?.height).toBeGreaterThan(10);
       expect(isVisible).toBe(true);
     });
@@ -170,6 +176,7 @@ describe("ElementsDelta", () => {
       ]) as SceneElementsMap;
 
       const [elements, isVisible] = apply(before, after);
+
       expect(elements.get(container.id)?.height).toBe(container.height);
       expect(elements.get(label.id)?.x).not.toBe(-100);
       expect(isVisible).toBe(true);
@@ -202,6 +209,7 @@ describe("ElementsDelta", () => {
       ]) as SceneElementsMap;
 
       const [elements, isVisible] = apply(before, after);
+
       expect(elements.get(container.id)?.width).toBe(container.width);
       expect(elements.get(arrow.id)?.x).not.toBe(200);
       expect(isVisible).toBe(true);
@@ -233,11 +241,13 @@ describe("ElementsDelta", () => {
             mutateElement(elements.get(unrelated.id)!, elements, {
               x: unrelated.x + 1,
             });
+
             return elements;
           });
         const consoleError = vi
           .spyOn(console, "error")
           .mockImplementation(() => {});
+
         vi.stubEnv("MODE", mode);
 
         try {
@@ -283,6 +293,7 @@ describe("ElementsDelta", () => {
         newElementWith(label, { isDeleted: true, boundElements: [] }),
         newElementWith(arrow, { startBinding: null }),
       ]) as SceneElementsMap;
+
       expect(apply(before, after)[1]).toBe(true);
     });
   });

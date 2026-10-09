@@ -168,6 +168,7 @@ const _newElementBase = <T extends ExcalidrawElement>(
     locked,
     customData: rest.customData,
   };
+
   return element;
 };
 
@@ -309,8 +310,8 @@ export const getTextAnchorRatios = (opts: {
     opts.verticalAlign === VERTICAL_ALIGN.MIDDLE
       ? 0.5
       : opts.verticalAlign === VERTICAL_ALIGN.BOTTOM
-      ? 1
-      : 0,
+        ? 1
+        : 0,
 });
 
 /** computes element x/y offset based on textAlign/verticalAlign */
@@ -418,6 +419,7 @@ const getAdjustedDimensions = (
   const { textAlign, verticalAlign } = element;
   let x: number;
   let y: number;
+
   if (
     textAlign === "center" &&
     verticalAlign === VERTICAL_ALIGN.MIDDLE &&
@@ -500,6 +502,7 @@ const adjustXYWithRotation = (
 ): [number, number] => {
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
+
   if (sides.e && sides.w) {
     x += deltaX1 + deltaX2;
   } else if (sides.e) {
@@ -527,6 +530,7 @@ const adjustXYWithRotation = (
     x += deltaY2 * sin;
     y += deltaY2 * (1 - cos);
   }
+
   return [x, y];
 };
 
@@ -546,6 +550,7 @@ export const refreshTextDimensions = (
   if (textElement.isDeleted) {
     return;
   }
+
   if (
     maxWidth !== undefined &&
     !container &&
@@ -553,8 +558,10 @@ export const refreshTextDimensions = (
     textElement.width <= maxWidth
   ) {
     const font = getFontString(textElement);
+
     if (measureText(text, font, textElement.lineHeight).width > maxWidth) {
       const wrappedText = wrapText(text, font, maxWidth);
+
       return {
         text: wrappedText,
         autoResize: false,
@@ -567,6 +574,7 @@ export const refreshTextDimensions = (
       };
     }
   }
+
   if (container || !textElement.autoResize) {
     text = wrapText(
       text,
@@ -576,7 +584,9 @@ export const refreshTextDimensions = (
         : textElement.width,
     );
   }
+
   const dimensions = getAdjustedDimensions(textElement, elementsMap, text);
+
   return { text, ...dimensions };
 };
 

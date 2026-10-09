@@ -204,6 +204,7 @@ describe("duplicating multiple elements", () => {
     );
     origElements.forEach((origElement, idx) => {
       const clonedElement = duplicatedElements[idx];
+
       expect(origElement).toEqual(
         expect.objectContaining({
           id: expect.not.stringMatching(clonedElement.id),
@@ -215,6 +216,7 @@ describe("duplicating multiple elements", () => {
           (clonedElement as any).containerId,
         );
       }
+
       if ("endBinding" in origElement) {
         if (origElement.endBinding) {
           expect(origElement.endBinding.elementId).not.toBe(
@@ -224,6 +226,7 @@ describe("duplicating multiple elements", () => {
           expect((clonedElement as any).endBinding).toBeNull();
         }
       }
+
       if ("startBinding" in origElement) {
         if (origElement.startBinding) {
           expect(origElement.startBinding.elementId).not.toBe(
@@ -267,6 +270,7 @@ describe("duplicating multiple elements", () => {
       if (arrow.endBinding) {
         expect(arrow.endBinding.elementId).toBe(clonedRectangle.id);
       }
+
       if (arrow.startBinding) {
         expect(arrow.startBinding.elementId).toBe(clonedRectangle.id);
       }
@@ -739,6 +743,7 @@ describe("duplication z-order", () => {
 
   it("alt-duplicating text container (in-order)", async () => {
     const [rectangle, text] = API.createTextContainer();
+
     API.setElements([rectangle, text]);
     API.setSelectedElements([rectangle]);
 
@@ -760,6 +765,7 @@ describe("duplication z-order", () => {
 
   it("alt-duplicating text container (out-of-order)", async () => {
     const [rectangle, text] = API.createTextContainer();
+
     API.setElements([text, rectangle]);
     API.setSelectedElements([rectangle]);
 

@@ -1,7 +1,6 @@
 export namespace OpenAIInput {
   type ChatCompletionContentPart =
-    | ChatCompletionContentPartText
-    | ChatCompletionContentPartImage;
+    ChatCompletionContentPartText | ChatCompletionContentPartImage;
 
   interface ChatCompletionContentPartImage {
     image_url: ChatCompletionContentPartImage.ImageURL;
@@ -229,6 +228,7 @@ export namespace OpenAIOutput {
      */
     usage?: CompletionUsage;
   }
+
   export interface Choice {
     /**
      * The reason the model stopped generating tokens. This will be `stop` if the model
@@ -239,11 +239,7 @@ export namespace OpenAIOutput {
      * function.
      */
     finish_reason:
-      | "stop"
-      | "length"
-      | "tool_calls"
-      | "content_filter"
-      | "function_call";
+      "stop" | "length" | "tool_calls" | "content_filter" | "function_call";
 
     /**
      * The index of the choice in the list of choices.

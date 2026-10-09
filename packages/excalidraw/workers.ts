@@ -72,6 +72,7 @@ export class WorkerPool<T, R> {
     let worker: IdleWorker;
 
     const idleWorker = Array.from(this.idleWorkers).shift();
+
     if (idleWorker) {
       this.idleWorkers.delete(idleWorker);
       worker = idleWorker;

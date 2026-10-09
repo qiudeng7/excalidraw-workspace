@@ -55,6 +55,7 @@ export const ExcalidrawAPIProvider = ({
   children: React.ReactNode;
 }) => {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+
   return (
     <ExcalidrawAPIContext.Provider value={api}>
       <ExcalidrawAPISetContext.Provider value={setApi}>
@@ -156,6 +157,7 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
   const setExcalidrawAPI = useContext(ExcalidrawAPISetContext);
 
   const onExcalidrawAPIRef = useRef(onExcalidrawAPI);
+
   onExcalidrawAPIRef.current = onExcalidrawAPI;
 
   const handleExcalidrawAPI = useCallback(
@@ -365,10 +367,12 @@ const areEqual = (prevProps: ExcalidrawProps, nextProps: ExcalidrawProps) => {
     if (key === "getFormFactor") {
       return true;
     }
+
     if (key === "canvasActions") {
       const canvasOptionKeys = Object.keys(
         prevUIOptions.canvasActions!,
       ) as (keyof Partial<typeof DEFAULT_UI_OPTIONS.canvasActions>)[];
+
       return canvasOptionKeys.every((key) => {
         if (
           key === "export" &&
@@ -380,12 +384,14 @@ const areEqual = (prevProps: ExcalidrawProps, nextProps: ExcalidrawProps) => {
             nextUIOptions.canvasActions.export.saveFileToDisk
           );
         }
+
         return (
           prevUIOptions?.canvasActions?.[key] ===
           nextUIOptions?.canvasActions?.[key]
         );
       });
     }
+
     return prevUIOptions[key] === nextUIOptions[key];
   });
 
@@ -413,9 +419,11 @@ export {
 } from "@excalidraw/element";
 
 export { getTextFromElements } from "@excalidraw/element";
+
 export { isInvisiblySmallElement } from "@excalidraw/element";
 
 export { defaultLang, useI18n, languages } from "./i18n";
+
 export {
   restoreAppState,
   restoreElement,
@@ -433,12 +441,15 @@ export {
 } from "@excalidraw/utils/export";
 
 export { serializeAsJSON, serializeLibraryAsJSON } from "./data/json";
+
 export {
   loadFromBlob,
   loadSceneOrLibraryFromBlob,
   loadLibraryFromBlob,
 } from "./data/blob";
+
 export { mergeLibraryItems, getLibraryItemsHash } from "./data/library";
+
 export { isLinearElement } from "@excalidraw/element";
 
 export {
@@ -466,10 +477,15 @@ export { CaptureUpdateAction } from "@excalidraw/element";
 export { parseLibraryTokensFromUrl, useHandleLibrary } from "./data/library";
 
 export { Sidebar } from "./components/Sidebar/Sidebar";
+
 export { Button } from "./components/Button";
+
 export { Footer };
+
 export { MainMenu };
+
 export { Ellipsify } from "./components/Ellipsify";
+
 export {
   useEditorInterface,
   useStylesPanelMode,
@@ -478,17 +494,24 @@ export {
 } from "./components/App";
 
 export { WelcomeScreen };
+
 export { LiveCollaborationTrigger };
+
 export { Stats } from "./components/Stats";
 
 export { DefaultSidebar } from "./components/DefaultSidebar";
+
 export { TTDDialog } from "./components/TTDDialog/TTDDialog";
+
 export { TTDDialogTrigger } from "./components/TTDDialog/TTDDialogTrigger";
+
 export {
   TTDStreamFetch,
   parseSSEStream,
 } from "./components/TTDDialog/utils/TTDStreamFetch";
+
 export type { StreamChunk } from "./components/TTDDialog/utils/TTDStreamFetch";
+
 export type {
   TTDPersistenceAdapter,
   SavedChat,
@@ -512,7 +535,9 @@ export {
 export { elementsOverlappingBBox } from "@excalidraw/element";
 
 export { DiagramToCodePlugin } from "./components/DiagramToCodePlugin/DiagramToCodePlugin";
+
 export { getDataURL } from "./data/blob";
+
 export { isElementLink } from "@excalidraw/element";
 
 export { Fonts } from "./fonts/Fonts";
@@ -541,17 +566,18 @@ export {
 export function useExcalidrawStateValue<K extends keyof AppState>(
   prop: K,
 ): AppState[K] | undefined;
+
 export function useExcalidrawStateValue<T extends keyof AppState>(
   props: T[],
 ): AppState | undefined;
+
 export function useExcalidrawStateValue<T>(
   selector: (appState: AppState) => T,
 ): T | undefined;
+
 export function useExcalidrawStateValue(
   selector:
-    | keyof AppState
-    | (keyof AppState)[]
-    | ((appState: AppState) => unknown),
+    keyof AppState | (keyof AppState)[] | ((appState: AppState) => unknown),
 ) {
   return _useAppStateValue(selector as any, false);
 }

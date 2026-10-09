@@ -12,12 +12,14 @@ export const useScrollPosition = <T extends HTMLElement>(
 
   useEffect(() => {
     const { current: element } = elementRef;
+
     if (!element) {
       return;
     }
 
     const handleScroll = throttle(() => {
       const { scrollTop } = element;
+
       setScrollPosition(scrollTop);
     }, 200);
 

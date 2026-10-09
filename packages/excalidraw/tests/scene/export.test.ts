@@ -127,6 +127,7 @@ describe("exportToSvg", () => {
     );
 
     const textElements = svgElement.querySelectorAll("text");
+
     expect(textElements.length).toBeGreaterThan(0);
 
     textElements.forEach((textEl) => {
@@ -187,6 +188,7 @@ describe("exportToSvg", () => {
       },
       null,
     );
+
     expect(svgElement.innerHTML).toMatchSnapshot();
   });
 
@@ -196,6 +198,7 @@ describe("exportToSvg", () => {
       DEFAULT_OPTIONS,
       null,
     );
+
     expect(svgElement.innerHTML).toMatchSnapshot();
   });
 
@@ -228,6 +231,7 @@ describe("exportToSvg", () => {
     );
 
     const mask = svgElement.querySelector("mask");
+
     expect(mask).not.toBeNull();
     expect(mask?.getAttribute("maskUnits")).toBe("userSpaceOnUse");
     // a degenerate (objectBoundingBox) region would be zero-area here
@@ -269,6 +273,7 @@ describe("exportToSvg", () => {
     const [visible, hole] = Array.from(
       svgElement.querySelectorAll("mask rect"),
     );
+
     expect(hole).toBeDefined();
     const offsetX = Number(visible.getAttribute("width")) - 100 - arrow.width;
     const offsetY = Number(visible.getAttribute("height")) - 100 - arrow.height;
@@ -278,6 +283,7 @@ describe("exportToSvg", () => {
     // coordinates
     const labelLeft = arrow.x + arrow.width / 2 - label.width / 2;
     const labelTop = arrow.y - label.height / 2;
+
     expect(Number(hole.getAttribute("x"))).toBe(
       offsetX + labelLeft - arrow.x - BOUND_TEXT_PADDING,
     );
@@ -348,6 +354,7 @@ describe("exportToCanvas", () => {
 
     const holeWidth = label.width + BOUND_TEXT_PADDING * 2;
     const holeHeight = label.height + BOUND_TEXT_PADDING * 2;
+
     expect(
       events.filter(
         (event: any) =>
@@ -364,10 +371,12 @@ describe("exporting frames", () => {
     const height =
       FRAME_STYLE.nameFontSize * FRAME_STYLE.nameLineHeight +
       FRAME_STYLE.nameOffsetY;
+
     // canvas truncates dimensions to integers
     if (exportType === "canvas") {
       return Math.trunc(height);
     }
+
     return height;
   };
 

@@ -166,6 +166,7 @@ const restoreLinearElementPoints = (
         if (isValidPoint(point)) {
           acc.push(pointFrom<LocalPoint>(point[0], point[1]));
         }
+
         return acc;
       }, [])
     : [];
@@ -206,6 +207,7 @@ const restoreFreedrawPoints = (
       restoredPoints.push(pointFrom<LocalPoint>(point[0], point[1]));
       if (index in pressureValues) {
         const pressure = pressureValues[index];
+
         restoredPressures.push(isFiniteNumber(pressure) ? pressure : 0.5);
       }
     }
@@ -266,7 +268,8 @@ const restoreStrokeVariability = (
 
 const getStrokeWidthKey = (strokeWidth: unknown): StrokeWidthKey | null => {
   return isFiniteNumber(strokeWidth)
-    ? STROKE_WIDTH_KEYS.find((key) => STROKE_WIDTH[key] === strokeWidth) ?? null
+    ? (STROKE_WIDTH_KEYS.find((key) => STROKE_WIDTH[key] === strokeWidth) ??
+        null)
     : null;
 };
 
@@ -292,6 +295,7 @@ const getFontFamilyByName = (fontFamilyName: string): FontFamilyValues => {
       fontFamilyName as keyof typeof FONT_FAMILY
     ] as FontFamilyValues;
   }
+
   return DEFAULT_FONT_FAMILY;
 };
 
@@ -341,6 +345,7 @@ const repairBinding = <T extends ExcalidrawArrowElement>(
           fixedPoint: normalizeFixedPoint(binding.fixedPoint),
         } as FixedPointBinding | null;
       }
+
       return null;
     }
 
@@ -348,13 +353,11 @@ const repairBinding = <T extends ExcalidrawArrowElement>(
     // ---------------------------------------------------------------------------
 
     const targetBoundElement = targetElementsMap.get(binding.elementId) as
-      | ExcalidrawBindableElement
-      | undefined;
+      ExcalidrawBindableElement | undefined;
     const boundElement =
       targetBoundElement ||
       (existingElementsMap?.get(binding.elementId) as
-        | ExcalidrawBindableElement
-        | undefined);
+        ExcalidrawBindableElement | undefined);
     const elementsMap = targetBoundElement
       ? targetElementsMap
       : existingElementsMap;
@@ -475,17 +478,17 @@ const restoreElementWithProperties = <
     roundness: element.roundness
       ? element.roundness
       : element.strokeSharpness === "round"
-      ? {
-          // for old elements that would now use adaptive radius algo,
-          // use legacy algo instead
-          type: isUsingAdaptiveRadius(element.type)
-            ? ROUNDNESS.LEGACY
-            : ROUNDNESS.PROPORTIONAL_RADIUS,
-        }
-      : null,
+        ? {
+            // for old elements that would now use adaptive radius algo,
+            // use legacy algo instead
+            type: isUsingAdaptiveRadius(element.type)
+              ? ROUNDNESS.LEGACY
+              : ROUNDNESS.PROPORTIONAL_RADIUS,
+          }
+        : null,
     boundElements: element.boundElementIds
       ? element.boundElementIds.map((id) => ({ type: "arrow", id }))
-      : element.boundElements ?? [],
+      : (element.boundElements ?? []),
     updated: element.updated ?? getUpdatedTimestamp(),
     created: element.created ?? null,
     link: element.link ? normalizeLink(element.link) : null,
@@ -535,16 +538,20 @@ export const restoreElement = (
 
       let fontSize = element.fontSize;
       let fontFamily = element.fontFamily;
+
       if ("font" in element) {
         const [fontPx, _fontFamily]: [string, string] = (
           element as any
         ).font.split(" ");
+
         fontSize = parseFloat(fontPx);
         fontFamily = getFontFamilyByName(_fontFamily);
       }
+
       if (!isFiniteNumber(fontSize)) {
         fontSize = DEFAULT_FONT_SIZE;
       }
+
       const text = (typeof element.text === "string" && element.text) || "";
 
       // line-height might not be specified either when creating elements
@@ -560,6 +567,7 @@ export const restoreElement = (
           : // no element height likely means programmatic use, so default
             // to a fixed line height
             getLineHeight(element.fontFamily));
+
       element = restoreElementWithProperties(element, {
         fontSize,
         fontFamily,
@@ -602,6 +610,7 @@ export const restoreElement = (
         pressures,
       });
     }
+
     case "image":
       return restoreElementWithProperties(element, {
         status: element.status || "pending",
@@ -645,7 +654,7 @@ export const restoreElement = (
         ...(isLineElement(element)
           ? {
               polygon: isValidPolygon(points)
-                ? element.polygon ?? false
+                ? (element.polygon ?? false)
                 : false,
             }
           : {}),
@@ -748,6 +757,7 @@ export const restoreElement = (
     // We also don't want to throw, but instead return void so we filter
     // out these unsupported elements from the restored array.
   }
+
   return null;
 };
 
@@ -768,12 +778,14 @@ const repairContainerElement = (
 
     // dedupe bindings & fix boundElement.containerId if not set already
     const boundIds = new Set<ExcalidrawElement["id"]>();
+
     container.boundElements = boundElements.reduce(
       (
         acc: Mutable<NonNullable<ExcalidrawElement["boundElements"]>>,
         binding,
       ) => {
         const boundElement = elementsMap.get(binding.id);
+
         if (boundElement && !boundIds.has(binding.id)) {
           boundIds.add(binding.id);
 
@@ -793,6 +805,7 @@ const repairContainerElement = (
               container.id;
           }
         }
+
         return acc;
       },
       [],
@@ -815,11 +828,12 @@ const repairBoundElement = (
     : null;
 
   (boundElement as Mutable<typeof boundElement>).angle = (
-    isArrowElement(container) ? 0 : container?.angle ?? 0
+    isArrowElement(container) ? 0 : (container?.angle ?? 0)
   ) as Radians;
 
   if (!container) {
     boundElement.containerId = null;
+
     return;
   }
 
@@ -835,6 +849,7 @@ const repairBoundElement = (
     const boundElements = (
       container.boundElements || (container.boundElements = [])
     ).slice();
+
     boundElements.push({ type: "text", id: boundElement.id });
     container.boundElements = boundElements;
   }
@@ -904,6 +919,7 @@ const restoreStickyNotes = (
     if (!isTextElement(element) || element.isDeleted) {
       continue;
     }
+
     if (isStickyNoteBoundText(element, elementsMap)) {
       const container = elementsMap.get(element.containerId!);
       // one ink per note: a transparent label takes the note's color;
@@ -914,6 +930,7 @@ const restoreStickyNotes = (
           ? container?.strokeColor
           : element.strokeColor,
       );
+
       Object.assign(element, {
         baseFontSize: normalizeStickyNoteFontSize(
           element.baseFontSize ?? element.fontSize,
@@ -933,8 +950,10 @@ const restoreStickyNotes = (
       if (!isStickyNoteElement(element) || element.isDeleted) {
         continue;
       }
+
       const textElement = getBoundTextElement(element, elementsMap);
       const layout = getStickyNoteLayout(element, textElement);
+
       Object.assign(element, layout.container);
       if (textElement && layout.text) {
         Object.assign(textElement, layout.text);
@@ -969,7 +988,9 @@ export const restoreElements = <T extends ExcalidrawElement>(
       if (element.type === "selection") {
         return elements;
       }
+
       let migratedElement: ExcalidrawElement | null;
+
       try {
         migratedElement = restoreElement(
           element,
@@ -983,6 +1004,7 @@ export const restoreElements = <T extends ExcalidrawElement>(
         console.error("Error restoring element:", error);
         migratedElement = null;
       }
+
       if (migratedElement) {
         const localElement = existingElementsMap?.get(element.id);
 
@@ -1000,6 +1022,7 @@ export const restoreElements = <T extends ExcalidrawElement>(
         if (existingIds.has(migratedElement.id)) {
           migratedElement = { ...migratedElement, id: randomId() };
         }
+
         existingIds.add(migratedElement.id);
 
         elements.push(migratedElement);
@@ -1018,6 +1041,7 @@ export const restoreElements = <T extends ExcalidrawElement>(
 
   // repair binding. Mutates elements.
   const restoredElementsMap = arrayToMap(restoredElements);
+
   for (const element of restoredElements) {
     if (element.frameId) {
       repairFrameMembership(element, restoredElementsMap);
@@ -1053,6 +1077,7 @@ export const restoreElements = <T extends ExcalidrawElement>(
       ) {
         (element as Mutable<ExcalidrawLinearElement>).startBinding = null;
       }
+
       if (
         element.endBinding &&
         (!restoredElementsMap.has(element.endBinding.elementId) ||
@@ -1107,11 +1132,13 @@ export const restoreElements = <T extends ExcalidrawElement>(
       const boundElement = restoredElementsMap.get(
         element.startBinding.elementId,
       );
+
       if (!boundElement) {
         console.error(
           "Bound element not found",
           element.startBinding.elementId,
         );
+
         return element;
       }
 
@@ -1168,6 +1195,7 @@ export const bumpElementVersions = <T extends ExcalidrawElement>(
     ) {
       return bumpVersion(element, localElement.version);
     }
+
     return element;
   });
 };
@@ -1180,6 +1208,7 @@ const coalesceAppStateValue = <
   defaultAppState: ReturnType<typeof getDefaultAppState>,
 ) => {
   const value = appState[key];
+
   // NOTE the value! assertion is needed in TS 4.5.5 (fixed in newer versions)
   return value !== undefined ? value! : defaultAppState[key];
 };
@@ -1207,25 +1236,31 @@ const restoreColorTopPicksList = (value: unknown): readonly string[] | null => {
   if (!Array.isArray(value)) {
     return null;
   }
+
   // keyed by normalized color value so notation variants (`#fff` vs
   // `#ffffff` vs `white`) dedupe, while the value keeps the original
   // notation — normalizing the output would break e.g. `transparent`
   // (→ `#00000000`), which the picker matches by literal value
   const colors = new Map<string, string>();
+
   for (const color of value) {
     if (typeof color !== "string") {
       continue;
     }
+
     const normalized = colorToHex(color) ?? color.toLowerCase();
+
     if (!colors.has(normalized)) {
       colors.set(normalized, color);
     }
+
     // the strip layout fits exactly this many slots — longer lists (hostile
     // or hand-edited storage) would overflow the properties island
     if (colors.size >= COLOR_TOP_PICKS_SLOTS) {
       break;
     }
   }
+
   return colors.size ? [...colors.values()] : null;
 };
 
@@ -1235,19 +1270,24 @@ const restoreFontTopPicks = (
   if (!Array.isArray(value)) {
     return null;
   }
+
   const fontFamilies = new Set<FontFamilyValues>();
+
   for (const fontFamily of value) {
     const metadata =
       typeof fontFamily === "number" ? FONT_METADATA[fontFamily] : undefined;
+
     // only families the font picker lists (no internal or fallback fonts)
     if (!metadata || metadata.private || metadata.fallback) {
       continue;
     }
+
     fontFamilies.add(fontFamily as FontFamilyValues);
     if (fontFamilies.size >= FONT_TOP_PICKS_SLOTS) {
       break;
     }
   }
+
   return fontFamilies.size ? [...fontFamilies] : null;
 };
 
@@ -1270,6 +1310,7 @@ export const restoreAppState = (
         appState,
         defaultAppState,
       );
+
       (nextAppState as any)[nextKey] = nextValue;
     }
   }
@@ -1283,16 +1324,18 @@ export const restoreAppState = (
     const suppliedValue = appState[key];
 
     const localValue = localAppState ? localAppState[key] : undefined;
+
     (nextAppState as any)[key] =
       suppliedValue !== undefined
         ? suppliedValue
         : localValue !== undefined
-        ? localValue
-        : defaultValue;
+          ? localValue
+          : defaultValue;
   }
 
   const boxSelectionMode =
     appState.boxSelectionMode ?? localAppState?.boxSelectionMode;
+
   if (boxSelectionMode !== undefined) {
     nextAppState.boxSelectionMode = boxSelectionMode;
   }
@@ -1330,7 +1373,7 @@ export const restoreAppState = (
     // reset on fresh restore so as to hide the UI button if penMode not active
     penDetected:
       localAppState?.penDetected ??
-      (appState.penMode ? appState.penDetected ?? false : false),
+      (appState.penMode ? (appState.penDetected ?? false) : false),
     activeTool: {
       ...updateActiveTool(
         defaultAppState,
@@ -1347,7 +1390,7 @@ export const restoreAppState = (
       value: getNormalizedZoom(
         isFiniteNumber(appState.zoom)
           ? appState.zoom
-          : appState.zoom?.value ?? defaultAppState.zoom.value,
+          : (appState.zoom?.value ?? defaultAppState.zoom.value),
       ),
     },
     openSidebar:
@@ -1375,6 +1418,7 @@ const restoreLibraryItem = (libraryItem: LibraryItem): LibraryItem | null => {
   const elements = getNonDeletedElements(
     restoreElements(libraryItem.elements, null),
   );
+
   return elements.length ? { ...libraryItem, elements } : null;
 };
 
@@ -1383,6 +1427,7 @@ export const restoreLibraryItems = (
   defaultStatus: LibraryItem["status"],
 ) => {
   const restoredItems: LibraryItem[] = [];
+
   for (const item of libraryItems) {
     // migrate older libraries
     if (Array.isArray(item)) {
@@ -1392,6 +1437,7 @@ export const restoreLibraryItems = (
         id: randomId(),
         created: Date.now(),
       });
+
       if (restoredItem) {
         restoredItems.push(restoredItem);
       }
@@ -1406,10 +1452,12 @@ export const restoreLibraryItems = (
         status: _item.status || defaultStatus,
         created: _item.created || Date.now(),
       });
+
       if (restoredItem) {
         restoredItems.push(restoredItem);
       }
     }
   }
+
   return restoredItems;
 };

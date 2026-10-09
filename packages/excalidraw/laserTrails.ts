@@ -93,6 +93,7 @@ export class LaserTrails implements Trail {
       // laser pointer trail when 1) the selected collab tool is the laser
       // pointer and 2) the collab pointer button is in the "down" state.
       let trail = this.collabTrails.get(key);
+
       if (!trail) {
         trail = new AnimatedTrail(this.app, {
           ...this.getTrailOptions(),
@@ -120,6 +121,7 @@ export class LaserTrails implements Trail {
           collaborator.pointer.x,
           collaborator.pointer.y,
         );
+
         if (buttonDown && lastPointOriginal) {
           trail.addPointToPath(collaborator.pointer.x, collaborator.pointer.y);
         }

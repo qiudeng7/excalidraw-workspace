@@ -80,6 +80,7 @@ export const isSpreadsheetValidForChartType = (
   }
 
   const dimensionCount = getSpreadsheetDimensionCount(spreadsheet);
+
   if (dimensionCount < 2) {
     return false;
   }
@@ -102,6 +103,7 @@ const getSeriesAwareSlotWidth = (
           CARTESIAN_BAR_SLOT_EXTRA_MAX,
           (seriesCount - 1) * CARTESIAN_BAR_SLOT_EXTRA_PER_SERIES,
         );
+
   return baseSlotWidth + extraSlotWidth;
 };
 
@@ -114,6 +116,7 @@ export const getCartesianChartLayout = (
       CARTESIAN_LINE_SLOT_WIDTH,
       seriesCount,
     );
+
     return {
       slotWidth,
       gap: CARTESIAN_GAP,
@@ -127,6 +130,7 @@ export const getCartesianChartLayout = (
     CARTESIAN_BASE_SLOT_WIDTH,
     seriesCount,
   );
+
   return {
     slotWidth,
     gap: CARTESIAN_GAP,
@@ -144,12 +148,14 @@ export const getChartDimensions = (
     (layout.slotWidth + layout.gap) * spreadsheet.series[0].values.length +
     layout.gap;
   const chartHeight = layout.chartHeight + layout.gap * 2;
+
   return { chartWidth, chartHeight };
 };
 
 export const getRadarDimensions = () => {
   const chartWidth = BAR_HEIGHT + RADAR_PADDING * 2;
   const chartHeight = BAR_HEIGHT + RADAR_PADDING * 2;
+
   return { chartWidth, chartHeight };
 };
 
@@ -159,6 +165,7 @@ const getCircularDistance = (
   paletteSize: number,
 ) => {
   const absoluteDistance = Math.abs(firstIndex - secondIndex);
+
   return Math.min(absoluteDistance, paletteSize - absoluteDistance);
 };
 
@@ -226,9 +233,11 @@ export const getColorOffset = (colorSeed?: number) => {
 
   const seedText = colorSeed.toString();
   let hash = 0;
+
   for (let index = 0; index < seedText.length; index++) {
     hash = (hash * 31 + seedText.charCodeAt(index)) | 0;
   }
+
   return Math.abs(hash) % bgColors.length;
 };
 
@@ -255,6 +264,7 @@ export const getRadarValueScale = (
     renderSteps: false,
     normalize: (value: number, _axisIndex: number) => {
       const safeValue = Math.max(0, value);
+
       return useLogScale
         ? Math.log10(safeValue + 1) / Math.log10(max + 1)
         : safeValue / max;
@@ -320,8 +330,8 @@ export const createRadarAxisLabels = (
       cos > RADAR_AXIS_LABEL_ALIGNMENT_THRESHOLD
         ? "left"
         : cos < -RADAR_AXIS_LABEL_ALIGNMENT_THRESHOLD
-        ? "right"
-        : "center";
+          ? "right"
+          : "center";
 
     // Keep labels outside the radar ring by projecting text extents
     // onto the axis direction.
@@ -338,8 +348,8 @@ export const createRadarAxisLabels = (
       sin > RADAR_AXIS_LABEL_ALIGNMENT_THRESHOLD
         ? BAR_GAP / 3
         : sin < -RADAR_AXIS_LABEL_ALIGNMENT_THRESHOLD
-        ? -BAR_GAP / 3
-        : 0;
+          ? -BAR_GAP / 3
+          : 0;
 
     return newTextElement({
       backgroundColor,
@@ -360,6 +370,7 @@ export const createRadarAxisLabels = (
   const axisLabelBottomY = Math.max(
     ...axisLabels.map((axisLabel) => axisLabel.y + axisLabel.height),
   );
+
   return { axisLabels, axisLabelTopY, axisLabelBottomY };
 };
 
@@ -385,6 +396,7 @@ export const createSeriesLegend = (
     const metrics = measureText(displayLabel, fontString, lineHeight);
     const itemWidth =
       RADAR_LEGEND_SWATCH_SIZE + RADAR_LEGEND_TEXT_GAP + metrics.width;
+
     return {
       label,
       displayLabel,
@@ -483,11 +495,14 @@ const ellipsifyTextToWidth = (
   }
 
   let end = text.length;
+
   while (end > 1) {
     const candidate = `${text.slice(0, end)}...`;
+
     if (measureText(candidate, fontString, lineHeight).width <= maxWidth) {
       return candidate;
     }
+
     end--;
   }
 
@@ -505,10 +520,12 @@ const wrapOrEllipsifyTextToWidth = (
   }
 
   const words = text.trim().split(/\s+/).filter(Boolean);
+
   if (words.length > 1) {
     const hasLongWord = words.some((word) => {
       return measureText(word, fontString, lineHeight).width > maxWidth;
     });
+
     if (
       !hasLongWord &&
       maxWidth >= getApproxMinLineWidth(fontString, lineHeight)
@@ -530,6 +547,7 @@ const getRotatedBoundingBox = (
 ) => {
   const cos = Math.abs(Math.cos(angle));
   const sin = Math.abs(Math.sin(angle));
+
   return {
     width: width * cos + height * sin,
     height: width * sin + height * cos,
@@ -560,9 +578,11 @@ const getCartesianAxisLabelSpec = (
   );
   const maxWidth = Math.max(minWidth, Math.floor(maxLabelWidth));
   const candidateWidths: number[] = [];
+
   for (let width = maxWidth; width >= minWidth; width -= 4) {
     candidateWidths.push(width);
   }
+
   if (candidateWidths[candidateWidths.length - 1] !== minWidth) {
     candidateWidths.push(minWidth);
   }
@@ -573,6 +593,7 @@ const getCartesianAxisLabelSpec = (
       .replace(/\.\.\./g, "")
       .replace(/\n/g, "").length;
     const lineCount = spec.text.split("\n").length;
+
     return {
       ellipsified,
       visibleChars,
@@ -586,15 +607,19 @@ const getCartesianAxisLabelSpec = (
   ) => {
     const candidateRank = getRank(candidate);
     const currentRank = getRank(current);
+
     if (candidateRank.ellipsified !== currentRank.ellipsified) {
       return !candidateRank.ellipsified;
     }
+
     if (candidateRank.visibleChars !== currentRank.visibleChars) {
       return candidateRank.visibleChars > currentRank.visibleChars;
     }
+
     if (candidateRank.lineCount !== currentRank.lineCount) {
       return candidateRank.lineCount < currentRank.lineCount;
     }
+
     return candidate.rotatedHeight < current.rotatedHeight;
   };
 
@@ -630,12 +655,15 @@ const getCartesianAxisLabelSpec = (
       wrapped,
     };
     const overflow = rotated.width - maxRotatedWidth;
+
     if (overflow <= 0) {
       if (!bestFit || shouldPrefer(spec, bestFit)) {
         bestFit = spec;
       }
+
       continue;
     }
+
     if (
       !bestOverflowAny ||
       overflow < bestOverflowAny.overflow ||
@@ -644,6 +672,7 @@ const getCartesianAxisLabelSpec = (
     ) {
       bestOverflowAny = { overflow, spec };
     }
+
     if (
       !isEllipsifiedLabel(spec.text) &&
       (!bestOverflowNonEllipsified ||
@@ -677,11 +706,13 @@ export const getRotatedTextElementBottom = (
   if (element.type !== "text") {
     return element.y + element.height;
   }
+
   const rotated = getRotatedBoundingBox(
     element.width,
     element.height,
     element.angle,
   );
+
   return element.y + element.height / 2 + rotated.height / 2;
 };
 

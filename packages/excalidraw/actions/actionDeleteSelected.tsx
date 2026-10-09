@@ -56,6 +56,7 @@ const deleteSelectedElements = (
 
   for (const frameId of framesToBeDeleted) {
     const frameChildren = getFrameChildren(elements, frameId);
+
     for (const el of frameChildren) {
       if (processedElements.has(el.id)) {
         continue;
@@ -63,12 +64,14 @@ const deleteSelectedElements = (
 
       if (isBoundToContainer(el)) {
         const containerElement = getContainerElement(el, elementsMap);
+
         if (containerElement) {
           selectedElementIds[containerElement.id] = true;
         }
       } else {
         selectedElementIds[el.id] = true;
       }
+
       processedElements.add(el.id);
     }
   }
@@ -84,6 +87,7 @@ const deleteSelectedElements = (
       if (el.frameId && framesToBeDeleted.has(el.frameId)) {
         shouldSelectEditingGroup = false;
         selectedElementIds[el.id] = true;
+
         return el;
       }
 
@@ -97,6 +101,7 @@ const deleteSelectedElements = (
       if (el.boundElements) {
         el.boundElements.forEach((candidate) => {
           const bound = app.scene.getNonDeletedElementsMap().get(candidate.id);
+
           if (bound && isElbowArrow(bound)) {
             app.scene.mutateElement(bound, {
               startBinding:
@@ -109,6 +114,7 @@ const deleteSelectedElements = (
           }
         });
       }
+
       return newElementWith(el, { isDeleted: true });
     }
 
@@ -118,12 +124,14 @@ const deleteSelectedElements = (
       if (!isBoundToContainer(el)) {
         selectedElementIds[el.id] = true;
       }
+
       return newElementWith(el, { frameId: null });
     }
 
     if (isBoundToContainer(el) && appState.selectedElementIds[el.containerId]) {
       return newElementWith(el, { isDeleted: true });
     }
+
     return el;
   });
 
@@ -135,6 +143,7 @@ const deleteSelectedElements = (
       nextElements,
       appState.editingGroupId,
     ).filter((el) => !el.isDeleted);
+
     if (elems.length > 1) {
       if (elems[0]) {
         selectedElementIds[elems[0].id] = true;
@@ -146,6 +155,7 @@ const deleteSelectedElements = (
       }
 
       const lastElementInGroup = elems[0];
+
       if (lastElementInGroup) {
         const editingGroupIdx = lastElementInGroup.groupIds.findIndex(
           (groupId) => {
@@ -153,10 +163,12 @@ const deleteSelectedElements = (
           },
         );
         const superGroupId = lastElementInGroup.groupIds[editingGroupIdx + 1];
+
         if (superGroupId) {
           const elems = getElementsInGroup(nextElements, superGroupId).filter(
             (el) => !el.isDeleted,
           );
+
           if (elems.length > 1) {
             nextEditingGroupId = superGroupId;
 
@@ -195,6 +207,7 @@ const handleGroupEditingState = (
       getNonDeletedElements(elements),
       appState.editingGroupId!,
     );
+
     if (siblingElements.length) {
       return {
         ...appState,
@@ -202,6 +215,7 @@ const handleGroupEditingState = (
       };
     }
   }
+
   return appState;
 };
 
@@ -219,9 +233,11 @@ export const actionDeleteSelected = register({
         elementId,
         elementsMap,
       );
+
       if (!linearElement) {
         return false;
       }
+
       // case: no point selected → do nothing, as deleting the whole element
       // is most likely a mistake, where you wanted to delete a specific point
       // but failed to select it (or you thought it's selected, while it was
@@ -236,6 +252,7 @@ export const actionDeleteSelected = register({
           if (el.id === linearElement.id) {
             return newElementWith(el, { isDeleted: true });
           }
+
           return el;
         });
         const nextAppState = handleGroupEditingState(appState, nextElements);

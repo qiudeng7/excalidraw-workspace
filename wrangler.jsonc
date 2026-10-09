@@ -1,5 +1,5 @@
 {
-  "name": "excalidraw-demo",
+  "name": "excalidraw-workspace",
   "compatibility_date": "2026-09-27",
   "workers_dev": true,
   "assets": {
@@ -26,6 +26,6 @@
     "nodejs_compat"
   ],
   "vars": {
-    "PUBLIC_ORIGIN": "https://excalidraw-demo.qiudeng.workers.dev"
+    "PUBLIC_ORIGIN": "https://excalidraw-workspace.qiudeng.workers.dev"
   }
 }

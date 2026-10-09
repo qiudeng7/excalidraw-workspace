@@ -34,6 +34,7 @@ describe("element locking", () => {
         document.body,
         `color-top-pick-${color}`,
       );
+
       expect(activeColor).toHaveClass("active");
     });
 
@@ -56,6 +57,7 @@ describe("element locking", () => {
         currentItemFillStyle: "solid",
       });
       const solidFillStyle = queryByTestId(document.body, `fill-solid`);
+
       expect(solidFillStyle).toHaveClass("active");
     });
 
@@ -91,6 +93,7 @@ describe("element locking", () => {
       });
 
       const centerTextAlign = queryByTestId(document.body, `align-right`);
+
       expect(centerTextAlign).toBeChecked();
     });
   });
@@ -102,10 +105,12 @@ describe("element locking", () => {
         backgroundColor: "red",
         fillStyle: "cross-hatch",
       });
+
       API.setElements([rect]);
       API.setSelectedElements([rect]);
 
       const crossHatchButton = queryByTestId(document.body, `fill-cross-hatch`);
+
       expect(crossHatchButton).toHaveClass("active");
     });
 
@@ -115,10 +120,12 @@ describe("element locking", () => {
         backgroundColor: COLOR_PALETTE.transparent,
         fillStyle: "cross-hatch",
       });
+
       API.setElements([rect]);
       API.setSelectedElements([rect]);
 
       const crossHatchButton = queryByTestId(document.body, `fill-cross-hatch`);
+
       expect(crossHatchButton).toBe(null);
     });
 
@@ -128,10 +135,12 @@ describe("element locking", () => {
         backgroundColor: DEFAULT_ELEMENT_BACKGROUND_PICKS[1],
         fillStyle: "hachure",
       });
+
       API.setElements([stickyNote]);
       API.setSelectedElements([stickyNote]);
 
       const hachureFillButton = queryByTestId(document.body, `fill-hachure`);
+
       expect(hachureFillButton).toBe(null);
     });
 
@@ -144,6 +153,7 @@ describe("element locking", () => {
         type: "rectangle",
         strokeWidth: STROKE_WIDTH.thin,
       });
+
       API.setElements([rect1, rect2]);
       API.setSelectedElements([rect1, rect2]);
 
@@ -151,6 +161,7 @@ describe("element locking", () => {
         document.body,
         `strokeWidth-thin`,
       );
+
       expect(thinStrokeWidthButton).toBeChecked();
     });
 
@@ -163,6 +174,7 @@ describe("element locking", () => {
         type: "freedraw",
         strokeWidth: FREEDRAW_STROKE_WIDTH.medium,
       });
+
       API.setElements([rect, freedraw]);
       API.setSelectedElements([rect, freedraw]);
 
@@ -178,6 +190,7 @@ describe("element locking", () => {
         type: "freedraw",
         strokeWidth: FREEDRAW_STROKE_WIDTH.thin,
       });
+
       API.setElements([rect, freedraw]);
       API.setSelectedElements([rect, freedraw]);
 
@@ -185,6 +198,7 @@ describe("element locking", () => {
         document.body,
         `strokeWidth-bold`,
       );
+
       expect(boldStrokeWidthButton).not.toBe(null);
       fireEvent.click(boldStrokeWidthButton!);
 
@@ -219,6 +233,7 @@ describe("element locking", () => {
         type: "rectangle",
         strokeWidth: STROKE_WIDTH.medium,
       });
+
       API.setElements([rect1, rect2]);
       API.setSelectedElements([rect1, rect2]);
 
@@ -243,6 +258,7 @@ describe("element locking", () => {
         type: "text",
         fontFamily: FONT_FAMILY["Comic Shanns"],
       });
+
       API.setElements([rect, text]);
       API.setSelectedElements([rect, text]);
 

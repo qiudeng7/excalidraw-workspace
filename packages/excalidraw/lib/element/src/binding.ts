@@ -115,7 +115,9 @@ export type BindingStrategy =
  * IMPORTANT: currently must be > 0 (this also applies to the computed gap)
  */
 export const BASE_BINDING_GAP = 5;
+
 export const BASE_ARROW_MIN_LENGTH = 10;
+
 export const FOCUS_POINT_SIZE = 10 / 1.5;
 
 // Below this size (in px) a bindable element has no meaningful interior to
@@ -133,6 +135,7 @@ export const getBindingGap = (
 export const maxBindingDistance_simple = (zoom?: AppState["zoom"]): number => {
   const BASE_BINDING_DISTANCE = Math.max(BASE_BINDING_GAP, 15);
   const zoomValue = zoom?.value && zoom.value < 1 ? zoom.value : 1;
+
   return clamp(
     // reducing zoom impact so that the diff between binding distance and
     // binding gap is kept to minimum when possible
@@ -215,7 +218,8 @@ export const bindOrUnbindBindingElement = (
             start.element,
             scene.getNonDeletedElementsMap(),
             undefined,
-            appState.arrowBindingOptimization && appState.arrowBindingOptimizationActive,
+            appState.arrowBindingOptimization &&
+              appState.arrowBindingOptimizationActive,
           ) || arrow.points[0],
       });
     }
@@ -230,7 +234,8 @@ export const bindOrUnbindBindingElement = (
             end.element,
             scene.getNonDeletedElementsMap(),
             undefined,
-            appState.arrowBindingOptimization && appState.arrowBindingOptimizationActive,
+            appState.arrowBindingOptimization &&
+              appState.arrowBindingOptimizationActive,
           ) || arrow.points[arrow.points.length - 1],
       });
     }
@@ -431,6 +436,7 @@ const bindingStrategyForNewSimpleArrowEndpointDragging = (
       const otherElement = elementsMap.get(
         arrow.startBinding.elementId,
       ) as NonDeleted<ExcalidrawBindableElement>;
+
       invariant(otherElement, "Other element must be in the elements map");
 
       const otherIsInsideBinding =
@@ -440,7 +446,7 @@ const bindingStrategyForNewSimpleArrowEndpointDragging = (
         element: otherElement,
         focusPoint: shiftKey
           ? elementCenterPoint(otherElement, elementsMap)
-          : origin ?? pointFrom<GlobalPoint>(arrow.x, arrow.y),
+          : (origin ?? pointFrom<GlobalPoint>(arrow.x, arrow.y)),
       };
 
       // We are hovering another element with the end point
@@ -448,9 +454,11 @@ const bindingStrategyForNewSimpleArrowEndpointDragging = (
         hit &&
         isBindableElementInsideOtherBindable(otherElement, hit, elementsMap);
       let current: BindingStrategy;
+
       if (hit) {
         const isInsideBinding =
           globalBindMode === "inside" || globalBindMode === "skip";
+
         current = {
           mode: isInsideBinding && !isNested ? "inside" : "orbit",
           element: hit,
@@ -634,45 +642,107 @@ export const getBindingStrategyForDraggingBindingElementEndpoints = (
 ): { start: BindingStrategy; end: BindingStrategy } => {
   const strategy = getFeatureFlag("COMPLEX_BINDINGS")
     ? getBindingStrategyForDraggingBindingElementEndpoints_complex(
-      arrow, draggingPoints, elementsMap, elements, appState, opts,
-    )
+        arrow,
+        draggingPoints,
+        elementsMap,
+        elements,
+        appState,
+        opts,
+      )
     : getBindingStrategyForDraggingBindingElementEndpoints_simple(
-      arrow, draggingPoints, screenPointerX, screenPointerY,
-      elementsMap, elements, appState, opts,
-    );
+        arrow,
+        draggingPoints,
+        screenPointerX,
+        screenPointerY,
+        elementsMap,
+        elements,
+        appState,
+        opts,
+      );
+
   // 仅普通箭头的本次单端手势：内部命中保留真实目标，只改变绑定模式。
   // 同一目标、嵌套/重叠和折线仍沿用上游规则，不承诺自动避障。
-  if (!appState.arrowBindingOptimization || !appState.arrowBindingOptimizationActive ||
-      !isBindingEnabled(appState) || isElbowArrow(arrow) || opts?.altKey ||
-      draggingPoints.size !== 1) return strategy;
+  if (
+    !appState.arrowBindingOptimization ||
+    !appState.arrowBindingOptimizationActive ||
+    !isBindingEnabled(appState) ||
+    isElbowArrow(arrow) ||
+    opts?.altKey ||
+    draggingPoints.size !== 1
+  )
+    return strategy;
   const startDragged = draggingPoints.has(0);
   const endDragged = draggingPoints.has(arrow.points.length - 1);
+
   if (!startDragged && !endDragged) return strategy;
   const current = startDragged ? strategy.start : strategy.end;
   const opposite = startDragged ? arrow.endBinding : arrow.startBinding;
   const target = current.element;
+
   // 新箭头的另一端即使拖动端在空白处，也必须跟随本次 Ctrl 状态。
   if (opts?.newArrow && !target && opposite) {
-    const bound = elementsMap.get(opposite.elementId) as NonDeleted<ExcalidrawBindableElement> | undefined;
+    const bound = elementsMap.get(opposite.elementId) as
+      NonDeleted<ExcalidrawBindableElement> | undefined;
+
     if (bound) {
-      const other: BindingStrategy = { element: bound, mode: appState.arrowBindingInside ? "inside" : "orbit", focusPoint: getGlobalFixedPointForBindableElement(opposite.fixedPoint, bound, elementsMap) };
-      return startDragged ? { ...strategy, end: other } : { ...strategy, start: other };
+      const other: BindingStrategy = {
+        element: bound,
+        mode: appState.arrowBindingInside ? "inside" : "orbit",
+        focusPoint: getGlobalFixedPointForBindableElement(
+          opposite.fixedPoint,
+          bound,
+          elementsMap,
+        ),
+      };
+
+      return startDragged
+        ? { ...strategy, end: other }
+        : { ...strategy, start: other };
     }
   }
+
   if (!target || current.mode === null) return strategy;
   const oppositeTarget = opposite && elementsMap.get(opposite.elementId);
-  if (oppositeTarget && (oppositeTarget.id === target.id ||
-      isBindableElementInsideOtherBindable(oppositeTarget as NonDeleted<ExcalidrawBindableElement>, target, elementsMap) ||
-      isBindableElementInsideOtherBindable(target, oppositeTarget as NonDeleted<ExcalidrawBindableElement>, elementsMap))) return strategy;
+
+  if (
+    oppositeTarget &&
+    (oppositeTarget.id === target.id ||
+      isBindableElementInsideOtherBindable(
+        oppositeTarget as NonDeleted<ExcalidrawBindableElement>,
+        target,
+        elementsMap,
+      ) ||
+      isBindableElementInsideOtherBindable(
+        target,
+        oppositeTarget as NonDeleted<ExcalidrawBindableElement>,
+        elementsMap,
+      ))
+  )
+    return strategy;
   const mode = appState.arrowBindingInside ? "inside" : "orbit";
   const adjusted = { ...current, mode } as BindingStrategy;
-  const result = startDragged ? { ...strategy, start: adjusted } : { ...strategy, end: adjusted };
+  const result = startDragged
+    ? { ...strategy, start: adjusted }
+    : { ...strategy, end: adjusted };
+
   // 新建时从另一端的真实绑定归一模式；strategy 保持该端不变时也不能遗漏。
   if (opts?.newArrow && opposite && oppositeTarget) {
     const bound = oppositeTarget as NonDeleted<ExcalidrawBindableElement>;
-    const other: BindingStrategy = { element: bound, mode, focusPoint: getGlobalFixedPointForBindableElement(opposite.fixedPoint, bound, elementsMap) };
-    return startDragged ? { ...result, end: other } : { ...result, start: other };
+    const other: BindingStrategy = {
+      element: bound,
+      mode,
+      focusPoint: getGlobalFixedPointForBindableElement(
+        opposite.fixedPoint,
+        bound,
+        elementsMap,
+      ),
+    };
+
+    return startDragged
+      ? { ...result, end: other }
+      : { ...result, start: other };
   }
+
   return result;
 };
 
@@ -705,6 +775,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
     console.error(
       "Attempting to bind a linear element with less than 2 points",
     );
+
     // a single-point can't be bound -> cancel
     return { start: { mode: undefined }, end: { mode: undefined } };
   }
@@ -744,6 +815,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
   const localPoint = draggingPoints.get(
     startDragged ? startIdx : endIdx,
   )?.point;
+
   invariant(
     localPoint,
     `Local point must be defined for ${
@@ -812,25 +884,25 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
         focusPoint: startDragged
           ? globalPoint
           : // NOTE: Can only affect the start point because new arrows always drag the end point
-          opts?.newArrow
-          ? pointFromArray<GlobalPoint>(
-              getGridPoint(
-                appState.selectedLinearElement!.initialState.origin![0],
-                appState.selectedLinearElement!.initialState.origin![1],
-                opts.gridSize as NullableGridSize,
-              ),
-            )!
-          : otherBindableElement
-          ? getGlobalFixedPointForBindableElement(
-              otherBinding.fixedPoint,
-              otherBindableElement,
-              elementsMap,
-            )
-          : LinearElementEditor.getPointAtIndexGlobalCoordinates(
-              arrow,
-              0,
-              elementsMap,
-            ), // startFixedPoint,
+            opts?.newArrow
+            ? pointFromArray<GlobalPoint>(
+                getGridPoint(
+                  appState.selectedLinearElement!.initialState.origin![0],
+                  appState.selectedLinearElement!.initialState.origin![1],
+                  opts.gridSize as NullableGridSize,
+                ),
+              )!
+            : otherBindableElement
+              ? getGlobalFixedPointForBindableElement(
+                  otherBinding.fixedPoint,
+                  otherBindableElement,
+                  elementsMap,
+                )
+              : LinearElementEditor.getPointAtIndexGlobalCoordinates(
+                  arrow,
+                  0,
+                  elementsMap,
+                ), // startFixedPoint,
       },
       end: {
         mode: "inside",
@@ -838,16 +910,16 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
         focusPoint: endDragged
           ? globalPoint
           : otherBindableElement
-          ? getGlobalFixedPointForBindableElement(
-              otherBinding.fixedPoint,
-              otherBindableElement,
-              elementsMap,
-            )
-          : LinearElementEditor.getPointAtIndexGlobalCoordinates(
-              arrow,
-              -1,
-              elementsMap,
-            ), // endFixedPoint
+            ? getGlobalFixedPointForBindableElement(
+                otherBinding.fixedPoint,
+                otherBindableElement,
+                elementsMap,
+              )
+            : LinearElementEditor.getPointAtIndexGlobalCoordinates(
+                arrow,
+                -1,
+                elementsMap,
+              ), // endFixedPoint
       },
     };
   }
@@ -893,19 +965,19 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
               opts?.angleLocked
                 ? globalPoint
                 : appState.gridModeEnabled
-                ? snapBoundPointToGrid(
-                    pointFrom<GlobalPoint>(scenePointerX, scenePointerY),
-                    hit,
-                    elementsMap,
-                    appState.gridSize as NullableGridSize,
-                    arrow,
-                    LinearElementEditor.getPointAtIndexGlobalCoordinates(
-                      arrow,
-                      startDragged ? 1 : -2,
+                  ? snapBoundPointToGrid(
+                      pointFrom<GlobalPoint>(scenePointerX, scenePointerY),
+                      hit,
                       elementsMap,
-                    ),
-                  )
-                : globalPoint,
+                      appState.gridSize as NullableGridSize,
+                      arrow,
+                      LinearElementEditor.getPointAtIndexGlobalCoordinates(
+                        arrow,
+                        startDragged ? 1 : -2,
+                        elementsMap,
+                      ),
+                    )
+                  : globalPoint,
               hit,
               startDragged ? "start" : "end",
               elementsMap,
@@ -939,6 +1011,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_simple = (
     : otherBinding?.mode === "inside" && otherPointWasInsideAtStart;
 
   let other: BindingStrategy = { mode: undefined };
+
   if (!otherNeverOverride) {
     if (
       otherBinding?.mode === "inside" &&
@@ -1012,6 +1085,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_complex = (
     console.error(
       "Attempting to bind a linear element with less than 2 points",
     );
+
     // a single-point can't be bound -> cancel
     return { start: { mode: undefined }, end: { mode: undefined } };
   }
@@ -1069,6 +1143,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_complex = (
   // Only the start point is dragged
   if (startDragged) {
     const localPoint = draggingPoints.get(startIdx)?.point;
+
     invariant(localPoint, "Local point must be defined for start dragging");
     const globalPoint = LinearElementEditor.getPointGlobalCoordinates(
       arrow,
@@ -1095,6 +1170,7 @@ const getBindingStrategyForDraggingBindingElementEndpoints_complex = (
   // Only the end point is dragged
   if (endDragged) {
     const localPoint = draggingPoints.get(endIdx)?.point;
+
     invariant(localPoint, "Local point must be defined for end dragging");
     const globalPoint = LinearElementEditor.getPointGlobalCoordinates(
       arrow,
@@ -1153,6 +1229,7 @@ const applyBinding = (
   });
 
   const boundElementsMap = arrayToMap(bindableElement.boundElements || []);
+
   if (!boundElementsMap.has(arrow.id)) {
     scene.mutateElement(bindableElement, {
       boundElements: (bindableElement.boundElements || []).concat({
@@ -1223,12 +1300,14 @@ export const unbindBindingElement = (
 
   const oppositeBinding =
     arrow[startOrEnd === "start" ? "endBinding" : "startBinding"];
+
   if (!oppositeBinding || oppositeBinding.elementId !== binding.elementId) {
     // Only remove the record on the bound element if the other
     // end is not bound to the same element
     const boundElement = scene
       .getNonDeletedElementsMap()
       .get(binding.elementId) as NonDeleted<ExcalidrawBindableElement>;
+
     scene.mutateElement(boundElement, {
       boundElements: boundElement.boundElements?.filter(
         (element) => element.id !== arrow.id,
@@ -1262,6 +1341,7 @@ export const reanchorBindingsToOutline = (
 
     for (const startOrEnd of ["startBinding", "endBinding"] as const) {
       const binding = element[startOrEnd];
+
       if (binding?.elementId !== changedElement.id) {
         continue;
       }
@@ -1301,9 +1381,11 @@ export const reanchorBindingsToOutline = (
       }
 
       const direction = vectorFromPoint(focusPoint, center);
+
       if (direction[0] === 0 && direction[1] === 0) {
         continue;
       }
+
       const outlinePoint = intersectElementWithLineSegment(
         changedElement,
         elementsMap,
@@ -1362,6 +1444,7 @@ export const updateBoundElements = (
   );
 
   let elementsMap: ElementsMap = scene.getNonDeletedElementsMap();
+
   if (options?.changedElements) {
     elementsMap = new Map(elementsMap) as typeof elementsMap;
     options.changedElements.forEach((element) => {
@@ -1447,6 +1530,7 @@ export const updateBoundElements = (
     });
 
     const boundText = getBoundTextElement(element, elementsMap);
+
     if (boundText && !boundText.isDeleted) {
       handleBindTextResize(element, scene, false);
     }
@@ -1487,6 +1571,7 @@ const updateArrowBindings = (
       threshold: maxBindingDistance_simple(appState.zoom),
     });
   const strategyName = startOrEnd === "startBinding" ? "start" : "end";
+
   unbindBindingElement(latestElement, strategyName, scene);
   if (hit) {
     const pointIdx =
@@ -1502,6 +1587,7 @@ const updateArrowBindings = (
         scene.getNonDeletedElements(),
         appState,
       );
+
     if (
       strategy[strategyName] &&
       strategy[strategyName].element?.id === bindableElement.id &&
@@ -1590,11 +1676,14 @@ export const getSimultaneouslyUpdatedElementIds = (
   if (!simultaneouslyUpdated) {
     return new Set();
   }
+
   let ids = simultaneouslyUpdatedElementIdsCache.get(simultaneouslyUpdated);
+
   if (!ids) {
     ids = new Set(simultaneouslyUpdated.map((element) => element.id));
     simultaneouslyUpdatedElementIdsCache.set(simultaneouslyUpdated, ids);
   }
+
   return ids;
 };
 
@@ -1684,6 +1773,7 @@ export const bindPointToSnapToElementOutline = (
   const bindableCenter = getCenterForBounds(aabb);
 
   let intersection: GlobalPoint | null = null;
+
   if (elbowed) {
     const snap = isMidpointSnappingEnabled
       ? getElbowArrowSnapMidPoint(edgePoint, bindableElement, elementsMap, zoom)
@@ -1717,6 +1807,7 @@ export const bindPointToSnapToElementOutline = (
     // take the crossing nearest to the point we aim at
     const byDistanceToResolved = (a: GlobalPoint, b: GlobalPoint) =>
       pointDistanceSq(a, resolved) - pointDistanceSq(b, resolved);
+
     intersection = intersectElementWithLineSegment(
       bindableElement,
       elementsMap,
@@ -1739,6 +1830,7 @@ export const bindPointToSnapToElementOutline = (
           anotherPoint,
         ),
       );
+
       intersection = intersectElementWithLineSegment(
         bindableElement,
         elementsMap,
@@ -1748,6 +1840,7 @@ export const bindPointToSnapToElementOutline = (
     }
   } else {
     let intersector = customIntersector;
+
     if (!intersector) {
       const halfVector = vectorScale(
         vectorNormalize(vectorFromPoint(edgePoint, adjacentPoint)),
@@ -1755,6 +1848,7 @@ export const bindPointToSnapToElementOutline = (
           Math.max(bindableElement.width, bindableElement.height) +
           bindingGap * 2,
       );
+
       intersector =
         customIntersector ??
         lineSegment(
@@ -1813,6 +1907,7 @@ export const avoidRectangularCorner = (
         bindTarget.angle,
       );
     }
+
     return pointRotateRads(
       pointFrom(bindTarget.x, bindTarget.y - bindingGap),
       center,
@@ -1830,6 +1925,7 @@ export const avoidRectangularCorner = (
         bindTarget.angle,
       );
     }
+
     return pointRotateRads(
       pointFrom(bindTarget.x - bindingGap, bindTarget.y + bindTarget.height),
       center,
@@ -1850,6 +1946,7 @@ export const avoidRectangularCorner = (
         bindTarget.angle,
       );
     }
+
     return pointRotateRads(
       pointFrom(
         bindTarget.x + bindTarget.width + bindingGap,
@@ -1870,6 +1967,7 @@ export const avoidRectangularCorner = (
         bindTarget.angle,
       );
     }
+
     return pointRotateRads(
       pointFrom(bindTarget.x + bindTarget.width + bindingGap, bindTarget.y),
       center,
@@ -1886,6 +1984,7 @@ const extractBinding = (
   elementsMap: ElementsMap,
 ) => {
   const binding = arrow[startOrEnd];
+
   if (!binding) {
     return {
       element: null,
@@ -1950,6 +2049,7 @@ const snapBoundPointToGrid = (
   // Both heading strategies above return global-axis directions.
   const absNX = Math.abs(heading[0]);
   const absNY = Math.abs(heading[1]);
+
   if (absNX >= absNY) {
     // Global X is closest to the perpendicular so snap Y, intersect horizontal line
     const [, snappedY] = getGridPoint(
@@ -2077,14 +2177,30 @@ export const updateBoundPoint = (
         pointDistanceSq(a, otherFocusPointOrArrowPoint) -
         pointDistanceSq(b, otherFocusPointOrArrowPoint),
     )[0];
+
   // 常规非重叠连接有轮廓交点时，不让上游极短箭头回退到内部。
-  if (preferOutline && outlinePoint && (!otherBindable ||
-      (otherBindable.id !== bindableElement.id && !hitElementItself({
-        element: otherBindable, point: outlinePoint, elementsMap,
-        threshold: getBindingGap(otherBindable), overrideShouldTestInside: true,
-      })))) {
-    return LinearElementEditor.createPointAt(arrow, elementsMap, outlinePoint[0], outlinePoint[1], null);
+  if (
+    preferOutline &&
+    outlinePoint &&
+    (!otherBindable ||
+      (otherBindable.id !== bindableElement.id &&
+        !hitElementItself({
+          element: otherBindable,
+          point: outlinePoint,
+          elementsMap,
+          threshold: getBindingGap(otherBindable),
+          overrideShouldTestInside: true,
+        })))
+  ) {
+    return LinearElementEditor.createPointAt(
+      arrow,
+      elementsMap,
+      outlinePoint[0],
+      outlinePoint[1],
+      null,
+    );
   }
+
   const startHasArrowhead = arrow.startArrowhead !== null;
   const endHasArrowhead = arrow.endArrowhead !== null;
   const resolvedTarget =
@@ -2134,8 +2250,8 @@ export const updateBoundPoint = (
     return LinearElementEditor.createPointAt(
       arrow,
       elementsMap,
-      arrowTooShort ? focusPoint[0] : outlinePoint?.[0] ?? focusPoint[0],
-      arrowTooShort ? focusPoint[1] : outlinePoint?.[1] ?? focusPoint[1],
+      arrowTooShort ? focusPoint[0] : (outlinePoint?.[0] ?? focusPoint[0]),
+      arrowTooShort ? focusPoint[1] : (outlinePoint?.[1] ?? focusPoint[1]),
       null,
     );
   }
@@ -2296,9 +2412,11 @@ export const fixDuplicatedBindingsAfterDuplication = (
             binding,
           ) => {
             const newBindingId = origIdToDuplicateId.get(binding.id);
+
             if (newBindingId) {
               acc.push({ ...binding, id: newBindingId });
             }
+
             return acc;
           },
           [],
@@ -2317,6 +2435,7 @@ export const fixDuplicatedBindingsAfterDuplication = (
       const newEndBindingId = origIdToDuplicateId.get(
         duplicateElement.endBinding.elementId,
       );
+
       Object.assign(duplicateElement, {
         endBinding: newEndBindingId
           ? {
@@ -2326,10 +2445,12 @@ export const fixDuplicatedBindingsAfterDuplication = (
           : null,
       });
     }
+
     if ("startBinding" in duplicateElement && duplicateElement.startBinding) {
       const newEndBindingId = origIdToDuplicateId.get(
         duplicateElement.startBinding.elementId,
       );
+
       Object.assign(duplicateElement, {
         startBinding: newEndBindingId
           ? {
@@ -2386,9 +2507,8 @@ const newBoundElements = (
   nextBoundElements.push(
     ...elementsToAdd.map(
       (x) =>
-        ({ id: x.id, type: x.type } as
-          | ExcalidrawArrowElement
-          | ExcalidrawTextElement),
+        ({ id: x.id, type: x.type }) as
+          ExcalidrawArrowElement | ExcalidrawTextElement,
     ),
   );
 
@@ -2406,10 +2526,7 @@ export const bindingProperties: Set<BindableProp | BindingProp> = new Set([
 export type BindableProp = "boundElements";
 
 export type BindingProp =
-  | "frameId"
-  | "containerId"
-  | "startBinding"
-  | "endBinding";
+  "frameId" | "containerId" | "startBinding" | "endBinding";
 
 type BoundElementsVisitingFunc = (
   boundElement: ExcalidrawElement | undefined,
@@ -2454,22 +2571,26 @@ const bindableElementsVisitor = <T>(
 
   if (element.frameId) {
     const id = element.frameId;
+
     result.push(visit(elements.get(id), "frameId", id));
   }
 
   if (isBoundToContainer(element)) {
     const id = element.containerId;
+
     result.push(visit(elements.get(id), "containerId", id));
   }
 
   if (isArrowElement(element)) {
     if (element.startBinding) {
       const id = element.startBinding.elementId;
+
       result.push(visit(elements.get(id), "startBinding", id));
     }
 
     if (element.endBinding) {
       const id = element.endBinding.elementId;
+
       result.push(visit(elements.get(id), "endBinding", id));
     }
   }
@@ -2548,6 +2669,7 @@ export class BoundElement {
         // unbind from bindable elements, as bindings from non deleted elements into deleted elements are incorrect
         if (!bindableElement || bindableElement.isDeleted) {
           updateElementWith(boundElement, { [bindingProp]: null });
+
           return;
         }
 
@@ -2665,11 +2787,13 @@ export class BindableElement {
               new Set([boundElementId]),
             ),
           });
+
           return;
         }
 
         if (isTextElement(boundElement)) {
           const boundElements = bindableElement.boundElements?.slice() ?? [];
+
           // check if this is the last element in the array, if not, there is an previously bound text which should be unbound
           if (
             boundElements.reverse().find((x) => x.type === "text")?.id ===
@@ -2727,13 +2851,11 @@ export const getGlobalFixedPoints = (
   const startElement =
     arrow.startBinding &&
     (elementsMap.get(arrow.startBinding.elementId) as
-      | ExcalidrawBindableElement
-      | undefined);
+      ExcalidrawBindableElement | undefined);
   const endElement =
     arrow.endBinding &&
     (elementsMap.get(arrow.endBinding.elementId) as
-      | ExcalidrawBindableElement
-      | undefined);
+      ExcalidrawBindableElement | undefined);
   const startPoint =
     startElement && arrow.startBinding
       ? getGlobalFixedPointForBindableElement(
@@ -2821,11 +2943,14 @@ type Side =
   | "bottom-left"
   | "left"
   | "top-left";
+
 type ShapeType = "rectangle" | "ellipse" | "diamond";
+
 const getShapeType = (element: ExcalidrawBindableElement): ShapeType => {
   if (element.type === "ellipse" || element.type === "diamond") {
     return element.type;
   }
+
   return "rectangle";
 };
 
@@ -2905,9 +3030,11 @@ const getShapeSideAdaptive = (
 
   // calculate angle
   let angle = Math.atan2(centerY, centerX);
+
   if (angle < 0) {
     angle += 2 * Math.PI;
   }
+
   const degrees = (angle * 180) / Math.PI;
 
   // get sector configuration for this shape type
@@ -2932,6 +3059,7 @@ const getShapeSideAdaptive = (
 
   for (const sector of config) {
     let diff = Math.abs(degrees - sector.centerAngle);
+
     // handle wraparound
     if (diff > 180) {
       diff = 360 - diff;
@@ -2951,6 +3079,7 @@ export const getBindingSideMidPoint = (
   elementsMap: ElementsMap,
 ) => {
   const bindableElement = elementsMap.get(binding.elementId);
+
   if (
     !bindableElement ||
     bindableElement.isDeleted ||
@@ -2975,61 +3104,78 @@ export const getBindingSideMidPoint = (
 
     let x: number;
     let y: number;
+
     switch (side) {
       case "left": {
         // left vertex - use the center of the left corner curve
         if (corners.length >= 3) {
           const leftCorner = corners[2];
           const midPoint = leftCorner[1];
+
           x = midPoint[0] - OFFSET;
           y = midPoint[1];
         } else {
           // fallback for non-rounded diamond
           const midPoint = getMidPoint(bottomLeft[1], topLeft[0]);
+
           x = midPoint[0] - OFFSET;
           y = midPoint[1];
         }
+
         break;
       }
+
       case "right": {
         if (corners.length >= 1) {
           const rightCorner = corners[0];
           const midPoint = rightCorner[1];
+
           x = midPoint[0] + OFFSET;
           y = midPoint[1];
         } else {
           const midPoint = getMidPoint(topRight[1], bottomRight[0]);
+
           x = midPoint[0] + OFFSET;
           y = midPoint[1];
         }
+
         break;
       }
+
       case "top": {
         if (corners.length >= 4) {
           const topCorner = corners[3];
           const midPoint = topCorner[1];
+
           x = midPoint[0];
           y = midPoint[1] - OFFSET;
         } else {
           const midPoint = getMidPoint(topLeft[1], topRight[0]);
+
           x = midPoint[0];
           y = midPoint[1] - OFFSET;
         }
+
         break;
       }
+
       case "bottom": {
         if (corners.length >= 2) {
           const bottomCorner = corners[1];
           const midPoint = bottomCorner[1];
+
           x = midPoint[0];
           y = midPoint[1] + OFFSET;
         } else {
           const midPoint = getMidPoint(bottomRight[1], bottomLeft[0]);
+
           x = midPoint[0];
           y = midPoint[1] + OFFSET;
         }
+
         break;
       }
+
       case "top-right": {
         const midPoint = getMidPoint(topRight[0], topRight[1]);
 
@@ -3037,6 +3183,7 @@ export const getBindingSideMidPoint = (
         y = midPoint[1] - OFFSET * 0.707;
         break;
       }
+
       case "bottom-right": {
         const midPoint = getMidPoint(bottomRight[0], bottomRight[1]);
 
@@ -3044,18 +3191,23 @@ export const getBindingSideMidPoint = (
         y = midPoint[1] + OFFSET * 0.707;
         break;
       }
+
       case "bottom-left": {
         const midPoint = getMidPoint(bottomLeft[0], bottomLeft[1]);
+
         x = midPoint[0] - OFFSET * 0.707;
         y = midPoint[1] + OFFSET * 0.707;
         break;
       }
+
       case "top-left": {
         const midPoint = getMidPoint(topLeft[0], topLeft[1]);
+
         x = midPoint[0] - OFFSET * 0.707;
         y = midPoint[1] - OFFSET * 0.707;
         break;
       }
+
       default: {
         return null;
       }
@@ -3079,53 +3231,65 @@ export const getBindingSideMidPoint = (
         y = ellipseCenterY - radiusY - OFFSET;
         break;
       }
+
       case "right": {
         x = ellipseCenterX + radiusX + OFFSET;
         y = ellipseCenterY;
         break;
       }
+
       case "bottom": {
         x = ellipseCenterX;
         y = ellipseCenterY + radiusY + OFFSET;
         break;
       }
+
       case "left": {
         x = ellipseCenterX - radiusX - OFFSET;
         y = ellipseCenterY;
         break;
       }
+
       case "top-right": {
         const angle = -Math.PI / 4;
         const ellipseX = radiusX * Math.cos(angle);
         const ellipseY = radiusY * Math.sin(angle);
+
         x = ellipseCenterX + ellipseX + OFFSET * 0.707;
         y = ellipseCenterY + ellipseY - OFFSET * 0.707;
         break;
       }
+
       case "bottom-right": {
         const angle = Math.PI / 4;
         const ellipseX = radiusX * Math.cos(angle);
         const ellipseY = radiusY * Math.sin(angle);
+
         x = ellipseCenterX + ellipseX + OFFSET * 0.707;
         y = ellipseCenterY + ellipseY + OFFSET * 0.707;
         break;
       }
+
       case "bottom-left": {
         const angle = (3 * Math.PI) / 4;
         const ellipseX = radiusX * Math.cos(angle);
         const ellipseY = radiusY * Math.sin(angle);
+
         x = ellipseCenterX + ellipseX - OFFSET * 0.707;
         y = ellipseCenterY + ellipseY + OFFSET * 0.707;
         break;
       }
+
       case "top-left": {
         const angle = (-3 * Math.PI) / 4;
         const ellipseX = radiusX * Math.cos(angle);
         const ellipseY = radiusY * Math.sin(angle);
+
         x = ellipseCenterX + ellipseX - OFFSET * 0.707;
         y = ellipseCenterY + ellipseY - OFFSET * 0.707;
         break;
       }
+
       default: {
         return null;
       }
@@ -3142,31 +3306,40 @@ export const getBindingSideMidPoint = (
 
     let x: number;
     let y: number;
+
     switch (side) {
       case "top": {
         const midPoint = getMidPoint(top[0], top[1]);
+
         x = midPoint[0];
         y = midPoint[1] - OFFSET;
         break;
       }
+
       case "right": {
         const midPoint = getMidPoint(right[0], right[1]);
+
         x = midPoint[0] + OFFSET;
         y = midPoint[1];
         break;
       }
+
       case "bottom": {
         const midPoint = getMidPoint(bottom[0], bottom[1]);
+
         x = midPoint[0];
         y = midPoint[1] + OFFSET;
         break;
       }
+
       case "left": {
         const midPoint = getMidPoint(left[0], left[1]);
+
         x = midPoint[0] - OFFSET;
         y = midPoint[1];
         break;
       }
+
       case "top-left": {
         if (corners.length >= 1) {
           const corner = corners[0];
@@ -3181,8 +3354,10 @@ export const getBindingSideMidPoint = (
           x = bindableElement.x - OFFSET;
           y = bindableElement.y - OFFSET;
         }
+
         break;
       }
+
       case "top-right": {
         if (corners.length >= 2) {
           const corner = corners[1];
@@ -3196,8 +3371,10 @@ export const getBindingSideMidPoint = (
           x = bindableElement.x + bindableElement.width + OFFSET;
           y = bindableElement.y - OFFSET;
         }
+
         break;
       }
+
       case "bottom-right": {
         if (corners.length >= 3) {
           const corner = corners[2];
@@ -3211,8 +3388,10 @@ export const getBindingSideMidPoint = (
           x = bindableElement.x + bindableElement.width + OFFSET;
           y = bindableElement.y + bindableElement.height + OFFSET;
         }
+
         break;
       }
+
       case "bottom-left": {
         if (corners.length >= 4) {
           const corner = corners[3];
@@ -3226,8 +3405,10 @@ export const getBindingSideMidPoint = (
           x = bindableElement.x - OFFSET;
           y = bindableElement.y + bindableElement.height + OFFSET;
         }
+
         break;
       }
+
       default: {
         return null;
       }

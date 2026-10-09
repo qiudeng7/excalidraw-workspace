@@ -21,12 +21,15 @@ import type {
 export const loadHTMLImageElement = (dataURL: DataURL) => {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
+
     image.onload = () => {
       resolve(image);
     };
+
     image.onerror = (error) => {
       reject(error);
     };
+
     image.src = dataURL;
   });
 };
@@ -48,8 +51,10 @@ export const updateImageCache = async ({
   await Promise.all(
     fileIds.reduce((promises, fileId) => {
       const fileData = files[fileId as string];
+
       if (fileData && !updatedFiles.has(fileId)) {
         updatedFiles.set(fileId, true);
+
         return promises.concat(
           (async () => {
             try {
@@ -62,6 +67,7 @@ export const updateImageCache = async ({
                 image: imagePromise,
                 mimeType: fileData.mimeType,
               } as const;
+
               // store the promise immediately to indicate there's an in-progress
               // initialization
               imageCache.set(fileId, data);
@@ -69,12 +75,17 @@ export const updateImageCache = async ({
               const image = await imagePromise;
 
               imageCache.set(fileId, { ...data, image });
-            } catch (error: any) {
+            } catch (error: unknown) {
+              console.warn(
+                "Image decoding failed; marking the image unavailable",
+                error,
+              );
               erroredFiles.set(fileId, true);
             }
           })(),
         );
       }
+
       return promises;
     }, [] as Promise<any>[]),
   );
@@ -105,6 +116,7 @@ export const normalizeSVG = (SVGString: string) => {
   const doc = new DOMParser().parseFromString(SVGString, MIME_TYPES.svg);
   const svg = doc.querySelector("svg");
   const errorNode = doc.querySelector("parsererror");
+
   if (errorNode || !isHTMLSVGElement(svg)) {
     throw new Error("Invalid SVG");
   } else {
@@ -120,6 +132,7 @@ export const normalizeSVG = (SVGString: string) => {
     if (width?.includes("%") || width === "auto") {
       width = null;
     }
+
     if (height?.includes("%") || height === "auto") {
       height = null;
     }
@@ -134,6 +147,7 @@ export const normalizeSVG = (SVGString: string) => {
         const match = viewBox.match(
           /\d+ +\d+ +(\d+(?:\.\d+)?) +(\d+(?:\.\d+)?)/,
         );
+
         if (match) {
           [, width, height] = match;
         }

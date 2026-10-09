@@ -22,6 +22,7 @@ import { TrashIcon } from "./icons";
 import "./ElementLinkDialog.scss";
 
 import type { AppProps, AppState, UIAppState } from "../types";
+
 const ElementLinkDialog = ({
   sourceElementId,
   onClose,
@@ -70,6 +71,7 @@ const ElementLinkDialog = ({
   const handleConfirm = useCallback(() => {
     if (nextLink && nextLink !== elementsMap.get(sourceElementId)?.link) {
       const elementToLink = elementsMap.get(sourceElementId);
+
       elementToLink &&
         scene.mutateElement(elementToLink, {
           link: nextLink,
@@ -78,6 +80,7 @@ const ElementLinkDialog = ({
 
     if (!nextLink && linkEdited && sourceElementId) {
       const elementToLink = elementsMap.get(sourceElementId);
+
       elementToLink &&
         scene.mutateElement(elementToLink, {
           link: null,
@@ -125,6 +128,7 @@ const ElementLinkDialog = ({
             if (!linkEdited) {
               setLinkEdited(true);
             }
+
             setNextLink(value);
           }}
           onKeyDown={(event) => {

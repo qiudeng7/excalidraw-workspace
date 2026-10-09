@@ -87,7 +87,9 @@ export const EyeDropper: React.FC<{
     if (!eyeDropperContainer) {
       return;
     }
+
     eyeDropperContainer.style.cursor = eyeDropperCursor;
+
     return () => {
       eyeDropperContainer.style.cursor = "";
     };
@@ -268,6 +270,7 @@ export const EyeDropper: React.FC<{
       ) {
         return true;
       }
+
       // consider all other clicks as outside
       return false;
     },

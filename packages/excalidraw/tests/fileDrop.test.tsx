@@ -29,6 +29,7 @@ const drag = (
     clientY: 200,
     ...init,
   });
+
   Object.defineProperty(event, "dataTransfer", {
     value: {
       dropEffect: "none",
@@ -42,6 +43,7 @@ const drag = (
     },
   });
   fireEvent(target, event);
+
   return event as MouseEvent & { dataTransfer: { dropEffect: string } };
 };
 
@@ -85,6 +87,7 @@ describe("file drop overlay", () => {
   it("updates when Shift changes through drag events or keyboard events", async () => {
     await render(<Excalidraw />);
     const canvas = GlobalTestState.interactiveCanvas;
+
     drag(canvas, "dragenter", { shiftKey: true });
     expect(overlay()?.textContent).toContain("Drop to add to canvas");
 
@@ -103,6 +106,7 @@ describe("file drop overlay", () => {
     async (type) => {
       await render(<Excalidraw />);
       const canvas = GlobalTestState.interactiveCanvas;
+
       drag(canvas, "dragenter");
       expect(overlay()).not.toBeNull();
 
@@ -113,6 +117,7 @@ describe("file drop overlay", () => {
       } else {
         drag(h.app.ownerDocument.body, type);
       }
+
       expect(overlay()).toBeNull();
       drag(canvas, "dragenter");
       expect(overlay()).not.toBeNull();
@@ -155,6 +160,7 @@ describe("file drop overlay", () => {
     const file = new h.app.ownerWindow.File([], "file", {
       type: MIME_TYPES.excalidrawlib,
     });
+
     drag(GlobalTestState.interactiveCanvas, "dragenter", { files: [file] });
     expect(overlay()?.textContent).toContain("Drop to import library");
   });
@@ -163,6 +169,7 @@ describe("file drop overlay", () => {
     await render(<Excalidraw />);
     const canvas = GlobalTestState.interactiveCanvas;
     const untyped = new h.app.ownerWindow.File([], "file", { type: "" });
+
     drag(canvas, "dragenter", { files: [untyped] });
     expect(overlay()?.textContent).toContain("Drop to replace content");
     expect(overlay()?.textContent).toContain("Library files will append");
@@ -171,6 +178,7 @@ describe("file drop overlay", () => {
     const json = new h.app.ownerWindow.File([], "file", {
       type: MIME_TYPES.json,
     });
+
     drag(canvas, "dragenter", { files: [json] });
     expect(overlay()?.textContent).toContain("Drop to replace content");
     expect(overlay()?.textContent).not.toContain("Library files");
@@ -202,6 +210,7 @@ describe("dropping scenes", () => {
 
   it("replaces the scene by default, removes the overlay, and toasts how to undo", async () => {
     const original = h.elements[0];
+
     drag(GlobalTestState.interactiveCanvas, "dragenter");
     drag(GlobalTestState.interactiveCanvas, "drop", { files: [sceneFile()] });
     expect(overlay()).toBeNull();
@@ -223,6 +232,7 @@ describe("dropping scenes", () => {
 
   it("toasts how to undo when a scene embedded in an image replaces the scene", async () => {
     const file = await API.loadFile("./fixtures/smiley_embedded_v2.png");
+
     drag(GlobalTestState.interactiveCanvas, "drop", { files: [file] });
     await waitFor(() =>
       expect(h.elements).toEqual([
@@ -234,6 +244,7 @@ describe("dropping scenes", () => {
 
   it("Shift-drop keeps existing content and settings, remaps IDs, and can be undone", async () => {
     const original = h.elements[0];
+
     drag(GlobalTestState.interactiveCanvas, "dragenter");
     drag(GlobalTestState.interactiveCanvas, "drop", {
       files: [sceneFile()],
@@ -259,6 +270,7 @@ describe("dropping scenes", () => {
     "Shift-drop adds the scene embedded in a %s",
     async (ext) => {
       const file = await API.loadFile(`./fixtures/smiley_embedded_v2.${ext}`);
+
       drag(GlobalTestState.interactiveCanvas, "drop", {
         files: [file],
         shiftKey: true,
@@ -293,11 +305,13 @@ describe("ignoring drops", () => {
 
       drag(canvas, "dragenter");
       const dragOver = drag(canvas, "dragover");
+
       expect(dragOver.defaultPrevented).toBe(true);
       expect(dragOver.dataTransfer.dropEffect).toBe("none");
       expect(overlay()).toBeNull();
 
       const drop = drag(canvas, "drop", { files: [sceneFile()] });
+
       expect(drop.defaultPrevented).toBe(true);
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(h.elements).toEqual([original]);
@@ -311,14 +325,18 @@ it("cancels file drags over a modal so the browser doesn't open the file", async
   act(() => h.app.setState({ openDialog: { name: "help" } }));
   const modal = await waitFor(() => {
     const modal = document.querySelector(".excalidraw-modal-container .Modal");
+
     expect(modal).not.toBeNull();
+
     return modal!;
   });
+
   expect(GlobalTestState.interactiveCanvas.closest(".excalidraw")).not.toBe(
     modal.closest(".excalidraw"),
   );
 
   const dragOver = drag(modal, "dragover");
+
   expect(dragOver.defaultPrevented).toBe(true);
   expect(dragOver.dataTransfer.dropEffect).toBe("none");
   expect(drag(modal, "drop").defaultPrevented).toBe(true);

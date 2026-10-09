@@ -113,11 +113,14 @@ const ImageExportModal = ({
 
   useEffect(() => {
     const previewNode = previewRef.current;
+
     if (!previewNode) {
       return;
     }
+
     const maxWidth = previewNode.offsetWidth;
     const maxHeight = previewNode.offsetHeight;
+
     if (!maxWidth) {
       return;
     }
@@ -155,6 +158,7 @@ const ImageExportModal = ({
           if (error.name === "CANVAS_POSSIBLY_TOO_BIG") {
             throw new Error(t("canvasError.canvasTooBig"));
           }
+
           throw error;
         }
 

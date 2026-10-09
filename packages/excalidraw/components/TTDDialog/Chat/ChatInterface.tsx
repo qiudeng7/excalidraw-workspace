@@ -67,16 +67,19 @@ export const ChatInterface = ({
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = event.target.value;
+
     onPromptChange(value);
   };
 
   const handleSubmit = () => {
     if (isGenerating && onAbort) {
       onAbort();
+
       return;
     }
 
     const trimmedPrompt = currentPrompt.trim();
+
     if (!trimmedPrompt) {
       return;
     }
@@ -103,6 +106,7 @@ export const ChatInterface = ({
 
   const onInput: FormEventHandler<HTMLTextAreaElement> = (ev) => {
     const target = ev.target as HTMLTextAreaElement;
+
     target.style.height = "auto";
     target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
   };
@@ -162,10 +166,12 @@ export const ChatInterface = ({
                 isGenerating
                   ? t("chat.generating")
                   : rateLimits?.rateLimitRemaining === 0
-                  ? t("chat.rateLimit.messageLimitInputPlaceholder")
-                  : messages.length > 0
-                  ? t("chat.inputPlaceholderWithMessages")
-                  : t("chat.inputPlaceholder", { shortcut: "Shift + Enter" })
+                    ? t("chat.rateLimit.messageLimitInputPlaceholder")
+                    : messages.length > 0
+                      ? t("chat.inputPlaceholderWithMessages")
+                      : t("chat.inputPlaceholder", {
+                          shortcut: "Shift + Enter",
+                        })
               }
               disabled={rateLimits?.rateLimitRemaining === 0}
               rows={1}

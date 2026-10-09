@@ -6,6 +6,7 @@ export const IV_LENGTH_BYTES = 12;
 
 export const createIV = (): Uint8Array<ArrayBuffer> => {
   const arr = new Uint8Array(IV_LENGTH_BYTES);
+
   return window.crypto.getRandomValues(arr);
 };
 
@@ -22,6 +23,7 @@ export const generateEncryptionKey = async <
     true, // extractable
     ["encrypt", "decrypt"],
   );
+
   return (
     returnAs === "cryptoKey"
       ? key
@@ -58,10 +60,10 @@ export const encryptData = async (
     typeof data === "string"
       ? new TextEncoder().encode(data)
       : data instanceof Uint8Array
-      ? data
-      : data instanceof Blob
-      ? await blobToArrayBuffer(data)
-      : data;
+        ? data
+        : data instanceof Blob
+          ? await blobToArrayBuffer(data)
+          : data;
 
   // We use symmetric encryption. AES-GCM is the recommended algorithm and
   // includes checks that the ciphertext has not been modified by an attacker.
@@ -83,6 +85,7 @@ export const decryptData = async (
   privateKey: string,
 ): Promise<ArrayBuffer> => {
   const key = await getCryptoKey(privateKey, "decrypt");
+
   return window.crypto.subtle.decrypt(
     {
       name: "AES-GCM",

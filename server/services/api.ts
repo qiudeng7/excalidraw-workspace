@@ -1,6 +1,7 @@
 import type { RepositoryPort, ObjectStore } from "../storage/repository";
 import { ApiError, json } from "./http";
 import { dispatchRequest } from "./composition";
+
 /** Platform adapter supplies owned storage and request environment to the application boundary. */
 export interface BackendContext {
   repository: RepositoryPort;
@@ -9,6 +10,7 @@ export interface BackendContext {
   clientIp: string;
   waitUntil(promise: Promise<unknown>): void;
 }
+
 export async function handleApi(
   req: Request,
   env: BackendContext,
@@ -25,6 +27,7 @@ export async function handleApi(
       "API operation failed",
       error instanceof Error ? error.message : "unknown",
     );
+
     return json(
       {
         error: {

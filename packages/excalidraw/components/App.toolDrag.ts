@@ -51,6 +51,7 @@ export const DRAGGABLE_TOOLS: Partial<Record<ToolType, DraggableTool>> = {
     createElement: (app, center) => {
       const size = DEFAULT_STICKY_NOTE_SIZE;
       const { state } = app;
+
       return newStickyNoteElement({
         type: "stickynote",
         ...centered(center, size, size),
@@ -120,9 +121,11 @@ export class AppToolDrag {
    */
   handleButtonPointerDown = (type: ToolType, event: PointerEvent) => {
     const tool = DRAGGABLE_TOOLS[type];
+
     if (!tool || event.button !== 0 || !this.app.isInteractionEnabled()) {
       return false;
     }
+
     this.cancel();
     this.armed = {
       type,
@@ -133,6 +136,7 @@ export class AppToolDrag {
     this.tool = tool;
     this.type = type;
     this.addListeners();
+
     return true;
   };
 
@@ -140,16 +144,20 @@ export class AppToolDrag {
     if (!this.armed || event.pointerId !== this.armed.pointerId) {
       return;
     }
+
     if (!this.preview) {
       const moved = Math.hypot(
         event.clientX - this.armed.clientX,
         event.clientY - this.armed.clientY,
       );
+
       if (moved < DRAGGING_THRESHOLD) {
         return;
       }
+
       trackEvent("toolbar", this.armed.type, "drag");
     }
+
     const preview = this.tool!.createElement(
       this.app,
       viewportCoordsToSceneCoords(event, this.app.state),
@@ -160,6 +168,7 @@ export class AppToolDrag {
       preview.y,
       event[KEYS.CTRL_OR_CMD] ? null : this.app.getEffectiveGridSize(),
     );
+
     this.preview = { ...preview, x, y };
     this.app.triggerRender();
   };
@@ -168,17 +177,23 @@ export class AppToolDrag {
     if (!this.armed || event.pointerId !== this.armed.pointerId) {
       return;
     }
+
     const { preview, tool, type } = this;
+
     // the button's own click handles a press that never became a drag
     if (!preview) {
       this.cancel();
+
       return;
     }
+
     this.cancel();
     if (!this.isOverCanvas(event)) {
       return;
     }
+
     const { app } = this;
+
     app.insertNewElement(preview);
     app.store.scheduleCapture();
     app.setState({
@@ -205,6 +220,7 @@ export class AppToolDrag {
   /** drop the gesture without a trace */
   cancel = () => {
     const wasDragging = this.preview !== null;
+
     this.armed = null;
     this.tool = null;
     this.type = null;
@@ -223,11 +239,13 @@ export class AppToolDrag {
       event.clientX,
       event.clientY,
     ) ?? event.target) as Element | null;
+
     return !!target?.closest?.(".excalidraw__canvas");
   };
 
   private addListeners = () => {
     const { ownerWindow } = this.app;
+
     ownerWindow.addEventListener(EVENT.POINTER_MOVE, this.onPointerMove);
     ownerWindow.addEventListener(EVENT.POINTER_UP, this.onPointerUp);
     ownerWindow.addEventListener(EVENT.POINTER_CANCEL, this.cancel);
@@ -237,6 +255,7 @@ export class AppToolDrag {
 
   private removeListeners = () => {
     const { ownerWindow } = this.app;
+
     ownerWindow.removeEventListener(EVENT.POINTER_MOVE, this.onPointerMove);
     ownerWindow.removeEventListener(EVENT.POINTER_UP, this.onPointerUp);
     ownerWindow.removeEventListener(EVENT.POINTER_CANCEL, this.cancel);

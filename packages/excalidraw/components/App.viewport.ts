@@ -45,6 +45,7 @@ import type {
 import type App from "./App";
 
 export const SCROLL_TO_CONTENT_ANIMATION_KEY = "animateScrollToContent";
+
 export const SCROLL_CONSTRAINTS_SNAP_BACK_ANIMATION_KEY =
   "animateScrollConstraintsSnapBack";
 
@@ -78,6 +79,7 @@ const isSetViewportRect = (target: unknown): target is SetViewportRect => {
   }
 
   const rect = target as Partial<SetViewportRect>;
+
   return (
     typeof rect.x === "number" &&
     typeof rect.y === "number" &&
@@ -91,6 +93,7 @@ const getElementsFromId = (
   elementsMap: NonDeletedSceneElementsMap,
 ) => {
   const element = elementsMap.get(id);
+
   if (element) {
     return [element];
   }
@@ -133,6 +136,7 @@ const resolveViewportTarget = (
   if (isSetViewportRect(target) && !isExcalidrawElement(target)) {
     const width = target.width ?? appState.width;
     const height = target.height ?? appState.height;
+
     return {
       bounds: [target.x, target.y, target.x + width, target.y + height],
       type: "area",
@@ -147,16 +151,19 @@ const resolveViewportTarget = (
     (acc, element) => {
       if (element && !element.isDeleted) {
         const sceneElement = elementsMap.get(element.id);
+
         if (sceneElement) {
           acc.push(sceneElement);
         }
       }
+
       return acc;
     },
     [],
   );
 
   const hasNoElements = !elements.length;
+
   if (elements.length !== targetElements.length || hasNoElements) {
     console.warn(
       "supplied element target(s) for setViewport contain deleted or non-existent elements which have been filtered out",
@@ -176,9 +183,11 @@ const resolveOverscroll = (
   if (overscroll === false) {
     return 0;
   }
+
   if (overscroll === true || overscroll == null) {
     return DEFAULT_OVERSCROLL;
   }
+
   return Math.max(overscroll, 0);
 };
 
@@ -312,9 +321,11 @@ const resolveAnimationDuration = (
   if (animation === false) {
     return null;
   }
+
   if (animation === true || animation == null) {
     return DEFAULT_SCROLL_ANIMATION_DURATION;
   }
+
   return animation.duration ?? DEFAULT_SCROLL_ANIMATION_DURATION;
 };
 
@@ -345,6 +356,7 @@ const animateToViewport = (
           ...interpolateViewport({ from, target, factor }),
           shouldCacheIgnoreZoom: true,
         });
+
         return { elapsed };
       }
 
@@ -417,6 +429,7 @@ export const snapBackToConstraints = (
 
         const restingViewport = constrainScrollState(currentState);
         const zoom = restingViewport.zoom.value;
+
         return {
           scrollX: restingViewport.scrollX + (overscrollX * remaining) / zoom,
           scrollY: restingViewport.scrollY + (overscrollY * remaining) / zoom,
@@ -476,6 +489,7 @@ export class AppViewport {
     const domRect = node.getBoundingClientRect();
     const left = domRect.left - containerRect.left;
     const right = domRect.right - containerRect.left;
+
     return left + domRect.width / 2 < this.app.state.width / 2
       ? { side: "left" as const, offset: right }
       : { side: "right" as const, offset: this.app.state.width - left };
@@ -493,13 +507,16 @@ export class AppViewport {
     const sidebar = container?.querySelector<HTMLElement>(
       '[data-viewport-ui="side"][data-viewport-ui-name="sidebar"]',
     );
+
     if (container && sidebar) {
       const { side, offset } = this.measureSide(
         sidebar,
         container.getBoundingClientRect(),
       );
+
       insets[side] = Math.max(0, offset);
     }
+
     return insets;
   };
 
@@ -575,14 +592,15 @@ export class AppViewport {
             measuredOffsets[side] = Math.max(measuredOffsets[side], offset);
 
             const name = node.dataset.viewportUiName as
-              | ViewportUIName
-              | undefined;
+              ViewportUIName | undefined;
+
             if (name) {
               renderedSurfaces.add(name);
               if (offset > 0) {
                 this.uiLastMeasured.set(name, { side, offset });
               }
             }
+
             break;
           }
         }
@@ -597,7 +615,9 @@ export class AppViewport {
         if (renderedSurfaces.has(name)) {
           return;
         }
+
         const { side, offset } = this.uiLastMeasured.get(name) ?? fallback;
+
         measuredOffsets[side] = Math.max(measuredOffsets[side], offset);
       };
 
@@ -610,6 +630,7 @@ export class AppViewport {
               : STYLES_PANEL_APPROX_WIDTH.full,
         });
       }
+
       if (opts.reserve.sidebar) {
         reserveSurface("sidebar", {
           side: isRTL ? "left" : "right",
@@ -678,6 +699,7 @@ export class AppViewport {
         scrollConstraints: null,
         shouldCacheIgnoreZoom: false,
       });
+
       return;
     }
 
@@ -699,6 +721,7 @@ export class AppViewport {
           },
         });
       }
+
       return;
     }
 
@@ -729,12 +752,14 @@ export class AppViewport {
         ...viewportUpdate,
         shouldCacheIgnoreZoom: false,
       });
+
       return;
     }
 
     const transition = {
       target: viewportUpdate,
     };
+
     this.activeTransition = transition;
 
     // The old lock has been superseded. Keep the new lock pending outside
@@ -796,29 +821,37 @@ export class AppViewport {
     if (this.activeTransition) {
       this.app.setState({ shouldCacheIgnoreZoom: false });
     }
+
     this.cancelTransition();
     if (!opts?.preserveScrollConstraintsSnapBack) {
       AnimationController.cancel(SCROLL_CONSTRAINTS_SNAP_BACK_ANIMATION_KEY);
     }
+
     this.app.requestUnfollow();
 
     this.app.setState((prevState, props) => {
       const update =
         typeof state === "function" ? state(prevState, props) : state;
+
       if (!update) {
         return null;
       }
+
       const nextState = { ...prevState, ...update };
+
       if (!nextState.scrollConstraints) {
         return update;
       }
+
       const zoomed =
         !opts?.zoomPreConstrained &&
         nextState.zoom.value !== prevState.zoom.value;
       const overscroll = zoomed ? 0 : nextState.scrollConstraints.overscroll;
+
       if (overscroll > 0) {
         this.snapBackDebounced();
       }
+
       return { ...nextState, ...constrainScrollState(nextState, overscroll) };
     });
 
@@ -839,6 +872,7 @@ export class AppViewport {
     if (!this.app.state.scrollConstraints) {
       return;
     }
+
     this.snapBackDebounced.cancel();
     this.snapBack();
   };
@@ -847,6 +881,7 @@ export class AppViewport {
     if (this.app.unmounted || this.dependencies.isGestureActive()) {
       return;
     }
+
     snapBackToConstraints(this.app.state, (updater) =>
       this.app.setState((state) => updater(state)),
     );

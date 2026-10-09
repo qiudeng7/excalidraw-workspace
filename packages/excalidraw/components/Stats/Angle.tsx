@@ -38,20 +38,24 @@ const handleDegreeChange: DragInputCallbackType<AngleProps["property"]> = ({
 }) => {
   const elementsMap = scene.getNonDeletedElementsMap();
   const origElement = originalElements[0];
+
   if (origElement && !isElbowArrow(origElement)) {
     const latestElement = elementsMap.get(origElement.id);
+
     if (!latestElement) {
       return;
     }
 
     if (nextValue !== undefined) {
       const nextAngle = degreesToRadians(nextValue as Degrees);
+
       scene.mutateElement(latestElement, {
         angle: nextAngle,
       });
       updateBindings(latestElement, scene, app.state);
 
       const boundTextElement = getBoundTextElement(latestElement, elementsMap);
+
       if (boundTextElement && !isArrowElement(latestElement)) {
         scene.mutateElement(boundTextElement, { angle: nextAngle });
       }
@@ -63,6 +67,7 @@ const handleDegreeChange: DragInputCallbackType<AngleProps["property"]> = ({
       Math.round(radiansToDegrees(origElement.angle) * 100) / 100;
     const changeInDegrees = Math.round(accumulatedChange);
     let nextAngleInDegrees = (originalAngleInDegrees + changeInDegrees) % 360;
+
     if (shouldChangeByStepSize) {
       nextAngleInDegrees = getStepSizedValue(nextAngleInDegrees, STEP_SIZE);
     }
@@ -78,6 +83,7 @@ const handleDegreeChange: DragInputCallbackType<AngleProps["property"]> = ({
     updateBindings(latestElement, scene, app.state);
 
     const boundTextElement = getBoundTextElement(latestElement, elementsMap);
+
     if (boundTextElement && !isArrowElement(latestElement)) {
       scene.mutateElement(boundTextElement, { angle: nextAngle });
     }

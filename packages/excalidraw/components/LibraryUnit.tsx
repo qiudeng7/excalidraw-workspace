@@ -68,10 +68,12 @@ export const LibraryUnit = memo(
                 const nameEl = showName
                   ? event.currentTarget.querySelector(".library-unit__name")
                   : null;
+
                 // name is already shown below the item, unless truncated
                 if (nameEl && nameEl.scrollWidth <= nameEl.clientWidth) {
                   return;
                 }
+
                 showTooltip(event.currentTarget, name!, {
                   delay: true,
                   position: "top",
@@ -103,8 +105,10 @@ export const LibraryUnit = memo(
           onDragStart={(event) => {
             if (!id) {
               event.preventDefault();
+
               return;
             }
+
             setIsHovered(false);
             onDrag(id, event);
           }}

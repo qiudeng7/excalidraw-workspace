@@ -28,11 +28,13 @@ export class Emitter<T extends any[] = []> {
     _handlers.push(() => detach());
 
     const detach = this.on(..._handlers);
+
     return detach;
   }
 
   off(...handlers: Subscriber<T>[] | Subscriber<T>[][]) {
     const _handlers = handlers.flat();
+
     this.subscribers = this.subscribers.filter(
       (handler) => !_handlers.includes(handler),
     );
@@ -42,6 +44,7 @@ export class Emitter<T extends any[] = []> {
     for (const handler of this.subscribers) {
       handler(...payload);
     }
+
     return this;
   }
 

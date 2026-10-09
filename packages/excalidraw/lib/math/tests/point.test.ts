@@ -14,12 +14,14 @@ describe("rotate", () => {
       pointFrom(x2, y2),
       angle,
     );
+
     expect([rotatedX, rotatedY]).toEqual([30, 20]);
     const res2 = pointRotateRads(
       pointFrom(rotatedX, rotatedY),
       pointFrom(x2, y2),
       -angle as Radians,
     );
+
     expect(res2).toEqual([x1, x2]);
   });
 });

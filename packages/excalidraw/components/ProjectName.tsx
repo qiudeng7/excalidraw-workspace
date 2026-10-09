@@ -22,7 +22,9 @@ export const ProjectName = (props: Props) => {
     if (!props.ignoreFocus) {
       focusNearestParent(event.target);
     }
+
     const value = event.target.value;
+
     if (value !== props.value) {
       props.onChange(value);
     }
@@ -34,6 +36,7 @@ export const ProjectName = (props: Props) => {
       if (event.nativeEvent.isComposing || event.keyCode === 229) {
         return;
       }
+
       event.currentTarget.blur();
     }
   };

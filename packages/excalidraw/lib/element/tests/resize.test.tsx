@@ -41,6 +41,7 @@ import type {
   NonDeleted,
 } from "../src/types";
 import type { TransformHandleDirection } from "../src/transformHandles";
+
 unmountComponent();
 
 const { h } = window;
@@ -102,6 +103,7 @@ describe("generic element", () => {
           width: 200,
           height: 100,
         });
+
         UI.resize(rectangle, handle, move);
 
         expect(rectangle.x).toBeCloseTo(x);
@@ -131,6 +133,7 @@ describe("generic element", () => {
           width: 200,
           height: 100,
         });
+
         UI.resize(rectangle, handle, move);
 
         expect(rectangle.x).toBeCloseTo(x);
@@ -147,6 +150,7 @@ describe("generic element", () => {
       width: 200,
       height: 100,
     });
+
     UI.resize(rectangle, "se", [100, 10], { shift: true });
 
     expect(rectangle.x).toBeCloseTo(0);
@@ -169,6 +173,7 @@ describe("generic element", () => {
       width: 200,
       height: 100,
     });
+
     UI.resize(rectangle, "nw", [20, 10], { alt: true });
 
     expect(rectangle.x).toBeCloseTo(20);
@@ -216,6 +221,7 @@ describe("generic element", () => {
       height: 100,
     });
     const label = await UI.editText(rectangle, "Hello world");
+
     UI.resize(rectangle, "se", [50, 50]);
 
     expect(label.x + label.width / 2).toBeCloseTo(
@@ -303,6 +309,7 @@ describe("generic element", () => {
         alt: true,
       });
       const newCenterY = rectangle.y + rectangle.height / 2;
+
       expect(newCenterY).toBeCloseTo(initCenterY);
       expect(rectangle.height).toBeCloseTo(minContainerHeight);
     },
@@ -345,6 +352,7 @@ describe("generic element", () => {
         minHeight = rectangle.height;
         expect(minHeight).toBeGreaterThan(80);
       }
+
       expect(rectangle.height).toBe(Math.max(minHeight, -nextHeight));
     }
   });
@@ -468,6 +476,7 @@ describe("line element", () => {
     expect(element.points[0]).toEqual([0, 0]);
 
     const { width, height } = getSizeFromPoints(element.points);
+
     expect(width).toBe(element.width);
     expect(height).toBe(element.height);
   });
@@ -586,9 +595,11 @@ describe("arrow element", () => {
     // uses cannot cancel out of the comparison
     const sampledPathMidpoint = (): GlobalPoint => {
       const samples: GlobalPoint[] = [];
+
       for (const segment of getLinearElementPathSegments(arrow, elementsMap)) {
         for (let i = 0; i <= 1000; i++) {
           const t = i / 1000;
+
           samples.push(
             isCurve(segment)
               ? bezierEquation(segment, t)
@@ -599,13 +610,17 @@ describe("arrow element", () => {
           );
         }
       }
+
       const cumulative = [0];
+
       for (let i = 1; i < samples.length; i++) {
         cumulative.push(
           cumulative[i - 1] + pointDistance(samples[i - 1], samples[i]),
         );
       }
+
       const half = cumulative[cumulative.length - 1] / 2;
+
       return samples[cumulative.findIndex((length) => length >= half)];
     };
 
@@ -643,6 +658,7 @@ describe("arrow element", () => {
 
     const { x, width, height } = arrow;
     const latestArrow = h.app.scene.getNonDeletedElement(arrow.id)!;
+
     act(() => {
       resizeSingleElement(
         -2 * width,
@@ -669,6 +685,7 @@ describe("arrow element", () => {
       width: 95,
       height: 100,
     });
+
     UI.clickTool("arrow");
     UI.clickOnTestId("elbow-arrow");
     mouse.reset();
@@ -697,6 +714,7 @@ describe("arrow element", () => {
       width: 95,
       height: 100,
     });
+
     UI.clickTool("arrow");
     UI.clickOnTestId("elbow-arrow");
     mouse.reset();
@@ -721,9 +739,11 @@ describe("arrow element", () => {
 describe("text element", () => {
   it("resizes", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "hello\nworld");
     const { width, height, fontSize } = text;
     const scale = 40 / height + 1;
+
     UI.resize(text, "se", [30, 40]);
 
     expect(text.x).toBeCloseTo(0);
@@ -737,9 +757,11 @@ describe("text element", () => {
   // TODO enable this test after adding single text element flipping
   it.skip("flips while resizing", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "hello\nworld");
     const { width, height, fontSize } = text;
     const scale = 100 / width - 1;
+
     UI.resize(text, "nw", [100, 80]);
 
     expect(text.x).toBeCloseTo(width);
@@ -753,9 +775,11 @@ describe("text element", () => {
   // TODO enable this test after fixing text resizing from center
   it.skip("resizes from center", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "hello\nworld");
     const { x, y, width, height, fontSize } = text;
     const scale = 80 / height + 1;
+
     UI.resize(text, "nw", [-25, -40], { alt: true });
 
     expect(text.x).toBeCloseTo(x - ((scale - 1) * width) / 2);
@@ -794,8 +818,10 @@ describe("text element", () => {
 
   it("updates font size via keyboard", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "abc");
     const { fontSize } = text;
+
     mouse.select(text);
 
     Keyboard.withModifierKeys({ shift: true, ctrl: true }, () => {
@@ -810,6 +836,7 @@ describe("text element", () => {
   // text can be resized from sides
   it("can be resized from e", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "Excalidraw\nEditor");
 
     const width = text.width;
@@ -826,6 +853,7 @@ describe("text element", () => {
 
   it("can be resized from w", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "Excalidraw\nEditor");
 
     const width = text.width;
@@ -842,6 +870,7 @@ describe("text element", () => {
 
   it("wraps when width is narrower than texts inside", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "Excalidraw\nEditor");
 
     const prevWidth = text.width;
@@ -875,6 +904,7 @@ describe("text element", () => {
 
   it("keeps properties when wrapped", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "Excalidraw\nEditor");
 
     const alignment = text.textAlign;
@@ -896,6 +926,7 @@ describe("text element", () => {
 
   it("has a minimum width when wrapped", async () => {
     const text = UI.createElement("text");
+
     await UI.editText(text, "Excalidraw\nEditor");
 
     const width = text.width;
@@ -917,6 +948,7 @@ describe("text element", () => {
 describe("image element", () => {
   it("resizes", async () => {
     const image = API.createElement({ type: "image", width: 100, height: 100 });
+
     API.setElements([image]);
     UI.resize(image, "ne", [-20, -30]);
 
@@ -930,6 +962,7 @@ describe("image element", () => {
 
   it("flips while resizing", async () => {
     const image = API.createElement({ type: "image", width: 100, height: 100 });
+
     API.setElements([image]);
     UI.resize(image, "sw", [150, -150]);
 
@@ -943,6 +976,7 @@ describe("image element", () => {
 
   it("resizes with locked/unlocked aspect ratio", async () => {
     const image = API.createElement({ type: "image", width: 100, height: 100 });
+
     API.setElements([image]);
     UI.resize(image, "ne", [30, -20]);
 
@@ -961,6 +995,7 @@ describe("image element", () => {
 
   it("resizes from center", async () => {
     const image = API.createElement({ type: "image", width: 100, height: 100 });
+
     API.setElements([image]);
     UI.resize(image, "nw", [25, 15], { alt: true });
 
@@ -1294,6 +1329,7 @@ describe("multiple selection", () => {
     const move = [80, 0] as [number, number];
     const scale = move[0] / selectionWidth + 1;
     const elementsMap = arrayToMap(h.elements);
+
     UI.resize([topArrow.get(), bottomArrow.get()], "se", move, {
       shift: true,
     });
@@ -1345,11 +1381,13 @@ describe("multiple selection", () => {
 
   it("resizes with text elements", async () => {
     const topText = UI.createElement("text", { position: 0 });
+
     await UI.editText(topText, "lorem ipsum");
 
     UI.clickTool("text");
     UI.clickByTitle("Large");
     const bottomText = UI.createElement("text", { position: 40 });
+
     await UI.editText(bottomText, "dolor\nsit amet");
 
     const selectionWidth = 40 + bottomText.width;
@@ -1388,6 +1426,7 @@ describe("multiple selection", () => {
       width: 120,
       height: 80,
     });
+
     API.setElements([topImage, bottomImage]);
 
     const selectionWidth = 200;
@@ -1460,6 +1499,7 @@ describe("multiple selection", () => {
       height: 100,
       angle: (Math.PI * 7) / 6,
     });
+
     API.setElements([image]);
 
     const line = UI.createElement("line", {
@@ -1499,6 +1539,7 @@ describe("multiple selection", () => {
     const scaleY = -scaleX;
     const lineOrigBounds = getBoundsFromPoints(line);
     const elementsMap = arrayToMap(h.elements);
+
     UI.resize([line, image, rectangle, boundArrow], "se", move, {
       shift: true,
     });

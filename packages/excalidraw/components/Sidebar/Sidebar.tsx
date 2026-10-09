@@ -69,6 +69,7 @@ export const SidebarInner = forwardRef(
 
     useLayoutEffect(() => {
       setIsSidebarDockedAtom(!!docked);
+
       return () => {
         setIsSidebarDockedAtom(false);
       };
@@ -77,9 +78,11 @@ export const SidebarInner = forwardRef(
     const headerPropsRef = useRef<SidebarPropsContextValue>(
       {} as SidebarPropsContextValue,
     );
+
     headerPropsRef.current.onCloseRequest = () => {
       setAppState({ openSidebar: null });
     };
+
     headerPropsRef.current.onDock = (isDocked) => onDock?.(isDocked);
     // renew the ref object if the following props change since we want to
     // rerender. We can't pass down as component props manually because
@@ -105,6 +108,7 @@ export const SidebarInner = forwardRef(
       if (isDialogOpen) {
         return;
       }
+
       setAppState({ openSidebar: null });
     }, [setAppState]);
 
@@ -117,6 +121,7 @@ export const SidebarInner = forwardRef(
           if ((event.target as Element).closest(".sidebar-trigger")) {
             return;
           }
+
           if (!docked || !editorInterface.canFitSidebar) {
             closeLibrary();
           }
@@ -134,7 +139,9 @@ export const SidebarInner = forwardRef(
           closeLibrary();
         }
       };
+
       document.addEventListener(EVENT.KEYDOWN, handleKeyDown);
+
       return () => {
         document.removeEventListener(EVENT.KEYDOWN, handleKeyDown);
       };
@@ -174,6 +181,7 @@ export const Sidebar = Object.assign(
     const { onStateChange } = props;
 
     const refPrevOpenSidebar = useRef(appState.openSidebar);
+
     useEffect(() => {
       if (
         // closing sidebar
@@ -192,12 +200,15 @@ export const Sidebar = Object.assign(
             : appState.openSidebar,
         );
       }
+
       refPrevOpenSidebar.current = appState.openSidebar;
     }, [appState.openSidebar, onStateChange, props.name]);
 
     const [mounted, setMounted] = useState(false);
+
     useLayoutEffect(() => {
       setMounted(true);
+
       return () => setMounted(false);
     }, []);
 

@@ -90,6 +90,7 @@ const TextToDiagramContent = ({
 
   const handleMermaidTabClick = (message: TChat.ChatMessage) => {
     const mermaidContent = message.content || "";
+
     if (mermaidContent) {
       saveMermaidDataToStorage(mermaidContent);
       setAppState({
@@ -100,6 +101,7 @@ const TextToDiagramContent = ({
 
   const handleInsertMessage = async (message: TChat.ChatMessage) => {
     const mermaidContent = message.content || "";
+
     if (!mermaidContent.trim() || !mermaidToExcalidrawLib.loaded) {
       return;
     }
@@ -150,6 +152,7 @@ const TextToDiagramContent = ({
 
     if (messageIndex > 0) {
       const previousMessage = chatHistory.messages[messageIndex - 1];
+
       if (
         previousMessage.type === "user" &&
         typeof previousMessage.content === "string"

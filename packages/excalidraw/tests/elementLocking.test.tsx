@@ -159,6 +159,7 @@ describe("element locking", () => {
     expect(API.getSelectedElement().id).toBe(lockedRectangle.id);
 
     const contextMenu = UI.queryContextMenu();
+
     expect(contextMenu).not.toBeNull();
     expect(
       contextMenu?.querySelector(
@@ -191,6 +192,7 @@ describe("element locking", () => {
     expect(API.getSelectedElement().id).toBe(rectangle.id);
 
     const contextMenu = UI.queryContextMenu();
+
     expect(contextMenu).not.toBeNull();
   });
 
@@ -238,6 +240,7 @@ describe("element locking", () => {
       containerId: container.id,
       locked: true,
     });
+
     API.setElements([container, text]);
     API.setSelectedElements([container]);
     Keyboard.keyPress(KEYS.ENTER);
@@ -255,10 +258,12 @@ describe("element locking", () => {
       height: 100,
       locked: true,
     });
+
     API.setElements([text]);
     UI.clickTool("text");
     mouse.clickAt(text.x + 50, text.y + 50);
     const editor = await getTextEditor();
+
     expect(editor).not.toBe(null);
     expect(h.state.editingTextElement?.id).not.toBe(text.id);
     expect(h.elements.length).toBe(2);
@@ -275,10 +280,12 @@ describe("element locking", () => {
       height: 100,
       locked: true,
     });
+
     API.setElements([text]);
     UI.clickTool("selection");
     mouse.doubleClickAt(text.x + 50, text.y + 50);
     const editor = await getTextEditor();
+
     expect(editor).not.toBe(null);
     expect(h.state.editingTextElement?.id).not.toBe(text.id);
     expect(h.elements.length).toBe(2);
@@ -300,6 +307,7 @@ describe("element locking", () => {
       height: textSize,
       containerId: container.id,
     });
+
     h.app.scene.mutateElement(container, {
       boundElements: [{ id: text.id, type: "text" }],
     });
@@ -341,6 +349,7 @@ describe("element locking", () => {
       containerId: container.id,
       locked: true,
     });
+
     h.app.scene.mutateElement(container, {
       boundElements: [{ id: text.id, type: "text" }],
     });
@@ -350,6 +359,7 @@ describe("element locking", () => {
     mouse.doubleClickAt(container.width / 2, container.height / 2);
 
     const editor = await getTextEditor();
+
     expect(editor).not.toBe(null);
     expect(h.state.editingTextElement?.id).not.toBe(text.id);
     expect(h.elements.length).toBe(3);
@@ -373,6 +383,7 @@ describe("element locking", () => {
       containerId: container.id,
       locked: true,
     });
+
     h.app.scene.mutateElement(container, {
       boundElements: [{ id: text.id, type: "text" }],
     });
@@ -382,6 +393,7 @@ describe("element locking", () => {
     mouse.clickAt(container.width / 2, container.height / 2);
 
     const editor = await getTextEditor();
+
     expect(editor).not.toBe(null);
     expect(h.state.editingTextElement?.id).not.toBe(text.id);
     expect(h.elements.length).toBe(3);

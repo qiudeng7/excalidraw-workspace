@@ -7,12 +7,16 @@ export const getTooltipDiv = () => {
   const existingDiv = document.querySelector<HTMLDivElement>(
     ".excalidraw-tooltip",
   );
+
   if (existingDiv) {
     return existingDiv;
   }
+
   const div = document.createElement("div");
+
   document.body.appendChild(div);
   div.classList.add("excalidraw-tooltip");
+
   return div;
 };
 
@@ -34,6 +38,7 @@ export const updateTooltipPosition = (
   const margin = 5;
 
   let left = item.left + item.width / 2 - tooltipRect.width / 2;
+
   if (left < 0) {
     left = margin;
   } else if (left + tooltipRect.width >= viewportWidth) {
@@ -81,6 +86,7 @@ export const hideTooltip = () => {
   tooltipItemObserver?.disconnect();
   tooltipItemObserver = null;
   const tooltip = getTooltipDiv();
+
   if (tooltip.classList.contains("excalidraw-tooltip--visible")) {
     tooltip.classList.remove("excalidraw-tooltip--visible");
     tooltipHiddenAt = Date.now();
@@ -101,6 +107,7 @@ const updateTooltip = (
   tooltip.textContent = label;
 
   const itemRect = item.getBoundingClientRect();
+
   updateTooltipPosition(tooltip, itemRect, position);
 
   tooltipItemObserver?.disconnect();
@@ -139,6 +146,7 @@ export const showTooltip = (
       updateTooltip(item, getTooltipDiv(), label, long, position);
     }
   };
+
   clearTimeout(showTooltipTimer);
   if (delay && Date.now() - tooltipHiddenAt > TOOLTIP_WARM_WINDOW) {
     showTooltipTimer = window.setTimeout(show, TOOLTIP_DELAY);
@@ -173,6 +181,7 @@ export const Tooltip = ({
   if (disabled) {
     return null;
   }
+
   return (
     <div
       className={clsx("excalidraw-tooltip-wrapper", className)}

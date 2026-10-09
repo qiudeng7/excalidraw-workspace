@@ -14,7 +14,9 @@ import {
   validRevision,
 } from "../http";
 import type { RouteHandler } from "../routing";
+
 const EMPTY_SCENE: CanvasScene = { elements: [], appState: {}, files: {} };
+
 export interface CanvasRoutesDependencies {
   request: Request;
   repository: Pick<RepositoryPort, "renameCanvas" | "deleteCanvas">;
@@ -23,6 +25,7 @@ export interface CanvasRoutesDependencies {
   snapshots: Snapshots;
   waitUntil: (promise: Promise<unknown>) => void;
 }
+
 export function createCanvasRoutes({
   request,
   repository,
@@ -38,9 +41,11 @@ export function createCanvasRoutes({
       const method = req.method;
       const user = await authentication.requireUser();
       const canvasMatch = path.match(/^\/api\/canvases\/([^/]+)$/);
+
       if (canvasMatch) {
         const id = canvasMatch[1]!;
         const row = await ownedResources.canvas(id, user);
+
         if (method === "GET") {
           try {
             return json({
@@ -57,6 +62,7 @@ export function createCanvasRoutes({
             )
               throw error;
             const latest = await ownedResources.canvas(id, user);
+
             return json({
               canvas: {
                 ...meta(latest),
@@ -65,16 +71,20 @@ export function createCanvasRoutes({
             });
           }
         }
+
         if (method === "PATCH") {
           const data = await body(req);
+
           await repository.renameCanvas(
             id,
             user.id,
             name(data.name),
             new Date().toISOString(),
           );
+
           return json({ canvas: meta(await ownedResources.canvas(id, user)) });
         }
+
         if (method === "DELETE") {
           const ws = await ownedResources.workspace(row.workspaceId, user);
           const data = req.body ? await body(req) : {};
@@ -87,6 +97,7 @@ export function createCanvasRoutes({
             row.workspaceId,
             revision,
           );
+
           if (!result.changed)
             return fail(
               409,
@@ -94,11 +105,14 @@ export function createCanvasRoutes({
               "列表已在其他页面更新，请重新加载",
             );
           if (result.objectKey) waitUntil(snapshots.delete([result.objectKey]));
+
           return json({ catalogRevision: revision + 1 });
         }
+
         if (method === "PUT") {
           const data = await body(req);
           const scene = data.scene;
+
           if (
             !isObject(scene) ||
             !Array.isArray(scene.elements) ||
@@ -106,6 +120,7 @@ export function createCanvasRoutes({
             !isObject(scene.files)
           )
             return fail(400, "INVALID_SCENE", "画布数据格式无效");
+
           return json(
             await snapshots.save(user, "canvas", id, row, data.revision, scene),
           );

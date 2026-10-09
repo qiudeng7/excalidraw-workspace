@@ -34,6 +34,7 @@ const createMockAPI = (initialState: AppState) => {
     > as ExcalidrawImperativeAPI,
     updateAppState: (partial: Partial<AppState>) => {
       const prevState = state;
+
       state = { ...state, ...partial };
       observer.flush(prevState);
     },
@@ -51,7 +52,9 @@ describe("app state hooks", () => {
 
     const ValueConsumer = () => {
       const value = useAppStateValue("viewModeEnabled");
+
       renderSpy(value);
+
       return <div data-testid="value">{String(value)}</div>;
     };
 
@@ -79,7 +82,9 @@ describe("app state hooks", () => {
 
     const ChangeConsumer = () => {
       const value = useOnAppStateChange("viewModeEnabled", callback);
+
       renderSpy(value);
+
       return <div data-testid="value">{String(value)}</div>;
     };
 

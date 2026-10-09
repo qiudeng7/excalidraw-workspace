@@ -23,15 +23,18 @@ export function pointFrom<Point extends GlobalPoint | LocalPoint>(
   x: number,
   y: number,
 ): Point;
+
 // TODO remove the overload once we migrate to using Point tuples everywhere
 export function pointFrom<Coord extends GlobalCoord | LocalCoord>(
   coords: Coord,
 ): Coord extends GlobalCoord ? GlobalPoint : LocalPoint;
+
 // TODO remove the overload once we migrate to using Point tuples everywhere
 export function pointFrom<Point extends GlobalPoint | LocalPoint>(coords: {
   x: number;
   y: number;
 }): Point;
+
 export function pointFrom<Point extends GlobalPoint | LocalPoint>(
   xOrCoords: number | { x: number; y: number },
   y?: number,
@@ -111,6 +114,7 @@ export function pointsEqual<Point extends GlobalPoint | LocalPoint>(
   tolerance: number = PRECISION,
 ): boolean {
   const abs = Math.abs;
+
   return abs(a[0] - b[0]) < tolerance && abs(a[1] - b[1]) < tolerance;
 }
 
@@ -130,8 +134,10 @@ export function pointRotateRads<Point extends GlobalPoint | LocalPoint>(
   if (!angle) {
     return point;
   }
+
   const [x, y] = point;
   const [cx, cy] = center;
+
   return pointFrom(
     (x - cx) * Math.cos(angle) - (y - cy) * Math.sin(angle) + cx,
     (x - cx) * Math.sin(angle) + (y - cy) * Math.cos(angle) + cy,

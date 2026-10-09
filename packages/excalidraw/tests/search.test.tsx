@@ -26,7 +26,9 @@ const querySearchInput = async () => {
     h.app.excalidrawContainerValue.container?.querySelector<HTMLInputElement>(
       `.${CLASSES.SEARCH_MENU_INPUT_WRAPPER} input`,
     )!;
+
   await waitFor(() => expect(input).not.toBeNull());
+
   return input;
 };
 
@@ -49,6 +51,7 @@ describe("search", () => {
     expect(h.app.state.openSidebar?.tab).toBe(CANVAS_SEARCH_TAB);
 
     const searchInput = await querySearchInput();
+
     expect(searchInput.matches(":focus")).toBe(true);
   });
 
@@ -77,6 +80,7 @@ describe("search", () => {
 
   it("should match text and cycle through matches on Enter", async () => {
     const scrollIntoViewMock = jest.fn();
+
     window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
 
     API.setElements([
@@ -115,6 +119,7 @@ describe("search", () => {
 
   it("should match text split across multiple lines", async () => {
     const scrollIntoViewMock = jest.fn();
+
     window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
 
     API.setElements([
@@ -163,6 +168,7 @@ describe("search", () => {
 
   it("should match frame names", async () => {
     const scrollIntoViewMock = jest.fn();
+
     window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
 
     API.setElements([

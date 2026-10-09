@@ -85,11 +85,13 @@ const getHints = ({
         shortcut_2: getTaggedShortcutKey("Enter"),
       });
     }
+
     if (activeTool.type === "arrow") {
       return t("hints.arrowTool", {
         shortcut: getTaggedShortcutKey("A"),
       });
     }
+
     return t("hints.linearElement");
   }
 
@@ -119,11 +121,13 @@ const getHints = ({
     selectedElements.length === 1
   ) {
     const targetElement = selectedElements[0];
+
     if (isLinearElement(targetElement) && targetElement.points.length === 2) {
       return t("hints.lockAngle", {
         shortcut: getTaggedShortcutKey("Shift"),
       });
     }
+
     if (
       isStickyNoteElement(targetElement) &&
       // a note's corners are proportional by default (Shift frees them); its
@@ -135,6 +139,7 @@ const getHints = ({
         shortcut_2: getTaggedShortcutKey("Alt"),
       });
     }
+
     return isImageElement(targetElement)
       ? t("hints.resizeImage", {
           shortcut_1: getTaggedShortcutKey("Shift"),
@@ -215,6 +220,7 @@ const getHints = ({
         ) {
           return t("hints.toggleArrowhead");
         }
+
         if (appState.selectedLinearElement?.isEditing) {
           return appState.selectedLinearElement.selectedPointsIndices
             ? t("hints.lineEditor_pointSelected", {
@@ -226,6 +232,7 @@ const getHints = ({
                 shortcut_2: getTaggedShortcutKey("Alt"),
               });
         }
+
         return isLineElement(selectedElements[0])
           ? t("hints.lineEditor_line_info", {
               shortcut: getTaggedShortcutKey("Enter"),
@@ -235,6 +242,7 @@ const getHints = ({
               shortcut_2: getTaggedShortcutKey(["CtrlOrCmd", "Enter"]),
             });
       }
+
       if (
         !appState.newElement &&
         !appState.selectedElementsAreBeingDragged &&
@@ -246,6 +254,7 @@ const getHints = ({
         const createFlowchart = t("hints.createFlowchart", {
           shortcut: getTaggedShortcutKey(["CtrlOrCmd", "↑↓"]),
         });
+
         if (isFlowchartNodeElement(selectedElements[0])) {
           if (
             isNodeInFlowchart(
@@ -296,8 +305,10 @@ export const HintViewer = ({
     if (index % 2 === 1) {
       const shortcutMatch =
         part[0] === "<" && part.match(/^<kbd>([^<]+)<\/kbd>$/);
+
       return <kbd key={index}>{shortcutMatch ? shortcutMatch[1] : part}</kbd>;
     }
+
     return part;
   });
 

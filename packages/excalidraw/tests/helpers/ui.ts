@@ -62,6 +62,7 @@ export type KeyboardModifiers = {
   shift?: boolean;
   ctrl?: boolean;
 };
+
 export class Keyboard {
   static withModifierKeys = (modifiers: KeyboardModifiers, cb: () => void) => {
     const prevAltKey = altKey;
@@ -164,6 +165,7 @@ const getElementPointForSelection = (
 
   if (isLinearElement(element)) {
     const bounds = getElementPointsCoords(element, element.points);
+
     center = pointFrom(
       (bounds[0] + bounds[2]) / 2,
       (bounds[1] + bounds[3]) / 2,
@@ -184,6 +186,7 @@ export class Pointer {
   public clientY = 0;
 
   static activePointers: Pointer[] = [];
+
   static resetAll() {
     Pointer.activePointers.forEach((pointer) => pointer.reset());
   }
@@ -350,6 +353,7 @@ const transform = (
   keyboardModifiers: KeyboardModifiers = {},
 ) => {
   const elements = Array.isArray(element) ? element : [element];
+
   act(() => {
     h.setState({
       selectedElementIds: elements.reduce(
@@ -362,6 +366,7 @@ const transform = (
     });
   });
   let handleCoords: TransformHandle | undefined;
+
   if (elements.length === 1) {
     handleCoords = getTransformHandles(
       elements[0],
@@ -380,6 +385,7 @@ const transform = (
       "mouse",
       isFrameSelected ? OMIT_SIDES_FOR_FRAME : OMIT_SIDES_FOR_MULTIPLE_ELEMENTS,
     );
+
     handleCoords = transformHandles[handle];
   }
 
@@ -412,14 +418,17 @@ const proxy = <T extends ExcalidrawElement>(
         const currentElement = h.elements.find(
           ({ id }) => id === element.id,
         ) as any;
+
         if (prop === "get") {
           if (currentElement.hasOwnProperty("get")) {
             throw new Error(
               "trying to get `get` test property, but ExcalidrawElement seems to define its own",
             );
           }
+
           return () => currentElement;
         }
+
         return currentElement[prop];
       },
     },
@@ -435,16 +444,16 @@ type DrawingToolName = Exclude<
 type Element<T extends DrawingToolName> = T extends "line" | "freedraw"
   ? ExcalidrawLinearElement
   : T extends "arrow"
-  ? ExcalidrawArrowElement
-  : T extends "text"
-  ? ExcalidrawTextElement
-  : T extends "rectangle"
-  ? ExcalidrawRectangleElement
-  : T extends "ellipse"
-  ? ExcalidrawEllipseElement
-  : T extends "diamond"
-  ? ExcalidrawDiamondElement
-  : ExcalidrawElement;
+    ? ExcalidrawArrowElement
+    : T extends "text"
+      ? ExcalidrawTextElement
+      : T extends "rectangle"
+        ? ExcalidrawRectangleElement
+        : T extends "ellipse"
+          ? ExcalidrawEllipseElement
+          : T extends "diamond"
+            ? ExcalidrawDiamondElement
+            : ExcalidrawElement;
 
 export class UI {
   static clickTool = (toolName: ToolType | "lock") => {
@@ -461,18 +470,22 @@ export class UI {
 
   static clickLabeledElement = (label: string) => {
     const element = document.querySelector(`[aria-label='${label}']`);
+
     if (!element) {
       throw new Error(`No labeled element found: ${label}`);
     }
+
     fireEvent.click(element);
   };
 
   static clickOnTestId = (testId: string) => {
     const element = document.querySelector(`[data-testid='${testId}']`);
+
     // const element = GlobalTestState.renderResult.queryByTestId(testId);
     if (!element) {
       throw new Error(`No element with testid "${testId}" found`);
     }
+
     fireEvent.click(element);
   };
 
@@ -544,6 +557,7 @@ export class UI {
       Keyboard.keyPress(KEYS.ESCAPE);
     } else if (type === "freedraw" && points.length > 2) {
       const firstPoint = points[0];
+
       mouse.reset();
       mouse.down(x + firstPoint[0], y + firstPoint[1]);
       points
@@ -557,6 +571,7 @@ export class UI {
       mouse.reset();
       mouse.up(x + width, y + height);
     }
+
     const origElement = h.elements[h.elements.length - 1] as any;
 
     if (angle !== 0) {
@@ -580,6 +595,7 @@ export class UI {
     }
 
     const editor = await getTextEditor();
+
     if (!editor) {
       throw new Error("Can't find wysiwyg text editor in the dom");
     }

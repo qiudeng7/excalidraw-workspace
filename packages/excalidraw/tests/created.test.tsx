@@ -52,6 +52,7 @@ describe("element creation timestamps", () => {
       });
 
       const edited = newElementWith(h.elements[0], { x: 50 });
+
       API.updateScene({
         elements: [edited],
         captureUpdate: CaptureUpdateAction.IMMEDIATELY,
@@ -101,6 +102,7 @@ describe("element creation timestamps", () => {
       x: 10,
       created: null,
     });
+
     API.updateScene({
       elements: [element],
       captureUpdate: CaptureUpdateAction.NEVER,
@@ -135,6 +137,7 @@ describe("element creation timestamps", () => {
 
   it("preserves the remote creation timestamp and revision during reconciliation", () => {
     const element = API.createElement({ type: "rectangle", created: 123 });
+
     API.updateScene({
       elements: [element],
       captureUpdate: CaptureUpdateAction.NEVER,

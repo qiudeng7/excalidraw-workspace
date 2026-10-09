@@ -34,6 +34,7 @@ export type NonOptional<T> = Exclude<T, undefined>;
 // src: https://stackoverflow.com/a/58658851/927631
 // -----------------------------------------------------------------------------
 export type SignatureType<T> = T extends (...args: infer R) => any ? R : never;
+
 export type CallableType<T extends (...args: any[]) => any> = (
   ...args: SignatureType<T>
 ) => ReturnType<T>;
@@ -44,11 +45,11 @@ export type ForwardRef<T, P = any> = Parameters<
   CallableType<React.ForwardRefRenderFunction<T, P>>
 >[1];
 
-export type ExtractSetType<T extends Set<any>> = T extends Set<infer U>
-  ? U
-  : never;
+export type ExtractSetType<T extends Set<any>> =
+  T extends Set<infer U> ? U : never;
 
 export type SameType<T, U> = T extends U ? (U extends T ? true : false) : false;
+
 export type Assert<T extends true> = T;
 
 export type NestedKeyOf<T, K = keyof T> = K extends keyof T & (string | number)
@@ -56,6 +57,7 @@ export type NestedKeyOf<T, K = keyof T> = K extends keyof T & (string | number)
   : never;
 
 export type SetLike<T> = Set<T> | T[];
+
 export type ReadonlySetLike<T> = ReadonlySet<T> | readonly T[];
 
 export type MakeBrand<T extends string> = {
@@ -74,6 +76,5 @@ export type DTO<T> = {
   [K in keyof T as T[K] extends Function ? never : K]: T[K];
 };
 
-export type MapEntry<M extends Map<any, any>> = M extends Map<infer K, infer V>
-  ? [K, V]
-  : never;
+export type MapEntry<M extends Map<any, any>> =
+  M extends Map<infer K, infer V> ? [K, V] : never;

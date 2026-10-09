@@ -39,6 +39,7 @@ import type { ExportType } from "../scene/types";
 import type { AppState, BinaryFiles } from "../types";
 
 export { loadFromBlob } from "./blob";
+
 export { loadFromJSON, saveAsJSON } from "./json";
 
 export type ExportedElements = readonly NonDeletedExcalidrawElement[] & {
@@ -70,6 +71,7 @@ export const prepareElementsForExport = (
 
   if (isExportingSelection) {
     const firstElement = exportedElements[0];
+
     if (exportedElements.length === 1 && isFrameLikeElement(firstElement)) {
       exportingFrame = firstElement;
       exportedElements = getElementsOverlappingFrame(
@@ -120,6 +122,7 @@ export const exportCanvas = async (
   if (elements.length === 0) {
     throw new Error(t("alerts.cannotExportEmptyCanvas"));
   }
+
   if (type === "svg" || type === "clipboard-svg") {
     const svgPromise = exportToSvg(
       elements,
@@ -154,11 +157,13 @@ export const exportCanvas = async (
       );
     } else if (type === "clipboard-svg") {
       const svg = await svgPromise.then((svg) => svg.outerHTML);
+
       try {
         await copyTextToSystemClipboard(svg);
       } catch (e) {
-        throw new Error(t("errors.copyToSystemClipboardFailed"));
+        throw new Error(t("errors.copyToSystemClipboardFailed"), { cause: e });
       }
+
       return;
     }
   }
@@ -194,12 +199,14 @@ export const exportCanvas = async (
   } else if (type === "clipboard") {
     try {
       const blob = canvasToBlob(tempCanvas);
+
       await copyBlobToClipboardAsPng(blob);
     } catch (error: any) {
       console.warn(error);
       if (error.name === "CANVAS_POSSIBLY_TOO_BIG") {
         throw new Error(t("canvasError.canvasTooBig"));
       }
+
       // TypeError *probably* suggests ClipboardItem not defined, which
       // people on Firefox can enable through a flag, so let's tell them.
       if (isFirefox && error.name === "TypeError") {

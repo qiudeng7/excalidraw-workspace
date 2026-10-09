@@ -292,7 +292,11 @@ const APP_STATE_STORAGE_CONF = (<
   bindMode: { browser: true, export: false, server: false },
   arrowBindingOptimization: { browser: false, export: false, server: false },
   arrowBindingInside: { browser: false, export: false, server: false },
-  arrowBindingOptimizationActive: { browser: false, export: false, server: false },
+  arrowBindingOptimizationActive: {
+    browser: false,
+    export: false,
+    server: false,
+  },
   shortArrowheads: { browser: false, export: false, server: false },
   colorTopPicks: { browser: true, export: false, server: false },
   fontTopPicks: { browser: true, export: false, server: false },
@@ -305,13 +309,16 @@ const _clearAppStateForStorage = <
   exportType: ExportType,
 ) => {
   type ExportableKeys = {
-    [K in keyof typeof APP_STATE_STORAGE_CONF]: typeof APP_STATE_STORAGE_CONF[K][ExportType] extends true
-      ? K
-      : never;
+    [
+      K in keyof typeof APP_STATE_STORAGE_CONF
+    ]: (typeof APP_STATE_STORAGE_CONF)[K][ExportType] extends true ? K : never;
   }[keyof typeof APP_STATE_STORAGE_CONF];
-  const stateForExport = {} as { [K in ExportableKeys]?: typeof appState[K] };
+
+  const stateForExport = {} as { [K in ExportableKeys]?: (typeof appState)[K] };
+
   for (const key of Object.keys(appState) as (keyof typeof appState)[]) {
     const propConfig = APP_STATE_STORAGE_CONF[key];
+
     if (propConfig?.[exportType]) {
       const nextValue = appState[key];
 
@@ -319,6 +326,7 @@ const _clearAppStateForStorage = <
       (stateForExport as any)[key] = nextValue;
     }
   }
+
   return stateForExport;
 };
 

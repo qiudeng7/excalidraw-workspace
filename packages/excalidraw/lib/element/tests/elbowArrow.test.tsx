@@ -143,6 +143,7 @@ describe("elbow arrow routing", () => {
       type: "arrow",
       elbowed: true,
     }) as NonDeleted<ExcalidrawElbowArrowElement>;
+
     scene.insertElement(arrow);
     h.app.scene.mutateElement(arrow, {
       points: [
@@ -186,6 +187,7 @@ describe("elbow arrow routing", () => {
       height: 200,
       points: [pointFrom(0, 0), pointFrom(90, 200)],
     }) as NonDeleted<ExcalidrawElbowArrowElement>;
+
     API.setElements([rectangle1, rectangle2, arrow]);
 
     bindBindingElement(
@@ -232,6 +234,7 @@ describe("elbow arrow ui", () => {
       clientY: 1,
     });
     const contextMenu = UI.queryContextMenu();
+
     fireEvent.click(queryByTestId(contextMenu!, "stats")!);
   });
 
@@ -306,6 +309,7 @@ describe("elbow arrow ui", () => {
     const inputAngle = UI.queryStatsProperty("A")?.querySelector(
       ".drag-input",
     ) as HTMLInputElement;
+
     UI.updateInput(inputAngle, String("40"));
 
     expect(arrow.points.map((point) => point.map(Math.round))).toEqual([

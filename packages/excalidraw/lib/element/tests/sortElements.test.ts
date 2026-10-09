@@ -12,6 +12,7 @@ const assertOrder = (
   expectedOrder: string[],
 ) => {
   const actualOrder = elements.map((element) => element.id);
+
   expect(actualOrder).toEqual(expectedOrder);
 };
 
@@ -413,6 +414,7 @@ describe("normalizeElementsOrder", () => {
   it.skip("normalizeElementsOrder() perf", () => {
     const makeElements = (iterations: number) => {
       const elements: ExcalidrawElement[] = [];
+
       while (iterations--) {
         const container = API.createElement({
           type: "rectangle",
@@ -429,17 +431,20 @@ describe("normalizeElementsOrder", () => {
           boundElements: [],
           groupIds: ["C", "A"],
         });
+
         h.app.scene.mutateElement(container, {
           boundElements: [{ type: "text", id: boundText.id }],
         });
 
         elements.push(boundText, otherElement, container);
       }
+
       return elements;
     };
 
     const elements = makeElements(10000);
     const t0 = Date.now();
+
     normalizeElementOrder(elements);
     console.info(`${Date.now() - t0}ms`);
   });

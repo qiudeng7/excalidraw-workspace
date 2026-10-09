@@ -61,12 +61,14 @@ const allElementsInSameGroup = (
       editingGroupIndex > -1
         ? elements[0].groupIds.slice(0, editingGroupIndex)
         : elements[0].groupIds;
+
     for (const groupId of groupIds) {
       if (elements.every((element) => isElementInGroup(element, groupId))) {
         return true;
       }
     }
   }
+
   return false;
 };
 
@@ -99,6 +101,7 @@ export const actionGroup = register({
         includeBoundTextElement: true,
       }),
     );
+
     if (selectedElements.length < 2) {
       // nothing to group
       return {
@@ -107,8 +110,10 @@ export const actionGroup = register({
         captureUpdate: CaptureUpdateAction.EVENTUALLY,
       };
     }
+
     // if everything is already grouped into 1 group, there is nothing to do
     const selectedGroupIds = getSelectedGroupIds(appState);
+
     if (selectedGroupIds.length === 1) {
       const selectedGroupId = selectedGroupIds[0];
       const elementIdsInGroup = new Set(
@@ -123,6 +128,7 @@ export const actionGroup = register({
         ...Array.from(elementIdsInGroup),
         ...Array.from(selectedElementIds),
       ]);
+
       if (combinedSet.size === elementIdsInGroup.size) {
         // no incremental ids in the selected ids
         return {
@@ -139,6 +145,7 @@ export const actionGroup = register({
     // and elements outside that frame
     const groupingElementsFromDifferentFrames =
       new Set(selectedElements.map((element) => element.frameId)).size > 1;
+
     // when it happens, we want to remove elements that are in the frame
     // and are going to be grouped from the frame (mouthful, I know)
     if (groupingElementsFromDifferentFrames) {
@@ -159,6 +166,7 @@ export const actionGroup = register({
       if (!selectElementIds.get(element.id)) {
         return element;
       }
+
       return newElementWith(element, {
         groupIds: addToGroup(
           element.groupIds,
@@ -234,17 +242,21 @@ export const actionUngroup = register({
     let nextElements = [...elements];
 
     const boundTextElementIds: ExcalidrawTextElement["id"][] = [];
+
     nextElements = nextElements.map((element) => {
       if (isBoundToContainer(element)) {
         boundTextElementIds.push(element.id);
       }
+
       const nextGroupIds = removeFromSelectedGroups(
         element.groupIds,
         appState.selectedGroupIds,
       );
+
       if (nextGroupIds.length === element.groupIds.length) {
         return element;
       }
+
       return newElementWith(element, {
         groupIds: nextGroupIds,
       });
@@ -292,6 +304,7 @@ export const actionUngroup = register({
         if (selected && !boundTextElementIds.includes(id)) {
           acc[id] = true;
         }
+
         return acc;
       },
       {},

@@ -167,6 +167,7 @@ const renderLinearElementPointHighlight = (
   elementsMap: ElementsMap,
 ) => {
   const { elementId, hoverPointIndex } = appState.selectedLinearElement!;
+
   if (
     appState.selectedLinearElement?.isEditing &&
     appState.selectedLinearElement?.selectedPointsIndices?.includes(
@@ -175,19 +176,23 @@ const renderLinearElementPointHighlight = (
   ) {
     return;
   }
+
   if (appState.selectedLinearElement?.isDragging) {
     return;
   }
+
   const element = LinearElementEditor.getElement(elementId, elementsMap);
 
   if (!element) {
     return;
   }
+
   const point = LinearElementEditor.getPointAtIndexGlobalCoordinates(
     element,
     hoverPointIndex,
     elementsMap,
   );
+
   highlightPoint(point, context, appState);
 };
 
@@ -266,6 +271,7 @@ const renderBindingHighlightForBindableElement_simple = (
   const enclosingFrame =
     suggestedBinding.element.frameId &&
     elementsMap.get(suggestedBinding.element.frameId);
+
   if (enclosingFrame && isFrameLikeElement(enclosingFrame)) {
     context.translate(enclosingFrame.x, enclosingFrame.y);
 
@@ -374,6 +380,7 @@ const renderBindingHighlightForBindableElement_simple = (
             // Draw each curve individually (for rounded corners)
             curves.forEach((curve) => {
               const [start, control1, control2, end] = curve;
+
               context.beginPath();
               context.moveTo(
                 start[0] - suggestedBinding.element.x,
@@ -415,6 +422,7 @@ const renderBindingHighlightForBindableElement_simple = (
             // Draw each curve individually (for rounded corners)
             curves.forEach((curve) => {
               const [start, control1, control2, end] = curve;
+
               context.beginPath();
               context.moveTo(
                 start[0] - suggestedBinding.element.x,
@@ -477,6 +485,7 @@ const renderBindingHighlightForBindableElement_simple = (
       // Elbow arrows show all midpoints, simple arrows only the one closest to
       // the pointer, once the pointer gets near it
       let shownMidpoints = midpoints;
+
       if (!isElbow) {
         const threshold =
           maxBindingDistance_simple(appState.zoom) +
@@ -488,6 +497,7 @@ const renderBindingHighlightForBindableElement_simple = (
               ? a
               : b,
           );
+
         shownMidpoints =
           closest && pointDistance(closest, pointerCoords) <= threshold * 2
             ? [closest]
@@ -499,6 +509,7 @@ const renderBindingHighlightForBindableElement_simple = (
         if (highlightedMidpoint && pointsEqual(midpoint, highlightedMidpoint)) {
           continue;
         }
+
         context.beginPath();
         context.arc(midpoint[0], midpoint[1], midpointRadius, 0, 2 * Math.PI);
         context.fill();
@@ -541,6 +552,7 @@ const renderBindingHighlightForBindableElement_complex = (
   const offset = element.strokeWidth / 2;
 
   const enclosingFrame = element.frameId && allElementsMap.get(element.frameId);
+
   if (enclosingFrame && isFrameLikeElement(enclosingFrame)) {
     context.translate(enclosingFrame.x, enclosingFrame.y);
 
@@ -654,6 +666,7 @@ const renderBindingHighlightForBindableElement_complex = (
             // Draw each curve individually (for rounded corners)
             curves.forEach((curve) => {
               const [start, control1, control2, end] = curve;
+
               context.beginPath();
               context.moveTo(
                 start[0] - element.x + offset,
@@ -696,6 +709,7 @@ const renderBindingHighlightForBindableElement_complex = (
             // Draw each curve individually (for rounded corners)
             curves.forEach((curve) => {
               const [start, control1, control2, end] = curve;
+
               context.beginPath();
               context.moveTo(
                 start[0] - element.x + offset,
@@ -790,6 +804,7 @@ const renderBindingHighlightForBindableElement_complex = (
       const cutoutRadius = midpointRadius + cutoutPadding;
 
       let midpoints;
+
       if (element.type === "diamond") {
         const [, curves] = deconstructDiamondElement(element);
         const center = elementCenterPoint(element, allElementsMap);
@@ -797,6 +812,7 @@ const renderBindingHighlightForBindableElement_complex = (
         midpoints = curves.map((curve) => {
           const point = bezierEquation(curve, 0.5);
           const rotatedPoint = pointRotateRads(point, center, element.angle);
+
           return {
             x: rotatedPoint[0] - element.x,
             y: rotatedPoint[1] - element.y,
@@ -810,6 +826,7 @@ const renderBindingHighlightForBindableElement_complex = (
           { x: element.width / 2, y: element.height }, // BOTTOM
           { x: 0, y: element.height / 2 }, // LEFT
         ];
+
         midpoints = basePoints.map((point) => {
           const globalPoint = pointFrom<GlobalPoint>(
             point.x + element.x,
@@ -820,6 +837,7 @@ const renderBindingHighlightForBindableElement_complex = (
             center,
             element.angle,
           );
+
           return {
             x: rotatedPoint[0] - element.x,
             y: rotatedPoint[1] - element.y,
@@ -892,6 +910,7 @@ const renderBindingHighlightForBindableElement = (
   const angleLocked =
     !!app.lastPointerMoveEvent &&
     shouldRotateWithDiscreteAngle(app.lastPointerMoveEvent);
+
   renderBindingHighlightForBindableElement_simple(
     context,
     suggestedBinding,
@@ -949,6 +968,7 @@ const renderSelectionBorder = (
   context.lineWidth = (activeEmbeddable ? 4 : 1) / appState.zoom.value;
 
   const count = selectionColors.length;
+
   for (let index = 0; index < count; ++index) {
     context.strokeStyle = selectionColors[index];
     if (dashed) {
@@ -957,6 +977,7 @@ const renderSelectionBorder = (
         spaceWidth + (lineWidth + spaceWidth) * (count - 1),
       ]);
     }
+
     context.lineDashOffset = (lineWidth + spaceWidth) * index;
     strokeRectWithRotation_simple(
       context,
@@ -969,6 +990,7 @@ const renderSelectionBorder = (
       angle,
     );
   }
+
   context.restore();
 };
 
@@ -1022,6 +1044,7 @@ const renderElementsBoxHighlight = (
 
   const getSelectionFromElements = (elements: ExcalidrawElement[]) => {
     const [x1, y1, x2, y2] = getCommonBounds(elements);
+
     return {
       angle: 0,
       x1,
@@ -1038,6 +1061,7 @@ const renderElementsBoxHighlight = (
 
   const getSelectionForGroupId = (groupId: GroupId) => {
     const groupElements = getElementsInGroup(elements, groupId);
+
     return getSelectionFromElements(groupElements);
   };
 
@@ -1062,6 +1086,7 @@ const renderLinearPointHandles = (
   if (!appState.selectedLinearElement) {
     return;
   }
+
   context.save();
   context.translate(appState.scrollX, appState.scrollY);
   context.lineWidth = 1 / appState.zoom.value;
@@ -1095,6 +1120,7 @@ const renderLinearPointHandles = (
     let isSelected =
       !!appState.selectedLinearElement?.isEditing &&
       !!appState.selectedLinearElement?.selectedPointsIndices?.includes(idx);
+
     // when element is a polygon, highlight the last point as well if first
     // point is selected since they overlap and the last point tends to be
     // rendered on top
@@ -1124,6 +1150,7 @@ const renderLinearPointHandles = (
   if (isElbowArrow(element)) {
     const fixedSegments =
       element.fixedSegments?.map((segment) => segment.index) || [];
+
     points.slice(0, -1).forEach((p, idx) => {
       if (
         !LinearElementEditor.isSegmentTooShort(
@@ -1334,6 +1361,7 @@ const renderTransformHandles = (
 ): void => {
   Object.keys(transformHandles).forEach((key) => {
     const transformHandle = transformHandles[key as TransformHandleType];
+
     if (transformHandle !== undefined) {
       const [x, y, width, height] = transformHandle;
 
@@ -1342,6 +1370,7 @@ const renderTransformHandles = (
       if (renderConfig.selectionColor) {
         context.strokeStyle = renderConfig.selectionColor;
       }
+
       if (key === "rotation") {
         fillCircle(context, x + width / 2, y + height / 2, width / 2, true);
         // prefer round corners if roundRect API is available
@@ -1363,6 +1392,7 @@ const renderTransformHandles = (
           true, // fill before stroke
         );
       }
+
       context.restore();
     }
   });
@@ -1487,6 +1517,7 @@ const renderTextBox = (
   const cy = text.y + text.height / 2;
   const shiftX = -(text.width / 2 + padding);
   const shiftY = -(text.height / 2 + padding);
+
   context.translate(cx + appState.scrollX, cy + appState.scrollY);
   context.rotate(text.angle);
   context.lineWidth = 1 / appState.zoom.value;
@@ -1517,9 +1548,11 @@ const renderTextToolHover = (
 ) => {
   const hover = appState.textToolHover!;
   const element = elementsMap.get(hover.elementId);
+
   if (!element || element.isDeleted) {
     return;
   }
+
   switch (hover.type) {
     case "text": {
       if (isTextElement(element)) {
@@ -1532,8 +1565,10 @@ const renderTextToolHover = (
           selectionColor,
         );
       }
+
       return;
     }
+
     case "container": {
       if (isBindableElement(element)) {
         // the outline arrow binding shows, minus its animation and its
@@ -1555,8 +1590,10 @@ const renderTextToolHover = (
         );
         context.restore();
       }
+
       return;
     }
+
     case "arrow": {
       if (isArrowElement(element)) {
         const point =
@@ -1570,6 +1607,7 @@ const renderTextToolHover = (
                 hover.anchor === "start" ? 0 : -1,
                 elementsMap,
               );
+
         highlightPoint(point, context, appState);
       }
     }
@@ -1707,8 +1745,8 @@ const _renderInteractiveScene = ({
 
   if (appState.editingTextElement) {
     const textElement = allElementsMap.get(appState.editingTextElement.id) as
-      | ExcalidrawTextElement
-      | undefined;
+      ExcalidrawTextElement | undefined;
+
     if (textElement && !textElement.autoResize) {
       renderTextBox(
         textElement,
@@ -1767,6 +1805,7 @@ const _renderInteractiveScene = ({
     const elements = element
       ? [element]
       : getElementsInGroup(allElementsMap, appState.activeLockedId);
+
     renderElementsBoxHighlight(
       context,
       appState,
@@ -1802,6 +1841,7 @@ const _renderInteractiveScene = ({
   const selectedLinearElement =
     linearState &&
     LinearElementEditor.getElement(linearState.elementId, allElementsMap);
+
   // Arrows have a different highlight behavior when
   // they are the only selected element
   if (selectedLinearElement) {
@@ -1852,6 +1892,7 @@ const _renderInteractiveScene = ({
 
     const isSingleLinearElementSelected =
       selectedElements.length === 1 && isLinearElement(selectedElements[0]);
+
     // render selected linear element points
     if (
       isSingleLinearElementSelected &&
@@ -1865,6 +1906,7 @@ const _renderInteractiveScene = ({
         elementsMap,
       );
     }
+
     const selectionColor =
       renderConfig.selectionColor || getThemedColor("#000", appState.theme);
     const lockedSelectionColor = getThemedColor("#ced4da", appState.theme);
@@ -1881,16 +1923,13 @@ const _renderInteractiveScene = ({
         const remoteClients = renderConfig.remoteSelectedElementIds.get(
           element.id,
         );
-        if (
-          !(
-            // Elbow arrow elements cannot be selected when bound on either end
-            (
-              isSingleLinearElementSelected &&
-              isElbowArrow(element) &&
-              (element.startBinding || element.endBinding)
-            )
-          )
-        ) {
+
+        if (!(
+          // Elbow arrow elements cannot be selected when bound on either end
+          isSingleLinearElementSelected &&
+          isElbowArrow(element) &&
+          (element.startBinding || element.endBinding)
+        )) {
           // local user
           if (
             locallySelectedIds.has(element.id) &&
@@ -1898,6 +1937,7 @@ const _renderInteractiveScene = ({
           ) {
             selectionColors.push(selectionColor);
           }
+
           // remote users
           if (remoteClients) {
             selectionColors.push(
@@ -1906,6 +1946,7 @@ const _renderInteractiveScene = ({
                   socketId,
                   appState.collaborators.get(socketId),
                 );
+
                 return background;
               }),
             );
@@ -1918,6 +1959,7 @@ const _renderInteractiveScene = ({
             elementsMap,
             true,
           );
+
           selections.push({
             angle: element.angle,
             x1,
@@ -1945,6 +1987,7 @@ const _renderInteractiveScene = ({
       const addSelectionForGroupId = (groupId: GroupId) => {
         const groupElements = getElementsInGroup(elementsMap, groupId);
         const [x1, y1, x2, y2] = getCommonBounds(groupElements);
+
         selections.push({
           angle: 0,
           x1,
@@ -1974,6 +2017,7 @@ const _renderInteractiveScene = ({
         renderSelectionBorder(context, appState, selection),
       );
     }
+
     // Paint resize transformHandles
     context.save();
     context.translate(appState.scrollX, appState.scrollY);
@@ -1987,6 +2031,7 @@ const _renderInteractiveScene = ({
         "mouse", // when we render we don't know which pointer type so use mouse,
         getOmitSidesForEditorInterface(editorInterface),
       );
+
       if (
         !appState.viewModeEnabled &&
         showBoundingBox &&
@@ -2024,11 +2069,14 @@ const _renderInteractiveScene = ({
     ) {
       const dashedLinePadding =
         (DEFAULT_TRANSFORM_HANDLE_SPACING * 2) / appState.zoom.value;
+
       context.fillStyle = getThemedColor("#fff", appState.theme);
       const [x1, y1, x2, y2] = getCommonBounds(selectedElements, elementsMap);
       const initialLineDash = context.getLineDash();
+
       context.setLineDash([2 / appState.zoom.value]);
       const lineWidth = context.lineWidth;
+
       context.lineWidth = 1 / appState.zoom.value;
       context.strokeStyle = selectionColor;
       strokeRectWithRotation_simple(
@@ -2055,6 +2103,7 @@ const _renderInteractiveScene = ({
             }
           : getOmitSidesForEditorInterface(editorInterface),
       );
+
       if (selectedElements.some((element) => !element.locked)) {
         renderTransformHandles(
           context,
@@ -2065,6 +2114,7 @@ const _renderInteractiveScene = ({
         );
       }
     }
+
     context.restore();
   }
 
@@ -2116,6 +2166,7 @@ const _renderInteractiveScene = ({
 
   // Paint scrollbars
   let scrollBars;
+
   if (renderConfig.renderScrollbars) {
     scrollBars = getScrollBars(
       elementsMap,
@@ -2161,6 +2212,8 @@ export const renderInteractiveScene = <
   renderConfig: InteractiveSceneRenderConfig,
 ): ReturnType<U> => {
   const ret = _renderInteractiveScene(renderConfig);
+
   renderConfig.callback(ret);
+
   return ret as ReturnType<U>;
 };

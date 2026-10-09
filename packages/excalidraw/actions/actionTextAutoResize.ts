@@ -26,6 +26,7 @@ export const actionTextAutoResize = register({
   trackEvent: { category: "element" },
   predicate: (elements, appState, _: unknown) => {
     const selectedElements = getSelectedElements(elements, appState);
+
     return (
       selectedElements.length === 1 &&
       isTextElement(selectedElements[0]) &&

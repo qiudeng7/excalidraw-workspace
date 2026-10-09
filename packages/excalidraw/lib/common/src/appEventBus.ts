@@ -41,10 +41,12 @@ export class AppEventBus<
 
   private getEmitter<K extends keyof Events>(name: K): Emitter<Events[K]> {
     let emitter = this.emitters.get(name);
+
     if (!emitter) {
       emitter = new Emitter<any>();
       this.emitters.set(name, emitter);
     }
+
     return emitter as Emitter<Events[K]>;
   }
 
@@ -106,6 +108,7 @@ export class AppEventBus<
         if (this.emittedOnce.has(name)) {
           throw new Error(`Event "${String(name)}" can only be emitted once`);
         }
+
         this.emittedOnce.add(name);
       }
     }

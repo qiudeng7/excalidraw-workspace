@@ -18,6 +18,7 @@ export const defaultGetElementLinkFromSelection: Exclude<
 
   try {
     const link = new URL(url);
+
     link.searchParams.set(ELEMENT_LINK_KEY, id);
 
     return normalizeLink(link.toString());
@@ -55,6 +56,7 @@ export const getLinkIdAndTypeFromSelection = (
           type: "group",
         };
       }
+
       return {
         id: selectedElements[0].groupIds[0],
         type: "group",
@@ -82,11 +84,14 @@ export const canCreateLinkFromElements = (
 export const isElementLink = (url: string) => {
   try {
     const _url = new URL(url);
+
     return (
       _url.searchParams.has(ELEMENT_LINK_KEY) &&
       _url.host === window.location.host
     );
   } catch (error) {
+    console.debug("Invalid element link URL", error);
+
     return false;
   }
 };
@@ -94,11 +99,15 @@ export const isElementLink = (url: string) => {
 export const parseElementLinkFromURL = (url: string) => {
   try {
     const { searchParams } = new URL(url);
+
     if (searchParams.has(ELEMENT_LINK_KEY)) {
       const id = searchParams.get(ELEMENT_LINK_KEY);
+
       return id;
     }
-  } catch {}
+  } catch (error) {
+    console.debug("Could not parse element link URL", error);
+  }
 
   return null;
 };

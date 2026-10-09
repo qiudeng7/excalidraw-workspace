@@ -17,6 +17,7 @@ interface RadioButtonProps {
 export const RadioButton = forwardRef<HTMLButtonElement, RadioButtonProps>(
   (props, ref) => {
     const { title, className, testId, active, icon, onClick } = props;
+
     return (
       <button
         type="button"
