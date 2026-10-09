@@ -51,7 +51,7 @@ export async function nodeStorage(
     const statement = db.prepare(sql);
     const rows = statement.all(
       ...(values as (string | number | null)[]),
-    ) as Record<string, any>[];
+    ) as Record<string, unknown>[];
     const changes = (
       db.prepare("SELECT changes() AS count").get() as {
         count: number;

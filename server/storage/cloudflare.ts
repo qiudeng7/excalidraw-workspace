@@ -21,7 +21,7 @@ export function cloudflareStorage(env: CloudflareBindings) {
       return { rows: result.results, changes: result.meta.changes };
     },
     async transaction(items) {
-      const results = await env.DB.batch<Record<string, any>>(
+      const results = await env.DB.batch<Record<string, unknown>>(
         items.map(statement),
       );
       return results.map((result) => ({

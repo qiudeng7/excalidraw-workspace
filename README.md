@@ -81,6 +81,8 @@ PUBLIC_ORIGIN=http://localhost:8080
 
 应用使用 Nuxt 4、Vue、TypeScript 和 Pinia，通过浏览器端 React 组件挂载 Excalidraw；依赖由 pnpm workspace 管理。Workers 与 Node 共用业务服务，分别适配 D1/R2 和 SQLite/文件目录。
 
+- [前端模块边界](docs/frontend-architecture.md)：控制器接口、状态归属和新增页面动作。
+- [后端模块与依赖注入](docs/backend-architecture.md)：Awilix 请求作用域、存储接口和新增 API 的权限边界。
 - [源码维护说明](packages/excalidraw/README.md)：上游来源、内部包关系、编辑器定制位置、构建与升级方式。
 - [更新记录](https://github.com/qiudeng7/excalidraw-workspace/releases)：各版本的 Changelog，通过 Git tag 和 GitHub Release 发布。
 - [页面与路由](src/pages/)及[Nuxt 配置](nuxt.config.ts)：账户入口、侧边栏和画布页面。根路径 `/` 是画布，`/home` 为首页，`/about` 为关于页；旧地址 `/draw` 跳转到 `/`。
@@ -108,7 +110,6 @@ pnpm exec wrangler r2 bucket create excalidraw-demo-data
 
 ```sh
 pnpm db:migrate:remote
-pnpm typecheck:worker
 pnpm deploy
 ```
 

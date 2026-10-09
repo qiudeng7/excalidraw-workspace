@@ -8,12 +8,14 @@ import { Excalidraw, FONT_FAMILY, MainMenu, serializeAsJSON } from '@excalidraw/
 import '@excalidraw/excalidraw/index.css'
 import type { ExcalidrawProps, ExcalidrawInitialDataState, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import type { CanvasDocument, CanvasScene, LibraryDocument, UserSettings } from '../../shared/contracts'
-import { PersistentResource } from '../lib/persistence'
+import { PersistentResource, type SaveResource } from '../lib/persistence'
+import type { EditorHandle } from '../lib/editor'
+import type { UserSettingsStatus } from '../lib/userSettings'
 import { confirmDialog, isAppDialogOpen } from '../lib/dialogs'
 
 const props = defineProps<{
   document: CanvasDocument; library: LibraryDocument; userId: string
-  userSettings: UserSettings; settingsReady: boolean; settingsStatus: string; settingsError: string; settingsConfigured: boolean; settingsConflict: boolean
+  userSettings: UserSettings; settingsReady: boolean; settingsStatus: UserSettingsStatus; settingsError: string; settingsConfigured: boolean; settingsConflict: boolean
 }>()
 const emit = defineEmits<{
   'save-state': [status: string]
@@ -79,13 +81,14 @@ function stateChanged(error?: string) {
   else if (!sceneResource.dirty && !libraryResource.dirty) message.value = ''
   emit('save-state', error ? '保存异常' : sceneResource.dirty || libraryResource.dirty ? '待保存…' : '已保存')
 }
-const sceneResource = new PersistentResource<CanvasScene>(
-  `${props.userId}:canvas:${props.document.id}`, `/api/canvases/${props.document.id}`, 'scene',
-  props.document.scene, props.document.revision, stateChanged, undefined, props.userId,
-)
-const libraryResource = new PersistentResource<unknown[]>(
-  `${props.userId}:library`, '/api/library', 'items', props.library.items, props.library.revision, stateChanged, undefined, props.userId,
-)
+const sceneResource: SaveResource<CanvasScene> = new PersistentResource({
+  key: `${props.userId}:canvas:${props.document.id}`, path: `/api/canvases/${props.document.id}`, field: 'scene',
+  value: props.document.scene, revision: props.document.revision, changed: stateChanged, ownerId: props.userId,
+})
+const libraryResource: SaveResource<unknown[]> = new PersistentResource({
+  key: `${props.userId}:library`, path: '/api/library', field: 'items',
+  value: props.library.items, revision: props.library.revision, changed: stateChanged, ownerId: props.userId,
+})
 async function flush() {
   await Promise.all([sceneResource.flush(), libraryResource.flush()])
 }
@@ -125,7 +128,7 @@ function beforeUnload(event: BeforeUnloadEvent) {
 onBeforeRouteLeave(async () => {
   try { await flush(); return true } catch { return false }
 })
-defineExpose({ flush, saveManually })
+defineExpose<EditorHandle>({ flush, saveManually })
 
 const container = useTemplateRef<HTMLDivElement>('container')
 const router = useRouter()

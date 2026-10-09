@@ -1,36 +1,29 @@
 import type { User, CanvasMeta, Navigation } from "../../shared/contracts";
-export type Row = Record<string, any>;
-export interface Statement {
-  sql: string;
-  values: unknown[];
-}
-export interface QueryResult {
-  rows: Row[];
-  changes: number;
-}
-/** Platform drivers stay private to storage; business code calls Repository operations. */
-export interface SqlDriver {
-  query(sql: string, values?: unknown[]): Promise<QueryResult>;
-  transaction(statements: Statement[]): Promise<QueryResult[]>;
-}
-export interface ObjectStore {
-  read(key: string): Promise<unknown | null>;
-  write(key: string, value: unknown): Promise<void>;
-  delete(keys: string[]): Promise<void>;
-  list(cursor?: string): Promise<{
-    objects: {
-      key: string;
-      modified: number;
-    }[];
-    cursor?: string;
-  }>;
-}
+import type {
+  Row,
+  RepositoryPort,
+  SqlDriver,
+  ObjectStore,
+  Statement,
+  StoredCanvas,
+  StoredLibrary,
+  StoredCredentials,
+} from "./ports";
+import {
+  text,
+  integer,
+  nullableText,
+  decodeUser,
+  decodeWorkspace,
+  decodeCanvas,
+} from "./rows";
+export type * from "./ports";
 const wc =
   "id,name,catalog_revision AS catalogRevision,created_at AS createdAt,updated_at AS updatedAt";
 const cc =
   "c.id,c.workspace_id AS workspaceId,c.name,c.revision,c.position,c.created_at AS createdAt,c.updated_at AS updatedAt";
-export class Repository {
-  constructor(private sql: SqlDriver) {}
+export class Repository implements RepositoryPort {
+  constructor(private sql: SqlDriver) { }
   private async one(sql: string, ...values: unknown[]) {
     return (await this.sql.query(sql, values)).rows[0] ?? null;
   }
@@ -40,18 +33,27 @@ export class Repository {
   private async run(sql: string, ...values: unknown[]) {
     return (await this.sql.query(sql, values)).changes;
   }
-  administrator() {
-    return this.one("SELECT id FROM users WHERE role='admin' LIMIT 1");
+  async administrator() {
+    const row = await this.one(
+      "SELECT id FROM users WHERE role='admin' LIMIT 1",
+    );
+    return row ? { id: text(row, "id") } : null;
   }
-  registration() {
-    return this.one("SELECT registration_enabled FROM settings WHERE id=1");
+  async registration() {
+    const row = await this.one(
+      "SELECT registration_enabled FROM settings WHERE id=1",
+    );
+    return row
+      ? { registration_enabled: integer(row, "registration_enabled") }
+      : null;
   }
-  session(hash: string, now: number): Promise<User | null> {
-    return this.one(
+  async session(hash: string, now: number): Promise<User | null> {
+    const row = await this.one(
       "SELECT u.id,u.email,u.name,u.role FROM users u JOIN sessions s ON s.user_id=u.id WHERE s.token_hash=? AND s.expires_at>?",
       hash,
       now,
-    ) as Promise<User | null>;
+    );
+    return row ? decodeUser(row) : null;
   }
   createSession(hash: string, user: string, expires: number) {
     return this.run(
@@ -64,34 +66,28 @@ export class Repository {
   deleteSession(hash: string) {
     return this.run("DELETE FROM sessions WHERE token_hash=?", hash);
   }
-  rateLimit(key: string, expires: number) {
-    return this.one(
+  async rateLimit(key: string, expires: number) {
+    const row = await this.one(
       "INSERT INTO rate_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 RETURNING count",
       key,
       expires,
     );
+    return row ? { count: integer(row, "count") } : null;
   }
-  purgeExpired(now: number) {
-    return this.sql.transaction([
+  async purgeExpired(now: number) {
+    await this.sql.transaction([
       { sql: "DELETE FROM rate_limits WHERE expires_at<?", values: [now] },
       { sql: "DELETE FROM sessions WHERE expires_at<?", values: [now] },
     ]);
   }
-  userByEmail(email: string): Promise<
-    | (User & {
-        password_hash: string;
-      })
-    | null
-  > {
-    return this.one(
+  async userByEmail(email: string): Promise<StoredCredentials | null> {
+    const row = await this.one(
       "SELECT id,email,name,role,password_hash FROM users WHERE email=?",
       email,
-    ) as Promise<
-      | (User & {
-          password_hash: string;
-        })
-      | null
-    >;
+    );
+    return row
+      ? { ...decodeUser(row), password_hash: text(row, "password_hash") }
+      : null;
   }
   async createAccount(
     user: User,
@@ -134,18 +130,20 @@ export class Repository {
       enabled ? 1 : 0,
     );
   }
-  workspace(id: string, user: string) {
-    return this.one(
+  async workspace(id: string, user: string) {
+    const row = await this.one(
       `SELECT ${wc} FROM workspaces WHERE id=? AND user_id=?`,
       id,
       user,
     );
+    return row ? decodeWorkspace(row) : null;
   }
-  workspaces(user: string) {
-    return this.all(
+  async workspaces(user: string) {
+    const rows = await this.all(
       `SELECT ${wc} FROM workspaces WHERE user_id=? ORDER BY created_at,id`,
       user,
     );
+    return rows.map(decodeWorkspace);
   }
   createWorkspace(id: string, user: string, name: string, now: string) {
     return this.run(
@@ -178,34 +176,26 @@ export class Repository {
       },
     ]);
     return r[0]!.rows.flatMap((r) =>
-      r.object_key ? [r.object_key as string] : [],
+      nullableText(r, "object_key") ? [text(r, "object_key")] : [],
     );
   }
-  canvas(
-    id: string,
-    user: string,
-  ): Promise<
-    | (CanvasMeta & {
-        objectKey: string | null;
-      })
-    | null
-  > {
-    return this.one(
+  async canvas(id: string, user: string): Promise<StoredCanvas | null> {
+    const row = await this.one(
       `SELECT ${cc},c.object_key AS objectKey FROM canvases c JOIN workspaces w ON w.id=c.workspace_id WHERE c.id=? AND w.user_id=?`,
       id,
       user,
-    ) as Promise<
-      | (CanvasMeta & {
-          objectKey: string | null;
-        })
-      | null
-    >;
-  }
-  canvases(workspace: string) {
-    return this.all(
-      `SELECT ${cc} FROM canvases c WHERE c.workspace_id=? ORDER BY c.position,c.id`,
-      workspace,
     );
+    return row
+      ? { ...decodeCanvas(row), objectKey: nullableText(row, "objectKey") }
+      : null;
+  }
+  async canvases(workspace: string): Promise<CanvasMeta[]> {
+    return (
+      await this.all(
+        `SELECT ${cc} FROM canvases c WHERE c.workspace_id=? ORDER BY c.position,c.id`,
+        workspace,
+      )
+    ).map(decodeCanvas);
   }
   async createCanvas(
     id: string,
@@ -254,7 +244,9 @@ export class Repository {
     ]);
     return {
       changed: result[1]!.changes,
-      objectKey: result[0]!.rows[0]?.object_key as string | null | undefined,
+      objectKey: result[0]!.rows[0]
+        ? nullableText(result[0]!.rows[0]!, "object_key")
+        : undefined,
     };
   }
   async reorderCanvases(
@@ -288,9 +280,9 @@ export class Repository {
     const row = result[0]!.rows[0];
     return row
       ? {
-          catalogRevision: row.catalogRevision as number,
-          canvases: result[1]!.rows,
-        }
+        catalogRevision: integer(row, "catalogRevision"),
+        canvases: result[1]!.rows.map(decodeCanvas),
+      }
       : null;
   }
   async navigation(user: string): Promise<Navigation> {
@@ -306,7 +298,15 @@ export class Repository {
     ]);
     const row = result[0]!.rows[0];
     if (!row) throw new Error("Navigation row missing");
-    return { ...row, workspaces: result[1]!.rows } as Navigation;
+    return {
+      revision: integer(row, "revision"),
+      lastWorkspaceId: nullableText(row, "lastWorkspaceId"),
+      lastCanvasId: nullableText(row, "lastCanvasId"),
+      workspaces: result[1]!.rows.map((row) => ({
+        workspaceId: text(row, "workspaceId"),
+        lastCanvasId: nullableText(row, "lastCanvasId"),
+      })),
+    };
   }
   async recordNavigation(user: string, canvas: string, revision: number) {
     const result = await this.sql.transaction([
@@ -321,17 +321,17 @@ export class Repository {
     ]);
     return result[1]!.changes;
   }
-  library(user: string): Promise<{
-    revision: number;
-    objectKey: string | null;
-  } | null> {
-    return this.one(
+  async library(user: string): Promise<StoredLibrary | null> {
+    const row = await this.one(
       "SELECT revision,object_key AS objectKey FROM libraries WHERE user_id=?",
       user,
-    ) as Promise<{
-      revision: number;
-      objectKey: string | null;
-    } | null>;
+    );
+    return row
+      ? {
+        revision: integer(row, "revision"),
+        objectKey: nullableText(row, "objectKey"),
+      }
+      : null;
   }
   saveSnapshot(
     type: "canvas" | "library",
@@ -343,26 +343,33 @@ export class Repository {
   ) {
     return type === "canvas"
       ? this.run(
-          "UPDATE canvases SET object_key=?,revision=revision+1,updated_at=? WHERE id=? AND revision=? AND workspace_id IN (SELECT id FROM workspaces WHERE user_id=?)",
-          key,
-          now,
-          id,
-          revision,
-          user,
-        )
+        "UPDATE canvases SET object_key=?,revision=revision+1,updated_at=? WHERE id=? AND revision=? AND workspace_id IN (SELECT id FROM workspaces WHERE user_id=?)",
+        key,
+        now,
+        id,
+        revision,
+        user,
+      )
       : this.run(
-          "UPDATE libraries SET object_key=?,revision=revision+1,updated_at=? WHERE user_id=? AND revision=?",
-          key,
-          now,
-          user,
-          revision,
-        );
+        "UPDATE libraries SET object_key=?,revision=revision+1,updated_at=? WHERE user_id=? AND revision=?",
+        key,
+        now,
+        user,
+        revision,
+      );
   }
-  userSettings(user: string) {
-    return this.one(
+  async userSettings(user: string) {
+    const row = await this.one(
       "SELECT settings_json AS settingsJson,revision,updated_at AS updatedAt FROM user_settings WHERE user_id=?",
       user,
     );
+    return row
+      ? {
+        settingsJson: text(row, "settingsJson"),
+        revision: integer(row, "revision"),
+        updatedAt: text(row, "updatedAt"),
+      }
+      : null;
   }
   async saveUserSettings(
     user: string,
@@ -380,7 +387,7 @@ export class Repository {
       revision,
       revision,
     );
-    return row?.revision as number | undefined;
+    return row ? integer(row, "revision") : undefined;
   }
   async objectReferenced(key: string) {
     return !!(await this.one(
@@ -392,7 +399,7 @@ export class Repository {
 }
 /** Never collect fresh objects: a write may not have reached its metadata CAS yet. */
 export async function collectOrphans(
-  repository: Repository,
+  repository: Pick<RepositoryPort, "objectReferenced">,
   objects: ObjectStore,
   now = Date.now(),
   grace = 24 * 60 * 60 * 1000,

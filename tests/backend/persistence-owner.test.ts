@@ -10,16 +10,16 @@ test("persistent library captures owner and aborts old saves without acknowledgi
     request = options;
     return new Promise<Response>((resolve) => (finish = resolve));
   }) as typeof fetch;
-  const resource = new PersistentResource(
-    "alice:library",
-    "/api/library",
-    "items",
-    [{ id: "original" }],
-    0,
-    () => changes++,
-    "isolated-test-scope",
-    "alice",
-  );
+  const resource = new PersistentResource({
+    key: "alice:library",
+    path: "/api/library",
+    field: "items",
+    value: [{ id: "original" }],
+    revision: 0,
+    changed: () => changes++,
+    scopeId: "isolated-test-scope",
+    ownerId: "alice",
+  });
   try {
     resource.update([{ id: "changed" }]);
     const saving = resource.flush();

@@ -1,4 +1,4 @@
-import { reactive } from "vue";
+import { reactive, readonly } from "vue";
 import { api, ApiError } from "./api";
 import {
   createDefaultUserSettings,
@@ -23,11 +23,22 @@ export interface UserSettingsState {
   cloudConflict: UserSettingsDocument | null;
 }
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+export interface UserSettingsResource {
+  readonly userId: string;
+  readonly state: Readonly<UserSettingsState>;
+  load(): Promise<boolean>;
+  update(settings: UserSettings): boolean;
+  flush(): Promise<boolean>;
+  retry(): Promise<boolean>;
+  useCloud(): boolean;
+  keepLocal(): Promise<boolean>;
+  dispose(): void;
+}
 /** One resource belongs to one account/session. Dispose it before changing the owner. */
 export function createUserSettingsResource(
   userId: string,
   isCurrent: () => boolean = () => true,
-) {
+): UserSettingsResource {
   const state = reactive<UserSettingsState>({
     settings: createDefaultUserSettings(),
     revision: 0,
@@ -233,7 +244,7 @@ export function createUserSettingsResource(
   }
   return {
     userId,
-    state,
+    state: readonly(state),
     load,
     update,
     flush,
@@ -243,6 +254,3 @@ export function createUserSettingsResource(
     dispose,
   };
 }
-export type UserSettingsResource = ReturnType<
-  typeof createUserSettingsResource
->;

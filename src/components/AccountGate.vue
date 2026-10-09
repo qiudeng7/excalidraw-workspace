@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import QuietIcon from './QuietIcon.vue'
 import type { Bootstrap, User } from '../../shared/contracts'
-import { api, ApiError } from '../lib/api'
+import { ApiError } from '../lib/api'
+import { accountApi } from '../lib/accountApi'
 const props = defineProps<{ bootstrap: Bootstrap }>()
 const emit = defineEmits<{ authenticated: [user: User]; refresh: [] }>()
 const registering = ref(false)
@@ -18,7 +19,7 @@ async function submit() {
   error.value = ''
   try {
     const endpoint = props.bootstrap.needsSetup ? 'setup' : registering.value ? 'register' : 'login'
-    const { user } = await api<{ user: User }>(`/api/${endpoint}`, { method: 'POST', body: JSON.stringify({ email: email.value, password: password.value, ...(creating.value ? { name: name.value } : {}) }) })
+    const user = await accountApi.authenticate(endpoint, { email: email.value, password: password.value, ...(creating.value ? { name: name.value } : {}) })
     password.value = ''
     emit('authenticated', user)
   } catch (cause) {

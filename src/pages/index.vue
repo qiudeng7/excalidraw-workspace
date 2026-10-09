@@ -1,417 +1,75 @@
 <script setup lang="ts">
+import { computed, onBeforeUnmount, ref, shallowRef } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
-import { createUserSettingsResource, type UserSettingsResource } from '../lib/userSettings'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import AccountGate from '../components/AccountGate.vue'
 import QuietIcon from '../components/QuietIcon.vue'
-import { api, ApiError } from '../lib/api'
+import { accountApi } from '../lib/accountApi'
+import { workspaceApi } from '../lib/workspaceApi'
 import { cancelAppDialog, confirmDialog, promptDialog } from '../lib/dialogs'
-import type { Bootstrap, User, Workspace, CanvasMeta, CanvasDocument, LibraryDocument, Navigation, CanvasCatalog } from '../../shared/contracts'
+import type { EditorHandle } from '../lib/editor'
+import { useOperation } from '../composables/useOperation'
+import { useAccountSession, type AccountSessionController } from '../composables/useAccountSession'
+import { useCanvasDocument } from '../composables/useCanvasDocument'
+import { useWorkspaceNavigation } from '../composables/useWorkspaceNavigation'
+import { useWorkspaceDirectory, type WorkspaceDirectoryController } from '../composables/useWorkspaceDirectory'
+import { useWorkspacePicker } from '../composables/useWorkspacePicker'
+import { useCanvasReorder, type CanvasReorderController } from '../composables/useCanvasReorder'
 
-const bootstrap = ref<Bootstrap>()
-const user = ref<User | null>(null)
-const settingsResource = shallowRef<UserSettingsResource>()
-let accountGeneration = 0
-async function loadAccountSettings(account: User) {
-  const capturedGeneration = ++accountGeneration
-  settingsResource.value?.dispose()
-  const resource = createUserSettingsResource(account.id, () => accountGeneration === capturedGeneration && user.value?.id === account.id)
-  settingsResource.value = resource
-  await resource.load()
-}
-async function flushSettings() {
-  if (settingsResource.value && !await settingsResource.value.flush()) throw new Error('设置尚未同步，请在 flag 菜单处理设置提示后再退出或跳转。')
-}
-function protectUnsavedSettings(event: BeforeUnloadEvent) {
-  if (settingsResource.value && ['pending', 'saving', 'error', 'conflict'].includes(settingsResource.value.state.status)) { event.preventDefault(); event.returnValue = '' }
-}
-function disposeSettings() {
-  accountGeneration++
-  settingsResource.value?.dispose()
-  settingsResource.value = undefined
-}
-const workspaces = ref<Workspace[]>([])
-const canvases = ref<CanvasMeta[]>([])
-const workspaceId = ref('')
-type Directory = CanvasCatalog
-const navigation = ref<Navigation>()
-const catalogRevision = ref(0)
-const directoryStale = ref(false)
-const navigationNotice = ref('')
-const drag = ref<{ id: string; targetId: string; pointerId: number; handle: HTMLElement }>()
-const interactionLocked = computed(() => busy.value || !!drag.value)
-const directoryLocked = computed(() => interactionLocked.value || directoryStale.value)
-const document = shallowRef<CanvasDocument>()
-const library = shallowRef<LibraryDocument>()
-const editor = ref<{ flush: () => Promise<void>; saveManually: () => Promise<void> }>()
-const busy = ref(false)
-const starting = ref(true)
-const error = ref('')
-const saveState = ref('正在加载')
+const editor = ref<EditorHandle>()
+const saveBarrier = { flush: async () => { await editor.value?.flush() } }
 const sidebarOpen = ref(!window.matchMedia('(max-width: 760px)').matches)
-const currentWorkspace = computed(() => workspaces.value.find(item => item.id === workspaceId.value))
-const settingsBusy = ref(false)
-const workspacePicker = ref<HTMLElement>()
-const workspaceTrigger = ref<HTMLButtonElement>()
-const workspaceList = ref<HTMLUListElement>()
-const workspaceMenuOpen = ref(false)
-const activeWorkspaceIndex = ref(0)
-
-function closeWorkspaceMenu(returnFocus = false) {
-  workspaceMenuOpen.value = false
-  if (returnFocus) workspaceTrigger.value?.focus()
-}
-async function openWorkspaceMenu(index?: number) {
-  if (interactionLocked.value || !workspaces.value.length) return
-  activeWorkspaceIndex.value = index ?? Math.max(0, workspaces.value.findIndex(item => item.id === workspaceId.value))
-  workspaceMenuOpen.value = true
-  await nextTick()
-  workspaceList.value?.focus()
-  scrollActiveWorkspace()
-}
-function scrollActiveWorkspace() {
-  workspaceList.value?.children[activeWorkspaceIndex.value]?.scrollIntoView({ block: 'nearest' })
-}
-function handleWorkspaceTriggerKey(event: KeyboardEvent) {
-  if (event.key === 'Enter' || event.key === ' ') { event.stopPropagation(); return }
-  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-  event.stopPropagation()
-  event.preventDefault()
-  void openWorkspaceMenu(event.key === 'Home' ? 0 : event.key === 'End' ? workspaces.value.length - 1 : undefined)
-}
-function handleWorkspaceListKey(event: KeyboardEvent) {
-  if (['Tab', 'Escape', 'Enter', ' ', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) event.stopPropagation()
-  if (event.key === 'Tab') { closeWorkspaceMenu(true); return }
-  if (event.key === 'Escape') { event.preventDefault(); closeWorkspaceMenu(true); return }
-  if (busy.value) return
-  if (event.key === 'Enter' || event.key === ' ') {
-    event.preventDefault()
-    const workspace = workspaces.value[activeWorkspaceIndex.value]
-    if (workspace) void selectWorkspace(workspace.id)
-    return
-  }
-  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-  event.preventDefault()
-  const last = workspaces.value.length - 1
-  activeWorkspaceIndex.value = event.key === 'Home' ? 0 : event.key === 'End' ? last : Math.max(0, Math.min(last, activeWorkspaceIndex.value + (event.key === 'ArrowDown' ? 1 : -1)))
-  void nextTick(scrollActiveWorkspace)
-}
-function dismissWorkspaceMenu(event: PointerEvent) {
-  if (workspaceMenuOpen.value && !workspacePicker.value?.contains(event.target as Node)) closeWorkspaceMenu()
-}
-function escapeWorkspaceMenu(event: KeyboardEvent) {
-  if (drag.value && event.key === 'Escape') { event.preventDefault(); cancelDrag() }
-  if (workspaceMenuOpen.value && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeWorkspaceMenu(true) }
-}
-function handleWorkspaceFocusOut(event: FocusEvent) {
-  if (event.relatedTarget && !workspacePicker.value?.contains(event.relatedTarget as Node)) closeWorkspaceMenu()
-}
-watch([busy, sidebarOpen], ([isBusy, isOpen]) => {
-  if (isBusy || !isOpen) closeWorkspaceMenu()
-})
 const saveShortcut = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘ S' : 'Ctrl S'
-
-async function run(action: () => Promise<void>) {
-  if (interactionLocked.value) return
-  busy.value = true
-  error.value = ''
-  try { await action() } catch (cause) { error.value = cause instanceof Error ? cause.message : '操作失败，请重试' }
-  finally { busy.value = false }
-}
-async function flush() { await editor.value?.flush() }
-async function loadCanvas(id: string) {
-  const owner = user.value!.id
-  const [canvasData, libraryData] = await Promise.all([
-    api<{ canvas: CanvasDocument }>(`/api/canvases/${id}`),
-    api<LibraryDocument>('/api/library', { headers: { 'X-Resource-Owner': owner } }),
-  ])
-  library.value = libraryData
-  document.value = canvasData.canvas
-  saveState.value = '已保存'
-  if (window.matchMedia('(max-width: 760px)').matches) sidebarOpen.value = false
-}
-async function readNavigation() {
-  navigation.value = await api<Navigation>('/api/navigation')
-  return navigation.value
-}
-async function refreshNavigationQuietly() {
-  try { await readNavigation() }
-  catch { navigation.value = undefined; navigationNotice.value = '最近打开位置暂时无法读取，画布仍可正常使用。' }
-}
-async function recordOpened(id: string) {
-  navigationNotice.value = ''
-  try {
-    if (!navigation.value) await readNavigation()
-    navigation.value = await api<Navigation>('/api/navigation', { method: 'PUT', body: JSON.stringify({ canvasId: id, revision: navigation.value!.revision }) })
-  } catch (cause) {
-    navigationNotice.value = cause instanceof ApiError && cause.code === 'NAVIGATION_CONFLICT'
-      ? '当前画布已打开，最近位置已在其他页面更新。'
-      : '画布已打开，最近位置未保存。下次切换时会再次尝试。'
-    // Read the winning version; never retry this write or move the current editor.
-    try { await readNavigation() } catch { navigation.value = undefined }
-  }
-}
-async function readDirectory(id: string) {
-  return api<Directory>(`/api/workspaces/${id}/canvases`)
-}
-function setDirectory(id: string, data: Directory) {
-  workspaceId.value = id
-  canvases.value = data.canvases
-  catalogRevision.value = data.catalogRevision
-  directoryStale.value = false
-}
-async function refreshDirectory() {
-  if (!workspaceId.value) return
-  try { setDirectory(workspaceId.value, await readDirectory(workspaceId.value)) }
-  catch { directoryStale.value = true; throw new Error('未能确认最新画布列表，请重新加载列表后再操作。') }
-}
-async function loadWorkspace(id: string, preferred?: string | null, explicit = false) {
-  const data = await readDirectory(id)
-  const remembered = preferred ?? navigation.value?.workspaces.find(item => item.workspaceId === id)?.lastCanvasId
-  const selected = data.canvases.find(item => item.id === remembered) ?? data.canvases[0]
-  // Only replace the current editor once the selected scene and library both load.
-  if (selected) await loadCanvas(selected.id)
-  else { document.value = undefined; saveState.value = '没有画布' }
-  setDirectory(id, data)
-  if (selected && (explicit || !navigation.value?.lastCanvasId)) await recordOpened(selected.id)
-}
-async function loadWorkspaces() {
-  const [data] = await Promise.all([api<{ workspaces: Workspace[] }>('/api/workspaces'), refreshNavigationQuietly()])
-  const entries = data.workspaces
-  workspaces.value = entries
-  if (!entries.length) {
-    document.value = undefined; workspaceId.value = ''; canvases.value = []; catalogRevision.value = 0; directoryStale.value = false; saveState.value = '没有工作空间'
-    return
-  }
-  const remembered = entries.find(item => item.id === navigation.value?.lastWorkspaceId)
-  // A deleted/empty recent space falls back to the first nonempty space, without creating data.
-  if (remembered) {
-    const recentDirectory = await readDirectory(remembered.id)
-    if (recentDirectory.canvases.length) {
-      await loadWorkspace(remembered.id, navigation.value?.lastCanvasId)
-      return
-    }
-  }
-  for (const entry of entries) {
-    const listing = await readDirectory(entry.id)
-    if (listing.canvases.length) { await loadWorkspace(entry.id, listing.canvases[0]!.id); return }
-  }
-  await loadWorkspace(remembered?.id ?? entries[0]!.id)
-}
-async function reorderCanvas(ids: string[]) {
-  if (directoryLocked.value || ids.every((id, i) => id === canvases.value[i]?.id)) return
-  const previous = [...canvases.value]
-  const ordered = ids.map(id => previous.find(canvas => canvas.id === id)!)
-  await run(async () => {
-    canvases.value = ordered
-    try {
-      setDirectory(workspaceId.value, await api<Directory>(`/api/workspaces/${workspaceId.value}/canvas-order`, { method: 'PUT', body: JSON.stringify({ canvasIds: ids, catalogRevision: catalogRevision.value }) }))
-    } catch (cause) {
-      canvases.value = previous
-      // A response can be lost after commit. Always re-read instead of sending the old order again.
-      await refreshDirectory()
-      const accepted = canvases.value.map(item => item.id).every((id, i) => id === ids[i]) && canvases.value.length === ids.length
-      if (!accepted) throw new Error(cause instanceof ApiError && cause.code === 'CATALOG_CONFLICT' ? '列表已在其他页面更新，请重新排序。' : '排序未完成，已恢复服务端列表，请重试。')
-    }
-  })
-}
-function moveCanvas(canvas: CanvasMeta, offset: number) {
-  const ids = canvases.value.map(item => item.id)
-  const index = ids.indexOf(canvas.id), target = index + offset
-  if (target < 0 || target >= ids.length) return
-  ids.splice(index, 1); ids.splice(target, 0, canvas.id)
-  void reorderCanvas(ids)
-}
-function startDrag(event: PointerEvent, canvas: CanvasMeta) {
-  if (directoryLocked.value || event.button !== 0) return
-  event.preventDefault()
-  const handle = event.currentTarget as HTMLElement
-  handle.setPointerCapture(event.pointerId)
-  drag.value = { id: canvas.id, targetId: canvas.id, pointerId: event.pointerId, handle }
-}
-function dragMove(event: PointerEvent) {
-  if (!drag.value || drag.value.pointerId !== event.pointerId) return
-  const row = window.document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-canvas-id]')
-  if (row?.dataset.canvasId && canvases.value.some(canvas => canvas.id === row.dataset.canvasId)) drag.value.targetId = row.dataset.canvasId
-}
-function cancelDrag() {
-  const current = drag.value
-  drag.value = undefined
-  if (current?.handle.hasPointerCapture(current.pointerId)) current.handle.releasePointerCapture(current.pointerId)
-}
-function finishDrag(event: PointerEvent) {
-  const current = drag.value
-  if (!current || current.pointerId !== event.pointerId) return
-  const ids = canvases.value.map(item => item.id), target = ids.indexOf(current.targetId)
-  ids.splice(ids.indexOf(current.id), 1); ids.splice(target, 0, current.id)
-  cancelDrag()
-  void reorderCanvas(ids)
-}
-function dragKey(event: KeyboardEvent, canvas: CanvasMeta) {
-  if (event.key === 'Escape') { event.preventDefault(); cancelDrag(); return }
-  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-    event.preventDefault(); event.stopPropagation(); moveCanvas(canvas, event.key === 'ArrowUp' ? -1 : 1)
-  }
-}
-async function initialize() {
-  starting.value = true
-  error.value = ''
-  try {
-    bootstrap.value = await api<Bootstrap>('/api/bootstrap')
-    if (!bootstrap.value.needsSetup) {
-      const session = await api<{ user: User | null }>('/api/session')
-      user.value = session.user
-      if (user.value) { await loadAccountSettings(user.value); await loadWorkspaces() }
-    }
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '无法连接服务' }
-  finally { starting.value = false }
-}
-async function authenticated(account: User) {
-  user.value = account
-  await run(async () => {
-    bootstrap.value = await api<Bootstrap>('/api/bootstrap')
-    await loadAccountSettings(account)
-    await loadWorkspaces()
-  })
-}
+// Owner and account callbacks run on mount/actions, after these ports are bound.
+let account: AccountSessionController
+let directory: WorkspaceDirectoryController
+const navigationController = useWorkspaceNavigation(workspaceApi)
+const canvasDocument = useCanvasDocument({ api: workspaceApi,
+  ownerId: () => {
+    if (!account.user.value) throw new Error('请先登录')
+    return account.user.value.id
+  },
+  onLoaded: () => { if (window.matchMedia('(max-width: 760px)').matches) sidebarOpen.value = false },
+})
+// Reorder is bound after directory creation. This reactive slot makes the lock safe even
+// if a controller reads it while the composition root is still initializing.
+const reorderSlot = shallowRef<CanvasReorderController>()
+const operation = useOperation(() => !!reorderSlot.value?.drag.value)
+const { busy, error, run } = operation
+const interactionLocked = computed(() => busy.value || !!reorderSlot.value?.drag.value)
+directory = useWorkspaceDirectory({ api: workspaceApi, navigationController, canvasDocument, editor: saveBarrier, interactionLocked, run,
+  dialogs: { prompt: promptDialog, confirm: confirmDialog },
+})
+const reordering = useCanvasReorder({ canvases: directory.canvases, locked: directory.directoryLocked,
+  reorder: directory.reorderCanvas,
+})
+reorderSlot.value = reordering
+account = useAccountSession({ api: accountApi, editor: saveBarrier, loadWorkspaces: directory.loadWorkspaces, run, reportError: operation.reportError,
+  clearWorkspace: () => { canvasDocument.reset(); directory.reset(); navigationController.reset() },
+})
+const { bootstrap, user, settingsResource, starting, settingsBusy, initialize, authenticated, logout, toggleRegistration, flushSettings } = account
+const { document, library, saveState, setSaveState } = canvasDocument
+const { workspaces, canvases, workspaceId, currentWorkspace, directoryStale, directoryLocked, refreshDirectory, loadWorkspaces, selectCanvas,
+  createWorkspace, renameWorkspace, deleteWorkspace, createCanvas, renameCanvas, deleteCanvas } = directory
+const { navigationNotice, clearNotice } = navigationController
+const { drag, moveCanvas, startDrag, dragMove, finishDrag, cancelDrag, dragKey } = reordering
+const picker = useWorkspacePicker({ workspaces, workspaceId, locked: interactionLocked, sidebarOpen, select: id => selectWorkspace(id) })
+const { workspacePicker, workspaceTrigger, workspaceList, workspaceMenuOpen, activeWorkspaceIndex,
+  closeWorkspaceMenu, openWorkspaceMenu, handleWorkspaceTriggerKey, handleWorkspaceListKey, handleWorkspaceFocusOut, setActiveWorkspace } = picker
 async function selectWorkspace(id: string) {
   if (interactionLocked.value) return
   closeWorkspaceMenu(true)
-  if (id === workspaceId.value) return
-  await run(async () => { await flush(); await refreshNavigationQuietly(); await loadWorkspace(id, undefined, true) })
-}
-async function selectCanvas(id: string) {
-  if (id === document.value?.id) return
-  await run(async () => { await flush(); await loadCanvas(id); await recordOpened(id) })
-}
-async function createWorkspace() {
-  if (interactionLocked.value) return
-  const name = await promptDialog({ title: '新建工作空间', label: '工作空间名称', initialValue: '新的工作空间', confirmLabel: '创建' })
-  if (!name) return
-  await run(async () => {
-    await flush()
-    const { workspace } = await api<{ workspace: Workspace }>('/api/workspaces', { method: 'POST', body: JSON.stringify({ name }) })
-    workspaces.value.push(workspace)
-    await refreshNavigationQuietly()
-    await loadWorkspace(workspace.id, undefined, true)
-  })
-}
-async function renameWorkspace() {
-  const name = await promptDialog({ title: '重命名工作空间', label: '工作空间名称', initialValue: currentWorkspace.value?.name, confirmLabel: '保存名称' })
-  if (!name || name === currentWorkspace.value?.name) return
-  await run(async () => {
-    const { workspace } = await api<{ workspace: Workspace }>(`/api/workspaces/${workspaceId.value}`, { method: 'PATCH', body: JSON.stringify({ name }) })
-    workspaces.value = workspaces.value.map(item => item.id === workspace.id ? workspace : item)
-  })
-}
-async function deleteWorkspace() {
-  if (interactionLocked.value) return
-  if (!await confirmDialog({ title: '删除工作空间', message: `删除「${currentWorkspace.value?.name}」及其中所有画布？此操作无法撤销。`, confirmLabel: '删除工作空间', danger: true })) return
-  await run(async () => {
-    await flush()
-    await api(`/api/workspaces/${workspaceId.value}`, { method: 'DELETE' })
-    document.value = undefined
-    workspaceId.value = ''
-    canvases.value = []
-    await loadWorkspaces()
-  })
-}
-async function createCanvas() {
-  if (directoryLocked.value || !workspaceId.value) return
-  const name = await promptDialog({ title: '新建画布', label: '画布名称', initialValue: '未命名画布', confirmLabel: '创建' })
-  if (!name) return
-  await run(async () => {
-    await flush()
-    let canvas: CanvasMeta
-    try {
-      canvas = (await api<{ canvas: CanvasMeta }>(`/api/workspaces/${workspaceId.value}/canvases`, { method: 'POST', body: JSON.stringify({ name, catalogRevision: catalogRevision.value }) })).canvas
-    } catch (cause) { await refreshDirectory(); throw cause }
-    await refreshDirectory()
-    await loadCanvas(canvas.id)
-    await recordOpened(canvas.id)
-  })
-}
-async function renameCanvas(canvas: CanvasMeta) {
-  const name = await promptDialog({ title: '重命名画布', label: '画布名称', initialValue: canvas.name, confirmLabel: '保存名称' })
-  if (!name || name === canvas.name) return
-  await run(async () => {
-    await flush()
-    const { canvas: updated } = await api<{ canvas: CanvasMeta }>(`/api/canvases/${canvas.id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
-    canvases.value = canvases.value.map(item => item.id === canvas.id ? updated : item)
-    if (document.value?.id === canvas.id) document.value = { ...document.value, name: updated.name }
-  })
-}
-async function deleteCanvas(canvas: CanvasMeta) {
-  if (directoryLocked.value) return
-  if (!await confirmDialog({ title: '删除画布', message: `删除画布「${canvas.name}」？此操作无法撤销。`, confirmLabel: '删除画布', danger: true })) return
-  await run(async () => {
-    await flush()
-    let failure: unknown
-    try { await api(`/api/canvases/${canvas.id}`, { method: 'DELETE', body: JSON.stringify({ catalogRevision: catalogRevision.value }) }) }
-    catch (cause) { failure = cause }
-    await refreshDirectory()
-    if (failure && canvases.value.some(item => item.id === canvas.id)) throw failure
-    if (document.value?.id === canvas.id) {
-      document.value = undefined
-      await refreshNavigationQuietly()
-      await loadWorkspace(workspaceId.value, canvases.value[0]?.id)
-    }
-  })
-}
-async function logout() {
-  await run(async () => {
-    await flush()
-    await flushSettings()
-    await api('/api/logout', { method: 'POST', body: '{}' })
-    document.value = undefined
-    library.value = undefined
-    disposeSettings()
-    user.value = null
-    workspaces.value = []
-    canvases.value = []
-    workspaceId.value = ''
-    navigation.value = undefined
-    navigationNotice.value = ''
-    directoryStale.value = false
-    bootstrap.value = await api<Bootstrap>('/api/bootstrap')
-  })
-}
-async function toggleRegistration(event: Event) {
-  if (!bootstrap.value) return
-  const input = event.target as HTMLInputElement
-  const enabled = input.checked
-  input.checked = bootstrap.value.registrationEnabled
-  settingsBusy.value = true
-  error.value = ''
-  try {
-    const settings = await api<{ registrationEnabled: boolean }>('/api/admin/settings', { method: 'PATCH', body: JSON.stringify({ registrationEnabled: enabled }) })
-    bootstrap.value.registrationEnabled = settings.registrationEnabled
-  } catch (cause) { error.value = cause instanceof Error ? cause.message : '设置失败' }
-  finally { settingsBusy.value = false }
+  await directory.selectWorkspace(id)
 }
 function closeActionMenu(event: MouseEvent) {
   const button = (event.target as HTMLElement).closest('button')
   if (button && !button.disabled) button.closest('details')?.removeAttribute('open')
 }
-onMounted(() => {
-  void initialize()
-  window.addEventListener('beforeunload', protectUnsavedSettings)
-  window.document.addEventListener('pointerdown', dismissWorkspaceMenu)
-  window.document.addEventListener('keydown', escapeWorkspaceMenu)
-})
 onBeforeRouteLeave(async () => {
   if (!user.value) return true
-  try { await flush(); await flushSettings(); return true }
-  catch (cause) { error.value = cause instanceof Error ? cause.message : '尚未保存，暂时无法跳转。'; return false }
+  try { await saveBarrier.flush(); await flushSettings(); return true }
+  catch (cause) { operation.reportError(cause instanceof Error ? cause.message : '尚未保存，暂时无法跳转。'); return false }
 })
-onBeforeUnmount(() => {
-  disposeSettings()
-  cancelAppDialog()
-  cancelDrag()
-  window.removeEventListener('beforeunload', protectUnsavedSettings)
-  window.document.removeEventListener('pointerdown', dismissWorkspaceMenu)
-  window.document.removeEventListener('keydown', escapeWorkspaceMenu)
-})
+onBeforeUnmount(cancelAppDialog)
 </script>
 
 <template>
@@ -429,7 +87,7 @@ onBeforeUnmount(() => {
             <QuietIcon name="folder" :size="16" /><span id="workspace-current-name" :title="currentWorkspace?.name">{{ currentWorkspace?.name ?? '选择工作空间' }}</span><svg class="workspace-chevron" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="m3 4.5 3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
           </button>
           <ul v-if="workspaceMenuOpen" id="workspace-options" ref="workspaceList" class="workspace-options" role="listbox" tabindex="0" aria-labelledby="workspace-picker-label" :aria-activedescendant="`workspace-option-${activeWorkspaceIndex}`" @keydown="handleWorkspaceListKey">
-            <li v-for="(workspace, index) in workspaces" :id="`workspace-option-${index}`" :key="workspace.id" role="option" :aria-selected="workspace.id === workspaceId" :aria-disabled="interactionLocked" :class="{ active: activeWorkspaceIndex === index, chosen: workspace.id === workspaceId }" :title="workspace.name" @pointermove="activeWorkspaceIndex = index" @click="selectWorkspace(workspace.id)">
+            <li v-for="(workspace, index) in workspaces" :id="`workspace-option-${index}`" :key="workspace.id" role="option" :aria-selected="workspace.id === workspaceId" :aria-disabled="interactionLocked" :class="{ active: activeWorkspaceIndex === index, chosen: workspace.id === workspaceId }" :title="workspace.name" @pointermove="setActiveWorkspace(index)" @click="selectWorkspace(workspace.id)">
               <QuietIcon name="folder" :size="15" /><span>{{ workspace.name }}</span><QuietIcon v-if="workspace.id === workspaceId" name="check" :size="15" />
             </li>
           </ul>
@@ -451,11 +109,11 @@ onBeforeUnmount(() => {
     </aside>
     <div class="draw-content">
       <header class="canvas-header"><button class="sidebar-toggle icon-button" :aria-expanded="sidebarOpen" aria-controls="workspace-sidebar" aria-label="切换工作空间侧边栏" title="工作空间" @click="sidebarOpen = !sidebarOpen"><QuietIcon name="panel" :size="18" /></button><div class="breadcrumb"><span class="workspace-crumb">{{ currentWorkspace?.name }}</span><span class="crumb-divider">/</span><span class="document-name">{{ document?.name ?? '我的画布' }}</span></div><div class="header-right"><span class="save-state" :class="{ saved: saveState === '已保存' && !busy }" role="status"><span class="status-dot" />{{ busy ? '处理中…' : saveState }}</span><button class="save-button" :disabled="interactionLocked || !document" title="保存画布 · Ctrl / ⌘ S" @click="editor?.saveManually()"><QuietIcon name="cloud" :size="15" /><span>保存</span><kbd>{{ saveShortcut }}</kbd></button></div></header>
-      <div v-if="navigationNotice" class="navigation-notice" role="status"><span>{{ navigationNotice }}</span><button class="icon-button" aria-label="关闭最近位置提示" @click="navigationNotice = ''"><QuietIcon name="close" :size="16" /></button></div>
+      <div v-if="navigationNotice" class="navigation-notice" role="status"><span>{{ navigationNotice }}</span><button class="icon-button" aria-label="关闭最近位置提示" @click="clearNotice"><QuietIcon name="close" :size="16" /></button></div>
       <div v-if="directoryStale" class="operation-error" role="alert"><span>画布列表尚未确认，目录操作已暂停。</span><button :disabled="busy" @click="run(refreshDirectory)">重新加载列表</button></div>
-      <div v-if="error" class="operation-error" role="alert"><span>{{ error }}</span><button v-if="!document" :disabled="directoryLocked" @click="run(loadWorkspaces)">重新加载</button><button class="icon-button" aria-label="关闭提示" @click="error = ''"><QuietIcon name="close" :size="16" /></button></div>
+      <div v-if="error" class="operation-error" role="alert"><span>{{ error }}</span><button v-if="!document" :disabled="directoryLocked" @click="run(loadWorkspaces)">重新加载</button><button class="icon-button" aria-label="关闭提示" @click="operation.reportError('')"><QuietIcon name="close" :size="16" /></button></div>
       <div v-if="settingsResource && ['unavailable', 'error', 'conflict'].includes(settingsResource.state.status)" class="settings-notice" role="alert"><span>{{ settingsResource.state.error }}</span><button v-if="!settingsResource.state.cloudConflict" @click="settingsResource.retry()">{{ settingsResource.state.ready ? '重试同步设置' : '重新读取设置' }}</button><template v-else><button @click="settingsResource.useCloud()">采用云端设置</button><button @click="settingsResource.keepLocal()">保存当前设置</button></template></div>
-      <div v-if="document && library && settingsResource" class="draw-editor" :inert="busy"><ExcalidrawCanvas :key="`${user.id}:${document.id}`" ref="editor" :document="document" :library="library" :user-id="user.id" :user-settings="settingsResource.state.settings" :settings-ready="settingsResource.state.ready" :settings-status="settingsResource.state.status" :settings-error="settingsResource.state.error" :settings-configured="settingsResource.state.configured" :settings-conflict="!!settingsResource.state.cloudConflict" @settings-change="settingsResource.update($event)" @settings-retry="settingsResource.retry()" @settings-reload="settingsResource.load()" @settings-use-cloud="settingsResource.useCloud()" @settings-keep-local="settingsResource.keepLocal()" @save-state="saveState = $event" /></div>
+      <div v-if="document && library && settingsResource" class="draw-editor" :inert="busy"><ExcalidrawCanvas :key="`${user.id}:${document.id}`" ref="editor" :document="document" :library="library" :user-id="user.id" :user-settings="settingsResource.state.settings" :settings-ready="settingsResource.state.ready" :settings-status="settingsResource.state.status" :settings-error="settingsResource.state.error" :settings-configured="settingsResource.state.configured" :settings-conflict="!!settingsResource.state.cloudConflict" @settings-change="settingsResource.update($event)" @settings-retry="settingsResource.retry()" @settings-reload="settingsResource.load()" @settings-use-cloud="settingsResource.useCloud()" @settings-keep-local="settingsResource.keepLocal()" @save-state="setSaveState($event)" /></div>
       <div v-else class="loading"><template v-if="busy">正在加载画布…</template><template v-else-if="!workspaces.length"><p>创建工作空间，开始整理你的画布。</p><button class="empty-create" :disabled="interactionLocked" @click="createWorkspace">新建工作空间</button></template><template v-else-if="!canvases.length"><p>这个工作空间还没有画布。</p><button class="empty-create" :disabled="directoryLocked" @click="createCanvas">新建画布</button></template><template v-else><p>暂时无法加载画布，请重试。</p><button :disabled="directoryLocked" @click="run(loadWorkspaces)">重新加载</button></template></div>
     </div>
   </section>

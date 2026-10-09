@@ -20,5 +20,6 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (!response.ok) {
     throw new ApiError(response.status, body?.error?.code ?? 'REQUEST_FAILED', body?.error?.message ?? `请求失败（${response.status}）`)
   }
+  if (body === null) throw new ApiError(response.status, 'INVALID_RESPONSE', '服务返回了无效的 JSON 响应，请重试')
   return body as T
 }

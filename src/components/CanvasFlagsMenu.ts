@@ -1,6 +1,7 @@
 import { createElement, useState, type ChangeEvent } from 'react'
 import { MainMenu } from '@excalidraw/excalidraw'
 import type { UserSettings } from '../../shared/contracts'
+import type { UserSettingsStatus } from '../lib/userSettings'
 import { SamplingMenu, readLegacySampling } from './canvasSampling'
 import { RenderingOptionsMenu, readLegacyRenderingOptions, defaultRenderingOptions } from './canvasRenderingOptions'
 
@@ -8,7 +9,7 @@ export interface FlagsMenuProps {
   settings: UserSettings
   ready: boolean
   configured: boolean
-  status: string
+  status: UserSettingsStatus
   error: string
   conflict: boolean
   onChange: (settings: UserSettings) => void
@@ -24,7 +25,7 @@ const features: [keyof UserSettings['features'], string, string][] = [
   ['solidFill', '默认实心填充', '只更新工具默认，不修改已有图形。当前上游默认也是实心，关闭可能没有视觉差异。'],
   ['shortArrowheads', '短箭头头部', '调整画布上所有开放箭头头部的显示，并应用到图片与 SVG 导出，不改动元素数据。其他应用打开 JSON 时按其自身样式显示。'],
 ]
-const statuses: Record<string, string> = {
+const statuses: Record<UserSettingsStatus, string> = {
   loading: '正在读取设置…', unavailable: '未读取云端设置', synced: '设置已同步', pending: '设置待保存', saving: '正在同步设置…', error: '设置保存失败', conflict: '设置与云端有冲突',
 }
 function FeatureControl({ name, label, description, value, disabled, onChange }: {

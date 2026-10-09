@@ -122,7 +122,32 @@ async function otherDrafts<T>(
 }
 
 /** One in-flight request per resource. A response only acknowledges the snapshot it sent. */
-export class PersistentResource<T> {
+export interface PersistentResourceOptions<T> {
+  key: string;
+  path: string;
+  field: string;
+  value: T;
+  revision: number;
+  changed: (message?: string) => void;
+  scopeId?: string;
+  ownerId?: string;
+}
+/** Scene/library save port; settings keep their distinct conflict-resolution state machine. */
+export interface SaveResource<T> {
+  readonly value: T;
+  readonly revision: number;
+  readonly dirty: boolean;
+  readonly conflict: boolean;
+  restore(): Promise<void>;
+  update(value: T): void;
+  schedule(delay?: number): void;
+  flush(): Promise<void>;
+  saveNow(): Promise<void>;
+  findOtherDrafts(): Promise<OtherDraft<T>[]>;
+  discardDraft(): Promise<void>;
+  dispose(): void;
+}
+export class PersistentResource<T> implements SaveResource<T> {
   value: T;
   revision: number;
   dirty = false;
@@ -140,16 +165,7 @@ export class PersistentResource<T> {
   private path: string;
   private field: string;
   private changed: (message?: string) => void;
-  constructor(
-    key: string,
-    path: string,
-    field: string,
-    value: T,
-    revision: number,
-    changed: (message?: string) => void,
-    scopeId?: string,
-    ownerId?: string,
-  ) {
+  constructor({ key, path, field, value, revision, changed, scopeId, ownerId }: PersistentResourceOptions<T>) {
     this.ownerId = ownerId;
     this.prefix = key;
     this.key = (scopeId ? Promise.resolve(scopeId) : getTabScope()).then(
