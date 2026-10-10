@@ -242,7 +242,11 @@ export class Repository implements RepositoryPort {
   ) {
     const result = await this.sql.transaction([
       {
-        sql: "INSERT INTO canvases(id,workspace_id,name,position,created_at,updated_at) SELECT ?,w.id,?,COALESCE((SELECT MAX(position)+1 FROM canvases WHERE workspace_id=w.id),0),?,? FROM workspaces w WHERE w.id=? AND w.user_id=? AND w.catalog_revision=?",
+        sql: "UPDATE canvases SET position=position+1 WHERE workspace_id=? AND EXISTS(SELECT 1 FROM workspaces WHERE id=? AND user_id=? AND catalog_revision=?)",
+        values: [workspace, workspace, user, catalogRevision],
+      },
+      {
+        sql: "INSERT INTO canvases(id,workspace_id,name,position,created_at,updated_at) SELECT ?,w.id,?,0,?,? FROM workspaces w WHERE w.id=? AND w.user_id=? AND w.catalog_revision=?",
         values: [id, name, now, now, workspace, user, catalogRevision],
       },
       {
@@ -251,7 +255,7 @@ export class Repository implements RepositoryPort {
       },
     ]);
 
-    return result[1]!.changes;
+    return result[2]!.changes;
   }
 
   renameCanvas(id: string, user: string, name: string, now: string) {

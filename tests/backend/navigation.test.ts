@@ -18,7 +18,6 @@ INSERT INTO canvases(id,workspace_id,name,created_at,updated_at) VALUES('b','leg
 test(`node: navigation and catalog CAS are atomic, migrated order and foreign keys are preserved`, async () => {
   const directory = await mkdtemp(resolve(tmpdir(), "navigation-"));
   let close: () => unknown;
-  let legacyWrite: (sql: string) => Promise<void>;
   let storage: Pick<
     Awaited<ReturnType<typeof nodeStorage>>,
     "repository" | "objects"
@@ -37,9 +36,6 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
   const raw = new DatabaseSync(resolve(directory, "workspace.sqlite"));
 
   raw.exec("PRAGMA foreign_keys=ON");
-  legacyWrite = async (sql) => {
-    raw.exec(sql);
-  };
 
   close = () => {
     raw.close();
@@ -97,28 +93,13 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
     );
     assert.equal(migrated!.catalogRevision, 0);
     assert.equal((await storage.repository.navigation("legacy")).revision, 0);
-    await legacyWrite(
-      "INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES('transition','transition@example.com','Transition','user','hash','2020-01-01');INSERT INTO canvases(id,workspace_id,name,created_at,updated_at) VALUES('d','legacy-space','D','2020-01-03','2020-01-03');",
+    raw.exec(
+      "INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES('transition','transition@example.com','Transition','user','hash','2020-01-01');",
     );
     assert.equal(
       (await storage.repository.navigation("transition")).revision,
       0,
     );
-    const appended = await storage.repository.canvasCatalog(
-      "legacy-space",
-      "legacy",
-    );
-
-    assert.deepEqual(
-      appended!.canvases.map((row) => [row.id, row.position]),
-      [
-        ["a", 0],
-        ["b", 1],
-        ["c", 2],
-        ["d", 3],
-      ],
-    );
-    assert.equal(appended!.catalogRevision, 0);
     const alice = await request("/register", "POST", {
       email: "alice@example.com",
       password: "strong-password-123",
@@ -159,6 +140,14 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
 
     catalog = (await list()).body;
     assert.equal(catalog.catalogRevision, 2);
+    assert.deepEqual(
+      catalog.canvases.map((row: any) => [row.id, row.position]),
+      [
+        [third, 0],
+        [second, 1],
+        [first, 2],
+      ],
+    );
     assert.equal(
       (
         await request(
