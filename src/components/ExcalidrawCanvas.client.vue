@@ -47,6 +47,7 @@ const emit = defineEmits<{
   "settings-keep-local": [];
 }>();
 const message = ref("");
+const { theme, preference, setPreference } = useTheme();
 const loading = ref(true);
 const manualSaveMessage = ref("");
 const manualSaveFailed = ref(false);
@@ -328,6 +329,8 @@ watch(
 );
 watch(
   () => [
+    theme.value,
+    preference.value,
     props.userSettings,
     props.settingsReady,
     props.settingsStatus,
@@ -348,7 +351,8 @@ function CanvasEditor() {
     arrowBindingOptimization: props.userSettings.features.edgeBinding,
     shortArrowheads: props.userSettings.features.shortArrowheads,
     langCode: "zh-CN",
-    theme: "light",
+    theme: theme.value,
+    onThemeChange: setPreference,
     children: createElement(
       MainMenu,
       null,
@@ -361,7 +365,10 @@ function CanvasEditor() {
       createElement(MainMenu.DefaultItems.Help),
       createElement(MainMenu.DefaultItems.ClearCanvas),
       createElement(MainMenu.Separator),
-      createElement(MainMenu.DefaultItems.ToggleTheme),
+      createElement(MainMenu.DefaultItems.ToggleTheme, {
+        allowSystemTheme: true,
+        theme: preference.value,
+      }),
       createElement(MainMenu.DefaultItems.ChangeCanvasBackground),
       createElement(MainMenu.Group, {
         title: "跳转",
@@ -663,24 +670,24 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translateX(-50%);
   padding: 10px 16px;
-  border: 1px solid #d9e5dc;
+  border: 1px solid var(--app-success-border);
   border-radius: 10px;
-  background: #f3faf5;
-  color: #246139;
+  background: var(--app-success-bg);
+  color: var(--app-success);
   font-size: 13px;
   box-shadow: 0 4px 16px #0001;
   pointer-events: none;
   max-width: calc(100% - 48px);
 }
 .manual-save-feedback.failed {
-  background: #fff1f0;
-  color: #b42318;
-  border-color: #f3c2bc;
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
+  border-color: var(--app-danger-border);
 }
 .save-notice {
   padding: 8px 12px;
-  background: #fff4da;
-  color: #634600;
+  background: var(--app-warning-bg);
+  color: var(--app-warning);
   font-size: 13px;
   display: flex;
   gap: 8px;
@@ -688,11 +695,17 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 .save-notice button {
-  border: 1px solid #d2bd8d;
-  background: white;
+  border: 1px solid var(--app-warning-border);
+  background: var(--app-surface);
+  color: var(--app-text);
   border-radius: 4px;
   padding: 4px 8px;
   cursor: pointer;
+}
+.save-notice select {
+  border: 1px solid var(--app-warning-border);
+  background: var(--app-surface);
+  color: var(--app-text);
 }
 
 .canvas-host {

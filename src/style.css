@@ -1,37 +1,160 @@
 :root {
+  color-scheme: light;
+  --app-bg: #f7f7fa;
+  --app-surface: #fff;
+  --app-sidebar: #f8f9f6;
+  --app-welcome: #f4f5f2;
+  --app-text: #303632;
+  --app-muted: #717b6d;
+  --app-subtle: #8c9784;
+  --app-border: #e0e5dc;
+  --app-border-strong: #cad4c5;
+  --app-hover: #eef1eb;
+  --app-selected: #e9eee5;
+  --app-selected-text: #34432e;
+  --app-accent: #354237;
+  --app-accent-hover: #455545;
+  --app-on-accent: #fff;
+  --app-focus: #7d9277;
+  --app-focus-ring: #7d927740;
+  --app-switch: #d5ddcf;
+  --app-switch-active: #617a56;
+  --app-success: #246139;
+  --app-success-bg: #f3faf5;
+  --app-success-border: #d9e5dc;
+  --app-danger: #a73931;
+  --app-danger-bg: #fff2ef;
+  --app-danger-border: #f3c2bc;
+  --app-danger-solid: #a15d4d;
+  --app-danger-hover: #8c4f41;
+  --app-warning: #786342;
+  --app-warning-bg: #fff5e7;
+  --app-warning-border: #e0d1b8;
+  --app-shadow: #26302516;
+  --app-backdrop: #202a2359;
+  --app-purple: #6750a4;
+  --app-purple-bg: #f0ebfa;
+  --app-purple-border: #ddd5ee;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #151719;
+  --app-surface: #202124;
+  --app-sidebar: #191b1d;
+  --app-welcome: #191d1b;
+  --app-text: #e5e7e5;
+  --app-muted: #b0b7ad;
+  --app-subtle: #929c8d;
+  --app-border: #383e37;
+  --app-border-strong: #56624f;
+  --app-hover: #2b3029;
+  --app-selected: #333e2e;
+  --app-selected-text: #d4e5c8;
+  --app-accent: #53694a;
+  --app-accent-hover: #647e59;
+  --app-on-accent: #fff;
+  --app-focus: #9dbb8f;
+  --app-focus-ring: #9dbb8f40;
+  --app-switch: #444d3f;
+  --app-switch-active: #8da77e;
+  --app-success: #a4d5b2;
+  --app-success-bg: #24372b;
+  --app-success-border: #3e5d47;
+  --app-danger: #edaaa0;
+  --app-danger-bg: #3d2826;
+  --app-danger-border: #6d4540;
+  --app-danger-solid: #a15d4d;
+  --app-danger-hover: #b26b59;
+  --app-warning: #e4ca96;
+  --app-warning-bg: #382f21;
+  --app-warning-border: #65553b;
+  --app-shadow: #0005;
+  --app-backdrop: #0009;
+  --app-purple: #c3b2ed;
+  --app-purple-bg: #322b42;
+  --app-purple-border: #5b4d74;
+}
+
+:root {
   font-family: system-ui, sans-serif;
-  color: #252532;
-  background: #f7f7fa;
+  color: var(--app-text);
+  background: var(--app-bg);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-body { margin: 0; }
-#__nuxt { height: 100dvh; display: flex; flex-direction: column; }
+body {
+  margin: 0;
+}
+#__nuxt {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
 .app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
   padding: 16px 24px;
-  background: #fff;
-  border-bottom: 1px solid #e5e5eb;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
 }
-.brand { font-weight: 700; text-decoration: none; color: inherit; }
-.app-header nav { display: flex; gap: 20px; }
-.app-header nav a { color: #686878; text-decoration: none; }
-.app-header nav a.router-link-exact-active { color: #6750a4; }
-.app-main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
-.page { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
-.page p { line-height: 1.7; color: #686878; }
+.brand {
+  font-weight: 700;
+  text-decoration: none;
+  color: inherit;
+}
+.app-header nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.app-header nav a {
+  color: var(--app-muted);
+  text-decoration: none;
+}
+.app-header nav a.router-link-exact-active {
+  color: var(--app-purple);
+}
+.app-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+.page p {
+  line-height: 1.7;
+  color: var(--app-muted);
+}
 .demo-button {
   padding: 10px 18px;
-  border: 1px solid #ddd5ee;
+  border: 1px solid var(--app-purple-border);
   border-radius: 8px;
-  background: #f0ebfa;
-  color: #503986;
+  background: var(--app-purple-bg);
+  color: var(--app-purple);
   cursor: pointer;
   font: inherit;
+}
+
+@media (max-width: 620px) {
+  .app-header {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+  .app-header nav {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
 }

@@ -19,6 +19,14 @@ export default defineNuxtConfig({
     head: {
       title: "Excalidraw Workspace",
       htmlAttrs: { lang: "zh-CN" },
+      // Resolve the theme before styles paint, including pages rendered on the server.
+      script: [
+        {
+          key: "initial-theme",
+          tagPriority: "critical",
+          innerHTML: `(function(){var preference=document.cookie.match(/(?:^|;\\s*)workspace-theme=(light|dark|system)(?:;|$)/);var value=preference?preference[1]:"system";document.documentElement.dataset.theme=value==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):value})()`,
+        },
+      ],
       link: [{ rel: "icon", type: "image/svg+xml", href: "/favicon.svg" }],
     },
   },

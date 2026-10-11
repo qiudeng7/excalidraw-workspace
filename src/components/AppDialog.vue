@@ -143,7 +143,7 @@ onBeforeUnmount(() => dialog.value?.close());
   margin: 0;
   border: 0;
   background: transparent;
-  color: #303632;
+  color: var(--app-text);
   overflow: auto;
   font-family:
     Inter,
@@ -157,16 +157,16 @@ onBeforeUnmount(() => dialog.value?.close());
   place-items: center;
 }
 .app-dialog::backdrop {
-  background: #202a2359;
+  background: var(--app-backdrop);
 }
 .app-dialog-card {
   box-sizing: border-box;
   width: min(100%, 420px);
   padding: 24px;
-  border: 1px solid #e0e5dc;
+  border: 1px solid var(--app-border);
   border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 20px 70px #17271c33;
+  background: var(--app-surface);
+  box-shadow: 0 20px 70px var(--app-shadow);
 }
 .app-dialog-heading {
   display: flex;
@@ -185,7 +185,7 @@ onBeforeUnmount(() => dialog.value?.close());
   margin: 0 0 20px;
   font-size: 13px;
   line-height: 1.8;
-  color: #717b6d;
+  color: var(--app-muted);
   overflow-wrap: anywhere;
 }
 .app-dialog-field {
@@ -193,23 +193,23 @@ onBeforeUnmount(() => dialog.value?.close());
   flex-direction: column;
   gap: 8px;
   font-size: 12px;
-  color: #717b6d;
+  color: var(--app-muted);
 }
 .app-dialog input {
   box-sizing: border-box;
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid #dce3d6;
+  border: 1px solid var(--app-border);
   border-radius: 6px;
   font: inherit;
   font-size: 14px;
-  color: #374131;
-  background: #fff;
+  color: var(--app-text);
+  background: var(--app-surface);
 }
 .app-dialog input:focus {
-  outline: 2px solid #7d927740;
+  outline: 2px solid var(--app-focus-ring);
   outline-offset: 1px;
-  border-color: #829277;
+  border-color: var(--app-focus);
 }
 .app-dialog button {
   font: inherit;
@@ -220,7 +220,7 @@ onBeforeUnmount(() => dialog.value?.close());
   line-height: 1.4;
 }
 .app-dialog button:focus-visible {
-  outline: 2px solid #7d9277;
+  outline: 2px solid var(--app-focus);
   outline-offset: 3px;
 }
 .app-dialog-close {
@@ -231,10 +231,10 @@ onBeforeUnmount(() => dialog.value?.close());
   padding: 0 !important;
   border: 0;
   background: transparent;
-  color: #8c9784;
+  color: var(--app-subtle);
 }
 .app-dialog-close:hover {
-  background: #eef1eb;
+  background: var(--app-hover);
 }
 .app-dialog-actions {
   display: flex;
@@ -243,27 +243,27 @@ onBeforeUnmount(() => dialog.value?.close());
   margin-top: 26px;
 }
 .app-dialog-cancel {
-  border: 1px solid #e0e5dc;
-  background: #fff;
-  color: #677360;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  color: var(--app-muted);
 }
 .app-dialog-cancel:hover {
-  background: #f5f7f2;
+  background: var(--app-hover);
 }
 .app-dialog-confirm {
-  border: 1px solid #465b3f;
-  background: #465b3f;
-  color: #fff;
+  border: 1px solid var(--app-accent);
+  background: var(--app-accent);
+  color: var(--app-on-accent);
 }
 .app-dialog-confirm:hover {
-  background: #394d32;
+  background: var(--app-accent-hover);
 }
 .app-dialog-danger {
-  border-color: #a15d4d;
-  background: #a15d4d;
+  border-color: var(--app-danger-solid);
+  background: var(--app-danger-solid);
 }
 .app-dialog-danger:hover {
-  background: #8c4f41;
+  background: var(--app-danger-hover);
 }
 .app-dialog button:disabled {
   opacity: 0.45;

@@ -476,6 +476,7 @@ onBeforeUnmount(cancelAppDialog);
           ><span class="document-name">{{ document?.name ?? "我的画布" }}</span>
         </div>
         <div class="header-right">
+          <ThemeSwitcher />
           <span
             class="save-state"
             :class="{ saved: saveState === '已保存' && !busy }"
@@ -612,16 +613,16 @@ onBeforeUnmount(cancelAppDialog);
   gap: 8px;
   flex-wrap: wrap;
   padding: 8px 16px;
-  background: #fff5e7;
-  color: #786342;
+  background: var(--app-warning-bg);
+  color: var(--app-warning);
   font-size: 12px;
 }
 .settings-notice span {
   flex: 1;
 }
 .settings-notice button {
-  border: 1px solid #e0d1b8;
-  background: #fff;
+  border: 1px solid var(--app-warning-border);
+  background: var(--app-surface);
 }
 
 .drag-handle {
@@ -631,7 +632,7 @@ onBeforeUnmount(cancelAppDialog);
   width: 18px;
   height: 30px;
   padding: 0 !important;
-  color: #a3ac9c;
+  color: var(--app-subtle);
   touch-action: none;
   cursor: grab;
 }
@@ -646,47 +647,47 @@ onBeforeUnmount(cancelAppDialog);
   opacity: 0.5;
 }
 .canvas-list li.drop-target {
-  box-shadow: inset 0 -2px #7d9277;
+  box-shadow: inset 0 -2px var(--app-focus);
 }
 .canvas-name {
   padding-left: 5px !important;
 }
 .sidebar-empty {
   padding: 0 8px;
-  color: #919b8a;
+  color: var(--app-subtle);
   font-size: 11px;
 }
 .navigation-notice {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #f3f5ef;
+  background: var(--app-hover);
   padding: 8px 16px;
   font-size: 12px;
-  color: #687660;
+  color: var(--app-muted);
 }
 .navigation-notice span {
   flex: 1;
 }
 .empty-create {
   padding: 10px 18px;
-  background: #354237;
-  color: #fff;
+  background: var(--app-accent);
+  color: var(--app-on-accent);
 }
 .empty-create:hover {
-  background: #455545;
+  background: var(--app-accent-hover);
 }
 
 .draw-page {
-  --text: #303632;
-  --muted: #8d958d;
-  --line: #e9ece7;
+  --text: var(--app-text);
+  --muted: var(--app-subtle);
+  --line: var(--app-border);
   position: relative;
   flex: 1;
   min-height: 0;
   display: flex;
   overflow: hidden;
-  background: #fff;
+  background: var(--app-surface);
   color: var(--text);
   font-family:
     Inter,
@@ -716,13 +717,13 @@ onBeforeUnmount(cancelAppDialog);
   justify-content: center;
   gap: 16px;
   font-size: 13px;
-  color: #7c857c;
+  color: var(--app-muted);
 }
 .loading-mark {
   width: 18px;
   height: 18px;
-  border: 2px solid #e7ece5;
-  border-top-color: #546653;
+  border: 2px solid var(--app-border);
+  border-top-color: var(--app-focus);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -738,7 +739,7 @@ onBeforeUnmount(cancelAppDialog);
   display: flex;
   flex-direction: column;
   padding: 0 14px;
-  background: #f8f9f6;
+  background: var(--app-sidebar);
   border-right: 1px solid var(--line);
   z-index: 20;
   overflow: auto;
@@ -764,8 +765,8 @@ onBeforeUnmount(cancelAppDialog);
   place-items: center;
   width: 28px;
   height: 28px;
-  background: #354237;
-  color: #fff;
+  background: var(--app-accent);
+  color: var(--app-on-accent);
   border-radius: 6px;
 }
 .workspace-controls {
@@ -777,7 +778,7 @@ onBeforeUnmount(cancelAppDialog);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: #727d70;
+  color: var(--app-muted);
   font-size: 11px;
   letter-spacing: 0.04em;
 }
@@ -799,10 +800,10 @@ onBeforeUnmount(cancelAppDialog);
   width: 100%;
   padding: 0 11px;
   height: 38px;
-  border: 1px solid #e1e6df;
+  border: 1px solid var(--app-border);
   border-radius: 6px;
-  background: white;
-  color: #707a6f;
+  background: var(--app-surface);
+  color: var(--app-muted);
   text-align: left;
 }
 .workspace-select-wrap > svg {
@@ -815,15 +816,15 @@ onBeforeUnmount(cancelAppDialog);
   white-space: nowrap;
   text-overflow: ellipsis;
   font-size: 13px;
-  color: #414b40;
+  color: var(--app-text);
 }
 .workspace-select-wrap:hover {
-  background: #fcfdfb;
-  border-color: #cad4c5;
+  background: var(--app-hover);
+  border-color: var(--app-border-strong);
 }
 .workspace-select-wrap.expanded {
-  border-color: #8b9d88;
-  box-shadow: 0 0 0 2px #84937d12;
+  border-color: var(--app-focus);
+  box-shadow: 0 0 0 2px var(--app-focus-ring);
 }
 .workspace-chevron {
   width: 12px;
@@ -843,10 +844,10 @@ onBeforeUnmount(cancelAppDialog);
   margin: 0;
   padding: 4px;
   list-style: none;
-  background: #fff;
-  border: 1px solid #e0e5dc;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: 7px;
-  box-shadow: 0 6px 24px #26302516;
+  box-shadow: 0 6px 24px var(--app-shadow);
   max-height: min(280px, calc(100dvh - 180px));
   overflow-y: auto;
   outline: none;
@@ -858,7 +859,7 @@ onBeforeUnmount(cancelAppDialog);
   gap: 8px;
   padding: 10px 8px;
   border-radius: 4px;
-  color: #747f6d;
+  color: var(--app-muted);
   font-size: 12px;
   cursor: pointer;
 }
@@ -871,17 +872,17 @@ onBeforeUnmount(cancelAppDialog);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #53604c;
+  color: var(--app-muted);
 }
 .workspace-options li.active {
-  background: #eff3eb;
+  background: var(--app-hover);
 }
 .workspace-options li.chosen > span {
   font-weight: 500;
-  color: #34432e;
+  color: var(--app-selected-text);
 }
 .workspace-options:focus-visible li.active {
-  box-shadow: inset 0 0 0 1px #d3dec9;
+  box-shadow: inset 0 0 0 1px var(--app-border-strong);
 }
 .workspace-options li[aria-disabled="true"] {
   opacity: 0.5;
@@ -893,7 +894,7 @@ onBeforeUnmount(cancelAppDialog);
 }
 .count {
   margin-left: 5px;
-  color: #b0b7ad;
+  color: var(--app-subtle);
   font-size: 10px;
 }
 .canvas-list {
@@ -912,14 +913,14 @@ onBeforeUnmount(cancelAppDialog);
   border-radius: 5px;
   min-height: 37px;
   padding-right: 3px;
-  color: #7c867a;
+  color: var(--app-muted);
 }
 .canvas-list li:hover {
-  background: #eff2ec;
+  background: var(--app-hover);
 }
 .canvas-list .selected {
-  background: #e9eee5;
-  color: #34432e;
+  background: var(--app-selected);
+  color: var(--app-selected-text);
 }
 .canvas-name {
   display: flex;
@@ -942,7 +943,7 @@ onBeforeUnmount(cancelAppDialog);
 }
 .canvas-menu {
   flex: none;
-  color: #9ca496;
+  color: var(--app-subtle);
 }
 .action-menu {
   position: relative;
@@ -963,11 +964,11 @@ onBeforeUnmount(cancelAppDialog);
 }
 .action-menu summary:hover,
 .action-menu[open] summary {
-  background: #e4e9e0;
-  color: #45513f;
+  background: var(--app-hover);
+  color: var(--app-muted);
 }
 .action-menu summary:focus-visible {
-  outline: 2px solid #7d9277;
+  outline: 2px solid var(--app-focus);
   outline-offset: 1px;
 }
 .action-menu[open] {
@@ -979,9 +980,9 @@ onBeforeUnmount(cancelAppDialog);
   top: 30px;
   min-width: 158px;
   padding: 4px;
-  background: white;
-  border: 1px solid #e0e5dc;
-  box-shadow: 0 6px 24px #26302516;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  box-shadow: 0 6px 24px var(--app-shadow);
   border-radius: 7px;
   z-index: 36;
 }
@@ -996,7 +997,7 @@ onBeforeUnmount(cancelAppDialog);
   white-space: nowrap;
 }
 .menu-popover .danger {
-  color: #a26355;
+  color: var(--app-danger);
 }
 .sidebar-bottom {
   margin-top: 26px;
@@ -1009,7 +1010,7 @@ onBeforeUnmount(cancelAppDialog);
 .admin-badge {
   font-size: 8px;
   letter-spacing: 0.09em;
-  color: #969f91;
+  color: var(--app-subtle);
 }
 .registration-switch {
   display: flex;
@@ -1027,7 +1028,7 @@ onBeforeUnmount(cancelAppDialog);
 }
 .registration-switch small {
   font-size: 10px;
-  color: #7f8c77;
+  color: var(--app-muted);
 }
 .registration-switch input {
   position: absolute;
@@ -1041,7 +1042,7 @@ onBeforeUnmount(cancelAppDialog);
   width: 28px;
   height: 16px;
   border-radius: 10px;
-  background: #d5ddcf;
+  background: var(--app-switch);
   position: relative;
   pointer-events: none;
 }
@@ -1053,18 +1054,18 @@ onBeforeUnmount(cancelAppDialog);
   top: 2px;
   left: 2px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--app-on-accent);
   transition: transform 0.15s;
   box-shadow: 0 1px 3px #0002;
 }
 .registration-switch input:checked + .switch-track {
-  background: #617a56;
+  background: var(--app-switch-active);
 }
 .registration-switch input:checked + .switch-track::after {
   transform: translateX(12px);
 }
 .registration-switch input:focus-visible + .switch-track {
-  outline: 2px solid #617a56;
+  outline: 2px solid var(--app-switch-active);
   outline-offset: 3px;
 }
 .registration-switch input:disabled + .switch-track {
@@ -1084,8 +1085,8 @@ onBeforeUnmount(cancelAppDialog);
   height: 30px;
   flex: none;
   border-radius: 50%;
-  background: #e4e9df;
-  color: #63755a;
+  background: var(--app-selected);
+  color: var(--app-muted);
   font-size: 11px;
   font-weight: 600;
 }
@@ -1108,7 +1109,7 @@ onBeforeUnmount(cancelAppDialog);
 }
 .account-text small {
   font-size: 10px;
-  color: #7e8975;
+  color: var(--app-muted);
 }
 .canvas-header {
   display: flex;
@@ -1119,7 +1120,7 @@ onBeforeUnmount(cancelAppDialog);
   box-sizing: border-box;
   padding: 0 20px 0 13px;
   border-bottom: 1px solid var(--line);
-  color: #7f887b;
+  color: var(--app-muted);
 }
 .breadcrumb {
   display: flex;
@@ -1134,16 +1135,16 @@ onBeforeUnmount(cancelAppDialog);
   white-space: nowrap;
   text-overflow: ellipsis;
   max-width: 200px;
-  color: #829078;
+  color: var(--app-muted);
 }
 .crumb-divider {
-  color: #ccd2c8;
+  color: var(--app-subtle);
 }
 .document-name {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: #475340;
+  color: var(--app-text);
   font-weight: 500;
 }
 .header-right {
@@ -1157,28 +1158,28 @@ onBeforeUnmount(cancelAppDialog);
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #7a8871;
+  color: var(--app-muted);
 }
 .status-dot {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #c9b682;
+  background: var(--app-warning);
 }
 .saved .status-dot {
-  background: #78996a;
+  background: var(--app-switch-active);
 }
 .save-button {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 10px !important;
-  color: #7b8971 !important;
+  color: var(--app-muted) !important;
 }
 .save-button kbd {
   font-family: inherit;
   font-size: 9px;
-  color: #b0b8a8;
+  color: var(--app-subtle);
   padding-left: 5px;
 }
 .icon-button {
@@ -1188,10 +1189,10 @@ onBeforeUnmount(cancelAppDialog);
   height: 27px;
   flex: none;
   padding: 0 !important;
-  color: #919b8a !important;
+  color: var(--app-subtle) !important;
 }
 .sidebar-toggle {
-  color: #7e8b76 !important;
+  color: var(--app-muted) !important;
 }
 button {
   cursor: pointer;
@@ -1203,20 +1204,20 @@ button {
   color: inherit;
 }
 button:hover {
-  background: #eef1eb;
+  background: var(--app-hover);
 }
 button:disabled {
   opacity: 0.45;
   cursor: wait;
 }
 button:focus-visible {
-  outline: 2px solid #7d9277;
+  outline: 2px solid var(--app-focus);
   outline-offset: 2px;
 }
 .operation-error {
   padding: 10px 16px;
-  background: #fff4ee;
-  color: #a05d4b;
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
   font-size: 12px;
   display: flex;
   align-items: center;
@@ -1253,7 +1254,7 @@ button:focus-visible {
     inset: 0;
     border: 0;
     border-radius: 0;
-    background: #202a2345;
+    background: var(--app-backdrop);
     z-index: 39;
   }
   .canvas-header {

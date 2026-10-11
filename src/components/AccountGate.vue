@@ -66,10 +66,14 @@ async function submit() {
           fill="none"
           aria-hidden="true"
         >
-          <path d="M75 95h78m70 0h94" stroke="#b7bbb8" stroke-width="1.5" />
+          <path
+            d="M75 95h78m70 0h94"
+            stroke="var(--app-subtle)"
+            stroke-width="1.5"
+          />
           <path
             d="m146 89 7 6-7 6m164-12 7 6-7 6"
-            stroke="#b7bbb8"
+            stroke="var(--app-subtle)"
             stroke-width="1.5"
           />
           <rect
@@ -78,12 +82,12 @@ async function submit() {
             width="60"
             height="60"
             rx="12"
-            stroke="#b7bbb8"
+            stroke="var(--app-subtle)"
             stroke-width="1.5"
           />
           <path
             d="M34 85h22M34 94h22M34 103h12"
-            stroke="#b7bbb8"
+            stroke="var(--app-subtle)"
             stroke-width="1.5"
           />
           <rect
@@ -92,14 +96,24 @@ async function submit() {
             width="75"
             height="75"
             rx="18"
-            stroke="#323a35"
+            stroke="var(--app-text)"
             stroke-width="1.5"
           />
-          <path d="m178 95 10 10 20-22" stroke="#323a35" stroke-width="2" />
-          <circle cx="346" cy="95" r="29" stroke="#b7bbb8" stroke-width="1.5" />
+          <path
+            d="m178 95 10 10 20-22"
+            stroke="var(--app-text)"
+            stroke-width="2"
+          />
+          <circle
+            cx="346"
+            cy="95"
+            r="29"
+            stroke="var(--app-subtle)"
+            stroke-width="1.5"
+          />
           <path
             d="M193 57V28H330v38"
-            stroke="#d8dbd8"
+            stroke="var(--app-border)"
             stroke-width="1.5"
             stroke-dasharray="4 5"
           />
@@ -110,6 +124,7 @@ async function submit() {
       >
     </div>
     <div class="form-panel">
+      <ThemeSwitcher class="account-theme-switcher" />
       <form class="account-card" @submit.prevent="submit">
         <span class="form-kicker">{{
           bootstrap.needsSetup ? "首次使用" : creating ? "新的开始" : "欢迎回来"
@@ -202,8 +217,8 @@ async function submit() {
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #fff;
-  color: #292d2b;
+  background: var(--app-surface);
+  color: var(--app-text);
   overflow: auto;
   font-family:
     Inter,
@@ -216,7 +231,7 @@ async function submit() {
   display: flex;
   flex-direction: column;
   padding: 42px 56px;
-  background: #f4f5f2;
+  background: var(--app-welcome);
   min-height: 580px;
   box-sizing: border-box;
 }
@@ -233,8 +248,8 @@ async function submit() {
 .brand-symbol {
   display: grid;
   place-items: center;
-  background: #2d3430;
-  color: #fff;
+  background: var(--app-accent);
+  color: var(--app-on-accent);
   width: 31px;
   height: 31px;
   border-radius: 7px;
@@ -244,7 +259,7 @@ async function submit() {
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.16em;
-  color: #838982;
+  color: var(--app-subtle);
 }
 .welcome-copy {
   margin: auto 0;
@@ -253,7 +268,7 @@ async function submit() {
 .eyebrow {
   font-size: 10px;
   letter-spacing: 0.18em;
-  color: #899087;
+  color: var(--app-subtle);
   font-weight: 600;
 }
 h2 {
@@ -266,7 +281,7 @@ h2 {
 .welcome-copy p {
   font-size: 14px;
   line-height: 1.95;
-  color: #7b837b;
+  color: var(--app-muted);
 }
 .idea-diagram {
   display: block;
@@ -276,12 +291,13 @@ h2 {
 }
 .welcome-footer {
   font-size: 11px;
-  color: #858c84;
+  color: var(--app-subtle);
   display: flex;
   justify-content: space-between;
   gap: 10px;
 }
 .form-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -289,6 +305,11 @@ h2 {
   padding: 48px 28px;
   box-sizing: border-box;
   gap: 48px;
+}
+.account-theme-switcher {
+  position: absolute;
+  top: 24px;
+  right: 28px;
 }
 .account-card {
   display: flex;
@@ -298,7 +319,7 @@ h2 {
 }
 .form-kicker {
   font-size: 12px;
-  color: #8a918b;
+  color: var(--app-subtle);
   letter-spacing: 0.08em;
 }
 h1 {
@@ -310,7 +331,7 @@ h1 {
 .intro {
   font-size: 13px;
   line-height: 1.8;
-  color: #808780;
+  color: var(--app-muted);
   margin: 0 0 30px;
 }
 .fields {
@@ -324,7 +345,7 @@ label {
   gap: 9px;
   font-size: 12px;
   font-weight: 500;
-  color: #414942;
+  color: var(--app-text);
 }
 input {
   font: inherit;
@@ -333,26 +354,26 @@ input {
   width: 100%;
   height: 44px;
   padding: 0 13px;
-  border: 1px solid #dee2dc;
+  border: 1px solid var(--app-border);
   border-radius: 6px;
   outline: none;
-  background: #fff;
-  color: #292d2b;
+  background: var(--app-surface);
+  color: var(--app-text);
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
 }
 input::placeholder {
-  color: #acb1ab;
+  color: var(--app-subtle);
 }
 input:focus {
-  border-color: #758879;
-  box-shadow: 0 0 0 3px #75887913;
+  border-color: var(--app-focus);
+  box-shadow: 0 0 0 3px var(--app-focus-ring);
 }
 small {
   font-size: 11px;
   line-height: 1.7;
-  color: #8c938c;
+  color: var(--app-subtle);
   margin-top: 12px;
 }
 button {
@@ -367,13 +388,13 @@ button {
   padding: 0 15px;
   border: 0;
   border-radius: 6px;
-  background: #2e3931;
-  color: white;
+  background: var(--app-accent);
+  color: var(--app-on-accent);
   font-size: 13px;
   margin-top: 26px;
 }
 .primary:hover {
-  background: #435346;
+  background: var(--app-accent-hover);
 }
 .form-bottom {
   display: flex;
@@ -381,7 +402,7 @@ button {
   justify-content: center;
   gap: 6px;
   font-size: 12px;
-  color: #929891;
+  color: var(--app-subtle);
   margin-top: 24px;
 }
 .form-bottom small {
@@ -391,7 +412,7 @@ button {
   padding: 4px 0;
   background: none;
   border: 0;
-  color: #34473a;
+  color: var(--app-selected-text);
   font-size: 12px;
   font-weight: 600;
 }
@@ -399,9 +420,9 @@ button {
   text-decoration: underline;
 }
 .error {
-  color: #a73931;
+  color: var(--app-danger);
   font-size: 12px;
-  background: #fff2ef;
+  background: var(--app-danger-bg);
   padding: 10px 12px;
   border-radius: 5px;
   margin: 16px 0 0;
@@ -411,7 +432,7 @@ button {
   align-items: center;
   gap: 7px;
   font-size: 10px;
-  color: #a0a69f;
+  color: var(--app-subtle);
 }
 button:disabled {
   opacity: 0.6;
@@ -452,14 +473,14 @@ button:disabled {
   .welcome-panel {
     min-height: 0;
     padding: 24px;
-    background: white;
+    background: var(--app-surface);
   }
   .welcome-copy,
   .welcome-footer {
     display: none;
   }
   .form-panel {
-    padding: 30px 28px 40px;
+    padding: 70px 28px 40px;
     justify-content: flex-start;
     gap: 44px;
   }

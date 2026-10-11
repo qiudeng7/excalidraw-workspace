@@ -15,16 +15,16 @@
   margin-top: 12px;
   padding: 10px 18px;
   border-radius: 6px;
-  background: #354237;
-  color: #fff;
+  background: var(--app-accent);
+  color: var(--app-on-accent);
   text-decoration: none;
   font-size: 14px;
 }
 .workspace-link:hover {
-  background: #455545;
+  background: var(--app-accent-hover);
 }
 .workspace-link:focus-visible {
-  outline: 2px solid #7d9277;
+  outline: 2px solid var(--app-focus);
   outline-offset: 3px;
 }
 </style>

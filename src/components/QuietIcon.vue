@@ -5,6 +5,9 @@ const props = withDefaults(defineProps<{ name: string; size?: number }>(), {
   size: 18,
 });
 const paths: Record<string, string> = {
+  sun: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5",
+  moon: "M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z",
+  monitor: "M3 4h18v13H3ZM8 21h8M12 17v4",
   panel:
     "M9 3v18M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z",
   plus: "M12 5v14M5 12h14",
