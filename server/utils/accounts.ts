@@ -16,11 +16,12 @@ export async function registerAccount(event: H3Event, role: User["role"]) {
   };
   const now = new Date().toISOString();
   const workspaceId = crypto.randomUUID();
+  const passwordHash = await hashPassword(password);
 
   try {
     const changes = await createAccount(
       user,
-      await hashPassword(password),
+      passwordHash,
       workspaceId,
       crypto.randomUUID(),
       now,
@@ -39,5 +40,5 @@ export async function registerAccount(event: H3Event, role: User["role"]) {
     throw error;
   }
 
-  return createSession(event, user);
+  return createSession(event, user, passwordHash);
 }

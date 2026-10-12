@@ -340,7 +340,9 @@ watch(
 
 function CanvasEditor() {
   return createElement(Excalidraw, {
-    interaction: !props.settingsOpen,
+    // Native modal inertness isolates pointer input; keep editor state intact.
+    // Keyboard input stays scoped to the editor, not the teleported settings.
+    handleKeyboardGlobally: false,
     canvasSampling: props.userSettings.debug.sampling,
     canvasRenderingOptions: props.userSettings.debug.renderingOptions,
     arrowBindingOptimization: props.userSettings.features.edgeBinding,
@@ -614,6 +616,16 @@ onBeforeUnmount(() => {
 .canvas-host :deep(.dropdown-menu .dropdown-menu-container) {
   max-height: calc(100dvh - 150px);
   overflow-y: auto;
+}
+
+/* Radix measures the space on the menu's actual opening side. Include the
+   extra-tools menu's margin so its last item stays inside the viewport. */
+.canvas-host
+  :deep(.App-toolbar__extra-tools-dropdown .dropdown-menu-container) {
+  max-height: min(
+    calc(100dvh - 150px),
+    calc(var(--radix-dropdown-menu-content-available-height) - 0.375rem)
+  );
 }
 
 /* 工具栏以画布内部的 FixedSideContainer 为定位边界。 */

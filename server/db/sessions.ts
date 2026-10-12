@@ -32,10 +32,30 @@ export async function createSession(
   hash: string,
   user: string,
   expires: number,
+  expectedPasswordHash: string,
 ) {
-  await db
+  // Check credentials in the insert itself: a password change can finish after
+  // verification but before this write, and must prevent the stale session.
+  const created = await db
     .insert(tables.sessions)
-    .values({ tokenHash: hash, userId: user, expiresAt: expires });
+    .select(
+      db
+        .select({
+          tokenHash: sql<string>`${hash}`.as("tokenHash"),
+          userId: tables.users.id,
+          expiresAt: sql<number>`${expires}`.as("expiresAt"),
+        })
+        .from(tables.users)
+        .where(
+          and(
+            eq(tables.users.id, user),
+            eq(tables.users.passwordHash, expectedPasswordHash),
+          ),
+        ),
+    )
+    .returning({ tokenHash: tables.sessions.tokenHash });
+
+  return created.length > 0;
 }
 
 export async function deleteSession(hash: string) {

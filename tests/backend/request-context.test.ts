@@ -51,6 +51,7 @@ test("request events isolate concurrent identities and keep shared storage avail
         await digest(tokens[index]!),
         user.id,
         Date.now() + 60000,
+        "unused-test-password",
       );
     }
 
