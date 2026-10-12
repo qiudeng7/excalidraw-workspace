@@ -649,17 +649,15 @@ onBeforeUnmount(() => {
       {{ manualSaveMessage }}
     </div>
     <div
-      v-if="entry.status !== 'ready'"
+      v-if="entry.status === 'error' || entry.status === 'conflict'"
       class="save-notice"
       role="status"
       data-testid="canvas-sync-lock"
     >
       <span>{{
-        entry.status === "checking"
-          ? "正在确认最新版本，暂时只读，可平移和缩放。"
-          : entry.status === "conflict"
-            ? "版本冲突，已保留本地草稿。"
-            : "版本校验失败，当前内容只读。"
+        entry.status === "conflict"
+          ? "版本冲突，已保留本地草稿。"
+          : "版本校验失败，当前内容只读。"
       }}</span>
       <button
         v-if="entry.status === 'error'"

@@ -604,8 +604,15 @@ onBeforeUnmount(() => {
           <span
             class="save-state"
             :class="{ saved: saveState === '已保存' && !busy }"
+            :title="
+              current?.status === 'checking'
+                ? '正在确认最新版本，暂时只读，可平移和缩放。'
+                : undefined
+            "
             role="status"
-            ><span class="status-dot" />{{ busy ? "处理中…" : saveState }}</span
+            ><span class="status-dot" />{{
+              busy && current?.status !== "checking" ? "处理中…" : saveState
+            }}</span
           ><button
             class="save-button"
             :disabled="interactionLocked || !document"
