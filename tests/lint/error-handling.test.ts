@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ESLint } from "eslint";
 
-test("catch policy rejects silent errors in TypeScript, TSX and Vue", async () => {
+test("catch policy rejects silent errors in JavaScript, TypeScript, TSX and Vue", async () => {
   const eslint = new ESLint();
   const cases: readonly (readonly [string, string, boolean])[] = [
     ["empty", "try { work(); } catch (error) {}", true],
@@ -29,7 +29,7 @@ test("catch policy rejects silent errors in TypeScript, TSX and Vue", async () =
     ],
   ];
 
-  for (const extension of ["ts", "tsx", "vue"]) {
+  for (const extension of ["js", "mjs", "cjs", "jsx", "ts", "tsx", "vue"]) {
     for (const [name, source, invalid] of cases) {
       const code =
         extension === "vue"
@@ -41,7 +41,8 @@ test("catch policy rejects silent errors in TypeScript, TSX and Vue", async () =
       const errors = result!.messages.filter(
         (message) =>
           message.ruleId === "no-restricted-syntax" ||
-          message.ruleId === "@typescript-eslint/no-unused-vars",
+          message.ruleId === "@typescript-eslint/no-unused-vars" ||
+          message.ruleId === "no-unused-vars",
       );
 
       assert.equal(errors.length > 0, invalid, `${extension}: ${name}`);

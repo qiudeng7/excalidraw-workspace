@@ -6,3 +6,16 @@ node_modules/
 dist/
 **/dist/
 coverage/
+**/dist-ssr/
+**/.cache/
+
+# Generated dependency resolution and database snapshots.
+pnpm-lock.yaml
+server/db/migrations/**/meta/
+
+# Keep vendored non-TypeScript assets in their upstream format.
+packages/**/*.md
+packages/**/*.scss
+packages/**/*.json
+packages/**/*.mjs
+packages/**/*.cjs

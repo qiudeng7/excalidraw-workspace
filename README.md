@@ -58,6 +58,33 @@ pnpm build           # 构建编辑器和 Workers 产物
 pnpm build:node      # 构建编辑器和 Node 服务 .output/
 ```
 
+### 代码检查和 Git hooks
+
+`pnpm install` 会通过 `prepare` 自动安装项目 Git hooks，并继续执行原有的 Nuxt `postinstall` 准备。安装器仅设置当前仓库的 `core.hooksPath`，记录安装前的配置，并先执行原有 hooks；已有的全局文件检查和 `commit-msg` 规范仍然生效。一个仓库的多个 worktree 共用这次安装，各自在自己的目录运行项目检查。
+
+```sh
+pnpm lint            # ESLint：代码规则与异常处理
+pnpm lint:fix        # 手动修复 ESLint 可修复的问题
+pnpm format:check    # Prettier：检查排版
+pnpm format          # 手动格式化，执行前先确认工作区改动
+pnpm check:staged    # 只检查 Git 暂存区中的新增、修改和重命名文件
+pnpm check:pre-push  # 后端回归、声明和 Nuxt 准备、类型检查
+pnpm test:hooks      # 在临时 Git 仓库验证 hooks，不修改当前仓库配置
+```
+
+提交前，`pre-commit` 先执行原有 hook，再对暂存内容运行 ESLint、Prettier 和 `git diff --cached --check`。检查读取独立的暂存区快照，不自动修复文件，也不会把同一文件尚未暂存的修改带入提交；仅删除文件或没有暂存文件时同样可运行。修改 ESLint 配置时会检查完整代码范围。Prettier 忽略构建产物、生成的锁文件与迁移元数据，以及沿用上游格式的编辑器非 TypeScript 资源，具体范围见 [.prettierignore](.prettierignore)。
+
+推送前，`pre-push` 先执行原有 hook，再运行 `check:pre-push`；任何一步失败都会停止推送。该检查会生成编辑器类型声明，不运行浏览器、Worker 或完整应用构建。手动运行这些检查不会发起提交或推送。
+
+如果安装依赖时使用了 `--ignore-scripts`，需要手动恢复 Nuxt 准备和 hooks：
+
+```sh
+pnpm exec nuxt prepare
+pnpm hooks:install
+```
+
+`pnpm hooks:install` 可重复执行，不会重复串联原有 hooks。`pnpm hooks:uninstall` 会还原安装前的仓库配置，同仓库的 worktree 也一起恢复。CI、没有 `.git` 的源码归档自动跳过安装；本地需要保留当前 hook 配置时，可使用 `SKIP_PROJECT_HOOKS=1 pnpm install --frozen-lockfile`，之后运行 `pnpm hooks:install` 补装。跳过安装不会卸载已经安装的 hooks。若 `config.worktree` 单独设置了 `core.hooksPath`，安装器会提示移除该覆盖后再安装，以免共享配置无法生效。
+
 验证本地 Cloudflare 适配器时，执行 `pnpm build`、`pnpm db:migrate:local`、`pnpm dev:worker`，打开 http://localhost:8787。Wrangler 模拟 D1 和 R2，数据在 `.wrangler/` 中，与 Node 开发目录和线上均独立。
 
 ## 用 Docker 运行

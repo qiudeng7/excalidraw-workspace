@@ -47,9 +47,10 @@ export function localClient(origin) {
     let body;
     try {
       body = JSON.parse(text);
-    } catch {
+    } catch (error) {
       throw new Error(
         `${method} ${path}: HTTP ${response.status} 返回非 JSON：${text.slice(0, 200)}`,
+        { cause: error },
       );
     }
     return {
