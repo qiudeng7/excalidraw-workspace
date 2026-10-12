@@ -4,11 +4,14 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "../../server/storage/node";
+import { nodeStorage } from "./storage";
 import { handleApi } from "./api";
 
 const legacy = await readFile(
-  new URL("../../migrations/0001_accounts.sql", import.meta.url),
+  new URL(
+    "../../server/db/migrations/sqlite/0001_accounts.sql",
+    import.meta.url,
+  ),
   "utf8",
 );
 const seed = `INSERT INTO users VALUES('legacy','legacy@example.com','Legacy','admin','hash','2020-01-01');
@@ -20,14 +23,14 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
   let close: () => unknown;
   let storage: Pick<
     Awaited<ReturnType<typeof nodeStorage>>,
-    "repository" | "storage"
+    "queries" | "database" | "storage"
   >;
   const db = new DatabaseSync(resolve(directory, "workspace.sqlite"));
 
   db.exec(legacy);
   db.exec(seed);
   db.exec(
-    "CREATE TABLE schema_migrations(name TEXT PRIMARY KEY);INSERT INTO schema_migrations VALUES('0001_accounts.sql')",
+    "CREATE TABLE _hub_migrations(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP);INSERT INTO _hub_migrations(name) VALUES('0001_accounts')",
   );
   db.close();
   const node = await nodeStorage(directory);
@@ -77,7 +80,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
   };
 
   try {
-    const migrated = await storage.repository.canvasCatalog(
+    const migrated = await storage.queries.canvasCatalog(
       "legacy-space",
       "legacy",
     );
@@ -91,14 +94,11 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
       ],
     );
     assert.equal(migrated!.catalogRevision, 0);
-    assert.equal((await storage.repository.navigation("legacy")).revision, 0);
+    assert.equal((await storage.queries.navigation("legacy")).revision, 0);
     raw.exec(
       "INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES('transition','transition@example.com','Transition','user','hash','2020-01-01');",
     );
-    assert.equal(
-      (await storage.repository.navigation("transition")).revision,
-      0,
-    );
+    assert.equal((await storage.queries.navigation("transition")).revision, 0);
     const alice = await request("/register", "POST", {
       email: "alice@example.com",
       password: "strong-password-123",

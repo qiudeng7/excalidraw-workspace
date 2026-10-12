@@ -1,3 +1,4 @@
+import { saveUserSettings } from "../db/user-settings";
 import { defineApiHandler } from "../utils/api";
 import { apiRequest } from "../utils/request";
 import { requireUser } from "../utils/auth";
@@ -5,8 +6,6 @@ import { fail, json, body, validRevision, assertOwner } from "../utils/http";
 import { validateUserSettings } from "../utils/userSettings";
 
 export default defineApiHandler(async (event) => {
-  const repository = await event.context.repository();
-
   const req = apiRequest(event);
   const user = await requireUser(event);
 
@@ -21,7 +20,7 @@ export default defineApiHandler(async (event) => {
       "INVALID_USER_SETTINGS",
       "设置格式无效，请使用完整的受支持配置",
     );
-  const updatedRevision = await repository.saveUserSettings(
+  const updatedRevision = await saveUserSettings(
     user.id,
     JSON.stringify(data.settings),
     revision,

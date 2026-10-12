@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791772052560,
+      "tag": "0001_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791772052560,
+      "tag": "0002_navigation",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791772052560,
+      "tag": "0003_user_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791772052560,
+      "tag": "0004_prepend_new_canvases",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791775054090,
+      "tag": "0005_snapshot_object_indexes",
+      "breakpoints": true
+    }
+  ]
+}

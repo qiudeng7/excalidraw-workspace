@@ -1,11 +1,10 @@
+import { registration, setRegistration } from "../../db/accounts";
 import { defineApiHandler } from "../../utils/api";
 import { apiRequest } from "../../utils/request";
 import { requireUser } from "../../utils/auth";
 import { fail, json, body } from "../../utils/http";
 
 export default defineApiHandler(async (event) => {
-  const repository = await event.context.repository();
-
   const req = apiRequest(event);
   const user = await requireUser(event);
 
@@ -16,8 +15,8 @@ export default defineApiHandler(async (event) => {
 
   if (typeof data.registrationEnabled !== "boolean")
     return fail(400, "INVALID_SETTINGS", "注册设置必须是布尔值");
-  await repository.setRegistration(data.registrationEnabled);
-  const settings = await repository.registration();
+  await setRegistration(data.registrationEnabled);
+  const settings = await registration();
 
-  return json({ registrationEnabled: !!settings?.registration_enabled });
+  return json({ registrationEnabled: !!settings?.registrationEnabled });
 });

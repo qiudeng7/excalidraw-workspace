@@ -5,18 +5,20 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm build:node
 
+FROM build AS migrations
+RUN chown -R node:node /app/.nuxt /app/.data /app/node_modules/@nuxthub
+USER node
+CMD ["sh", "-c", "umask 077; exec pnpm db:migrate"]
+
 FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     NITRO_HOST=0.0.0.0 \
-    NITRO_PORT=3000 \
-    DATA_DIR=/data \
-    MIGRATIONS_DIR=/app/migrations
+    NITRO_PORT=3000
 COPY --from=build --chown=node:node /app/.output ./.output
-COPY --from=build --chown=node:node /app/migrations ./migrations
-RUN mkdir /data && chown node:node /data
+RUN mkdir -p /app/.data/db /app/.data/blob && chown -R node:node /app/.data
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
     CMD node -e "fetch('http://127.0.0.1:3000/api/bootstrap').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", ".output/server/index.mjs"]
+CMD ["sh", "-c", "umask 077; exec node .output/server/index.mjs"]

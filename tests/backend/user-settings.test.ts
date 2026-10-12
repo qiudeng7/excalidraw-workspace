@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "../../server/storage/node";
+import { nodeStorage } from "./storage";
 import { handleApi } from "./api";
 import { createDefaultUserSettings } from "../../shared/contracts";
 
@@ -12,7 +12,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
   let close: () => unknown;
   let storage: Pick<
     Awaited<ReturnType<typeof nodeStorage>>,
-    "repository" | "storage"
+    "queries" | "database" | "storage"
   >;
   const node = await nodeStorage(directory);
 

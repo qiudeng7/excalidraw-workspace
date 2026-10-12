@@ -1,3 +1,4 @@
+import { canvasCatalog, reorderCanvases } from "../../../db/canvases";
 import { defineApiHandler, resourceId } from "../../../utils/api";
 import { apiRequest } from "../../../utils/request";
 import { requireUser } from "../../../utils/auth";
@@ -6,17 +7,16 @@ import { fail, json, body, validRevision } from "../../../utils/http";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);
-  const repository = await event.context.repository();
 
   const req = apiRequest(event);
   const user = await requireUser(event);
 
-  await requireWorkspace(repository, id, user);
+  await requireWorkspace(id, user);
 
   const data = await body(req);
   const revision = validRevision(data.catalogRevision);
   const ids = data.canvasIds;
-  const catalog = await repository.canvasCatalog(id, user.id);
+  const catalog = await canvasCatalog(id, user.id);
 
   if (!catalog) return fail(404, "NOT_FOUND", "工作区不存在");
   if (catalog.catalogRevision !== revision)
@@ -33,8 +33,8 @@ export default defineApiHandler(async (event) => {
       "INVALID_CANVAS_ORDER",
       "画布顺序必须包含该空间所有画布且不可重复",
     );
-  if (!(await repository.reorderCanvases(id, user.id, ids, revision)))
+  if (!(await reorderCanvases(id, user.id, ids, revision)))
     return fail(409, "CATALOG_CONFLICT", "列表已在其他页面更新，请重新排序");
 
-  return json(await repository.canvasCatalog(id, user.id));
+  return json(await canvasCatalog(id, user.id));
 });

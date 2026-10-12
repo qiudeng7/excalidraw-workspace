@@ -52,7 +52,7 @@ async function run() {
   await request(`/canvases/${canvas2.id}`, 'GET', undefined, alice);
   assert.deepEqual(await nav(), originalNav, '普通GET不得更新最近位置');
   const initial = await list();
-  assert.deepEqual(initial.canvases.map(c => c.id), [firstCanvas.id, canvas2.id, canvas3.id], '新画布追加末尾');
+  assert.deepEqual(initial.canvases.map(c => c.id), [canvas3.id, canvas2.id, firstCanvas.id], '新画布插入顶部');
   assert.deepEqual(initial.canvases.map(c => c.position), [0, 1, 2]);
   expect(await request(`/canvases/${firstCanvas.id}`, 'PUT', { revision: 0, scene }, alice), 200, '保存场景');
   const reversed = initial.canvases.map(c => c.id).reverse();
@@ -62,7 +62,7 @@ async function run() {
   assert.deepEqual(reordered.canvases.map(c => c.id), reversed);
   assert.equal(expect(await request(`/canvases/${firstCanvas.id}`, 'GET', undefined, alice), 200, '重排后场景').canvas.revision, 1);
   expect(await request(`/canvases/${firstCanvas.id}`, 'PUT', { revision: 1, scene }, alice), 200, '重排不冲突场景保存');
-  report('确定顺序、追加、完整重排与场景 revision 独立');
+  report('确定顺序、顶部插入、完整重排与场景 revision 独立');
   for (const invalid of [[canvas2.id, canvas2.id, firstCanvas.id], reversed.slice(1), [...reversed, otherCanvas.id], [otherCanvas.id, ...reversed.slice(1)], [bobCanvas.id, ...reversed.slice(1)]]) {
     const before = await list();
     const result = await order(first.id, invalid, before.catalogRevision);
@@ -110,7 +110,7 @@ async function run() {
   ]);
   assert.deepEqual(createRace.map(r => r.status).sort(), [200, 409], '创建与排序同版本仅一方成功');
   const afterCreate = await list(); assert.equal(afterCreate.catalogRevision, beforeCreate.catalogRevision + 1);
-  if (createRace[0].status === 200) assert.deepEqual(afterCreate.canvases.map(c => c.id), [...beforeCreate.canvases.map(c => c.id), createRace[0].body.canvas.id]);
+  if (createRace[0].status === 200) assert.deepEqual(afterCreate.canvases.map(c => c.id), [createRace[0].body.canvas.id, ...beforeCreate.canvases.map(c => c.id)]);
   else assert.deepEqual(afterCreate.canvases.map(c => c.id), [...beforeCreate.canvases.map(c => c.id)].reverse());
   const target = await create(first.id, '并发删除');
   const beforeDelete = await list();

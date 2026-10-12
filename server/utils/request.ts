@@ -1,5 +1,4 @@
 import { getRequestURL, toWebRequest, type H3Event } from "h3";
-import type {} from "../types/h3";
 import { clientIp, publicOrigin } from "./security";
 
 declare module "h3" {

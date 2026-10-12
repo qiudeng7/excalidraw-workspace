@@ -45,7 +45,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-打开 Nuxt 输出的地址，通常为 http://localhost:3000。首次运行会引导创建管理员。本地开发使用 SQLite 和私有文件目录，首次启动自动应用迁移；数据默认保存在被 Git 忽略的 `.data/` 中，与线上数据相互独立。
+打开 Nuxt 输出的地址，通常为 http://localhost:3000。首次运行会引导创建管理员。本地开发使用 SQLite 和私有文件目录，启动命令先应用迁移，再启动服务；数据默认保存在被 Git 忽略的 `.data/` 中，与线上数据相互独立。
 
 `pnpm dev` 会先构建编辑器源码；修改编辑器后仍需重新构建，连续开发方式见[源码维护说明](packages/excalidraw/README.md#构建和开发)。
 
@@ -66,7 +66,7 @@ pnpm build:node      # 构建编辑器和 Node 服务 .output/
 docker compose up --build -d
 ```
 
-打开 http://localhost:8080。容器以普通用户运行，SQLite 和快照一起保存在命名卷 `workspace-data`，重建或重启容器会保留数据。首次启动自动应用数据库迁移，不需要 Cloudflare 账户。Docker 是单实例部署，数据与在线应用独立。
+打开 http://localhost:8080。容器以普通用户运行，SQLite 和快照一起保存在命名卷 `workspace-data`，重建或重启容器会保留数据。迁移服务成功后才启动应用，不需要 Cloudflare 账户。已有旧版数据请先按[升级步骤](docs/deployment.md#从旧-node-版本升级)离线转换。Docker 是单实例部署，数据与在线应用独立。
 
 默认端口只绑定本机回环地址。对外提供服务时，配置反向代理和 HTTPS，并在 `.env` 设置 `PUBLIC_ORIGIN=https://你的域名`；它用于校验请求来源和设置 Secure cookie。更换本地端口时也需同时修改 `PORT` 与 `PUBLIC_ORIGIN`。
 
@@ -75,20 +75,20 @@ PORT=8080
 PUBLIC_ORIGIN=http://localhost:8080
 ```
 
-备份或搬迁请在停止写入后备份整个 `/data` 卷，包括 SQLite 文件与快照目录；不要只备份数据库。`docker compose down` 保留命名卷，`down -v` 会删除数据。更多配置见[部署说明](docs/deployment.md)。
+备份或搬迁请在停止写入后备份整个 `/app/.data` 卷，包括 SQLite 文件与快照目录；不要只备份数据库。`docker compose down` 保留命名卷，`down -v` 会删除数据。更多配置见[部署说明](docs/deployment.md)。
 
 ## 代码与维护
 
-应用使用 Nuxt 4、Vue、TypeScript 和 Pinia，通过浏览器端 React 组件挂载 Excalidraw；依赖由 pnpm workspace 管理。Workers 与 Node 共用业务服务，分别适配 D1/R2 和 SQLite/文件目录。
+应用使用 Nuxt 4、Vue、TypeScript 和 Pinia，通过浏览器端 React 组件挂载 Excalidraw；依赖由 pnpm workspace 管理。数据库通过 NuxtHub 与 Drizzle 接入：Workers 使用 D1，Node 使用本地 SQLite；快照通过 NuxtHub Blob 保存到 R2 和私有文件目录。
 
 - [前端模块边界](docs/frontend-architecture.md)：控制器接口、状态归属和新增页面动作。
-- [后端架构](docs/backend-architecture.md)：Nuxt 文件路由、请求上下文、原生存储和新增 API 的权限边界。
+- [后端架构](docs/backend-architecture.md)：Nuxt 文件路由、NuxtHub、原子写入和后台回收任务。
 - [源码维护说明](packages/excalidraw/README.md)：上游来源、内部包关系、编辑器定制位置、构建与升级方式。
 - [更新记录](https://github.com/qiudeng7/excalidraw-workspace/releases)：各版本的 Changelog，通过 Git tag 和 GitHub Release 发布。
 - [页面与路由](src/pages/)及[Nuxt 配置](nuxt.config.ts)：账户入口、侧边栏和画布页面。根路径 `/` 是画布，`/home` 为首页，`/about` 为关于页；旧地址 `/draw` 跳转到 `/`。
 - [编辑器包装组件](src/components/ExcalidrawCanvas.client.vue)：Vue 与 React 的衔接、默认样式、菜单和云端保存。
 - [自动保存队列](src/lib/persistence.ts)：保存去抖、本地草稿和冲突处理。
-- [后端服务与存储适配器](server/)和[数据库迁移](migrations/)：账户、访问权限、工作空间、画布和素材库 API。
+- [后端服务与数据库查询](server/)和[数据库迁移](server/db/migrations/sqlite/)：账户、访问权限、工作空间、画布和素材库 API。
 
 编辑器基线为上游 `master` 提交 [`438d898`](https://github.com/excalidraw/excalidraw/commit/438d89861f53d8a90ad566113ecac1b83761098f)（2026-09-27）。这里维护的是固定提交的本地源码，通过 `workspace:*` 引用，不再使用 pnpm patch，也不是新的 npm 稳定版。
 

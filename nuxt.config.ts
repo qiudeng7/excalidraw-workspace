@@ -1,28 +1,23 @@
-import { fileURLToPath } from "node:url";
-
-const nodeStorage = fileURLToPath(
-  new URL("./server/storage/node.ts", import.meta.url),
-);
-const workerStorage = fileURLToPath(
-  new URL("./server/storage/node.unavailable.ts", import.meta.url),
-);
-
 export default defineNuxtConfig({
   compatibilityDate: "2026-09-27",
   srcDir: "src/",
-  alias: {
-    "#workspace-node-storage": nodeStorage,
-    "#workspace-sqlite-driver": fileURLToPath(
-      import.meta.resolve("db0/connectors/node-sqlite"),
-    ),
-  },
   serverDir: "server/",
-  modules: ["@pinia/nuxt"],
+  modules: ["@pinia/nuxt", "@nuxthub/core"],
+  hub: {
+    // The filesystem SDK needs a relative path for portable Node artifacts.
+    blob: process.env.NITRO_PRESET?.startsWith("cloudflare")
+      ? true
+      : { driver: "fs", dir: ".data/blob" },
+    db: {
+      dialect: "sqlite",
+      connection: { url: "file:.data/db/sqlite.db" },
+      applyMigrationsDuringBuild: false,
+      applyMigrationsDuringDev: false,
+    },
+  },
   runtimeConfig: {
     publicOrigin: "",
     trustedProxyIps: "",
-    workspacePlatform:
-      process.env.NITRO_PRESET === "cloudflare-module" ? "cloudflare" : "node",
   },
   css: ["~/style.css"],
   devtools: { enabled: false },
@@ -47,24 +42,9 @@ export default defineNuxtConfig({
     "/api/**": { headers: { "cache-control": "no-store" } },
   },
   nitro: {
-    experimental: { database: true },
-    database: {
-      default:
-        process.env.NITRO_PRESET === "cloudflare-module"
-          ? { connector: "cloudflare-d1", options: { bindingName: "DB" } }
-          : { connector: "node-sqlite", options: {} },
-    },
     preset: process.env.NITRO_PRESET || "node-server",
-    // Keep node:sqlite out of the Worker bundle, even behind a dynamic import.
-    alias: {
-      "db0/connectors/node-sqlite": fileURLToPath(
-        new URL("./server/storage/connector.ts", import.meta.url),
-      ),
-      "#workspace-node-storage":
-        process.env.NITRO_PRESET === "cloudflare-module"
-          ? workerStorage
-          : nodeStorage,
-    },
+    experimental: { tasks: true },
+    scheduledTasks: { "0 * * * *": ["snapshots:cleanup"] },
     cloudflare: {
       deployConfig: false,
       nodeCompat: true,

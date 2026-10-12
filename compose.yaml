@@ -1,13 +1,25 @@
 services:
+  migrations:
+    build:
+      context: .
+      target: migrations
+    volumes:
+      - workspace-data:/app/.data
+
   app:
-    build: .
+    build:
+      context: .
+      target: runtime
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${PORT:-8080}:3000"
     environment:
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
     volumes:
-      - workspace-data:/data
+      - workspace-data:/app/.data
     restart: unless-stopped
 
 volumes:

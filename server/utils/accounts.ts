@@ -1,3 +1,4 @@
+import { createAccount } from "../db/accounts";
 import type { H3Event } from "h3";
 import type { User } from "../../shared/contracts";
 import { readAuthCredentials, createSession } from "./auth";
@@ -6,7 +7,6 @@ import { hashPassword } from "./passwords";
 
 /** Initial setup and registration share account creation and uniqueness rules. */
 export async function registerAccount(event: H3Event, role: User["role"]) {
-  const repository = await event.context.repository();
   const { data, email, password } = await readAuthCredentials(event);
   const user: User = {
     id: crypto.randomUUID(),
@@ -18,7 +18,7 @@ export async function registerAccount(event: H3Event, role: User["role"]) {
   const workspaceId = crypto.randomUUID();
 
   try {
-    const changes = await repository.createAccount(
+    const changes = await createAccount(
       user,
       await hashPassword(password),
       workspaceId,

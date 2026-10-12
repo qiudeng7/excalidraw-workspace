@@ -1,11 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, utimes } from "node:fs/promises";
+import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "../../server/storage/node";
+import { nodeStorage } from "./storage";
 import { handleApi } from "./api";
-import { collectOrphans } from "../../server/storage/repository";
 import { clientIp, publicOrigin } from "../../server/utils/security";
 
 test("SQLite service preserves sessions, image snapshots and revisions across restarts", async () => {
@@ -164,16 +163,27 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
     const key = `${alice.body.user.id}/canvas/${canvas.id}/orphan.json`;
 
     await storage.objects.write(key, {});
-    await collectOrphans(storage.repository, storage.objects);
+    await storage.collectOrphans();
     assert.ok(
       await storage.objects.read(key),
       "fresh uncommitted object must survive GC",
     );
     const stale = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
+    await writeFile(resolve(directory, "objects", `${key}.old.tmp`), "partial");
+    await writeFile(
+      resolve(directory, "objects", `${key}.fresh.tmp`),
+      "partial",
+    );
+    await utimes(resolve(directory, "objects", `${key}.old.tmp`), stale, stale);
     await utimes(resolve(directory, "objects", key), stale, stale);
-    await collectOrphans(storage.repository, storage.objects);
+    await storage.collectOrphans();
     assert.equal(await storage.objects.read(key), null);
+    assert.equal(await storage.blob.get(`${key}.old.tmp`), null);
+    assert.equal(
+      await (await storage.blob.get(`${key}.fresh.tmp`))?.text(),
+      "partial",
+    );
     assert.deepEqual(
       (await request(`/canvases/${canvas.id}`, "GET", undefined, alice.cookie))
         .body.canvas.scene,

@@ -7,11 +7,10 @@ import { fail, json, body, isObject } from "../../utils/http";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);
-  const repository = await event.context.repository();
 
   const req = apiRequest(event);
   const user = await requireUser(event);
-  const row = await requireCanvas(repository, id, user);
+  const row = await requireCanvas(id, user);
 
   const data = await body(req);
   const scene = data.scene;

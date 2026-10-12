@@ -1,72 +1,61 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
-  mkdtemp,
-  mkdir,
-  writeFile,
-  readFile,
-  rm,
-  utimes,
-} from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { createStorage } from "unstorage";
+import { createBlobStorage } from "@nuxthub/core/blob";
+import { createDriver as fsDriver } from "@nuxthub/core/blob/drivers/fs";
+import { createDriver as r2Driver } from "@nuxthub/core/blob/drivers/cloudflare-r2";
 import type { R2Bucket } from "@cloudflare/workers-types";
-import { nodeObjectDriver } from "../../server/storage/node";
-import { cloudflareStorage } from "../../server/storage/cloudflare";
-import { workspaceR2Driver } from "../../server/storage/r2";
-import { objectStore } from "../../server/storage/objects";
+import { readSnapshot } from "../../server/utils/snapshots";
+import { withBlob } from "./blobs";
 
-test("native filesystem storage reads legacy paths and only reclaims stale temporary writes", async () => {
-  const directory = await mkdtemp(resolve(tmpdir(), "native-objects-"));
+test("NuxtHub filesystem blobs read legacy snapshots without sidecar metadata", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "hub-objects-"));
   const root = resolve(directory, "objects/user/canvas/id");
   const key = "user/canvas/id/legacy.json";
   const scene = {
-    elements: [{ id: "existing-image" }],
+    elements: [{ id: "image" }],
     files: { image: "data:image/png;base64,abcd" },
   };
 
   try {
     await mkdir(root, { recursive: true });
     await writeFile(resolve(root, "legacy.json"), JSON.stringify(scene));
-    await writeFile(resolve(root, "stale.tmp"), "partial");
-    await writeFile(resolve(root, "fresh.tmp"), "partial");
-    const stale = new Date(Date.now() - 48 * 60 * 60 * 1000);
-
-    await utimes(resolve(root, "stale.tmp"), stale, stale);
-    const objects = objectStore(
-      createStorage({ driver: nodeObjectDriver(directory) }),
+    const blob = createBlobStorage(
+      fsDriver({ dir: resolve(directory, "objects") }),
     );
 
-    assert.deepEqual(await objects.read(key), scene);
+    assert.deepEqual(await withBlob(blob, () => readSnapshot(key, {})), scene);
     assert.deepEqual(
-      (await objects.list()).objects.map((object) => object.key),
+      (await blob.list()).blobs.map((item) => item.pathname),
       [key],
     );
-    await assert.rejects(readFile(resolve(root, "stale.tmp")), {
-      code: "ENOENT",
-    });
-    assert.equal(await readFile(resolve(root, "fresh.tmp"), "utf8"), "partial");
+    assert.ok(Number.isFinite((await blob.head(key)).uploadedAt.getTime()));
     await writeFile(resolve(root, "corrupt.json"), "partial JSON");
     await assert.rejects(
-      objects.read("user/canvas/id/corrupt.json"),
-      /Invalid stored snapshot JSON/,
+      withBlob(blob, () => readSnapshot("user/canvas/id/corrupt.json", {})),
+      SyntaxError,
     );
-    await objects.write("user/canvas/id/new.json", scene);
+    await blob.put("user/canvas/id/new.json", JSON.stringify(scene), {
+      contentType: "application/json",
+    });
     assert.deepEqual(
       JSON.parse(await readFile(resolve(root, "new.json"), "utf8")),
       scene,
     );
-    await assert.rejects(
-      objects.read("../outside.json"),
-      /Invalid private object key/,
+    assert.equal(
+      (await blob.list()).blobs.some((item) =>
+        item.pathname.endsWith(".$meta.json"),
+      ),
+      false,
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });
 
-test("native R2 storage preserves legacy slash keys and includes every listing page", async () => {
+test("NuxtHub R2 blobs preserve slash keys and expose every listing page", async () => {
   const uploaded = new Date(Date.now() - 48 * 60 * 60 * 1000);
   const items = new Map(
     Array.from({ length: 1005 }, (_, index) => [
@@ -79,53 +68,54 @@ test("native R2 storage preserves legacy slash keys and includes every listing p
     async get(key: string) {
       const value = items.get(key);
 
-      return value === undefined ? null : { text: async () => value };
+      return value === undefined
+        ? null
+        : { arrayBuffer: async () => new TextEncoder().encode(value).buffer };
     },
     async put(key: string, value: string) {
       items.set(key, value);
+
+      return { key, uploaded };
     },
-    async delete(keys: string | string[]) {
-      for (const key of Array.isArray(keys) ? keys : [keys]) items.delete(key);
+    async delete(key: string) {
+      items.delete(key);
     },
-    async head(key: string) {
-      return items.has(key) ? { uploaded } : null;
-    },
-    async list({ cursor }: { cursor?: string }) {
+    async list({ cursor, limit }: { cursor?: string; limit: number }) {
       calls.push(cursor);
       const offset = Number(cursor || 0);
-      const objects = [...items.keys()]
-        .slice(offset, offset + 1000)
-        .map((key) => ({ key, uploaded }));
 
       return {
-        objects,
-        truncated: offset + 1000 < items.size,
-        cursor: String(offset + 1000),
+        objects: [...items.keys()]
+          .slice(offset, offset + limit)
+          .map((key) => ({ key, uploaded })),
+        truncated: offset + limit < items.size,
+        cursor: String(offset + limit),
       };
     },
   } as unknown as R2Bucket;
-  const native = createStorage({ driver: workspaceR2Driver(bucket) });
-  const { objects } = cloudflareStorage(
-    { DATA: bucket, DB: {} as never },
-    native,
-  );
+  const binding = "TEST_HUB_BLOB";
+  const env = globalThis as unknown as Record<string, unknown>;
 
-  assert.deepEqual(await objects.read("user/canvas/id/0.json"), { index: 0 });
-  const page = await objects.list();
-  const next = await objects.list(page.cursor);
+  env[binding] = bucket;
+  try {
+    const blob = createBlobStorage(r2Driver({ binding }));
+    const page = await blob.list();
+    const next = await blob.list({ cursor: page.cursor });
 
-  assert.equal(page.objects.length + next.objects.length, 1005);
-  assert.deepEqual(calls, [undefined, "1000"]);
-  assert.equal(page.objects[0]!.modified, uploaded.getTime());
-  assert.ok(
-    next.objects.some((object) => object.key === "user/canvas/id/1004.json"),
-  );
-  calls.length = 0;
-  assert.equal((await native.getKeys()).length, 1005);
-  assert.deepEqual(calls, [undefined, "1000"]);
-  await objects.write("user/library/id/new.json", [{ id: "item" }]);
-  assert.equal(items.get("user/library/id/new.json"), '[{"id":"item"}]');
-  assert.equal(items.has("user:library:id:new.json"), false);
-  await objects.delete(["user/library/id/new.json"]);
-  assert.equal(items.has("user/library/id/new.json"), false);
+    assert.equal(page.blobs.length + next.blobs.length, 1005);
+    assert.deepEqual(calls, [undefined, "1000"]);
+    assert.equal(page.blobs[0]!.uploadedAt.getTime(), uploaded.getTime());
+    assert.equal(next.hasMore, false);
+    assert.deepEqual(
+      await withBlob(blob, () => readSnapshot("user/canvas/id/0.json", {})),
+      { index: 0 },
+    );
+    await blob.put("user/library/id/new.json", '[{"id":"item"}]');
+    assert.equal(items.get("user/library/id/new.json"), '[{"id":"item"}]');
+    assert.equal(items.has("user:library:id:new.json"), false);
+    await blob.del(["user/library/id/new.json"]);
+    assert.equal(items.has("user/library/id/new.json"), false);
+  } finally {
+    delete env[binding];
+  }
 });

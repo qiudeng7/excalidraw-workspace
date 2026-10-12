@@ -5,12 +5,13 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "../../server/storage/node";
+import { nodeStorage } from "./storage";
 import { handleApi, type ApiFixture } from "./api";
 import { digest } from "../../server/utils/passwords";
 import { createDefaultUserSettings } from "../../shared/contracts";
 import type { User, UserSettingsDocument } from "../../shared/contracts";
-import { Repository } from "../../server/storage/repository";
+import { sql } from "drizzle-orm";
+import { withDatabase } from "./database";
 
 test("request events isolate concurrent identities and keep shared storage available", async () => {
   const directory = await mkdtemp(resolve(tmpdir(), "request-isolation-"));
@@ -36,25 +37,17 @@ test("request events isolate concurrent identities and keep shared storage avail
     role: "user",
   };
   const tokens = ["a".repeat(64), "b".repeat(64)];
-  let sessionQueries = 0;
-  const session = storage.repository.session.bind(storage.repository);
-
-  storage.repository.session = (...args) => {
-    sessionQueries++;
-
-    return session(...args);
-  };
 
   try {
     for (const [index, user] of [alice, bob].entries()) {
-      await storage.repository.createAccount(
+      await storage.queries.createAccount(
         user,
         "unused-test-password",
         crypto.randomUUID(),
         crypto.randomUUID(),
         new Date().toISOString(),
       );
-      await storage.repository.createSession(
+      await storage.queries.createSession(
         await digest(tokens[index]!),
         user.id,
         Date.now() + 60000,
@@ -90,11 +83,13 @@ test("request events isolate concurrent identities and keep shared storage avail
 
     assert.equal(saved.status, 200);
     assert.equal(
-      sessionQueries,
+      storage.statements.filter((query) =>
+        query.includes('inner join "sessions"'),
+      ).length,
       1,
       "wrapper and handler reuse the request identity",
     );
-    sessionQueries = 0;
+    storage.statements.length = 0;
     const results = await Promise.all(
       Array.from({ length: 24 }, async (_, index) => {
         const owner = index % 2;
@@ -118,14 +113,16 @@ test("request events isolate concurrent identities and keep shared storage avail
 
     assert.equal(results.length, 24);
     assert.equal(
-      sessionQueries,
+      storage.statements.filter((query) =>
+        query.includes('inner join "sessions"'),
+      ).length,
       48,
       "each HTTP request resolves its own identity exactly once",
     );
     assert.equal((await call("/session", "c".repeat(64))).status, 200);
     assert.equal((await call("/user-settings", "c".repeat(64))).status, 401);
     // A completed request does not close the process-owned SQLite connection.
-    assert.equal((await storage.repository.userByEmail(bob.email))?.id, bob.id);
+    assert.equal((await storage.queries.userByEmail(bob.email))?.id, bob.id);
     await Promise.all(pending);
   } finally {
     storage.close();
@@ -135,7 +132,7 @@ test("request events isolate concurrent identities and keep shared storage avail
 
 test("platform initialization failures use the normal HTTP error boundary", async () => {
   const context = {
-    get repository() {
+    get database() {
       throw new Error("invalid platform storage");
     },
     storage: {},
@@ -161,30 +158,24 @@ test("platform initialization failures use the normal HTTP error boundary", asyn
   }
 });
 
-test("repository rejects malformed SQL rows at the storage boundary", async () => {
-  const repository = new Repository({
-    async query() {
-      return {
-        rows: [
-          {
-            id: "user",
-            email: "test@example.com",
-            name: "Test",
-            role: "superuser",
-          },
-        ],
-        changes: 0,
-      };
-    },
-    async transaction() {
-      return [];
-    },
-  });
+test("SQLite constraints reject invalid stored roles", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "invalid-role-"));
+  const storage = await nodeStorage(directory);
 
-  await assert.rejects(
-    repository.session("hash", Date.now()),
-    /Invalid stored role/,
-  );
+  try {
+    await assert.rejects(
+      storage.database.run(
+        sql`INSERT INTO users VALUES('invalid','invalid@example.com','Invalid','superuser','hash','2020')`,
+      ),
+      (error: unknown) =>
+        error instanceof Error &&
+        error.cause instanceof Error &&
+        /CHECK constraint failed/.test(error.cause.message),
+    );
+  } finally {
+    storage.close();
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("native request config controls origins and preserves trusted proxy IP rules", async () => {

@@ -1,11 +1,7 @@
+import { publishSnapshot } from "../db/snapshots";
 import type { H3Event } from "h3";
 import type { User } from "../../shared/contracts";
-import type { ObjectStore } from "../storage/ports";
-import { objectStore } from "../storage/objects";
-import {
-  cloudflareObjects,
-  type CloudflareBindings,
-} from "../storage/cloudflare";
+import { blob } from "@nuxthub/blob";
 import { fail, validRevision } from "./http";
 import { runBackground } from "./request";
 
@@ -20,32 +16,28 @@ export interface SnapshotMetadata {
   objectKey: string | null;
 }
 
-/** Adapt native storage only where immutable snapshot rules need it. */
-export function snapshotObjects(event: H3Event): ObjectStore {
-  const storage = useStorage("objects");
-  const cf = event.context.cloudflare as
-    { env: CloudflareBindings } | undefined;
-
-  return cf ? cloudflareObjects(cf.env.DATA, storage) : objectStore(storage);
-}
-
-export async function readSnapshot(
-  objects: ObjectStore,
-  key: string | null,
-  fallback: unknown,
-) {
+export async function readSnapshot(key: string | null, fallback: unknown) {
   if (!key) return fallback;
-  const object = await objects.read(key);
+  const object = await blob.get(key);
 
   if (!object)
-    fail(503, "STORAGE_UNAVAILABLE", "保存的数据暂时无法读取，请稍后重试");
+    return fail(
+      503,
+      "STORAGE_UNAVAILABLE",
+      "保存的数据暂时无法读取，请稍后重试",
+    );
+  const value: unknown = JSON.parse(await object.text());
 
-  return object;
+  if (!value || typeof value !== "object")
+    throw new Error("Invalid stored snapshot JSON");
+
+  return value;
 }
 
-export async function deleteSnapshots(objects: ObjectStore, keys: string[]) {
-  for (let offset = 0; offset < keys.length; offset += 1000)
-    await objects.delete(keys.slice(offset, offset + 1000));
+export async function deleteSnapshots(keys: string[]) {
+  // Bound the SDK's concurrent deletes when a workspace contains many snapshots.
+  for (let offset = 0; offset < keys.length; offset += 100)
+    await blob.del(keys.slice(offset, offset + 100));
 }
 
 /** Publish an immutable object before committing its metadata revision. */
@@ -58,8 +50,6 @@ export async function saveSnapshot(
   revision: unknown,
   value: unknown,
 ) {
-  const repository = await event.context.repository();
-  const objects = snapshotObjects(event);
   const expectedRevision = validRevision(revision);
 
   if (row.revision !== expectedRevision)
@@ -71,11 +61,13 @@ export async function saveSnapshot(
   const key = `${user.id}/${type}/${id}/${crypto.randomUUID()}.json`;
   const now = new Date().toISOString();
 
-  await objects.write(key, value);
+  await blob.put(key, JSON.stringify(value), {
+    contentType: "application/json",
+  });
   let changes: number;
 
   try {
-    changes = await repository.saveSnapshot(
+    changes = await publishSnapshot(
       type,
       id,
       user.id,
@@ -84,16 +76,16 @@ export async function saveSnapshot(
       now,
     );
   } catch (error) {
-    runBackground(event, objects.delete([key]));
+    runBackground(event, deleteSnapshots([key]));
     throw error;
   }
 
   if (!changes) {
-    runBackground(event, objects.delete([key]));
+    runBackground(event, deleteSnapshots([key]));
     fail(409, "REVISION_CONFLICT", "其他页面已经修改或删除了内容，请重新加载");
   }
 
-  if (row.objectKey) runBackground(event, objects.delete([row.objectKey]));
+  if (row.objectKey) runBackground(event, deleteSnapshots([row.objectKey]));
 
   return { revision: expectedRevision + 1, updatedAt: now };
 }

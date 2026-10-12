@@ -1,3 +1,10 @@
+import {
+  createSession as storeSession,
+  deleteSession,
+  purgeExpired,
+  rateLimit as incrementRateLimit,
+  session,
+} from "../db/sessions";
 import { getCookie, type H3Event } from "h3";
 import type { User } from "../../shared/contracts";
 import {
@@ -49,9 +56,8 @@ export function currentUser(event: H3Event): Promise<User | null> {
     const token = sessionToken(event);
 
     if (!token) return null;
-    const repository = await event.context.repository();
 
-    return repository.session(await digest(token), Date.now());
+    return session(await digest(token), Date.now());
   })());
 }
 
@@ -63,10 +69,9 @@ export async function createSession(
   event: H3Event,
   user: User,
 ): Promise<Response> {
-  const repository = await event.context.repository();
   const token = random();
 
-  await repository.createSession(
+  await storeSession(
     await digest(token),
     user.id,
     Date.now() + SESSION_SECONDS * 1000,
@@ -78,10 +83,9 @@ export async function createSession(
 }
 
 export async function logout(event: H3Event): Promise<Response> {
-  const repository = await event.context.repository();
   const token = sessionToken(event);
 
-  if (token) await repository.deleteSession(await digest(token));
+  if (token) await deleteSession(await digest(token));
 
   return json({}, 200, { "Set-Cookie": cookie(requestOrigin(event), "", 0) });
 }
@@ -96,9 +100,8 @@ export async function rateLimit(
   limit: number,
   windowSeconds = 900,
 ): Promise<void> {
-  const repository = await event.context.repository();
   const bucket = Math.floor(Date.now() / (windowSeconds * 1000));
-  const record = await repository.rateLimit(
+  const record = await incrementRateLimit(
     `${key}:${bucket}`,
     (bucket + 1) * windowSeconds * 1000,
   );
@@ -108,14 +111,12 @@ export async function rateLimit(
 }
 
 export async function readAuthCredentials(event: H3Event) {
-  const repository = await event.context.repository();
-
   await rateLimit(event, `auth-ip:${await digest(requestClientIp(event))}`, 40);
   const data = await body(apiRequest(event));
   const result = credentials(data);
 
   await rateLimit(event, `auth-email:${await digest(result.email)}`, 15);
-  runBackground(event, repository.purgeExpired(Date.now()));
+  runBackground(event, purgeExpired(Date.now()));
 
   return { data, ...result };
 }

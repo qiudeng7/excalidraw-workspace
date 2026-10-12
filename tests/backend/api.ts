@@ -1,13 +1,13 @@
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createApp, createRouter, defineEventHandler, toWebHandler } from "h3";
-import type { RepositoryPort } from "../../server/storage/ports";
-import type { SnapshotStorage } from "../../server/storage/objects";
-import { withNativeStorage } from "./nitro";
+import { withDatabase, type TestDatabase } from "./database";
+import "./nitro";
+import { withBlob, type TestBlob } from "./blobs";
 
 export interface ApiFixture {
-  repository: RepositoryPort;
-  storage: SnapshotStorage;
+  database: TestDatabase;
+  blob: TestBlob;
   publicOrigin: string;
   waitUntil(promise: Promise<unknown>): void;
 }
@@ -48,7 +48,6 @@ export async function handleApi(
 
   app.use(
     defineEventHandler((event) => {
-      event.context.repository = async () => fixture.repository;
       event.context.nitro = {
         runtimeConfig: {
           publicOrigin: fixture.publicOrigin,
@@ -62,5 +61,8 @@ export async function handleApi(
     router.add(entry.route, entry.handler, entry.method);
   app.use(router);
 
-  return withNativeStorage(fixture.storage, () => toWebHandler(app)(request));
+  return withDatabase(
+    () => fixture.database,
+    () => withBlob(fixture.blob, () => toWebHandler(app)(request)),
+  );
 }
