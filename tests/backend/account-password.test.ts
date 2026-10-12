@@ -65,7 +65,7 @@ const original = "Original-password-2026!";
 const next = "Updated-password-2026!";
 
 /** Stop the actual session write, after the handler has accepted credentials. */
-function pauseSessionInsert(database: TestDatabase) {
+function pauseSessionInsert(database: TestDatabase, afterInsert = false) {
   const reached = Promise.withResolvers<void>();
   const resume = Promise.withResolvers<void>();
   const hold = (query: any): any =>
@@ -73,10 +73,20 @@ function pauseSessionInsert(database: TestDatabase) {
       get(target, key) {
         if (key === "then")
           return async (resolve: any, reject: any) => {
-            reached.resolve();
-            await resume.promise;
+            try {
+              const result = afterInsert ? await target : undefined;
 
-            return target.then(resolve, reject);
+              reached.resolve();
+              await resume.promise;
+
+              return afterInsert
+                ? resolve(result)
+                : target.then(resolve, reject);
+            } catch (error) {
+              reached.reject(error);
+
+              return reject(error);
+            }
           };
 
         const value = Reflect.get(target, key);
@@ -89,7 +99,23 @@ function pauseSessionInsert(database: TestDatabase) {
     });
 
   return {
-    reached: reached.promise,
+    async reached() {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      try {
+        await Promise.race([
+          reached.promise,
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(
+              () => reject(new Error("Session INSERT barrier timed out")),
+              5000,
+            );
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
     resume: () => resume.resolve(),
     database: new Proxy(database, {
       get(target, key) {
@@ -108,87 +134,111 @@ function pauseSessionInsert(database: TestDatabase) {
   };
 }
 
-for (const entry of ["login", "setup", "register"] as const)
-  test(
-    `${entry} cannot publish a session after its accepted password is changed`,
-    { timeout: 10000 },
-    async () => {
-      const f = await fixture();
-      const barrier = pauseSessionInsert(f.storage.database);
-      let pending: ReturnType<typeof f.request> | undefined;
+for (const afterInsert of [false, true])
+  for (const entry of ["login", "setup", "register"] as const)
+    test(
+      `${entry}: password change ${afterInsert ? "after" : "before"} session INSERT invalidates delayed authentication`,
+      { timeout: 10000 },
+      async () => {
+        const f = await fixture();
+        const barrier = pauseSessionInsert(f.storage.database, afterInsert);
+        let pending: ReturnType<typeof f.request> | undefined;
 
-      try {
-        if (entry !== "setup")
+        try {
+          if (entry !== "setup")
+            assert.equal(
+              (
+                await f.request("/setup", "POST", {
+                  email: "admin@example.test",
+                  password: original,
+                })
+              ).status,
+              200,
+            );
+          const email =
+            entry === "login" ? "admin@example.test" : "alice@example.test";
+
+          pending = f.request(
+            `/${entry}`,
+            "POST",
+            { email, password: original },
+            undefined,
+            "https://demo.test",
+            undefined,
+            barrier.database,
+          );
+          // No sleep or scheduling guess: the session INSERT is waiting here.
+          await barrier.reached();
+          const current = await f.request("/login", "POST", {
+            email,
+            password: original,
+          });
+
+          assert.equal(current.status, 200);
+          const changed = await f.request(
+            "/account/password",
+            "PUT",
+            { currentPassword: original, newPassword: next },
+            current.cookie,
+          );
+
+          assert.equal(changed.status, 200);
+          barrier.resume();
+          const stale = await pending;
+
+          if (afterInsert) {
+            assert.equal(stale.status, 200);
+            assert.ok(
+              stale.cookie,
+              "a delayed response may still issue its cookie",
+            );
+            assert.equal(
+              (await f.request("/session", "GET", undefined, stale.cookie)).body
+                .user,
+              null,
+              "the cookie for the already inserted session must be revoked",
+            );
+          } else {
+            assert.equal(stale.status, 401);
+            assert.equal(stale.body.error.code, "INVALID_CREDENTIALS");
+            assert.equal(stale.cookie, undefined);
+          }
+
           assert.equal(
-            (
-              await f.request("/setup", "POST", {
-                email: "admin@example.test",
-                password: original,
-              })
-            ).status,
+            (await f.request("/session", "GET", undefined, current.cookie)).body
+              .user.id,
+            current.body.user.id,
+          );
+          const sessions = await f.storage.database
+            .select()
+            .from(tables.sessions)
+            .where(eq(tables.sessions.userId, current.body.user.id));
+
+          assert.equal(
+            sessions.length,
+            1,
+            "only the current session survives the password change",
+          );
+          assert.equal(
+            (await f.request("/login", "POST", { email, password: original }))
+              .status,
+            401,
+          );
+          assert.equal(
+            (await f.request("/login", "POST", { email, password: next }))
+              .status,
             200,
           );
-        const email =
-          entry === "login" ? "admin@example.test" : "alice@example.test";
-
-        pending = f.request(
-          `/${entry}`,
-          "POST",
-          { email, password: original },
-          undefined,
-          "https://demo.test",
-          undefined,
-          barrier.database,
-        );
-        // No sleep or scheduling guess: the session INSERT is waiting here.
-        await barrier.reached;
-        const current = await f.request("/login", "POST", {
-          email,
-          password: original,
-        });
-
-        assert.equal(current.status, 200);
-        const changed = await f.request(
-          "/account/password",
-          "PUT",
-          { currentPassword: original, newPassword: next },
-          current.cookie,
-        );
-
-        assert.equal(changed.status, 200);
-        barrier.resume();
-        const stale = await pending;
-
-        assert.equal(stale.status, 401);
-        assert.equal(stale.body.error.code, "INVALID_CREDENTIALS");
-        assert.equal(stale.cookie, undefined);
-        assert.equal(
-          (await f.request("/session", "GET", undefined, current.cookie)).body
-            .user.id,
-          current.body.user.id,
-        );
-        const sessions = await f.storage.database
-          .select()
-          .from(tables.sessions)
-          .where(eq(tables.sessions.userId, current.body.user.id));
-
-        assert.equal(sessions.length, 1, "the stale insert wrote no session");
-        assert.equal(
-          (await f.request("/login", "POST", { email, password: original }))
-            .status,
-          401,
-        );
-        assert.equal(
-          (await f.request("/login", "POST", { email, password: next })).status,
-          200,
-        );
-      } finally {
-        barrier.resume();
-        await pending;
-        await f.close();
-      }
-    },
-  );
+        } finally {
+          barrier.resume();
+          try {
+            await pending;
+          } finally {
+            await f.close();
+          }
+        }
+      },
+    );
 
 test("password change verifies the original password, preserves the current session and revokes only other sessions of the same user", async () => {
   const f = await fixture();

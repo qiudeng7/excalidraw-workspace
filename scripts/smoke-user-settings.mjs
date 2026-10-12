@@ -1,65 +1,12 @@
 #!/usr/bin/env node
 // 仅向本地测试服务创建独立账户，验证 Nitro/Workers 的实际配置与账户隔离。
-// node scripts/smoke-user-settings.mjs http://localhost:8792
+// node scripts/smoke-user-settings.mjs http://localhost:3000
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-const base = new URL(process.argv[2] ?? "http://localhost:3000");
-assert.ok(
-  ["localhost", "127.0.0.1", "[::1]"].includes(base.hostname) &&
-    base.protocol === "http:",
-  "仅允许本地回环 HTTP",
-);
-assert.ok(
-  !base.username &&
-    !base.password &&
-    base.pathname === "/" &&
-    !base.search &&
-    !base.hash,
-  "仅提供本地 origin",
-);
-async function request(
-  path,
-  method = "GET",
-  data,
-  cookie,
-  owner,
-  settingsOwner = false,
-) {
-  const response = await fetch(new URL(`/api${path}`, base), {
-    method,
-    headers: {
-      Origin: base.origin,
-      "Content-Type": "application/json",
-      "X-Requested-With": "excalidraw-demo",
-      ...(cookie ? { Cookie: cookie } : {}),
-      ...(owner
-        ? { [settingsOwner ? "X-Settings-Owner" : "X-Resource-Owner"]: owner }
-        : {}),
-    },
-    signal: AbortSignal.timeout(15000),
-    redirect: "error",
-    ...(data === undefined ? {} : { body: JSON.stringify(data) }),
-  });
-  const text = await response.text();
-  let body;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    throw new Error(
-      `${method} ${path}: HTTP ${response.status} 返回非 JSON：${text.slice(0, 200)}`,
-    );
-  }
-  return {
-    status: response.status,
-    body,
-    cookie: response.headers.get("set-cookie")?.split(";")[0],
-  };
-}
-const report = (message) => console.log(`✓ ${message}`);
-const expect = (result, status) => {
-  assert.equal(result.status, status);
-  return result.body;
-};
+import { localClient, expect, report } from "./local-smoke.mjs";
+
+const request = localClient(process.argv[2] ?? "http://localhost:3000");
+
 async function run() {
   const bootstrap = expect(await request("/bootstrap"), 200);
   assert.ok(
