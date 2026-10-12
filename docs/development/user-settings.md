@@ -18,9 +18,11 @@
 
 ## 修改与保存设置
 
-面板中的编辑器与调试修改调用 `UserSettingsResource.update()`，立即预览并在去抖后通过 [PUT /api/user-settings](../../server/api/user-settings.put.ts) 提交 `{ revision, settings }`。请求须包含完整版本化设置，字段由 [validateUserSettings()](../../server/utils/userSettings.ts) 校验；未知字段或不完整配置会被拒绝。
+面板中的编辑器与调试修改调用 `UserSettingsResource.update()`，立即预览并在去抖后通过 [PUT /api/user-settings](../../server/api/user-settings.put.ts) 提交 `{ revision, settings }`。字段由 [validateUserSettingsWrite()](../../server/utils/userSettings.ts) 校验，接受三种已发布的完整 `version: 1` 结构：最初不含 `disableDefaultSidebar` 和 `bottomToolbar` 的结构、含 `disableDefaultSidebar` 但不含 `bottomToolbar` 的结构，以及包含两者的当前结构。其他字段在三种结构中都必须完整且类型正确；未知字段、任意局部更新及仅含 `bottomToolbar` 而缺少 `disableDefaultSidebar` 的结构会被拒绝。
 
-后端通过 [saveUserSettings()](../../server/db/user-settings.ts) 按预期版本写入数据库，成功返回新版本。保存失败显示错误并保留当前预览，可重试。设置保存在数据库，不走画布和素材库的快照链路。
+旧客户端缺少的新增选项，从同一账户当前云端设置中保留；云端没有记录时采用默认值，两项均为 `true`。旧存储记录本身缺少的选项也按读取规则补齐。客户端明确传入的 `false` 会保留。后端保存并返回补齐后的完整设置，部署前已打开的旧标签页可继续保存与重试。
+
+后端通过 [saveUserSettings()](../../server/db/user-settings.ts) 按预期版本写入数据库，成功返回新版本。旧结构的读取补齐与保存之间若有其他请求写入，仍按版本冲突处理，避免覆盖较新的选项。保存失败显示错误并保留当前预览，可重试；读取失败、保存错误和冲突的恢复入口在设置面板各分类中都可见。设置保存在数据库，不走画布和素材库的快照链路。
 
 退出和站内离开前等待设置保存。账户切换或组件卸载时销毁旧资源、取消定时器与在途请求；相关生命周期在 [useAccountSession.ts](../../src/composables/useAccountSession.ts)。
 
@@ -35,4 +37,4 @@
 
 ## 验证入口
 
-[user-settings.test.ts](../../tests/backend/user-settings.test.ts) 检查字段、归属和版本，[user-settings-resource.test.ts](../../tests/backend/user-settings-resource.test.ts) 检查读取失败、预览、冲突选择及旧账户请求取消。浏览器中检查设置面板的分类切换、即时预览、重登录恢复、双标签页冲突，以及读取失败时控件只读。
+[user-settings.test.ts](../../tests/backend/user-settings.test.ts) 检查字段、归属和版本，[user-settings-compat.test.ts](../../tests/backend/user-settings-compat.test.ts) 检查旧客户端写入、新增选项保留及补齐过程中的版本竞争，[user-settings-resource.test.ts](../../tests/backend/user-settings-resource.test.ts) 检查读取失败、预览、冲突选择及旧账户请求取消。浏览器中检查设置面板的分类切换、即时预览、重登录恢复、双标签页冲突，以及读取失败时控件只读。
