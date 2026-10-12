@@ -1,9 +1,14 @@
-import { saveUserSettings } from "../db/user-settings";
+import { saveUserSettings, userSettings } from "../db/user-settings";
 import { defineApiHandler } from "../utils/api";
 import { apiRequest } from "../utils/request";
 import { requireUser } from "../utils/auth";
 import { fail, json, body, validRevision, assertOwner } from "../utils/http";
-import { validateUserSettings } from "../utils/userSettings";
+import {
+  completeUserSettingsWrite,
+  readStoredUserSettings,
+  validateUserSettings,
+  validateUserSettingsWrite,
+} from "../utils/userSettings";
 
 export default defineApiHandler(async (event) => {
   const req = apiRequest(event);
@@ -14,15 +19,28 @@ export default defineApiHandler(async (event) => {
   const data = await body(req);
   const revision = validRevision(data.revision);
 
-  if (!validateUserSettings(data.settings))
+  if (!validateUserSettingsWrite(data.settings))
     return fail(
       400,
       "INVALID_USER_SETTINGS",
       "设置格式无效，请使用完整的受支持配置",
     );
+  let previous;
+
+  if (!validateUserSettings(data.settings)) {
+    const row = await userSettings(user.id);
+
+    if (row) {
+      previous = readStoredUserSettings(JSON.parse(row.settingsJson));
+      if (!previous) throw new Error("Invalid stored user settings");
+    }
+  }
+
+  const settings = completeUserSettingsWrite(data.settings, previous);
+  // CAS also protects the read/merge gap: a competing write makes this save conflict.
   const updatedRevision = await saveUserSettings(
     user.id,
-    JSON.stringify(data.settings),
+    JSON.stringify(settings),
     revision,
     new Date().toISOString(),
   );
@@ -35,7 +53,7 @@ export default defineApiHandler(async (event) => {
     );
 
   return json({
-    settings: data.settings,
+    settings,
     revision: updatedRevision,
     configured: true,
   });

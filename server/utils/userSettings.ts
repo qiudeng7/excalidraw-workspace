@@ -1,4 +1,17 @@
-import type { UserSettings } from "../../shared/contracts";
+import {
+  createDefaultUserSettings,
+  type UserSettings,
+} from "../../shared/contracts";
+
+type UserSettingsWrite = Omit<UserSettings, "features"> & {
+  features: Omit<
+    UserSettings["features"],
+    "disableDefaultSidebar" | "bottomToolbar"
+  > &
+    Partial<
+      Pick<UserSettings["features"], "disableDefaultSidebar" | "bottomToolbar">
+    >;
+};
 
 /** Full versioned payload only: reject unknown fields instead of storing arbitrary data. */
 export function validateUserSettings(value: unknown): value is UserSettings {
@@ -65,4 +78,33 @@ export function readStoredUserSettings(value: unknown): UserSettings | null {
   }
 
   return validateUserSettings(value) ? value : null;
+}
+
+/** Accept complete v1 payloads from each released client, not arbitrary patches. */
+export function validateUserSettingsWrite(
+  value: unknown,
+): value is UserSettingsWrite {
+  if (!readStoredUserSettings(value)) return false;
+  const features = (value as UserSettingsWrite).features;
+
+  // bottomToolbar was introduced after disableDefaultSidebar; this shape never shipped.
+  return (
+    !Object.hasOwn(features, "bottomToolbar") ||
+    Object.hasOwn(features, "disableDefaultSidebar")
+  );
+}
+
+/** Omitted flags belong to the newer client and must retain its saved choices. */
+export function completeUserSettingsWrite(
+  value: UserSettingsWrite,
+  previous = createDefaultUserSettings(),
+): UserSettings {
+  return {
+    ...value,
+    features: {
+      disableDefaultSidebar: previous.features.disableDefaultSidebar,
+      bottomToolbar: previous.features.bottomToolbar,
+      ...value.features,
+    },
+  };
 }
