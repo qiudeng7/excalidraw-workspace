@@ -1,5 +1,9 @@
-import { repairOrder, reject } from "./merge";
-import type { RoomState, SharedScene, Grant } from "./types";
+import { repairOrder, reject } from "#shared/collaboration/merge";
+import type {
+  RoomState,
+  SharedScene,
+  Grant,
+} from "#shared/collaboration/types";
 
 export function createRoom(
   id: string,

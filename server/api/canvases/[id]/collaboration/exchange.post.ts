@@ -1,9 +1,9 @@
-import { defineApiHandler, resourceId } from "../../../../utils/api";
-import { body, json, fail } from "../../../../utils/http";
-import { apiRequest } from "../../../../utils/request";
-import { random, digest } from "../../../../utils/passwords";
-import { canvasCommand } from "../../../../collaboration/service";
-import { rateLimit } from "../../../../utils/auth";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { body, json, fail } from "#server/utils/http";
+import { apiRequest } from "#server/utils/request";
+import { random, digest } from "#server/utils/passwords";
+import { canvasCommand } from "#server/collaboration/service";
+import { rateLimit } from "#server/utils/auth";
 
 export default defineApiHandler(
   async (event) => {

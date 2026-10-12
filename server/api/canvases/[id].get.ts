@@ -1,18 +1,18 @@
-import { defineApiHandler, resourceId } from "../../utils/api";
-import { requireUser } from "../../utils/auth";
-import { requireCanvas } from "../../utils/access";
-import { meta, readSnapshot } from "../../utils/snapshots";
-import { apiRequest } from "../../utils/request";
-import { canvasValidator } from "../../../shared/snapshotValidator";
-import { ApiError, json, assertOwner } from "../../utils/http";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { requireUser } from "#server/utils/auth";
+import { requireCanvas } from "#server/utils/access";
+import { meta, readSnapshot } from "#server/utils/snapshots";
+import { apiRequest } from "#server/utils/request";
+import { canvasValidator } from "#shared/snapshotValidator";
+import { ApiError, json, assertOwner } from "#server/utils/http";
 
 import {
   canvasCommand,
   hydrateView,
   ensureRoom,
   principal,
-} from "../../collaboration/service";
-import type { CanvasView } from "../../../shared/collaboration/types";
+} from "#server/collaboration/service";
+import type { CanvasView } from "#shared/collaboration/types";
 
 const EMPTY_SCENE = { elements: [], appState: {}, files: {} };
 

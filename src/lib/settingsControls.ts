@@ -1,8 +1,8 @@
 import {
   createDefaultUserSettings,
   type UserSettings,
-} from "../../shared/contracts";
-import type { UserSettingsStatus } from "./userSettings";
+} from "#shared/contracts";
+import type { UserSettingsStatus } from "~/lib/userSettings";
 
 export type RenderingOptions = UserSettings["debug"]["renderingOptions"];
 

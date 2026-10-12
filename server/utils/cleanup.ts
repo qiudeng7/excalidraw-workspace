@@ -1,6 +1,6 @@
 import { blob } from "@nuxthub/blob";
-import { referencedObjects } from "../db/snapshots";
-import { deleteSnapshots } from "./snapshots";
+import { referencedObjects } from "#server/db/snapshots";
+import { deleteSnapshots } from "#server/utils/snapshots";
 
 /** Never collect fresh objects: a write may not have reached its metadata CAS yet. */
 export async function collectOrphans(

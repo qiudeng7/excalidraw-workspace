@@ -1,10 +1,10 @@
 import { blob } from "@nuxthub/blob";
 import { getQuery } from "h3";
-import { defineApiHandler, resourceId } from "../../../../utils/api";
-import { fail, json } from "../../../../utils/http";
-import { canvasCommand } from "../../../../collaboration/service";
-import { referencedRoomObjects } from "../../../../collaboration/garbage-collection";
-import type { RoomBackup } from "../../../../../shared/collaboration/backup";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { fail, json } from "#server/utils/http";
+import { canvasCommand } from "#server/collaboration/service";
+import { referencedRoomObjects } from "#server/collaboration/garbage-collection";
+import type { RoomBackup } from "#shared/collaboration/backup";
 
 export default defineApiHandler(async (event) => {
   const backup = await canvasCommand<RoomBackup>(event, resourceId(event), {

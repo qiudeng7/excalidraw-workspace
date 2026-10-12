@@ -1,9 +1,9 @@
-import { defineApiHandler } from "../../utils/api";
-import { requireUser, rateLimit, currentSessionHash } from "../../utils/auth";
-import { apiRequest } from "../../utils/request";
-import { body, fail, json, assertOwner } from "../../utils/http";
-import { hashPassword, verifyPassword } from "../../utils/passwords";
-import { changeAccountPassword, userByEmail } from "../../db/accounts";
+import { defineApiHandler } from "#server/utils/api";
+import { requireUser, rateLimit, currentSessionHash } from "#server/utils/auth";
+import { apiRequest } from "#server/utils/request";
+import { body, fail, json, assertOwner } from "#server/utils/http";
+import { hashPassword, verifyPassword } from "#server/utils/passwords";
+import { changeAccountPassword, userByEmail } from "#server/db/accounts";
 
 export default defineApiHandler(async (event) => {
   const user = await requireUser(event);

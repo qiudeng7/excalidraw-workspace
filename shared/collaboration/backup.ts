@@ -1,6 +1,14 @@
-import { createRoom, validateGrant } from "./state";
-import { canonical, reject, validateElement } from "./merge";
-import { MAX_SCENE_BYTES, type RoomState, type FileReference } from "./types";
+import { createRoom, validateGrant } from "#shared/collaboration/state";
+import {
+  canonical,
+  reject,
+  validateElement,
+} from "#shared/collaboration/merge";
+import {
+  MAX_SCENE_BYTES,
+  type RoomState,
+  type FileReference,
+} from "#shared/collaboration/types";
 
 export interface RoomBackup {
   format: "excalidraw-room-v1";

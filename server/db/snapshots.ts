@@ -1,7 +1,7 @@
 import { db } from "@nuxthub/db";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import * as tables from "./schema";
-import { ownedWorkspaceIds } from "./workspaces";
+import * as tables from "#server/db/schema";
+import { ownedWorkspaceIds } from "#server/db/workspaces";
 
 export async function library(user: string) {
   return (

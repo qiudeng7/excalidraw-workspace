@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, useId } from "vue";
-import type { DialogOptions } from "../lib/dialogs";
+import type { DialogOptions } from "~/lib/dialogs";
 
 const props = defineProps<{
   request: DialogOptions & { input?: { label: string; initialValue: string } };

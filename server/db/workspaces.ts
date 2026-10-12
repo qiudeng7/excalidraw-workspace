@@ -1,7 +1,7 @@
 import { db } from "@nuxthub/db";
 import { and, asc, eq, getTableColumns, inArray } from "drizzle-orm";
-import * as tables from "./schema";
-import type { Workspace } from "../../shared/contracts";
+import * as tables from "#server/db/schema";
+import type { Workspace } from "#shared/contracts";
 
 const { userId: _owner, ...workspaceColumns } = getTableColumns(
   tables.workspaces,

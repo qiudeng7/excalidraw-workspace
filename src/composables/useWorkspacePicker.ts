@@ -7,7 +7,7 @@ import {
   onBeforeUnmount,
   type Ref,
 } from "vue";
-import type { Workspace } from "../../shared/contracts";
+import type { Workspace } from "#shared/contracts";
 
 export interface WorkspacePickerDependencies {
   workspaces: Readonly<Ref<readonly Workspace[]>>;

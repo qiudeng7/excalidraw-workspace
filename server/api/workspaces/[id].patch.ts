@@ -1,9 +1,9 @@
-import { renameWorkspace } from "../../db/workspaces";
-import { defineApiHandler, resourceId } from "../../utils/api";
-import { apiRequest } from "../../utils/request";
-import { requireUser } from "../../utils/auth";
-import { requireWorkspace } from "../../utils/access";
-import { json, body, name } from "../../utils/http";
+import { renameWorkspace } from "#server/db/workspaces";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { requireWorkspace } from "#server/utils/access";
+import { json, body, name } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);

@@ -2,14 +2,14 @@ import { db } from "@nuxthub/db";
 import { and, eq } from "drizzle-orm";
 import { blob } from "@nuxthub/blob";
 import type { H3Event } from "h3";
-import { canvases, workspaces, sharedCanvases } from "../db/schema";
-import { currentUser, currentSessionHash } from "../utils/auth";
-import { fail, assertOwner, ApiError } from "../utils/http";
-import { apiRequest } from "../utils/request";
-import { readSnapshot } from "../utils/snapshots";
-import { digest } from "../utils/passwords";
-import { createRoom, type Command } from "../../shared/collaboration/room";
-import { roomCommand } from "./transport";
+import { canvases, workspaces, sharedCanvases } from "#server/db/schema";
+import { currentUser, currentSessionHash } from "#server/utils/auth";
+import { fail, assertOwner, ApiError } from "#server/utils/http";
+import { apiRequest } from "#server/utils/request";
+import { readSnapshot } from "#server/utils/snapshots";
+import { digest } from "#server/utils/passwords";
+import { createRoom, type Command } from "#shared/collaboration/room";
+import { roomCommand } from "#server/collaboration/transport";
 import type {
   Access,
   CanvasView,
@@ -17,10 +17,10 @@ import type {
   Principal,
   RoomState,
   SharedScene,
-} from "../../shared/collaboration/types";
-import type { CanvasScene } from "../../shared/contracts";
-import { projectNodeRoom } from "./node-projection";
-import { validateElement } from "../../shared/collaboration/merge";
+} from "#shared/collaboration/types";
+import type { CanvasScene } from "#shared/contracts";
+import { projectNodeRoom } from "#server/collaboration/node-projection";
+import { validateElement } from "#shared/collaboration/merge";
 
 export async function principal(event: H3Event): Promise<Principal> {
   const user = await currentUser(event);

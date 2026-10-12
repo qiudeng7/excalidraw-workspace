@@ -1,4 +1,4 @@
-import type { RoomState } from "../../shared/collaboration/types";
+import type { RoomState } from "#shared/collaboration/types";
 
 export const ROOM_OBJECT_GRACE = 24 * 60 * 60 * 1000;
 

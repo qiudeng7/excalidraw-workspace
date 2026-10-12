@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, useId } from "vue";
-import QuietIcon from "./QuietIcon.vue";
-import ReleaseNotes from "./ReleaseNotes.vue";
+import QuietIcon from "~/components/QuietIcon.vue";
+import ReleaseNotes from "~/components/ReleaseNotes.vue";
 
 const props = defineProps<{ owner: string }>();
 const emit = defineEmits<{

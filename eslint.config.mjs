@@ -62,6 +62,14 @@ const rules = {
   ],
 };
 
+const aliasMessage =
+  "应用内导入请使用 Nuxt 别名：src 使用 ~/，server 使用 #server/，shared 使用 #shared/。";
+
+const aliasImports = (regex) => [
+  "error",
+  { patterns: [{ regex, message: aliasMessage }] },
+];
+
 export default [
   {
     ignores: [
@@ -105,6 +113,38 @@ export default [
     languageOptions: {
       parser: vueParser,
       parserOptions: { parser: tseslint.parser, extraFileExtensions: [".vue"] },
+    },
+  },
+  {
+    files: ["{src,server,shared}/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,vue}"],
+    rules: {
+      "no-restricted-imports": aliasImports("^\\.{1,2}(?:/|$)"),
+      "no-restricted-modules": ["error", { patterns: ["./**", "../**"] }],
+      "no-restricted-syntax": [
+        ...rules["no-restricted-syntax"],
+        {
+          selector: "ImportExpression > Literal.source[value=/^\\./]",
+          message: aliasMessage,
+        },
+        {
+          selector: "TSImportType > Literal.source[value=/^\\./]",
+          message: aliasMessage,
+        },
+        {
+          selector:
+            "ImportExpression > TemplateLiteral.source[expressions.length=0] > TemplateElement[value.raw=/^\\./]",
+          message: aliasMessage,
+        },
+      ],
+    },
+  },
+  {
+    files: ["server/worker.mjs"],
+    rules: {
+      // Nitro's generated entry is a build artifact, not an application alias.
+      "no-restricted-imports": aliasImports(
+        "^\\.(?!\\./\\.output/server/index\\.mjs$)",
+      ),
     },
   },
 ];

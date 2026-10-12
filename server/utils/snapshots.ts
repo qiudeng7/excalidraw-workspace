@@ -1,9 +1,9 @@
-import { publishSnapshot } from "../db/snapshots";
+import { publishSnapshot } from "#server/db/snapshots";
 import type { H3Event } from "h3";
-import type { User } from "../../shared/contracts";
+import type { User } from "#shared/contracts";
 import { blob } from "@nuxthub/blob";
-import { fail, validRevision } from "./http";
-import { runBackground } from "./request";
+import { fail, validRevision } from "#server/utils/http";
+import { runBackground } from "#server/utils/request";
 
 export function meta<T extends { objectKey: string | null }>(row: T) {
   const { objectKey: _, ...rest } = row;

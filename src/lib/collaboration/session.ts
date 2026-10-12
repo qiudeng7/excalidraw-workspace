@@ -1,16 +1,16 @@
-import type { CanvasScene } from "../../../shared/contracts";
+import type { CanvasScene } from "#shared/contracts";
 import type {
   Access,
   CanvasView,
   Commit,
   Element,
   Operation,
-} from "../../../shared/collaboration/types";
-import { orderElements, wins } from "../../../shared/collaboration/merge";
-import { api, ApiError } from "../api";
-import { ConfirmedCache } from "../confirmedCache";
-import { getTabScope } from "../persistence";
-import { draftStorage, type Draft } from "./storage";
+} from "#shared/collaboration/types";
+import { orderElements, wins } from "#shared/collaboration/merge";
+import { api, ApiError } from "~/lib/api";
+import { ConfirmedCache } from "~/lib/confirmedCache";
+import { getTabScope } from "~/lib/persistence";
+import { draftStorage, type Draft } from "~/lib/collaboration/storage";
 import ReconnectingWebSocket from "partysocket/ws";
 
 export type HydratedView = Omit<CanvasView, "scene"> & { scene: CanvasScene };

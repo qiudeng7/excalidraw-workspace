@@ -1,12 +1,12 @@
-import { deleteCanvas } from "../../db/canvases";
-import { defineApiHandler, resourceId } from "../../utils/api";
-import { apiRequest, runBackground } from "../../utils/request";
-import { requireUser } from "../../utils/auth";
-import { requireWorkspace, requireCanvas } from "../../utils/access";
-import { deleteSnapshots } from "../../utils/snapshots";
-import { fail, json, body, validRevision } from "../../utils/http";
+import { deleteCanvas } from "#server/db/canvases";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { apiRequest, runBackground } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { requireWorkspace, requireCanvas } from "#server/utils/access";
+import { deleteSnapshots } from "#server/utils/snapshots";
+import { fail, json, body, validRevision } from "#server/utils/http";
 
-import { tombstoneCanvas } from "../../collaboration/service";
+import { tombstoneCanvas } from "#server/collaboration/service";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);

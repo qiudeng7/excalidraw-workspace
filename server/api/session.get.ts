@@ -1,6 +1,6 @@
-import { defineApiHandler } from "../utils/api";
-import { currentUser } from "../utils/auth";
-import { json } from "../utils/http";
+import { defineApiHandler } from "#server/utils/api";
+import { currentUser } from "#server/utils/auth";
+import { json } from "#server/utils/http";
 
 export default defineApiHandler(
   async (event) => {

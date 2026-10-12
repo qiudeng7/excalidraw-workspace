@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { currentRelease, releases, type ReleaseNote } from "../data/releases";
+import { currentRelease, releases, type ReleaseNote } from "~/data/releases";
 
 defineProps<{ history?: boolean }>();
 const emit = defineEmits<{ shown: [] }>();

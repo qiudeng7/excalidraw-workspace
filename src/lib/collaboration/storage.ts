@@ -1,5 +1,5 @@
-import type { Operation } from "../../../shared/collaboration/types";
-import type { CanvasScene } from "../../../shared/contracts";
+import type { Operation } from "#shared/collaboration/types";
+import type { CanvasScene } from "#shared/contracts";
 import { openDB, type DBSchema } from "idb";
 
 export interface Draft {

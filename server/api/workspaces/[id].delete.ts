@@ -1,15 +1,15 @@
-import { deleteWorkspace } from "../../db/workspaces";
-import { runBackground } from "../../utils/request";
-import { defineApiHandler, resourceId } from "../../utils/api";
-import { requireUser } from "../../utils/auth";
-import { requireWorkspace } from "../../utils/access";
-import { deleteSnapshots } from "../../utils/snapshots";
-import { json } from "../../utils/http";
+import { deleteWorkspace } from "#server/db/workspaces";
+import { runBackground } from "#server/utils/request";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { requireUser } from "#server/utils/auth";
+import { requireWorkspace } from "#server/utils/access";
+import { deleteSnapshots } from "#server/utils/snapshots";
+import { json } from "#server/utils/http";
 
 import { db } from "@nuxthub/db";
 import { eq } from "drizzle-orm";
-import { canvases, workspaces } from "../../db/schema";
-import { tombstoneCanvas } from "../../collaboration/service";
+import { canvases, workspaces } from "#server/db/schema";
+import { tombstoneCanvas } from "#server/collaboration/service";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);

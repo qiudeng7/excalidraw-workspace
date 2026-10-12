@@ -1,5 +1,5 @@
-import { defineApiHandler } from "../utils/api";
-import { logout } from "../utils/auth";
+import { defineApiHandler } from "#server/utils/api";
+import { logout } from "#server/utils/auth";
 
 export default defineApiHandler(
   async (event) => {

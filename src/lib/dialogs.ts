@@ -1,5 +1,5 @@
 import { createApp } from "vue";
-import AppDialog from "../components/AppDialog.vue";
+import AppDialog from "~/components/AppDialog.vue";
 
 export type DialogOptions = {
   title: string;

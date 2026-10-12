@@ -5,12 +5,9 @@ import type {
   LibraryDocument,
   Navigation,
   Workspace,
-} from "../../shared/contracts";
-import {
-  snapshotValidator,
-  canvasValidator,
-} from "../../shared/snapshotValidator";
-import { api, conditionalApi } from "./api";
+} from "#shared/contracts";
+import { snapshotValidator, canvasValidator } from "#shared/snapshotValidator";
+import { api, conditionalApi } from "~/lib/api";
 
 /** HTTP details belong here; controllers depend on this replaceable domain port. */
 export interface WorkspaceApi {

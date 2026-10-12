@@ -6,13 +6,13 @@ import {
   onBeforeUnmount,
   type Ref,
 } from "vue";
-import type { Bootstrap, User } from "../../shared/contracts";
-import type { AccountApi } from "../lib/accountApi";
+import type { Bootstrap, User } from "#shared/contracts";
+import type { AccountApi } from "~/lib/accountApi";
 import {
   createUserSettingsResource,
   type UserSettingsResource,
-} from "../lib/userSettings";
-import type { SaveBarrier } from "../lib/editor";
+} from "~/lib/userSettings";
+import type { SaveBarrier } from "~/lib/editor";
 
 export interface AccountSessionDependencies {
   api: AccountApi;

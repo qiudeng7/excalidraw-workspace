@@ -1,7 +1,7 @@
-import { defineApiHandler, resourceId } from "../../../../utils/api";
-import { json } from "../../../../utils/http";
-import { canvasCommand, hydrateView } from "../../../../collaboration/service";
-import type { CanvasView } from "../../../../../shared/collaboration/types";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { json } from "#server/utils/http";
+import { canvasCommand, hydrateView } from "#server/collaboration/service";
+import type { CanvasView } from "#shared/collaboration/types";
 
 export default defineApiHandler(
   async (event) =>

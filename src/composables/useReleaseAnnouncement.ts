@@ -1,6 +1,6 @@
 import { onBeforeUnmount, ref, watch } from "vue";
-import { currentRelease } from "../data/releases";
-import { announcementPrefix, ReleaseProgress } from "../lib/releaseProgress";
+import { currentRelease } from "~/data/releases";
+import { announcementPrefix, ReleaseProgress } from "~/lib/releaseProgress";
 
 export function useReleaseAnnouncement(
   accountId: () => string | undefined,

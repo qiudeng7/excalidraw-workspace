@@ -1,9 +1,15 @@
-import { navigation, recordNavigation } from "../db/navigation";
-import { defineApiHandler } from "../utils/api";
-import { apiRequest } from "../utils/request";
-import { requireUser } from "../utils/auth";
-import { requireCanvas } from "../utils/access";
-import { fail, json, body, validRevision, assertOwner } from "../utils/http";
+import { navigation, recordNavigation } from "#server/db/navigation";
+import { defineApiHandler } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { requireCanvas } from "#server/utils/access";
+import {
+  fail,
+  json,
+  body,
+  validRevision,
+  assertOwner,
+} from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
   const req = apiRequest(event);

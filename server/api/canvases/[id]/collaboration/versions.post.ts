@@ -1,13 +1,10 @@
-import { defineApiHandler, resourceId } from "../../../../utils/api";
-import { body, json, name, fail } from "../../../../utils/http";
-import { apiRequest } from "../../../../utils/request";
-import { canvasCommand } from "../../../../collaboration/service";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { body, json, name, fail } from "#server/utils/http";
+import { apiRequest } from "#server/utils/request";
+import { canvasCommand } from "#server/collaboration/service";
 
 import { blob } from "@nuxthub/blob";
-import type {
-  CanvasView,
-  PublishedVersion,
-} from "../../../../../shared/collaboration/types";
+import type { CanvasView, PublishedVersion } from "#shared/collaboration/types";
 
 export default defineApiHandler(async (event) => {
   const data = await body(apiRequest(event));

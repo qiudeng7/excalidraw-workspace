@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import QuietIcon from "./QuietIcon.vue";
-import type { Bootstrap, User } from "../../shared/contracts";
-import { ApiError } from "../lib/api";
-import { accountApi } from "../lib/accountApi";
+import QuietIcon from "~/components/QuietIcon.vue";
+import type { Bootstrap, User } from "#shared/contracts";
+import { ApiError } from "~/lib/api";
+import { accountApi } from "~/lib/accountApi";
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 const emit = defineEmits<{ authenticated: [user: User]; refresh: [] }>();

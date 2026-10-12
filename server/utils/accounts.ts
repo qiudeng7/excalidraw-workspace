@@ -1,9 +1,9 @@
-import { createAccount } from "../db/accounts";
+import { createAccount } from "#server/db/accounts";
 import type { H3Event } from "h3";
-import type { User } from "../../shared/contracts";
-import { readAuthCredentials, createSession } from "./auth";
-import { ApiError, fail, name } from "./http";
-import { hashPassword } from "./passwords";
+import type { User } from "#shared/contracts";
+import { readAuthCredentials, createSession } from "#server/utils/auth";
+import { ApiError, fail, name } from "#server/utils/http";
+import { hashPassword } from "#server/utils/passwords";
 
 /** Initial setup and registration share account creation and uniqueness rules. */
 export async function registerAccount(event: H3Event, role: User["role"]) {

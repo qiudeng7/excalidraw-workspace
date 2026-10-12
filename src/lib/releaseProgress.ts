@@ -1,4 +1,4 @@
-import type { ReleaseNote } from "../data/releases";
+import type { ReleaseNote } from "~/data/releases";
 
 type ProgressStorage = Pick<Storage, "length" | "key" | "getItem" | "setItem">;
 

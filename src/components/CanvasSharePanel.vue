@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { api } from "../lib/api";
-import { confirmDialog } from "../lib/dialogs";
+import { api } from "~/lib/api";
+import { confirmDialog } from "~/lib/dialogs";
 import type {
   Member,
   ShareLink,
   PublishedVersion,
-} from "../../shared/collaboration/types";
+} from "#shared/collaboration/types";
 
 const props = defineProps<{
   canvasId: string;

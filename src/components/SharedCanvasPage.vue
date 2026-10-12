@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
-import { accountApi } from "../lib/accountApi";
-import { api, ApiError } from "../lib/api";
-import { closeCollaboration } from "../lib/collaboration/session";
-import type { Bootstrap, User } from "../../shared/contracts";
-import type { EditorHandle } from "../lib/editor";
+import { accountApi } from "~/lib/accountApi";
+import { api, ApiError } from "~/lib/api";
+import { closeCollaboration } from "~/lib/collaboration/session";
+import type { Bootstrap, User } from "#shared/contracts";
+import type { EditorHandle } from "~/lib/editor";
 import {
   createUserSettingsResource,
   type UserSettingsResource,
-} from "../lib/userSettings";
+} from "~/lib/userSettings";
 
 const props = defineProps<{ canvasId: string; share?: boolean }>();
 const user = ref<User | null>(null);

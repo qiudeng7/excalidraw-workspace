@@ -1,6 +1,6 @@
 import { db } from "@nuxthub/db";
 import { and, eq, sql } from "drizzle-orm";
-import * as tables from "./schema";
+import * as tables from "#server/db/schema";
 
 export async function userSettings(user: string) {
   return (

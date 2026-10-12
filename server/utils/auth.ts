@@ -4,17 +4,17 @@ import {
   purgeExpired,
   rateLimit as incrementRateLimit,
   session,
-} from "../db/sessions";
+} from "#server/db/sessions";
 import { getCookie, type H3Event } from "h3";
-import type { User } from "../../shared/contracts";
+import type { User } from "#shared/contracts";
 import {
   apiRequest,
   requestOrigin,
   requestClientIp,
   runBackground,
-} from "./request";
-import { body, fail, json } from "./http";
-import { digest, random } from "./passwords";
+} from "#server/utils/request";
+import { body, fail, json } from "#server/utils/http";
+import { digest, random } from "#server/utils/passwords";
 
 const SESSION_SECONDS = 60 * 60 * 24 * 14;
 

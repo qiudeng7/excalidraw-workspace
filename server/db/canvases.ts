@@ -8,8 +8,8 @@ import {
   inArray,
   sql,
 } from "drizzle-orm";
-import * as tables from "./schema";
-import { ownedWorkspaceIds } from "./workspaces";
+import * as tables from "#server/db/schema";
+import { ownedWorkspaceIds } from "#server/db/workspaces";
 
 const { objectKey: _object, ...canvasColumns } = getTableColumns(
   tables.canvases,

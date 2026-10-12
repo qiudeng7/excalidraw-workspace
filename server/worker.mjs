@@ -1,6 +1,6 @@
 // Wrangler bundles this wrapper after Nitro builds its HTTP application.
 import nitro from "../.output/server/index.mjs";
-export { CanvasRoom } from "./collaboration/durable-object";
+export { CanvasRoom } from "#server/collaboration/durable-object";
 
 export default {
   ...nitro,

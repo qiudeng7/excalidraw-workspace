@@ -1,9 +1,9 @@
 import type { H3Event } from "h3";
-import { nodeCommand } from "./node";
-import type { Command } from "../../shared/collaboration/room";
-import { CollaborationError } from "../../shared/collaboration/merge";
-import type { Principal, RoomState } from "../../shared/collaboration/types";
-import { ApiError } from "../utils/http";
+import { nodeCommand } from "#server/collaboration/node";
+import type { Command } from "#shared/collaboration/room";
+import { CollaborationError } from "#shared/collaboration/merge";
+import type { Principal, RoomState } from "#shared/collaboration/types";
+import { ApiError } from "#server/utils/http";
 
 export async function roomCommand<T>(
   event: H3Event,

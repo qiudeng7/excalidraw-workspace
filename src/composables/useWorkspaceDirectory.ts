@@ -1,15 +1,11 @@
 import { computed, ref, shallowReadonly, type Ref } from "vue";
-import type {
-  Workspace,
-  CanvasMeta,
-  CanvasCatalog,
-} from "../../shared/contracts";
-import { ApiError } from "../lib/api";
-import type { WorkspaceApi } from "../lib/workspaceApi";
-import type { NavigationController } from "./useWorkspaceNavigation";
-import type { CanvasDocumentController } from "./useCanvasDocument";
-import type { SaveBarrier } from "../lib/editor";
-import type { promptDialog, confirmDialog } from "../lib/dialogs";
+import type { Workspace, CanvasMeta, CanvasCatalog } from "#shared/contracts";
+import { ApiError } from "~/lib/api";
+import type { WorkspaceApi } from "~/lib/workspaceApi";
+import type { NavigationController } from "~/composables/useWorkspaceNavigation";
+import type { CanvasDocumentController } from "~/composables/useCanvasDocument";
+import type { SaveBarrier } from "~/lib/editor";
+import type { promptDialog, confirmDialog } from "~/lib/dialogs";
 
 export interface WorkspaceDirectoryDependencies {
   api: Pick<

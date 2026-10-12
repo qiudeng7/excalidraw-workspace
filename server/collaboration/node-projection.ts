@@ -1,12 +1,12 @@
 import { db } from "@nuxthub/db";
 import { sql } from "drizzle-orm";
-import { collaborationRooms } from "../db/schema";
-import { nodeCommand } from "./node";
+import { collaborationRooms } from "#server/db/schema";
+import { nodeCommand } from "#server/collaboration/node";
 import {
   projectionStatements,
   type DirectoryProjection,
   type Statement,
-} from "./directory";
+} from "#server/collaboration/directory";
 
 export async function projectNodeRoom(id: string) {
   const projection = (await nodeCommand(

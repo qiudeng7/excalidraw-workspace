@@ -1,9 +1,9 @@
 import { db } from "@nuxthub/db";
 import { and, eq, sql } from "drizzle-orm";
-import { collaborationRooms } from "../db/schema";
-import { execute, type Command } from "../../shared/collaboration/room";
-import { reject } from "../../shared/collaboration/merge";
-import type { Principal, RoomState } from "../../shared/collaboration/types";
+import { collaborationRooms } from "#server/db/schema";
+import { execute, type Command } from "#shared/collaboration/room";
+import { reject } from "#shared/collaboration/merge";
+import type { Principal, RoomState } from "#shared/collaboration/types";
 
 export const roomListeners = new Map<
   string,

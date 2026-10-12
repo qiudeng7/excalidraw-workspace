@@ -1,10 +1,10 @@
-import { userSettings } from "../db/user-settings";
-import { defineApiHandler } from "../utils/api";
-import { apiRequest } from "../utils/request";
-import { requireUser } from "../utils/auth";
-import { json, assertOwner } from "../utils/http";
-import { readStoredUserSettings } from "../utils/userSettings";
-import { createDefaultUserSettings } from "../../shared/contracts";
+import { userSettings } from "#server/db/user-settings";
+import { defineApiHandler } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { json, assertOwner } from "#server/utils/http";
+import { readStoredUserSettings } from "#server/utils/userSettings";
+import { createDefaultUserSettings } from "#shared/contracts";
 
 export default defineApiHandler(async (event) => {
   const req = apiRequest(event);

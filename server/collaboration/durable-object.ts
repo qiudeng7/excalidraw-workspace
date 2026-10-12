@@ -1,16 +1,18 @@
 /// <reference types="@cloudflare/workers-types" />
 import { Server, type Connection } from "partyserver";
-import { execute, type Command } from "../../shared/collaboration/room";
-import { CollaborationError, reject } from "../../shared/collaboration/merge";
-import type {
-  Access,
-  Principal,
-  RoomState,
-} from "../../shared/collaboration/types";
+import { execute, type Command } from "#shared/collaboration/room";
+import { CollaborationError, reject } from "#shared/collaboration/merge";
+import type { Access, Principal, RoomState } from "#shared/collaboration/types";
 
-import { referencedRoomObjects, ROOM_OBJECT_GRACE } from "./garbage-collection";
-import { projectionStatements, type DirectoryProjection } from "./directory";
-import { sanitizePresence } from "./presence";
+import {
+  referencedRoomObjects,
+  ROOM_OBJECT_GRACE,
+} from "#server/collaboration/garbage-collection";
+import {
+  projectionStatements,
+  type DirectoryProjection,
+} from "#server/collaboration/directory";
+import { sanitizePresence } from "#server/collaboration/presence";
 
 interface Environment {
   DB: D1Database;

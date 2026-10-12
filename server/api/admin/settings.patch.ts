@@ -1,8 +1,8 @@
-import { registration, setRegistration } from "../../db/accounts";
-import { defineApiHandler } from "../../utils/api";
-import { apiRequest } from "../../utils/request";
-import { requireUser } from "../../utils/auth";
-import { fail, json, body } from "../../utils/http";
+import { registration, setRegistration } from "#server/db/accounts";
+import { defineApiHandler } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { fail, json, body } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
   const req = apiRequest(event);

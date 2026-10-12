@@ -1,8 +1,8 @@
-import { userByEmail } from "../db/accounts";
-import { defineApiHandler } from "../utils/api";
-import { readAuthCredentials, createSession } from "../utils/auth";
-import { verifyPassword } from "../utils/passwords";
-import { fail } from "../utils/http";
+import { userByEmail } from "#server/db/accounts";
+import { defineApiHandler } from "#server/utils/api";
+import { readAuthCredentials, createSession } from "#server/utils/auth";
+import { verifyPassword } from "#server/utils/passwords";
+import { fail } from "#server/utils/http";
 
 export default defineApiHandler(
   async (event) => {

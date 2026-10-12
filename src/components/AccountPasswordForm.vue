@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, useId } from "vue";
-import { accountApi } from "../lib/accountApi";
+import { accountApi } from "~/lib/accountApi";
 
 const props = defineProps<{ userId: string }>();
 const currentPassword = ref("");

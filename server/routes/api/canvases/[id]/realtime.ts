@@ -1,13 +1,10 @@
 import { defineWebSocketHandler } from "h3";
-import { nodeCommand, roomListeners } from "../../../../collaboration/node";
-import { session } from "../../../../db/sessions";
-import { digest } from "../../../../utils/passwords";
-import { sanitizePresence } from "../../../../collaboration/presence";
-import type {
-  Access,
-  Principal,
-} from "../../../../../shared/collaboration/types";
-import type { Command } from "../../../../../shared/collaboration/room";
+import { nodeCommand, roomListeners } from "#server/collaboration/node";
+import { session } from "#server/db/sessions";
+import { digest } from "#server/utils/passwords";
+import { sanitizePresence } from "#server/collaboration/presence";
+import type { Access, Principal } from "#shared/collaboration/types";
+import type { Command } from "#shared/collaboration/room";
 
 interface Connection {
   id: string;

@@ -5,7 +5,7 @@ import {
   onBeforeUnmount,
   type Ref,
 } from "vue";
-import type { CanvasMeta } from "../../shared/contracts";
+import type { CanvasMeta } from "#shared/contracts";
 
 export interface CanvasDrag {
   id: string;

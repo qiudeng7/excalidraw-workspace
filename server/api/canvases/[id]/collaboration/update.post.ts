@@ -1,10 +1,10 @@
-import { defineApiHandler, resourceId } from "../../../../utils/api";
-import { body, json, fail } from "../../../../utils/http";
-import { apiRequest } from "../../../../utils/request";
-import { digest } from "../../../../utils/passwords";
-import { canvasCommand } from "../../../../collaboration/service";
-import { canonical } from "../../../../../shared/collaboration/merge";
-import type { Operation } from "../../../../../shared/collaboration/types";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { body, json, fail } from "#server/utils/http";
+import { apiRequest } from "#server/utils/request";
+import { digest } from "#server/utils/passwords";
+import { canvasCommand } from "#server/collaboration/service";
+import { canonical } from "#shared/collaboration/merge";
+import type { Operation } from "#shared/collaboration/types";
 
 export default defineApiHandler(
   async (event) => {

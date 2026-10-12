@@ -4,17 +4,17 @@ import type {
   CanvasScene,
   LibraryDocument,
   SaveResult,
-} from "../../shared/contracts";
-import type { WorkspaceApi } from "./workspaceApi";
-import { ApiError } from "./api";
-import { canvasRevisionScope } from "../../shared/snapshotValidator";
+} from "#shared/contracts";
+import type { WorkspaceApi } from "~/lib/workspaceApi";
+import { ApiError } from "~/lib/api";
+import { canvasRevisionScope } from "#shared/snapshotValidator";
 import {
   ConfirmedCache,
   cacheKey,
   immutableSnapshot,
   snapshotBytes,
-} from "./confirmedCache";
-import { PersistentResource, readCurrentDraft } from "./persistence";
+} from "~/lib/confirmedCache";
+import { PersistentResource, readCurrentDraft } from "~/lib/persistence";
 
 export interface CanvasResource {
   document: CanvasDocument;

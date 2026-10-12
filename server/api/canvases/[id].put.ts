@@ -1,9 +1,9 @@
-import { defineApiHandler, resourceId } from "../../utils/api";
-import { apiRequest } from "../../utils/request";
-import { requireUser } from "../../utils/auth";
-import { requireCanvas } from "../../utils/access";
-import { saveSnapshot } from "../../utils/snapshots";
-import { fail, json, body, isObject, assertOwner } from "../../utils/http";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { requireCanvas } from "#server/utils/access";
+import { saveSnapshot } from "#server/utils/snapshots";
+import { fail, json, body, isObject, assertOwner } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);

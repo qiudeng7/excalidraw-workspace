@@ -1,11 +1,8 @@
-import { defineApiHandler, resourceId } from "../../../../utils/api";
-import { body, json, fail } from "../../../../utils/http";
-import { apiRequest } from "../../../../utils/request";
-import {
-  canvasCommand,
-  projectMember,
-} from "../../../../collaboration/service";
-import { userByEmail } from "../../../../db/accounts";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { body, json, fail } from "#server/utils/http";
+import { apiRequest } from "#server/utils/request";
+import { canvasCommand, projectMember } from "#server/collaboration/service";
+import { userByEmail } from "#server/db/accounts";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);

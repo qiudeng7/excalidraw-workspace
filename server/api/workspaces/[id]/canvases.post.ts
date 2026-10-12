@@ -1,10 +1,10 @@
-import { createCanvas } from "../../../db/canvases";
-import { defineApiHandler, resourceId } from "../../../utils/api";
-import { apiRequest } from "../../../utils/request";
-import { requireUser } from "../../../utils/auth";
-import { requireWorkspace, requireCanvas } from "../../../utils/access";
-import { meta } from "../../../utils/snapshots";
-import { fail, json, body, name, validRevision } from "../../../utils/http";
+import { createCanvas } from "#server/db/canvases";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { requireWorkspace, requireCanvas } from "#server/utils/access";
+import { meta } from "#server/utils/snapshots";
+import { fail, json, body, name, validRevision } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);

@@ -1,4 +1,9 @@
-import { canonical, mergeElements, reject, validateElement } from "./merge";
+import {
+  canonical,
+  mergeElements,
+  reject,
+  validateElement,
+} from "#shared/collaboration/merge";
 import {
   MAX_OPERATION_BYTES,
   MAX_SCENE_BYTES,
@@ -12,11 +17,15 @@ import {
   type Principal,
   type RoomState,
   type SharedScene,
-} from "./types";
-import { validateGrant } from "./state";
+} from "#shared/collaboration/types";
+import { validateGrant } from "#shared/collaboration/state";
 
-export { createRoom, validateGrant } from "./state";
-import { exportRoom, importRoom, type RoomBackup } from "./backup";
+export { createRoom, validateGrant } from "#shared/collaboration/state";
+import {
+  exportRoom,
+  importRoom,
+  type RoomBackup,
+} from "#shared/collaboration/backup";
 
 export function authorize(
   room: RoomState,

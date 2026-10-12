@@ -9,6 +9,8 @@
     "run_worker_first": true,
   },
   "main": "server/worker.mjs",
+  // The Worker wrapper and Durable Object are bundled outside Nuxt by Wrangler.
+  "tsconfig": ".nuxt/tsconfig.server.json",
   "durable_objects": {
     "bindings": [{ "name": "CANVAS_ROOMS", "class_name": "CanvasRoom" }],
   },

@@ -1,4 +1,4 @@
-import type { CanvasScene } from "../contracts";
+import type { CanvasScene } from "#shared/contracts";
 
 export const PROTOCOL_VERSION = 1;
 

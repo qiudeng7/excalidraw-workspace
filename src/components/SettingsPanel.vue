@@ -7,8 +7,8 @@ import {
   ref,
   useId,
 } from "vue";
-import type { User, UserSettings } from "../../shared/contracts";
-import type { UserSettingsResource } from "../lib/userSettings";
+import type { User, UserSettings } from "#shared/contracts";
+import type { UserSettingsResource } from "~/lib/userSettings";
 import {
   featureControls,
   renderingControls,
@@ -16,12 +16,12 @@ import {
   defaultRenderingOptions,
   readLegacySampling,
   readLegacyRenderingOptions,
-} from "../lib/settingsControls";
-import QuietIcon from "./QuietIcon.vue";
-import ThemeSwitcher from "./ThemeSwitcher.vue";
-import AccountPasswordForm from "./AccountPasswordForm.vue";
-import ReleaseNotes from "./ReleaseNotes.vue";
-import { currentRelease } from "../data/releases";
+} from "~/lib/settingsControls";
+import QuietIcon from "~/components/QuietIcon.vue";
+import ThemeSwitcher from "~/components/ThemeSwitcher.vue";
+import AccountPasswordForm from "~/components/AccountPasswordForm.vue";
+import ReleaseNotes from "~/components/ReleaseNotes.vue";
+import { currentRelease } from "~/data/releases";
 
 const props = defineProps<{
   resource: UserSettingsResource;

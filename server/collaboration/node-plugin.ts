@@ -1,5 +1,5 @@
-import { collectNodeRoomOrphans } from "./node-cleanup";
-import { repairNodeProjections } from "./node-projection";
+import { collectNodeRoomOrphans } from "#server/collaboration/node-cleanup";
+import { repairNodeProjections } from "#server/collaboration/node-projection";
 
 export default defineNitroPlugin((nitro) => {
   let running = false;

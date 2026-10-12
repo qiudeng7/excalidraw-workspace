@@ -1,10 +1,10 @@
-import { snapshotValidator } from "../../shared/snapshotValidator";
-import { library } from "../db/snapshots";
-import { defineApiHandler } from "../utils/api";
-import { apiRequest } from "../utils/request";
-import { requireUser } from "../utils/auth";
-import { readSnapshot } from "../utils/snapshots";
-import { ApiError, fail, json, assertOwner } from "../utils/http";
+import { snapshotValidator } from "#shared/snapshotValidator";
+import { library } from "#server/db/snapshots";
+import { defineApiHandler } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { readSnapshot } from "#server/utils/snapshots";
+import { ApiError, fail, json, assertOwner } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
   const req = apiRequest(event);

@@ -1,4 +1,4 @@
-import { collectOrphans } from "../../utils/cleanup";
+import { collectOrphans } from "#server/utils/cleanup";
 
 export default defineTask({
   meta: { description: "Reclaim unreferenced snapshots older than 24 hours" },

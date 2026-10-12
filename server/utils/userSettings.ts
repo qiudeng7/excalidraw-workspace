@@ -1,7 +1,7 @@
 import {
   createDefaultUserSettings,
   type UserSettings,
-} from "../../shared/contracts";
+} from "#shared/contracts";
 
 type UserSettingsWrite = Omit<UserSettings, "features"> & {
   features: Omit<

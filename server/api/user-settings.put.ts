@@ -1,14 +1,20 @@
-import { saveUserSettings, userSettings } from "../db/user-settings";
-import { defineApiHandler } from "../utils/api";
-import { apiRequest } from "../utils/request";
-import { requireUser } from "../utils/auth";
-import { fail, json, body, validRevision, assertOwner } from "../utils/http";
+import { saveUserSettings, userSettings } from "#server/db/user-settings";
+import { defineApiHandler } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import {
+  fail,
+  json,
+  body,
+  validRevision,
+  assertOwner,
+} from "#server/utils/http";
 import {
   completeUserSettingsWrite,
   readStoredUserSettings,
   validateUserSettings,
   validateUserSettingsWrite,
-} from "../utils/userSettings";
+} from "#server/utils/userSettings";
 
 export default defineApiHandler(async (event) => {
   const req = apiRequest(event);

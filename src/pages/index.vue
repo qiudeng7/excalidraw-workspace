@@ -1,36 +1,36 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
-import AccountGate from "../components/AccountGate.vue";
-import QuietIcon from "../components/QuietIcon.vue";
-import ReleaseAnnouncement from "../components/ReleaseAnnouncement.vue";
-import { useReleaseAnnouncement } from "../composables/useReleaseAnnouncement";
+import AccountGate from "~/components/AccountGate.vue";
+import QuietIcon from "~/components/QuietIcon.vue";
+import ReleaseAnnouncement from "~/components/ReleaseAnnouncement.vue";
+import { useReleaseAnnouncement } from "~/composables/useReleaseAnnouncement";
 import {
   flushCollaboration,
   closeCollaboration,
-} from "../lib/collaboration/session";
-import { api } from "../lib/api";
-import { accountApi } from "../lib/accountApi";
-import type { CanvasResource } from "../lib/canvasResources";
-import { workspaceApi } from "../lib/workspaceApi";
-import { cancelAppDialog, confirmDialog, promptDialog } from "../lib/dialogs";
-import type { EditorHandle } from "../lib/editor";
-import { useOperation } from "../composables/useOperation";
+} from "~/lib/collaboration/session";
+import { api } from "~/lib/api";
+import { accountApi } from "~/lib/accountApi";
+import type { CanvasResource } from "~/lib/canvasResources";
+import { workspaceApi } from "~/lib/workspaceApi";
+import { cancelAppDialog, confirmDialog, promptDialog } from "~/lib/dialogs";
+import type { EditorHandle } from "~/lib/editor";
+import { useOperation } from "~/composables/useOperation";
 import {
   useAccountSession,
   type AccountSessionController,
-} from "../composables/useAccountSession";
-import { useCanvasDocument } from "../composables/useCanvasDocument";
-import { useWorkspaceNavigation } from "../composables/useWorkspaceNavigation";
+} from "~/composables/useAccountSession";
+import { useCanvasDocument } from "~/composables/useCanvasDocument";
+import { useWorkspaceNavigation } from "~/composables/useWorkspaceNavigation";
 import {
   useWorkspaceDirectory,
   type WorkspaceDirectoryController,
-} from "../composables/useWorkspaceDirectory";
-import { useWorkspacePicker } from "../composables/useWorkspacePicker";
+} from "~/composables/useWorkspaceDirectory";
+import { useWorkspacePicker } from "~/composables/useWorkspacePicker";
 import {
   useCanvasReorder,
   type CanvasReorderController,
-} from "../composables/useCanvasReorder";
+} from "~/composables/useCanvasReorder";
 
 const editor = ref<EditorHandle>();
 const saveBarrier = {

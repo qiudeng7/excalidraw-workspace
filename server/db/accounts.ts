@@ -1,7 +1,7 @@
 import { db } from "@nuxthub/db";
 import { and, eq, ne, exists, sql } from "drizzle-orm";
-import * as tables from "./schema";
-import type { User } from "../../shared/contracts";
+import * as tables from "#server/db/schema";
+import type { User } from "#shared/contracts";
 
 const userColumns = {
   id: tables.users.id,

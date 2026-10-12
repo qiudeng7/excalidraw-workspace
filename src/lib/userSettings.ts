@@ -1,10 +1,10 @@
 import { reactive, readonly } from "vue";
-import { api, ApiError } from "./api";
+import { api, ApiError } from "~/lib/api";
 import {
   createDefaultUserSettings,
   type UserSettings,
   type UserSettingsDocument,
-} from "../../shared/contracts";
+} from "#shared/contracts";
 
 export type UserSettingsStatus =
   | "loading"

@@ -1,8 +1,8 @@
-import { navigation } from "../db/navigation";
-import { defineApiHandler } from "../utils/api";
-import { requireUser } from "../utils/auth";
-import { apiRequest } from "../utils/request";
-import { json, assertOwner } from "../utils/http";
+import { navigation } from "#server/db/navigation";
+import { defineApiHandler } from "#server/utils/api";
+import { requireUser } from "#server/utils/auth";
+import { apiRequest } from "#server/utils/request";
+import { json, assertOwner } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
   const user = await requireUser(event);

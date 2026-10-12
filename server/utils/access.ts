@@ -1,7 +1,7 @@
-import type { User } from "../../shared/contracts";
-import { canvas } from "../db/canvases";
-import { workspace } from "../db/workspaces";
-import { fail } from "./http";
+import type { User } from "#shared/contracts";
+import { canvas } from "#server/db/canvases";
+import { workspace } from "#server/db/workspaces";
+import { fail } from "#server/utils/http";
 
 export async function requireWorkspace(id: string, user: User) {
   return (

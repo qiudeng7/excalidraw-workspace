@@ -8,7 +8,7 @@ import {
   useId,
   watch,
 } from "vue";
-import type { ThemePreference } from "../composables/useTheme";
+import type { ThemePreference } from "~/composables/useTheme";
 
 const { preference, setPreference } = useTheme();
 const options: { value: ThemePreference; label: string; icon: string }[] = [

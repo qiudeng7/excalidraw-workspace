@@ -1,7 +1,7 @@
 import { shallowReadonly, ref, type Ref } from "vue";
-import type { Navigation } from "../../shared/contracts";
-import { ApiError } from "../lib/api";
-import type { WorkspaceApi } from "../lib/workspaceApi";
+import type { Navigation } from "#shared/contracts";
+import { ApiError } from "~/lib/api";
+import type { WorkspaceApi } from "~/lib/workspaceApi";
 
 export interface NavigationController {
   navigation: Readonly<Ref<Navigation | undefined>>;

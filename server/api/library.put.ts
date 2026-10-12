@@ -1,9 +1,9 @@
-import { library } from "../db/snapshots";
-import { defineApiHandler } from "../utils/api";
-import { apiRequest } from "../utils/request";
-import { requireUser } from "../utils/auth";
-import { saveSnapshot } from "../utils/snapshots";
-import { fail, json, body, assertOwner } from "../utils/http";
+import { library } from "#server/db/snapshots";
+import { defineApiHandler } from "#server/utils/api";
+import { apiRequest } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { saveSnapshot } from "#server/utils/snapshots";
+import { fail, json, body, assertOwner } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
   const req = apiRequest(event);

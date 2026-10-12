@@ -1,11 +1,11 @@
 import { db } from "@nuxthub/db";
 import { eq } from "drizzle-orm";
-import { canvases, sharedCanvases } from "../db/schema";
-import { defineApiHandler } from "../utils/api";
-import { requireUser } from "../utils/auth";
-import { ApiError, json } from "../utils/http";
-import { canvasCommand } from "../collaboration/service";
-import type { CanvasView } from "../../shared/collaboration/types";
+import { canvases, sharedCanvases } from "#server/db/schema";
+import { defineApiHandler } from "#server/utils/api";
+import { requireUser } from "#server/utils/auth";
+import { ApiError, json } from "#server/utils/http";
+import { canvasCommand } from "#server/collaboration/service";
+import type { CanvasView } from "#shared/collaboration/types";
 
 export default defineApiHandler(async (event) => {
   const user = await requireUser(event);

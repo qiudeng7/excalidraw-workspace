@@ -1,5 +1,5 @@
 import { getRequestURL, toWebRequest, type H3Event } from "h3";
-import { clientIp, publicOrigin } from "./security";
+import { clientIp, publicOrigin } from "#server/utils/security";
 
 declare module "h3" {
   interface H3EventContext {

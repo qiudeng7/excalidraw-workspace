@@ -1,6 +1,6 @@
-import { administrator, registration } from "../db/accounts";
-import { defineApiHandler } from "../utils/api";
-import { json } from "../utils/http";
+import { administrator, registration } from "#server/db/accounts";
+import { defineApiHandler } from "#server/utils/api";
+import { json } from "#server/utils/http";
 
 export default defineApiHandler(
   async (event) => {

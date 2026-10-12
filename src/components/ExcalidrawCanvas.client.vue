@@ -11,7 +11,7 @@ import {
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import "../assets/editor-layout.css";
+import "~/assets/editor-layout.css";
 import type {
   AppState,
   ExcalidrawProps,
@@ -22,12 +22,12 @@ import type {
   CanvasDocument,
   CanvasScene,
   UserSettings,
-} from "../../shared/contracts";
-import type { SaveResource } from "../lib/persistence";
-import type { CanvasResource, CanvasResources } from "../lib/canvasResources";
-import type { EditorHandle } from "../lib/editor";
-import type { UserSettingsStatus } from "../lib/userSettings";
-import { confirmDialog, isAppDialogOpen } from "../lib/dialogs";
+} from "#shared/contracts";
+import type { SaveResource } from "~/lib/persistence";
+import type { CanvasResource, CanvasResources } from "~/lib/canvasResources";
+import type { EditorHandle } from "~/lib/editor";
+import type { UserSettingsStatus } from "~/lib/userSettings";
+import { confirmDialog, isAppDialogOpen } from "~/lib/dialogs";
 
 const props = defineProps<{
   document: CanvasDocument;

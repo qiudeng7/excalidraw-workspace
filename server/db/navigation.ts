@@ -1,7 +1,7 @@
 import { db } from "@nuxthub/db";
 import { and, asc, eq, exists, getTableColumns, sql } from "drizzle-orm";
-import * as tables from "./schema";
-import type { Navigation } from "../../shared/contracts";
+import * as tables from "#server/db/schema";
+import type { Navigation } from "#shared/contracts";
 
 export async function navigation(user: string): Promise<Navigation> {
   const { userId: _user, ...columns } = getTableColumns(tables.userNavigation);

@@ -1,9 +1,12 @@
 import { blob } from "@nuxthub/blob";
 import { db } from "@nuxthub/db";
 import { asc, gt } from "drizzle-orm";
-import { collaborationRooms } from "../db/schema";
-import type { RoomState } from "../../shared/collaboration/types";
-import { referencedRoomObjects, ROOM_OBJECT_GRACE } from "./garbage-collection";
+import { collaborationRooms } from "#server/db/schema";
+import type { RoomState } from "#shared/collaboration/types";
+import {
+  referencedRoomObjects,
+  ROOM_OBJECT_GRACE,
+} from "#server/collaboration/garbage-collection";
 
 export async function collectNodeRoomOrphans(now = Date.now()) {
   let after = "";

@@ -21,22 +21,22 @@ import {
 } from "@excalidraw/excalidraw";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import "@excalidraw/excalidraw/index.css";
-import "../assets/editor-layout.css";
+import "~/assets/editor-layout.css";
 import type {
   ExcalidrawImperativeAPI,
   ExcalidrawProps,
   ExcalidrawInitialDataState,
 } from "@excalidraw/excalidraw/types";
-import type { Operation } from "../../shared/collaboration/types";
+import type { Operation } from "#shared/collaboration/types";
 import {
   createDefaultUserSettings,
   type CanvasDocument,
   type CanvasScene,
   type UserSettings,
-} from "../../shared/contracts";
-import { collaborationSession } from "../lib/collaboration/session";
-import type { CanvasResources } from "../lib/canvasResources";
-import type { EditorHandle } from "../lib/editor";
+} from "#shared/contracts";
+import { collaborationSession } from "~/lib/collaboration/session";
+import type { CanvasResources } from "~/lib/canvasResources";
+import type { EditorHandle } from "~/lib/editor";
 
 const props = defineProps<{
   canvasId: string;

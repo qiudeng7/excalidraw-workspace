@@ -1,5 +1,5 @@
-import type { Bootstrap, User } from "../../shared/contracts";
-import { api } from "./api";
+import type { Bootstrap, User } from "#shared/contracts";
+import { api } from "~/lib/api";
 
 export interface Credentials {
   email: string;

@@ -1,22 +1,16 @@
 import { blob } from "@nuxthub/blob";
-import { defineApiHandler, resourceId } from "../../../../utils/api";
-import { body, json, fail, ApiError } from "../../../../utils/http";
-import { apiRequest } from "../../../../utils/request";
-import {
-  canvasCommand,
-  projectMember,
-} from "../../../../collaboration/service";
-import {
-  importRoom,
-  type RoomBackup,
-} from "../../../../../shared/collaboration/backup";
-import { referencedRoomObjects } from "../../../../collaboration/garbage-collection";
+import { defineApiHandler, resourceId } from "#server/utils/api";
+import { body, json, fail, ApiError } from "#server/utils/http";
+import { apiRequest } from "#server/utils/request";
+import { canvasCommand, projectMember } from "#server/collaboration/service";
+import { importRoom, type RoomBackup } from "#shared/collaboration/backup";
+import { referencedRoomObjects } from "#server/collaboration/garbage-collection";
 import {
   canonical,
   CollaborationError,
   validateElement,
-} from "../../../../../shared/collaboration/merge";
-import type { SharedScene } from "../../../../../shared/collaboration/types";
+} from "#shared/collaboration/merge";
+import type { SharedScene } from "#shared/collaboration/types";
 
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);

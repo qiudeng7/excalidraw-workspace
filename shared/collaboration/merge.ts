@@ -1,4 +1,4 @@
-import type { Element, SharedScene } from "./types";
+import type { Element, SharedScene } from "#shared/collaboration/types";
 import {
   shouldDiscardRemoteElement,
   reconcileElementVersions,

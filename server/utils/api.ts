@@ -4,9 +4,9 @@ import {
   sendWebResponse,
   type H3Event,
 } from "h3";
-import { apiRequest, requestOrigin } from "./request";
-import { requireUser } from "./auth";
-import { ApiError, assertOrigin, fail, json } from "./http";
+import { apiRequest, requestOrigin } from "#server/utils/request";
+import { requireUser } from "#server/utils/auth";
+import { ApiError, assertOrigin, fail, json } from "#server/utils/http";
 
 /** Retain the existing JSON error contract and default authentication for API routes. */
 export function defineApiHandler(

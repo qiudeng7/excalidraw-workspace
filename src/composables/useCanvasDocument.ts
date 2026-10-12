@@ -3,10 +3,10 @@ import type {
   CanvasDocument,
   CanvasMeta,
   LibraryDocument,
-} from "../../shared/contracts";
-import type { WorkspaceApi } from "../lib/workspaceApi";
-import { CanvasResources, type CanvasResource } from "../lib/canvasResources";
-import { ApiError } from "../lib/api";
+} from "#shared/contracts";
+import type { WorkspaceApi } from "~/lib/workspaceApi";
+import { CanvasResources, type CanvasResource } from "~/lib/canvasResources";
+import { ApiError } from "~/lib/api";
 
 export interface CanvasDocumentController {
   document: Readonly<Ref<CanvasDocument | undefined>>;
