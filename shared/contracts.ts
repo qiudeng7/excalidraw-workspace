@@ -78,6 +78,7 @@ export interface UserSettings {
     formalLines: boolean;
     solidFill: boolean;
     shortArrowheads: boolean;
+    disableDefaultSidebar: boolean;
   };
   debug: {
     sampling: 1 | 1.5 | 2;
@@ -107,6 +108,7 @@ export function createDefaultUserSettings(): UserSettings {
       formalLines: true,
       solidFill: true,
       shortArrowheads: true,
+      disableDefaultSidebar: true,
     },
     debug: {
       sampling: 1,

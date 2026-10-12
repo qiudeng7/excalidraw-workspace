@@ -350,6 +350,9 @@ function CanvasEditor() {
     canvasRenderingOptions: props.userSettings.debug.renderingOptions,
     arrowBindingOptimization: props.userSettings.features.edgeBinding,
     shortArrowheads: props.userSettings.features.shortArrowheads,
+    UIOptions: {
+      defaultSidebar: !props.userSettings.features.disableDefaultSidebar,
+    },
     langCode: "zh-CN",
     theme: theme.value,
     onThemeChange: setPreference,

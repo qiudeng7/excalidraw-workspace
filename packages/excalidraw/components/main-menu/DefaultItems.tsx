@@ -177,6 +177,9 @@ CommandPalette.displayName = "CommandPalette";
 export const SearchMenu = (opts?: { className?: string }) => {
   const { t } = useI18n();
   const actionManager = useExcalidrawActionManager();
+  const { UIOptions } = useAppProps();
+
+  if (UIOptions.defaultSidebar === false) return null;
 
   return (
     <DropdownMenuItem

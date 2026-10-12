@@ -1151,6 +1151,8 @@ export type CanvasActions = Partial<{
 }>;
 
 export type UIOptions = Partial<{
+  /** Enable the built-in library/search sidebar and its entry points. Defaults to true. */
+  defaultSidebar: boolean;
   dockedSidebarBreakpoint: number;
   canvasActions: CanvasActions;
   tools: {

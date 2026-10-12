@@ -24,6 +24,11 @@ export interface FlagsMenuProps {
 }
 const features: [keyof UserSettings["features"], string, string][] = [
   [
+    "disableDefaultSidebar",
+    "关闭excalidraw默认侧边栏",
+    "开启后关闭 Excalidraw 自带的右侧素材库与查找侧边栏及其入口；关闭此开关可恢复使用。",
+  ],
+  [
     "edgeBinding",
     "连线交互优化",
     "普通箭头指向元素内部或边缘时，默认连接到轮廓，避免遮挡内容；拖拽未松手时按住 Ctrl 可连接到内部，松开 Ctrl 恢复轮廓连接。Alt / ⌘ 保留原行为。折线箭头及重叠等特殊几何沿用原规则。",

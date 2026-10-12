@@ -432,6 +432,7 @@ function CommandPaletteInner({
           category: DEFAULT_CATEGORIES.app,
           icon: LibraryIcon,
           viewMode: false,
+          predicate: appProps.UIOptions.defaultSidebar !== false,
           perform: () => {
             if (uiAppState.openSidebar) {
               setAppState({
@@ -452,6 +453,7 @@ function CommandPaletteInner({
           category: DEFAULT_CATEGORIES.app,
           icon: searchIcon,
           viewMode: true,
+          predicate: appProps.UIOptions.defaultSidebar !== false,
           perform: () => {
             actionManager.executeAction(actionToggleSearchMenu);
           },

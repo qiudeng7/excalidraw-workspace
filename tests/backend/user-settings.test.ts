@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
+import { sql } from "drizzle-orm";
 import { nodeStorage } from "./storage";
 import { handleApi } from "./api";
 import { createDefaultUserSettings } from "../../shared/contracts";
@@ -72,6 +73,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
     const settings = createDefaultUserSettings();
     const original = { settings, revision: 0, configured: false };
 
+    assert.equal(settings.features.disableDefaultSidebar, true);
     assert.deepEqual(
       (await request("/user-settings", "GET", undefined, alice.cookie)).body,
       original,
@@ -120,6 +122,10 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
       { ...settings, extra: true },
       { ...settings, version: 2 },
       { ...settings, features: { ...settings.features, edgeBinding: 1 } },
+      {
+        ...settings,
+        features: { ...settings.features, disableDefaultSidebar: "true" },
+      },
       { ...settings, debug: { ...settings.debug, sampling: 3 } },
       {
         ...settings,
@@ -245,6 +251,40 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
 
     assert.equal(catalog.catalogRevision, 0);
     assert.equal(catalog.canvases[0].revision, 0);
+
+    // Existing v1 rows retain their preferences and CAS revision when the new flag is read.
+    const legacy = structuredClone(next) as any;
+
+    delete legacy.features.disableDefaultSidebar;
+    legacy.features.nunitoFont = false;
+    await storage.database.run(
+      sql`UPDATE user_settings SET settings_json = ${JSON.stringify(legacy)} WHERE user_id = ${alice.body.user.id}`,
+    );
+    const upgraded = (
+      await request("/user-settings", "GET", undefined, alice.cookie)
+    ).body;
+
+    assert.equal(upgraded.revision, 2);
+    assert.equal(upgraded.configured, true);
+    assert.deepEqual(upgraded.settings, {
+      ...legacy,
+      features: { ...legacy.features, disableDefaultSidebar: true },
+    });
+    upgraded.settings.features.disableDefaultSidebar = false;
+    const toggled = await request(
+      "/user-settings",
+      "PUT",
+      { settings: upgraded.settings, revision: upgraded.revision },
+      alice.cookie,
+    );
+
+    assert.equal(toggled.status, 200);
+    assert.equal(toggled.body.revision, 3);
+    assert.equal(toggled.body.settings.features.disableDefaultSidebar, false);
+    assert.deepEqual(
+      (await request("/user-settings", "GET", undefined, alice.cookie)).body,
+      toggled.body,
+    );
   } finally {
     await close!();
     await rm(directory, { recursive: true, force: true });

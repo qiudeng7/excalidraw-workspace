@@ -25,6 +25,7 @@ export function validateUserSettings(value: unknown): value is UserSettings {
       "formalLines",
       "solidFill",
       "shortArrowheads",
+      "disableDefaultSidebar",
     ])
   )
     return false;
@@ -43,4 +44,25 @@ export function validateUserSettings(value: unknown): value is UserSettings {
     "alignPixels",
     "smoothCanvas",
   ]);
+}
+
+/** Upgrade saved v1 settings without resetting existing preferences or revisions. */
+export function readStoredUserSettings(value: unknown): UserSettings | null {
+  if (value && typeof value === "object" && "features" in value) {
+    const features = value.features;
+
+    if (
+      features &&
+      typeof features === "object" &&
+      !Array.isArray(features) &&
+      !Object.hasOwn(features, "disableDefaultSidebar")
+    ) {
+      value = {
+        ...value,
+        features: { ...features, disableDefaultSidebar: true },
+      };
+    }
+  }
+
+  return validateUserSettings(value) ? value : null;
 }

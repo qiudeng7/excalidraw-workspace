@@ -3,7 +3,7 @@ import { defineApiHandler } from "../utils/api";
 import { apiRequest } from "../utils/request";
 import { requireUser } from "../utils/auth";
 import { json, assertOwner } from "../utils/http";
-import { validateUserSettings } from "../utils/userSettings";
+import { readStoredUserSettings } from "../utils/userSettings";
 import { createDefaultUserSettings } from "../../shared/contracts";
 
 export default defineApiHandler(async (event) => {
@@ -20,10 +20,9 @@ export default defineApiHandler(async (event) => {
       revision: 0,
       configured: false,
     });
-  const settings: unknown = JSON.parse(row.settingsJson);
+  const settings = readStoredUserSettings(JSON.parse(row.settingsJson));
 
-  if (!validateUserSettings(settings))
-    throw new Error("Invalid stored user settings");
+  if (!settings) throw new Error("Invalid stored user settings");
 
   return json({ settings, revision: row.revision, configured: true });
 });

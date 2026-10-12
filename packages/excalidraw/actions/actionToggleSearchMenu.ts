@@ -23,7 +23,7 @@ export const actionToggleSearchMenu = register({
     predicate: (appState) => appState.gridModeEnabled,
   },
   perform(elements, appState, _, app) {
-    if (appState.openDialog) {
+    if (appState.openDialog || app.props.UIOptions.defaultSidebar === false) {
       return false;
     }
 
@@ -53,7 +53,10 @@ export const actionToggleSearchMenu = register({
   },
   checked: (appState) => appState.gridModeEnabled,
   predicate: (element, appState, props) => {
-    return props.gridModeEnabled === undefined;
+    return (
+      props.gridModeEnabled === undefined &&
+      props.UIOptions?.defaultSidebar !== false
+    );
   },
   keyTest: (event) => event[KEYS.CTRL_OR_CMD] && event.key === KEYS.F,
 });

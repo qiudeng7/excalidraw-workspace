@@ -28,6 +28,7 @@ import {
   APP_NAME,
   CURSOR_TYPE,
   DEFAULT_STROKE_STREAMLINE,
+  DEFAULT_SIDEBAR,
   DEFAULT_STROKE_STREAMLINE_PRECISE,
   DEFAULT_TRANSFORM_HANDLE_SPACING,
   DEFAULT_VERTICAL_ALIGN,
@@ -4572,6 +4573,13 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   componentDidUpdate(prevProps: AppProps, prevState: AppState) {
+    if (
+      this.props.UIOptions.defaultSidebar === false &&
+      this.state.openSidebar?.name === DEFAULT_SIDEBAR.name
+    ) {
+      this.setState({ openSidebar: null, searchMatches: null });
+    }
+
     this.scene.arrowBindingOptimization = !!this.props.arrowBindingOptimization;
     if (
       prevProps.shortArrowheads !== this.props.shortArrowheads ||
@@ -5889,6 +5897,13 @@ class App extends React.Component<AppProps, AppState> {
     tab?: SidebarTabName;
     force?: boolean;
   }): boolean => {
+    if (
+      name === DEFAULT_SIDEBAR.name &&
+      this.props.UIOptions.defaultSidebar === false
+    ) {
+      return false;
+    }
+
     let nextName;
 
     if (force === undefined) {
