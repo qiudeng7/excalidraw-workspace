@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 import { createElement, Fragment } from "react";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import { createRoot, type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
 import {
   Excalidraw,
   FONT_FAMILY,
@@ -11,6 +12,7 @@ import {
 } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
 import type {
+  AppState,
   ExcalidrawProps,
   ExcalidrawInitialDataState,
   ExcalidrawImperativeAPI,
@@ -18,26 +20,28 @@ import type {
 import type {
   CanvasDocument,
   CanvasScene,
-  LibraryDocument,
   UserSettings,
 } from "../../shared/contracts";
-import { PersistentResource, type SaveResource } from "../lib/persistence";
+import type { SaveResource } from "../lib/persistence";
+import type { CanvasResource, CanvasResources } from "../lib/canvasResources";
 import type { EditorHandle } from "../lib/editor";
 import type { UserSettingsStatus } from "../lib/userSettings";
 import { confirmDialog, isAppDialogOpen } from "../lib/dialogs";
 
 const props = defineProps<{
   document: CanvasDocument;
-  library: LibraryDocument;
+  entry: CanvasResource;
+  resources: CanvasResources;
   userId: string;
   userSettings: UserSettings;
   settingsStatus: UserSettingsStatus;
   settingsOpen: boolean;
 }>();
-const emit = defineEmits<{
-  "save-state": [status: string];
+
+defineEmits<{
+  "retry-load": [];
 }>();
-const message = ref("");
+const message = ref(props.entry.message);
 const { theme, preference, setPreference } = useTheme();
 const loading = ref(true);
 const manualSaveMessage = ref("");
@@ -66,7 +70,8 @@ async function saveManually() {
   manualSaving = true;
   manualSaveMessage.value = "正在保存到云端…";
   try {
-    await Promise.all([sceneResource.saveNow(), libraryResource.flush()]);
+    if (syncReadOnly()) throw new Error("画布版本校验完成后才能保存。");
+    await Promise.all([sceneResource.saveNow(), libraryResource().flush()]);
     if (active) manualSaveMessage.value = "已保存到云端";
   } catch (error) {
     if (active) {
@@ -139,40 +144,101 @@ let sceneFingerprint = "";
 let libraryFingerprint = "";
 
 function stateChanged(error?: string) {
-  hasConflict.value = sceneResource.conflict || libraryResource.conflict;
+  hasConflict.value = sceneResource.conflict || libraryResource().conflict;
   if (error) message.value = error;
-  else if (!sceneResource.dirty && !libraryResource.dirty) message.value = "";
-  emit(
-    "save-state",
-    error
-      ? "保存异常"
-      : sceneResource.dirty || libraryResource.dirty
-        ? "待保存…"
-        : "已保存",
-  );
+  else if (!sceneResource.dirty && !libraryResource().dirty) message.value = "";
 }
 
-const sceneResource: SaveResource<CanvasScene> = new PersistentResource({
-  key: `${props.userId}:canvas:${props.document.id}`,
-  path: `/api/canvases/${props.document.id}`,
-  field: "scene",
-  value: props.document.scene,
-  revision: props.document.revision,
-  changed: stateChanged,
-  ownerId: props.userId,
-});
-const libraryResource: SaveResource<unknown[]> = new PersistentResource({
-  key: `${props.userId}:library`,
-  path: "/api/library",
-  field: "items",
-  value: props.library.items,
-  revision: props.library.revision,
-  changed: stateChanged,
-  ownerId: props.userId,
-});
+const sceneResource: SaveResource<CanvasScene> = props.entry.resource;
+const emptyLibrary: SaveResource<unknown[]> = {
+  value: [],
+  revision: 0,
+  dirty: false,
+  conflict: false,
+  isSaving: false,
+  hasUnconfirmedSave: false,
+  restore: async () => {},
+  checkpoint: async () => {},
+  settle: async () => {},
+  pauseAutosave: () => {},
+  resumeAutosave: () => {},
+  update: () => {},
+  schedule: () => {},
+  flush: async () => {},
+  saveNow: async () => {},
+  findOtherDrafts: async () => [],
+  discardDraft: async () => {},
+  dispose: () => {},
+};
+const libraryResource = () => props.resources.library ?? emptyLibrary;
+// Manager status can change before Vue delivers the next document prop. Keep
+// React and input guards locked until the wrapper explicitly commits the handoff.
+let renderedReadOnly = props.entry.status !== "ready";
+const syncReadOnly = () => props.entry.status !== "ready" || renderedReadOnly;
+let userViewMode =
+  props.entry.editorContext?.viewModeEnabled ??
+  !!props.document.scene.appState.viewModeEnabled;
+let restoringContext = false;
+let injectedLibrary = false;
+
+let injectingLibrary: Promise<void> | undefined;
+
+async function ensureLibrary() {
+  if (props.userSettings.features.disableDefaultSidebar) return;
+  try {
+    await props.resources.ensureLibrary();
+  } catch (error) {
+    if (active)
+      message.value = `素材库加载失败：${error instanceof Error ? error.message : "未知错误"}`;
+
+    return;
+  }
+
+  if (
+    !active ||
+    !editorApi ||
+    syncReadOnly() ||
+    props.resources.libraryStatus !== "ready" ||
+    injectedLibrary
+  )
+    return;
+  if (injectingLibrary) return injectingLibrary;
+  const editor = editorApi;
+
+  root?.render(createElement(CanvasEditor));
+  // Inject after React receives libraryReady. All hydration callbacks are ignored until it settles.
+  injectingLibrary = (async () => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+    if (
+      !active ||
+      editorApi !== editor ||
+      syncReadOnly() ||
+      props.userSettings.features.disableDefaultSidebar
+    )
+      return;
+    const items = await editor.updateLibrary({
+      libraryItems: libraryResource().value as never,
+      merge: false,
+    });
+
+    if (!active || editorApi !== editor) return;
+    libraryFingerprint = JSON.stringify(items);
+    injectedLibrary = true;
+  })()
+    .catch((error) => {
+      message.value = `素材库显示失败：${error instanceof Error ? error.message : "未知错误"}`;
+    })
+    .finally(() => {
+      injectingLibrary = undefined;
+    });
+
+  return injectingLibrary;
+}
 
 async function flush() {
-  await Promise.all([sceneResource.flush(), libraryResource.flush()]);
+  await Promise.all([sceneResource.flush(), libraryResource().flush()]);
 }
 
 async function retry() {
@@ -198,7 +264,7 @@ async function loadCloudVersion() {
   try {
     // Keep a non-conflicting resource's pending draft intact across the reload.
     if (sceneResource.conflict) await sceneResource.discardDraft();
-    if (libraryResource.conflict) await libraryResource.discardDraft();
+    if (libraryResource().conflict) await libraryResource().discardDraft();
     window.location.reload();
   } catch (error) {
     message.value = `无法清理本地草稿，请保留备份后重试：${error instanceof Error ? error.message : "未知错误"}`;
@@ -206,31 +272,19 @@ async function loadCloudVersion() {
 }
 
 function downloadBackup() {
-  const scene = sceneResource.value;
-  const blobs = [
-    {
-      name: `${props.document.name}.excalidraw`,
-      data: {
-        type: "excalidraw",
-        version: 2,
-        source: location.origin,
-        ...scene,
-      },
-    },
-    {
-      name: "素材库.excalidrawlib",
-      data: {
-        type: "excalidrawlib",
-        version: 2,
-        source: location.origin,
-        libraryItems: libraryResource.value,
-      },
-    },
-  ];
-
-  for (const file of blobs) {
-    downloadJson(file.name, file.data);
-  }
+  downloadJson(`${props.document.name}.excalidraw`, {
+    type: "excalidraw",
+    version: 2,
+    source: location.origin,
+    ...sceneResource.value,
+  });
+  if (props.resources.library)
+    downloadJson("素材库.excalidrawlib", {
+      type: "excalidrawlib",
+      version: 2,
+      source: location.origin,
+      libraryItems: props.resources.library.value,
+    });
 }
 
 const snapshot: NonNullable<ExcalidrawProps["onChange"]> = (
@@ -239,6 +293,21 @@ const snapshot: NonNullable<ExcalidrawProps["onChange"]> = (
   files,
 ) => {
   if (!active) return;
+  if (
+    appState.openSidebar?.name === "default" &&
+    (!appState.openSidebar.tab || appState.openSidebar.tab === "library") &&
+    props.resources.libraryStatus === "unloaded"
+  )
+    void ensureLibrary();
+  if (syncReadOnly()) return;
+  if (!restoringContext) {
+    userViewMode = appState.viewModeEnabled;
+    props.entry.editorContext = {
+      viewModeEnabled: userViewMode,
+      activeTool: { ...appState.activeTool },
+    };
+  }
+
   // Upstream's export filter removes transient selections/collaborators and keeps referenced images.
   const serialized = serializeAsJSON(elements, appState, files, "local");
   const fingerprint = serialized;
@@ -256,8 +325,7 @@ const snapshot: NonNullable<ExcalidrawProps["onChange"]> = (
 
 function beforeUnload(event: BeforeUnloadEvent) {
   if (
-    sceneResource.dirty ||
-    libraryResource.dirty ||
+    props.resources.hasDirty() ||
     ["pending", "saving", "error", "conflict"].includes(props.settingsStatus)
   ) {
     event.preventDefault();
@@ -277,7 +345,17 @@ onBeforeRouteLeave(async () => {
     return false;
   }
 });
-defineExpose<EditorHandle>({ flush, saveManually });
+
+function capture() {
+  if (!editorApi || syncReadOnly()) return;
+  snapshot(
+    editorApi.getSceneElements(),
+    editorApi.getAppState(),
+    editorApi.getFiles(),
+  );
+}
+
+defineExpose<EditorHandle>({ capture, flush, saveManually });
 
 const container = useTemplateRef<HTMLDivElement>("container");
 const router = useRouter();
@@ -331,10 +409,60 @@ watch(
   },
 );
 watch(
-  () => [theme.value, preference.value, props.userSettings, props.settingsOpen],
+  () => [theme.value, preference.value, props.settingsOpen, props.document],
   () => {
-    root?.render(createElement(CanvasEditor));
+    stateChanged(props.entry.message || props.resources.libraryMessage);
+    const nextReadOnly = props.entry.status !== "ready";
+    const unlocked = renderedReadOnly && !nextReadOnly;
+    const context = props.entry.editorContext;
+    const restoreViewMode = userViewMode;
+
+    if (unlocked) {
+      restoringContext = true;
+      // Only the already-rendered readonly viewport becomes the new baseline.
+      // Subsequent real content changes continue through snapshot() during restoration.
+      if (editorApi)
+        sceneFingerprint = serializeAsJSON(
+          editorApi.getSceneElements(),
+          editorApi.getAppState(),
+          editorApi.getFiles(),
+          "local",
+        );
+    }
+
+    renderedReadOnly = nextReadOnly;
+    if (unlocked) {
+      // Commit the controlled readonly prop's removal before restoring the user's
+      // uncontrolled mode. A rAF can run before React commits and lose this restore.
+      flushSync(() => root?.render(createElement(CanvasEditor)));
+      if (active && !syncReadOnly() && editorApi) {
+        const editor = editorApi;
+
+        flushSync(() =>
+          editor.updateScene({
+            appState: {
+              viewModeEnabled: restoreViewMode,
+              activeTool: context
+                ? (context.activeTool as AppState["activeTool"])
+                : editor.getAppState().activeTool,
+            },
+          }),
+        );
+      }
+
+      restoringContext = false;
+    } else root?.render(createElement(CanvasEditor));
+    if (
+      props.resources.libraryStatus === "ready" &&
+      !injectedLibrary &&
+      !syncReadOnly()
+    )
+      void ensureLibrary();
   },
+);
+watch(
+  () => props.userSettings,
+  () => root?.render(createElement(CanvasEditor)),
   { deep: true },
 );
 
@@ -343,6 +471,13 @@ function CanvasEditor() {
     // Native modal inertness isolates pointer input; keep editor state intact.
     // Keyboard input stays scoped to the editor, not the teleported settings.
     handleKeyboardGlobally: false,
+    syncReadOnly: syncReadOnly(),
+    viewModeEnabled: syncReadOnly() ? true : undefined,
+    libraryReady:
+      props.resources.libraryStatus === "ready" &&
+      !props.userSettings.features.disableDefaultSidebar,
+    libraryPreview: props.resources.libraryPreview as never,
+    onPaste: () => !syncReadOnly(),
     canvasSampling: props.userSettings.debug.sampling,
     canvasRenderingOptions: props.userSettings.debug.renderingOptions,
     arrowBindingOptimization: props.userSettings.features.edgeBinding,
@@ -396,8 +531,11 @@ function CanvasEditor() {
       appState: {
         ...sceneResource.value.appState,
         ...toolDefaults(),
+        viewModeEnabled: userViewMode,
+        ...(props.entry.editorContext
+          ? { activeTool: props.entry.editorContext.activeTool }
+          : {}),
       },
-      libraryItems: libraryResource.value,
     } as ExcalidrawInitialDataState,
     onInitialize: (editor) => {
       editorApi = editor;
@@ -408,24 +546,32 @@ function CanvasEditor() {
         editor.getFiles(),
         "local",
       );
-      libraryFingerprint = JSON.stringify(libraryResource.value);
+      libraryFingerprint = JSON.stringify(libraryResource().value);
+      injectedLibrary = false;
       active = true;
+      if (props.resources.libraryStatus === "ready") void ensureLibrary();
       if (sceneResource.dirty) sceneResource.schedule();
-      if (libraryResource.dirty) libraryResource.schedule();
+      if (libraryResource().dirty) libraryResource().schedule();
       stateChanged(
-        sceneResource.conflict || libraryResource.conflict
+        sceneResource.conflict || libraryResource().conflict
           ? message.value
           : undefined,
       );
     },
     onChange: snapshot,
     onLibraryChange: (items) => {
-      if (!active) return;
+      if (
+        !active ||
+        !injectedLibrary ||
+        syncReadOnly() ||
+        props.resources.libraryStatus !== "ready"
+      )
+        return;
       const fingerprint = JSON.stringify(items);
 
       if (fingerprint === libraryFingerprint) return;
       libraryFingerprint = fingerprint;
-      libraryResource.update([...items]);
+      libraryResource().update([...items]);
     },
   });
 }
@@ -433,11 +579,11 @@ function CanvasEditor() {
 onMounted(async () => {
   window.addEventListener("beforeunload", beforeUnload);
   window.addEventListener("keydown", saveShortcut, true);
-  await Promise.all([sceneResource.restore(), libraryResource.restore()]);
+
   try {
     const [scenes, libraries] = await Promise.all([
       sceneResource.findOtherDrafts(),
-      libraryResource.findOtherDrafts(),
+      libraryResource().findOtherDrafts(),
     ]);
 
     otherDrafts.value = [
@@ -481,8 +627,7 @@ onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnload);
   window.removeEventListener("keydown", saveShortcut, true);
   clearTimeout(feedbackTimer);
-  sceneResource.dispose();
-  libraryResource.dispose();
+  // Account-level resources keep pending saves alive across canvas switches.
   root?.unmount();
   root = undefined;
   editorApi = undefined;
@@ -498,6 +643,62 @@ onBeforeUnmount(() => {
       :role="manualSaveFailed ? 'alert' : 'status'"
     >
       {{ manualSaveMessage }}
+    </div>
+    <div
+      v-if="entry.status !== 'ready'"
+      class="save-notice"
+      role="status"
+      data-testid="canvas-sync-lock"
+    >
+      <span>{{
+        entry.status === "checking"
+          ? "正在确认最新版本，暂时只读，可平移和缩放。"
+          : entry.status === "conflict"
+            ? "版本冲突，已保留本地草稿。"
+            : "版本校验失败，当前内容只读。"
+      }}</span>
+      <button
+        v-if="entry.status === 'error'"
+        type="button"
+        @click="$emit('retry-load')"
+      >
+        重新校验
+      </button>
+      <button
+        v-if="entry.status === 'conflict'"
+        type="button"
+        @click="downloadBackup"
+      >
+        下载本地备份
+      </button>
+      <button
+        v-if="entry.status === 'conflict'"
+        type="button"
+        @click="loadCloudVersion"
+      >
+        丢弃草稿并加载云端
+      </button>
+    </div>
+    <div
+      v-if="
+        resources.libraryStatus === 'loading' ||
+        resources.libraryStatus === 'error'
+      "
+      class="save-notice"
+      role="status"
+    >
+      <span>{{
+        resources.libraryStatus === "loading"
+          ? "正在加载素材库…"
+          : resources.libraryMessage
+      }}</span>
+      <button
+        v-if="resources.libraryStatus === 'error'"
+        type="button"
+        @click="ensureLibrary"
+      >
+        重试素材库
+      </button>
     </div>
     <div v-if="loading" class="save-notice">正在加载画布与本地草稿…</div>
     <div v-if="message" class="save-notice" role="alert">

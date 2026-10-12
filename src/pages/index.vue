@@ -4,6 +4,7 @@ import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "../components/AccountGate.vue";
 import QuietIcon from "../components/QuietIcon.vue";
 import { accountApi } from "../lib/accountApi";
+import type { CanvasResource } from "../lib/canvasResources";
 import { workspaceApi } from "../lib/workspaceApi";
 import { cancelAppDialog, confirmDialog, promptDialog } from "../lib/dialogs";
 import type { EditorHandle } from "../lib/editor";
@@ -26,8 +27,13 @@ import {
 
 const editor = ref<EditorHandle>();
 const saveBarrier = {
+  checkpoint: async () => {
+    editor.value?.capture();
+    await canvasDocument.checkpoint();
+  },
   flush: async () => {
-    await editor.value?.flush();
+    editor.value?.capture();
+    await canvasDocument.flushAll();
   },
 };
 const settingsOpen = ref(false);
@@ -38,7 +44,10 @@ const saveShortcut = /Mac|iPhone|iPad/.test(navigator.platform)
 // Owner and account callbacks run on mount/actions, after these ports are bound.
 let account: AccountSessionController;
 let directory: WorkspaceDirectoryController;
-const navigationController = useWorkspaceNavigation(workspaceApi);
+const navigationController = useWorkspaceNavigation(
+  workspaceApi,
+  () => account?.user.value?.id,
+);
 const canvasDocument = useCanvasDocument({
   api: workspaceApi,
   ownerId: () => {
@@ -56,6 +65,20 @@ const canvasDocument = useCanvasDocument({
 const reorderSlot = shallowRef<CanvasReorderController>();
 const operation = useOperation(() => !!reorderSlot.value?.drag.value);
 const { busy, error, run } = operation;
+
+async function retryCurrentCanvas() {
+  const id = canvasDocument.document.value?.id;
+
+  if (!id) return;
+  try {
+    await canvasDocument.loadCanvas(id);
+  } catch (error) {
+    operation.reportError(
+      error instanceof Error ? error.message : "画布校验失败",
+    );
+  }
+}
+
 const interactionLocked = computed(
   () => busy.value || !!reorderSlot.value?.drag.value,
 );
@@ -100,7 +123,8 @@ const {
   toggleRegistration,
   flushSettings,
 } = account;
-const { document, library, saveState, setSaveState } = canvasDocument;
+const { document, current, resources, saveState, loadingCanvas } =
+  canvasDocument;
 const {
   workspaces,
   canvases,
@@ -177,7 +201,42 @@ onBeforeRouteLeave(async () => {
     return false;
   }
 });
-onBeforeUnmount(cancelAppDialog);
+
+function downloadResourceBackup(entry: CanvasResource) {
+  const url = URL.createObjectURL(
+    new Blob(
+      [
+        JSON.stringify({
+          type: "excalidraw",
+          version: 2,
+          source: location.origin,
+          ...entry.resource.value,
+        }),
+      ],
+      { type: "application/json" },
+    ),
+  );
+  const link = window.document.createElement("a");
+
+  link.href = url;
+  link.download = `${entry.document.name}-本地草稿.excalidraw`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function protectDrafts(event: BeforeUnloadEvent) {
+  if (resources.value?.hasDirty()) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+}
+
+window.addEventListener("beforeunload", protectDrafts);
+onBeforeUnmount(() => {
+  cancelAppDialog();
+  window.removeEventListener("beforeunload", protectDrafts);
+  canvasDocument.reset();
+});
 </script>
 
 <template>
@@ -231,16 +290,16 @@ onBeforeUnmount(cancelAppDialog);
               <QuietIcon name="more" :size="17" />
             </summary>
             <div class="menu-popover" @click="closeActionMenu">
-              <button :disabled="interactionLocked" @click="createWorkspace">
+              <button :disabled="directoryLocked" @click="createWorkspace">
                 <QuietIcon name="plus" :size="15" />新建工作空间</button
               ><button
-                :disabled="interactionLocked || !workspaceId"
+                :disabled="directoryLocked || !workspaceId"
                 @click="renameWorkspace"
               >
                 <QuietIcon name="edit" :size="15" />重命名</button
               ><button
                 class="danger"
-                :disabled="interactionLocked || !workspaceId"
+                :disabled="directoryLocked || !workspaceId"
                 @click="deleteWorkspace"
               >
                 <QuietIcon name="trash" :size="15" />删除工作空间
@@ -375,12 +434,26 @@ onBeforeUnmount(cancelAppDialog);
           </button>
           <button
             class="canvas-name"
+            :aria-label="canvas.name"
             :title="canvas.name"
             :aria-current="document?.id === canvas.id ? 'page' : undefined"
             :disabled="interactionLocked"
             @click="selectCanvas(canvas.id)"
           >
             <QuietIcon name="canvas" :size="16" /><span>{{ canvas.name }}</span>
+            <small
+              v-if="resources?.canvases.get(canvas.id)?.resource.dirty"
+              :title="
+                resources.canvases.get(canvas.id)?.message || '正在后台保存'
+              "
+              >{{
+                resources.canvases.get(canvas.id)?.resource.conflict
+                  ? "冲突"
+                  : resources.canvases.get(canvas.id)?.message
+                    ? "保存失败"
+                    : "保存中"
+              }}</small
+            >
           </button>
           <details class="action-menu canvas-menu">
             <summary
@@ -455,6 +528,27 @@ onBeforeUnmount(cancelAppDialog);
       </div>
     </aside>
     <div class="draw-content">
+      <div
+        v-for="entry in [...(resources?.canvases.values() ?? [])].filter(
+          (item) =>
+            item.message &&
+            item.resource.dirty &&
+            item.document.id !== document?.id,
+        )"
+        :key="entry.document.id"
+        class="operation-error"
+        role="alert"
+      >
+        <span>{{ entry.document.name }}：{{ entry.message }}</span>
+        <button @click="selectCanvas(entry.document.id)">查看画布</button>
+        <button @click="downloadResourceBackup(entry)">下载本地备份</button>
+        <button
+          v-if="!entry.resource.conflict"
+          @click="run(() => entry.resource.flush())"
+        >
+          重试保存
+        </button>
+      </div>
       <header class="canvas-header">
         <button
           class="sidebar-toggle icon-button"
@@ -546,20 +640,21 @@ onBeforeUnmount(cancelAppDialog);
         >
       </div>
       <div
-        v-if="document && library && settingsResource"
+        v-if="document && current && resources && settingsResource"
         class="draw-editor"
         :inert="busy"
       >
         <ExcalidrawCanvas
-          :key="`${user.id}:${document.id}`"
+          :key="`${user.id}:${document.id}:${current.version}`"
           ref="editor"
           :document="document"
-          :library="library"
+          :entry="current"
+          :resources="resources"
           :user-id="user.id"
           :user-settings="settingsResource.state.settings"
           :settings-status="settingsResource.state.status"
           :settings-open="settingsOpen"
-          @save-state="setSaveState($event)"
+          @retry-load="retryCurrentCanvas"
         />
       </div>
       <div v-else class="loading">

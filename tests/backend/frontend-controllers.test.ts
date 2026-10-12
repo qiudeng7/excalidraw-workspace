@@ -46,18 +46,15 @@ test("HTTP port refuses successful HTML/null responses instead of returning a fo
   }
 });
 
-test("document controller commits scene and library together and captures the owner", async () => {
-  let failLibrary = false;
+test("document controller loads scenes independently of the lazy account library", async () => {
   let loaded = 0;
-  const owners: string[] = [];
+  let libraryReads = 0;
   const document = useCanvasDocument({
     api: {
       readCanvas: async (id) => canvas(id, 0),
-      readLibrary: async (owner) => {
-        owners.push(owner);
-        if (failLibrary) throw new Error("offline");
-
-        return { items: [owner], revision: 1 };
+      readLibrary: async () => {
+        libraryReads++;
+        throw new Error("offline");
       },
     },
     ownerId: () => "alice",
@@ -66,13 +63,16 @@ test("document controller commits scene and library together and captures the ow
     },
   });
 
-  await document.loadCanvas("original");
-  failLibrary = true;
-  await assert.rejects(document.loadCanvas("replacement"), /offline/);
-  assert.equal(document.document.value?.id, "original");
-  assert.deepEqual(document.library.value?.items, ["alice"]);
-  assert.equal(loaded, 1);
-  assert.deepEqual(owners, ["alice", "alice"]);
+  try {
+    await document.loadCanvas("original");
+    await document.loadCanvas("replacement");
+    assert.equal(document.document.value?.id, "replacement");
+    assert.equal(document.library.value, undefined);
+    assert.equal(libraryReads, 0);
+    assert.equal(loaded, 2);
+  } finally {
+    document.reset();
+  }
 });
 
 test("navigation conflict adopts the winning revision without retrying or selecting another canvas", async () => {
@@ -159,6 +159,7 @@ function directoryFixture() {
   });
 
   return {
+    api,
     directory,
     document,
     operation,
@@ -203,4 +204,34 @@ test("catalog conflict restores server order without replacing the loaded editor
     directory.canvases.value.map((item) => item.id),
     ["first", "second"],
   );
+});
+
+test("late account workspace lists cannot publish after reset and a new account load", async () => {
+  const fixture = directoryFixture();
+  let resolveOld!: (value: Workspace[]) => void;
+  const oldList = new Promise<Workspace[]>((resolve) => {
+    resolveOld = resolve;
+  });
+  let requests = 0;
+
+  fixture.api.listWorkspaces = async () =>
+    ++requests === 1
+      ? oldList
+      : [{ ...workspace, id: "new-space", name: "new account space" }];
+  try {
+    const old = fixture.directory.loadWorkspaces();
+
+    fixture.directory.reset();
+    fixture.document.reset();
+    await fixture.directory.loadWorkspaces();
+    resolveOld([{ ...workspace, name: "private old account space" }]);
+    await old;
+    assert.equal(
+      fixture.directory.workspaces.value[0]?.name,
+      "new account space",
+    );
+    assert.equal(fixture.directory.workspaceId.value, "new-space");
+  } finally {
+    fixture.document.reset();
+  }
 });

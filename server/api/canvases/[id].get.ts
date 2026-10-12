@@ -2,7 +2,9 @@ import { defineApiHandler, resourceId } from "../../utils/api";
 import { requireUser } from "../../utils/auth";
 import { requireCanvas } from "../../utils/access";
 import { meta, readSnapshot } from "../../utils/snapshots";
-import { ApiError, json } from "../../utils/http";
+import { apiRequest } from "../../utils/request";
+import { canvasValidator } from "../../../shared/snapshotValidator";
+import { ApiError, json, assertOwner } from "../../utils/http";
 
 const EMPTY_SCENE = { elements: [], appState: {}, files: {} };
 
@@ -10,26 +12,46 @@ export default defineApiHandler(async (event) => {
   const id = resourceId(event);
 
   const user = await requireUser(event);
+  const req = apiRequest(event);
+
+  assertOwner(req, user.id, "x-resource-owner");
   const row = await requireCanvas(id, user);
+  const headers = {
+    ETag: canvasValidator(row),
+    "Cache-Control": "no-store",
+  };
+
+  if (req.headers.get("if-none-match") === headers.ETag)
+    return new Response(null, { status: 304, headers });
 
   try {
-    return json({
-      canvas: {
-        ...meta(row),
-        scene: await readSnapshot(row.objectKey, EMPTY_SCENE),
+    return json(
+      {
+        canvas: {
+          ...meta(row),
+          scene: await readSnapshot(row.objectKey, EMPTY_SCENE),
+        },
       },
-    });
+      200,
+      headers,
+    );
   } catch (error) {
     // An autosave may have replaced and removed this immutable object after the D1 read.
     if (!(error instanceof ApiError) || error.code !== "STORAGE_UNAVAILABLE")
       throw error;
     const latest = await requireCanvas(id, user);
 
-    return json({
-      canvas: {
-        ...meta(latest),
-        scene: await readSnapshot(latest.objectKey, EMPTY_SCENE),
+    return json(
+      {
+        canvas: {
+          ...meta(latest),
+          scene: await readSnapshot(latest.objectKey, EMPTY_SCENE),
+        },
       },
-    });
+      200,
+      {
+        ETag: canvasValidator(latest),
+      },
+    );
   }
 });

@@ -100,6 +100,8 @@ export function useAccountSession({
         user.value = await api.session();
         if (user.value) {
           await loadAccountSettings(user.value);
+          // The directory can publish a readonly cached preview while validation continues.
+          starting.value = false;
           await loadWorkspaces();
         }
       }
@@ -115,8 +117,13 @@ export function useAccountSession({
     await run(async () => {
       bootstrap.value = await api.bootstrap();
       await loadAccountSettings(account);
-      await loadWorkspaces();
     });
+    if (!settingsResource.value) return;
+    try {
+      await loadWorkspaces();
+    } catch (cause) {
+      reportError(cause instanceof Error ? cause.message : "无法读取画布");
+    }
   }
 
   async function logout() {

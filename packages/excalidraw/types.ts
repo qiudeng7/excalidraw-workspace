@@ -946,6 +946,12 @@ export interface ExcalidrawProps {
   ) => JSX.Element | null;
   langCode?: Language["code"];
   viewModeEnabled?: boolean;
+  /** Host synchronization preview: block every content mutation while allowing navigation. */
+  syncReadOnly?: boolean;
+  /** A lazy host library has not been initialized yet; mutations are refused. */
+  libraryReady?: boolean;
+  /** Disposable readonly library items displayed during host validation. */
+  libraryPreview?: LibraryItems;
   /**
    * Whether the editor accepts user input (pointer, keyboard, wheel, touch,
    * clipboard, drag&drop). When `false`, the scene still renders and reacts

@@ -14,33 +14,50 @@ export interface NavigationController {
 
 export function useWorkspaceNavigation(
   api: Pick<WorkspaceApi, "readNavigation" | "recordOpened">,
+  ownerId: () => string | undefined = () => undefined,
 ): NavigationController {
   const navigation = ref<Navigation>();
   const navigationNotice = ref("");
 
-  async function readNavigation() {
-    navigation.value = await api.readNavigation();
+  let generation = 0;
 
-    return navigation.value;
+  async function readNavigation() {
+    const captured = generation;
+    const value = await api.readNavigation(ownerId());
+
+    if (captured === generation) navigation.value = value;
+
+    return value;
   }
 
   async function refreshNavigationQuietly() {
+    const captured = generation;
+
     try {
       await readNavigation();
     } catch (error) {
+      if (captured !== generation) return;
       console.warn("最近打开位置读取失败，使用画布列表回退", error);
       navigation.value = undefined;
       navigationNotice.value = "最近打开位置暂时无法读取，画布仍可正常使用。";
     }
   }
 
-  async function recordOpened(id: string) {
+  async function saveOpened(
+    id: string,
+    captured: number,
+    owner: string | undefined,
+  ) {
     navigationNotice.value = "";
     try {
       const current = navigation.value ?? (await readNavigation());
 
-      navigation.value = await api.recordOpened(id, current.revision);
+      if (captured !== generation) return;
+      const result = await api.recordOpened(id, current.revision, owner);
+
+      if (captured === generation) navigation.value = result;
     } catch (cause) {
+      if (captured !== generation) return;
       navigationNotice.value =
         cause instanceof ApiError && cause.code === "NAVIGATION_CONFLICT"
           ? "当前画布已打开，最近位置已在其他页面更新。"
@@ -50,8 +67,34 @@ export function useWorkspaceNavigation(
         await readNavigation();
       } catch (error) {
         console.warn("无法读取其他页面提交的最近位置", error);
-        navigation.value = undefined;
+        if (captured === generation) navigation.value = undefined;
       }
+    }
+  }
+
+  let pending: string | undefined;
+  let recording: Promise<void> | undefined;
+
+  async function recordOpened(id: string) {
+    pending = id;
+    if (recording) return recording;
+    const captured = generation;
+    const owner = ownerId();
+
+    const task = (async () => {
+      while (pending && captured === generation) {
+        const latest = pending;
+
+        pending = undefined;
+        await saveOpened(latest, captured, owner);
+      }
+    })();
+
+    recording = task;
+    try {
+      await task;
+    } finally {
+      if (recording === task) recording = undefined;
     }
   }
 
@@ -66,6 +109,9 @@ export function useWorkspaceNavigation(
     recordOpened,
     clearNotice,
     reset() {
+      generation++;
+      pending = undefined;
+      recording = undefined;
       navigation.value = undefined;
       clearNotice();
     },

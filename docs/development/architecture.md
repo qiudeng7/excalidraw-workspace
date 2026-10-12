@@ -8,20 +8,20 @@
 
 [src/pages/index.vue](../../src/pages/index.vue) 组装依赖、绑定模板和路由离开保护。根路径 `/` 是画布，`/home` 为首页，`/about` 为关于页；[nuxt.config.ts](../../nuxt.config.ts) 将旧地址 `/draw` 重定向到 `/`。控制器拥有自己的状态，对外暴露动作与只读 ref；需要其他控制器能力时通过接口传入，避免直接修改另一个控制器的状态。
 
-| 职责                             | 实现                                                                                                                                   |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| 账户生命周期与设置资源创建、销毁 | [useAccountSession.ts](../../src/composables/useAccountSession.ts)                                                                     |
-| 工作空间、画布目录和目录版本     | [useWorkspaceDirectory.ts](../../src/composables/useWorkspaceDirectory.ts)                                                             |
-| 画布与素材库读取后一起替换       | [useCanvasDocument.ts](../../src/composables/useCanvasDocument.ts)                                                                     |
-| 最近位置、导航版本和提示         | [useWorkspaceNavigation.ts](../../src/composables/useWorkspaceNavigation.ts)                                                           |
-| 操作串行化与错误反馈             | [useOperation.ts](../../src/composables/useOperation.ts)                                                                               |
-| 选择菜单、焦点和排序手势         | [useWorkspacePicker.ts](../../src/composables/useWorkspacePicker.ts)、[useCanvasReorder.ts](../../src/composables/useCanvasReorder.ts) |
-| 画布、素材库草稿与保存队列       | [persistence.ts](../../src/lib/persistence.ts)                                                                                         |
-| 账户设置保存与冲突选择           | [userSettings.ts](../../src/lib/userSettings.ts)                                                                                       |
+| 职责                               | 实现                                                                                                                                   |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| 账户生命周期与设置资源创建、销毁   | [useAccountSession.ts](../../src/composables/useAccountSession.ts)                                                                     |
+| 工作空间、画布目录和目录版本       | [useWorkspaceDirectory.ts](../../src/composables/useWorkspaceDirectory.ts)                                                             |
+| 画布缓存预览与只读版本校验         | [useCanvasDocument.ts](../../src/composables/useCanvasDocument.ts)                                                                     |
+| 最近位置、导航版本和提示           | [useWorkspaceNavigation.ts](../../src/composables/useWorkspaceNavigation.ts)                                                           |
+| 操作串行化与错误反馈               | [useOperation.ts](../../src/composables/useOperation.ts)                                                                               |
+| 选择菜单、焦点和排序手势           | [useWorkspacePicker.ts](../../src/composables/useWorkspacePicker.ts)、[useCanvasReorder.ts](../../src/composables/useCanvasReorder.ts) |
+| 账号级资源、后台队列与素材库懒加载 | [canvasResources.ts](../../src/lib/canvasResources.ts)、[persistence.ts](../../src/lib/persistence.ts)                                 |
+| 账户设置保存与冲突选择             | [userSettings.ts](../../src/lib/userSettings.ts)                                                                                       |
 
 新增 HTTP 调用放到相应 API 适配器，目录与账户控制器分别依赖 [WorkspaceApi](../../src/lib/workspaceApi.ts) 和 [AccountApi](../../src/lib/accountApi.ts)。通用 [api.ts](../../src/lib/api.ts) 统一请求头和错误解析，成功状态下的无效 JSON 也按错误处理。
 
-跨画布、退出和离开页面的操作通过 [SaveBarrier](../../src/lib/editor.ts) 等待编辑器保存；账户设置另有保存屏障。新增窗口事件监听须同时处理注销，拖拽取消和卸载须释放指针捕获。
+跨画布使用 [SaveBarrier](../../src/lib/editor.ts) 的本地草稿 checkpoint，云端写入由账号级资源继续执行；退出和离开页面等待所有未同步资源。账户设置另有保存屏障。新增窗口事件监听须同时处理注销，拖拽取消和卸载须释放指针捕获。
 
 ## 请求与权限边界
 

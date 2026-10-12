@@ -73,6 +73,7 @@ function db() {
 
     request.onupgradeneeded = () => request.result.createObjectStore("drafts");
     request.onsuccess = () => resolve(request.result);
+    request.onblocked = () => reject(new Error("草稿数据库被其他页面占用"));
     request.onerror = () => reject(request.error);
   }));
 }
@@ -102,6 +103,10 @@ async function storage<T>(
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });
+}
+
+export async function readCurrentDraft<T>(prefix: string) {
+  return storage<T>(`${prefix}:tab:${await getTabScope()}`, "get");
 }
 
 async function otherDrafts<T>(
@@ -150,6 +155,13 @@ export interface PersistentResourceOptions<T> {
   changed: (message?: string) => void;
   scopeId?: string;
   ownerId?: string;
+  confirmed?: (value: T, result: SaveResult) => void;
+  readRemote?: () => Promise<{
+    value: T;
+    revision: number;
+    updatedAt?: string;
+  }>;
+  runRequest?: (task: () => Promise<SaveResult>) => Promise<SaveResult>;
 }
 
 /** Scene/library save port; settings keep their distinct conflict-resolution state machine. */
@@ -158,6 +170,12 @@ export interface SaveResource<T> {
   readonly revision: number;
   readonly dirty: boolean;
   readonly conflict: boolean;
+  readonly isSaving: boolean;
+  readonly hasUnconfirmedSave: boolean;
+  checkpoint(): Promise<void>;
+  settle(): Promise<void>;
+  pauseAutosave(): void;
+  resumeAutosave(): void;
   restore(): Promise<void>;
   update(value: T): void;
   schedule(delay?: number): void;
@@ -178,6 +196,7 @@ export class PersistentResource<T> implements SaveResource<T> {
   private timer?: ReturnType<typeof setTimeout>;
   private writes: Promise<unknown> = Promise.resolve();
   private disposed = false;
+  private autosavePaused = false;
   private activeRequest?: AbortController;
   private ownerId?: string;
   private storageError = false;
@@ -186,6 +205,45 @@ export class PersistentResource<T> implements SaveResource<T> {
   private path: string;
   private field: string;
   private changed: (message?: string) => void;
+  private confirmed?: PersistentResourceOptions<T>["confirmed"];
+  private readRemote?: PersistentResourceOptions<T>["readRemote"];
+  private runRequest?: PersistentResourceOptions<T>["runRequest"];
+  private uncertain?: { revision: number; value: T; generation: number };
+
+  get isSaving() {
+    return !!this.saving;
+  }
+
+  get hasUnconfirmedSave() {
+    return !!this.uncertain;
+  }
+
+  async checkpoint() {
+    for (;;) {
+      const writes = this.writes;
+
+      await writes;
+      if (writes === this.writes) break;
+    }
+
+    if (this.dirty && this.storageError)
+      throw new Error("本地草稿写入失败，请保持当前画布并重试云端保存。");
+  }
+
+  async settle() {
+    // flush() may immediately send a newer generation after acknowledging this one.
+    while (this.saving) await this.saving;
+  }
+
+  pauseAutosave() {
+    this.autosavePaused = true;
+    clearTimeout(this.timer);
+  }
+
+  resumeAutosave() {
+    this.autosavePaused = false;
+    if (this.dirty) this.schedule();
+  }
 
   constructor({
     key,
@@ -196,8 +254,14 @@ export class PersistentResource<T> implements SaveResource<T> {
     changed,
     scopeId,
     ownerId,
+    confirmed,
+    readRemote,
+    runRequest,
   }: PersistentResourceOptions<T>) {
     this.ownerId = ownerId;
+    this.confirmed = confirmed;
+    this.readRemote = readRemote;
+    this.runRequest = runRequest;
     this.prefix = key;
     this.key = (scopeId ? Promise.resolve(scopeId) : getTabScope()).then(
       (scope) => `${key}:tab:${scope}`,
@@ -247,9 +311,10 @@ export class PersistentResource<T> implements SaveResource<T> {
       : undefined;
 
     this.writes = this.writes
-      .then(async () =>
-        storage(await this.key, snapshot ? "put" : "delete", snapshot),
-      )
+      .then(async () => {
+        await storage(await this.key, snapshot ? "put" : "delete", snapshot);
+        this.storageError = false;
+      })
       .catch((error) => {
         console.warn("无法暂存本地草稿", error);
         this.storageError = true;
@@ -270,7 +335,7 @@ export class PersistentResource<T> implements SaveResource<T> {
 
   schedule(delay = 700) {
     clearTimeout(this.timer);
-    if (!this.disposed && !this.conflict)
+    if (!this.disposed && !this.conflict && !this.autosavePaused)
       this.timer = setTimeout(() => {
         void this.flush().catch((error) => {
           // save() already reports failures and decides whether another retry is safe.
@@ -298,6 +363,7 @@ export class PersistentResource<T> implements SaveResource<T> {
       await this.saving;
     } finally {
       this.saving = undefined;
+      if (!this.disposed) this.changed();
     }
 
     if (this.dirty) return this.flush();
@@ -305,7 +371,8 @@ export class PersistentResource<T> implements SaveResource<T> {
 
   private async save() {
     const generation = this.generation;
-    const value = this.value;
+    const value = JSON.parse(JSON.stringify(this.value)) as T;
+    const revision = this.revision;
 
     this.changed();
     const controller = new AbortController();
@@ -314,21 +381,60 @@ export class PersistentResource<T> implements SaveResource<T> {
     try {
       if (this.disposed)
         throw new DOMException("Resource disposed", "AbortError");
-      const saved = await api<SaveResult>(this.path, {
-        method: "PUT",
-        headers: this.ownerId
-          ? { "X-Resource-Owner": this.ownerId }
-          : undefined,
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(20_000),
-        ]),
-        body: JSON.stringify({ revision: this.revision, [this.field]: value }),
-      });
+      if (this.uncertain && this.readRemote) {
+        const uncertain = this.uncertain;
+        const remote = await this.readRemote();
+
+        if (this.disposed)
+          throw new DOMException("Resource disposed", "AbortError");
+        if (
+          remote.revision === uncertain.revision + 1 &&
+          JSON.stringify(remote.value) === JSON.stringify(uncertain.value)
+        ) {
+          this.revision = remote.revision;
+          if (uncertain.generation === this.generation) this.dirty = false;
+          this.uncertain = undefined;
+          this.confirmed?.(uncertain.value, {
+            revision: remote.revision,
+            updatedAt: remote.updatedAt ?? "",
+          });
+          this.persist();
+          await this.writes;
+          this.changed();
+
+          return;
+        }
+
+        if (remote.revision !== uncertain.revision) {
+          this.conflict = true;
+          throw new ApiError(
+            409,
+            "REVISION_CONFLICT",
+            "保存结果无法确认，云端已有其他更新，请保留备份后处理冲突。",
+          );
+        }
+
+        this.uncertain = undefined;
+      }
+
+      const send = () =>
+        api<SaveResult>(this.path, {
+          method: "PUT",
+          headers: this.ownerId
+            ? { "X-Resource-Owner": this.ownerId }
+            : undefined,
+          signal: AbortSignal.any([
+            controller.signal,
+            AbortSignal.timeout(20_000),
+          ]),
+          body: JSON.stringify({ revision, [this.field]: value }),
+        });
+      const saved = await (this.runRequest ? this.runRequest(send) : send());
 
       if (this.disposed)
         throw new DOMException("Resource disposed", "AbortError");
       this.revision = saved.revision;
+      this.confirmed?.(value, saved);
       if (generation === this.generation) this.dirty = false;
       this.persist();
       await this.writes;
@@ -341,6 +447,14 @@ export class PersistentResource<T> implements SaveResource<T> {
     } catch (error) {
       if (this.disposed) throw error;
       this.conflict = error instanceof ApiError && error.status === 409;
+      // A transport failure can occur after commit. Re-read before the next write.
+      if (
+        (!(error instanceof ApiError) ||
+          error.status >= 500 ||
+          error.code === "INVALID_RESPONSE") &&
+        !this.uncertain
+      )
+        this.uncertain = { revision, value, generation };
       this.changed(
         this.conflict
           ? "保存冲突：其他页面已修改此内容。已保留本地草稿，请下载备份后刷新处理。"
@@ -380,6 +494,7 @@ export class PersistentResource<T> implements SaveResource<T> {
     await storage(await this.key, "delete");
     this.dirty = false;
     this.conflict = false;
+    this.uncertain = undefined;
   }
 
   dispose() {

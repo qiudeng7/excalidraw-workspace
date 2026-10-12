@@ -5150,7 +5150,7 @@ class App extends React.Component<AppProps, AppState> {
 
   public pasteFromClipboard = withBatchedUpdates(
     async (event: ClipboardEvent) => {
-      if (!this.isInteractionEnabled()) {
+      if (!this.isInteractionEnabled() || this.props.syncReadOnly) {
         return;
       }
 
@@ -5197,6 +5197,7 @@ class App extends React.Component<AppProps, AppState> {
         }
       }
 
+      if (this.props.syncReadOnly) return;
       await this.insertClipboardContent(data, filesList, isPlainPaste);
 
       this.setActiveTool(
@@ -5215,6 +5216,7 @@ class App extends React.Component<AppProps, AppState> {
     fit?: SetViewportOptions["fit"];
     preserveFrameChildrenOrder?: boolean;
   }) => {
+    if (this.props.syncReadOnly) return;
     const elements = restoreElements(opts.elements, null, {
       deleteInvisibleElements: true,
     });

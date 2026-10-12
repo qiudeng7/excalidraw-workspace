@@ -159,6 +159,7 @@ try {
     "scripts/smoke-account-compatibility.mjs",
     origin,
   ]);
+  await command(["exec", "node", "tests/http/cache.mjs", origin]);
 } finally {
   await cleanup();
 }

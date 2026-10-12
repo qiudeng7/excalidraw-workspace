@@ -397,6 +397,12 @@ class Library {
           latestLibraryItems: LibraryItems,
         ) => LibraryItems | Promise<LibraryItems>),
   ): Promise<LibraryItems> => {
+    // Do not turn an unloaded library's placeholder into an authoritative empty library.
+    // This central gate also covers API, URL/blob import, reset and context-menu paths.
+    if (this.app.props.libraryReady === false || this.app.props.syncReadOnly) {
+      return Promise.resolve(cloneLibraryItems(this.currLibraryItems));
+    }
+
     const task = new Promise<LibraryItems>(async (resolve, reject) => {
       try {
         await this.getLastUpdateTask();

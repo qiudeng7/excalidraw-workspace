@@ -133,6 +133,8 @@ export class ActionManager {
       return false;
     }
 
+    if (this.app.props.syncReadOnly && action.viewMode !== true) return;
+
     if (this.isActionBlockedByViewportTransition(action)) {
       event.preventDefault();
       event.stopPropagation();
@@ -169,6 +171,8 @@ export class ActionManager {
       return;
     }
 
+    if (this.app.props.syncReadOnly && action.viewMode !== true) return;
+
     if (this.isActionBlockedByViewportTransition(action)) {
       return;
     }
@@ -199,6 +203,8 @@ export class ActionManager {
 
       PanelComponent.displayName = "PanelComponent";
       const updateData = (formState?: any) => {
+        if (this.app.props.syncReadOnly && action.viewMode !== true) return;
+
         if (this.isActionBlockedByViewportTransition(action)) {
           return;
         }

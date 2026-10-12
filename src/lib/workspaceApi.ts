@@ -6,7 +6,11 @@ import type {
   Navigation,
   Workspace,
 } from "../../shared/contracts";
-import { api } from "./api";
+import {
+  snapshotValidator,
+  canvasValidator,
+} from "../../shared/snapshotValidator";
+import { api, conditionalApi } from "./api";
 
 /** HTTP details belong here; controllers depend on this replaceable domain port. */
 export interface WorkspaceApi {
@@ -14,8 +18,23 @@ export interface WorkspaceApi {
   readCatalog(workspaceId: string): Promise<CanvasCatalog>;
   readCanvas(canvasId: string): Promise<CanvasDocument>;
   readLibrary(ownerId: string): Promise<LibraryDocument>;
-  readNavigation(): Promise<Navigation>;
-  recordOpened(canvasId: string, revision: number): Promise<Navigation>;
+  validateCanvas?(
+    id: string,
+    ownerId: string,
+    known?: CanvasDocument,
+    signal?: AbortSignal,
+  ): Promise<CanvasDocument | undefined>;
+  validateLibrary?(
+    ownerId: string,
+    known?: LibraryDocument,
+    signal?: AbortSignal,
+  ): Promise<LibraryDocument | undefined>;
+  readNavigation(ownerId?: string): Promise<Navigation>;
+  recordOpened(
+    canvasId: string,
+    revision: number,
+    ownerId?: string,
+  ): Promise<Navigation>;
   reorder(
     workspaceId: string,
     canvasIds: string[],
@@ -50,9 +69,49 @@ export const workspaceApi: WorkspaceApi = {
     api<LibraryDocument>("/api/library", {
       headers: { "X-Resource-Owner": ownerId },
     }),
-  readNavigation: () => api<Navigation>("/api/navigation"),
-  recordOpened: (canvasId, revision) =>
-    api<Navigation>("/api/navigation", json("PUT", { canvasId, revision })),
+  validateCanvas: async (id, ownerId, known, signal) => {
+    const response = await conditionalApi<{ canvas: CanvasDocument }>(
+      `/api/canvases/${segment(id)}`,
+      {
+        signal,
+        headers: {
+          "X-Resource-Owner": ownerId,
+          ...(known
+            ? {
+                "If-None-Match": canvasValidator(known),
+              }
+            : {}),
+        },
+      },
+    );
+
+    return response?.canvas;
+  },
+  validateLibrary: (ownerId, known, signal) =>
+    conditionalApi<LibraryDocument>("/api/library", {
+      signal,
+      headers: {
+        "X-Resource-Owner": ownerId,
+        ...(known
+          ? {
+              "If-None-Match": snapshotValidator(
+                "library",
+                ownerId,
+                known.revision,
+              ),
+            }
+          : {}),
+      },
+    }),
+  readNavigation: (ownerId) =>
+    api<Navigation>("/api/navigation", {
+      headers: ownerId ? { "X-Resource-Owner": ownerId } : {},
+    }),
+  recordOpened: (canvasId, revision, ownerId) =>
+    api<Navigation>("/api/navigation", {
+      ...json("PUT", { canvasId, revision }),
+      headers: ownerId ? { "X-Resource-Owner": ownerId } : {},
+    }),
   reorder: (id, canvasIds, catalogRevision) =>
     api<CanvasCatalog>(
       `/api/workspaces/${segment(id)}/canvas-order`,

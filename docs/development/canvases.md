@@ -2,36 +2,59 @@
 
 [返回开发者指南](readme.md)
 
-画布的目录操作与内容保存分开处理：名称、顺序和归属在数据库中，图形、应用状态和图片组成场景快照。目录用例在 [useWorkspaceDirectory.ts](../../src/composables/useWorkspaceDirectory.ts)，内容读取在 [useCanvasDocument.ts](../../src/composables/useCanvasDocument.ts)，编辑和保存接入在 [ExcalidrawCanvas.client.vue](../../src/components/ExcalidrawCanvas.client.vue)。
+画布的目录操作与内容保存分开处理：名称、顺序和归属在数据库中，图形、应用状态和图片组成场景快照。目录用例在 [useWorkspaceDirectory.ts](../../src/composables/useWorkspaceDirectory.ts)，内容读取在 [useCanvasDocument.ts](../../src/composables/useCanvasDocument.ts)，账号级缓存和后台资源在 [canvasResources.ts](../../src/lib/canvasResources.ts)，编辑器接入在 [ExcalidrawCanvas.client.vue](../../src/components/ExcalidrawCanvas.client.vue)。
 
 ## 创建画布
 
 `createCanvas()` 等待当前编辑器保存，再通过 [POST /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.post.ts) 提交名称和目录版本 `catalogRevision`。后端验证空间归属，通过 [db/canvases.ts](../../server/db/canvases.ts) 原子插入画布到目录顶部，并递增目录版本。
 
-成功后前端重新读取 [GET /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.get.ts)，再读取新画布和素材库、记录最近位置，后两步见[切换画布](#切换画布)。新画布尚无快照，读取时返回空场景。
+成功后前端重新读取 [GET /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.get.ts)，再读取新画布、后台记录最近位置，后两步见[切换画布](#切换画布)。新画布尚无快照，读取时返回空场景。
 
 创建失败时也重新确认目录，然后报告原错误。目录无法确认时锁定目录修改，避免继续使用旧版本操作。
 
 ## 切换画布
 
-用户选择另一张画布时，`selectCanvas()` 先等待保存，再读取目标内容，最后记录最近位置。
+用户选择另一张画布时，`selectCanvas()` 捕获当前场景并等待最新草稿写入 IndexedDB，然后立即启动目标加载。旧画布的云端保存由账号级资源继续执行，不随 React 编辑器卸载取消；不同资源最多同时进行两次保存，同一资源仍只有一个保存请求。
 
 ```mermaid
 flowchart TD
-    A[选择目标画布] --> B[等待当前画布与素材库保存]
-    B --> C[并行读取目标内容]
-    C --> D[GET /api/canvases/:id]
-    C --> E[GET /api/library]
-    D --> F[两项都成功后替换编辑器内容]
-    E --> F
-    F --> G[PUT /api/navigation]
+    A[选择目标画布] --> B[捕获当前编辑并确认本地草稿落盘]
+    B --> C[旧画布后台保存]
+    B --> D[读取本标签页草稿与已同步缓存]
+    B --> E[云端版本校验]
+    D --> F[立即展示已有内容，暂时只读]
+    E --> G{版本和草稿状态}
+    G -->|已同步且版本一致| H[解除只读]
+    G -->|已同步但云端更新| I[替换最新内容后解除只读]
+    G -->|草稿基础版本一致| J[保留草稿，恢复编辑与后台保存]
+    G -->|草稿基础版本变化| K[保留草稿，提示冲突]
+    G -->|网络失败| L[缓存保持只读，可重试校验]
+    H --> M[后台合并记录最近位置]
 ```
 
-- [GET /api/canvases/:id](../../server/api/canvases/[id].get.ts)：校验归属后读取场景。若快照刚被并发保存替换、旧对象已删除，重新读取数据库引用后再尝试一次。
-- [GET /api/library](../../server/api/library.get.ts)：读取当前账户的[个人素材库](library.md#读取素材库)。两项读取由 `useCanvasDocument.loadCanvas()` 并行发起，全部成功才替换文档。
-- [PUT /api/navigation](../../server/api/navigation.put.ts)：提交 `{ canvasId, revision }`，更新全局及空间内的最近位置。`useWorkspaceNavigation.recordOpened()` 必要时先通过 [GET /api/navigation](../../server/api/navigation.get.ts) 取得版本。
+素材库不参与这条加载链路，见[素材库按需读取](library.md#读取素材库)。没有本地内容时等待云端返回；有本地内容时允许平移、缩放和查看，禁止绘制、粘贴、拖放、导入、撤销、删除和素材插入。临时只读与用户自己开启的查看模式分别管理，初始化和只读视角变化不会触发保存。
 
-保存或内容读取失败会中止切换。导航写入失败不会撤销已经打开的画布；发生 `NAVIGATION_CONFLICT` 时只提示并读取最新导航，不重试覆盖，也不改变当前选择。导航控制器见 [useWorkspaceNavigation.ts](../../src/composables/useWorkspaceNavigation.ts)。
+[GET /api/canvases/:id](../../server/api/canvases/[id].get.ts) 先鉴权、检查 owner 和数据库归属。内存命中时携带 `If-None-Match`；服务器比较内容版本及目录元数据，完全相同返回无响应体的 `304`，不读取对象存储；版本变化返回完整内容。首次磁盘读取与网络请求并行，所以磁盘命中的第一次打开仍可能接收完整响应。所有响应保留 `Cache-Control: no-store`，缓存由应用主动管理。对象刚被并发保存替换时，重新读取数据库引用后再尝试一次。
+
+切换和初始化目录期间，目录的新增、删除、重命名和排序暂不可用；画布与工作空间仍可继续切换，最后一次选择生效。删除成功会使对应的内存资源和已同步缓存失效，迟到的读取不能重新显示它。
+
+快速切回仍在保存的画布，展示最新本地内容并保持只读，等自己的保存完成后再校验，避免把自己的新版本误判为外部修改。保存响应丢失时先回读版本和上传快照，确认已被接受后才确认保存；无法确定时保留草稿和冲突提示，不把草稿自动套用到新版本上。
+
+快速点击多个画布时，最后一次选择决定当前编辑器；同一画布的读取合并，较晚返回的旧选择只更新对应缓存。[最近位置](../../src/composables/useWorkspaceNavigation.ts) 在后台按顺序写入，并合并等待中的选择；导航冲突只提示和读取最新版本，不移动当前画布。
+
+### 缓存与草稿边界
+
+[confirmedCache.ts](../../src/lib/confirmedCache.ts) 管理已同步快照；[persistence.ts](../../src/lib/persistence.ts) 管理未同步草稿。两者使用不同 IndexedDB 数据库，草稿不参与缓存淘汰。
+
+| 内容             | 键与保留规则                                                                                                                 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 活跃或未同步资源 | 当前账号与画布，草稿另带独占标签页 ID；当前、dirty、保存中和校验中的资源固定保留                                             |
+| 已同步内存资源   | 当前画布加最近四张未固定画布；估算序列化容量上限 64 MiB，当前画布及未同步资源不计入可淘汰项                                  |
+| 已同步磁盘快照   | `schemaVersion + accountId + type + resourceId`，包含 revision、内容、字节数和最近访问时间；画布图片和素材库合计最多 256 MiB |
+
+容量限制按序列化体积估算，并非浏览器实际堆内存上限。超大单项不强制放进可淘汰缓存；缓存不可用时回退云端，草稿写入失败且云端尚未保存成功时保留当前画布，不能无保护切走。
+
+缓存只接收成功 GET 或 PUT 确认的不可变快照。保存期间产生的新编辑继续保持 dirty，旧响应不能确认新编辑，也不能用较旧 revision 回退缓存。账号切换清空内存、取消旧读取；权限失效或画布被删除后移除已同步缓存并停止显示该画布，未同步草稿仍独立保留。
 
 ## 保存内容
 
@@ -39,7 +62,7 @@ flowchart TD
 
 [PUT /api/canvases/:id](../../server/api/canvases/[id].put.ts) 接收 `{ revision, scene }`，其中 `scene` 包含 `elements`、`appState`、`files`。处理器校验归属和场景形状，再调用 [saveSnapshot()](../../server/utils/snapshots.ts)：校验版本 → 写入新快照 → 按预期版本更新数据库引用 → 后台删除旧快照。成功返回新的版本与更新时间。原子性边界见[版本与快照](architecture.md#版本与快照)。
 
-单次 JSON 请求上限为 20 MB。保存失败时显示错误并尽可能保留本地草稿；切换画布、切换空间、退出登录和站内离开前须等待保存。刷新或关闭页面使用 `beforeunload` 提醒，关闭页面不会保证完成保存。
+单次 JSON 请求上限为 20 MB。保存失败时显示错误并尽可能保留本地草稿；切换画布或空间只等待本地保护，退出登录和站内离开等待该账号所有画布与已加载素材库的保存。刷新或关闭页面使用 `beforeunload` 提醒，关闭页面不会保证完成保存。
 
 ## 处理保存冲突
 
@@ -69,4 +92,4 @@ flowchart TD
 
 ## 验证入口
 
-[navigation.test.ts](../../tests/backend/navigation.test.ts) 覆盖目录版本、排序和导航；[node-storage.test.ts](../../tests/backend/node-storage.test.ts) 检查含图片快照读写、并发与重启持久化；[snapshots.test.ts](../../tests/backend/snapshots.test.ts) 检查发布失败的新对象回收；[persistence-owner.test.ts](../../tests/backend/persistence-owner.test.ts) 检查保存资源的账户归属与请求取消；[frontend-controllers.test.ts](../../tests/backend/frontend-controllers.test.ts) 检查读取和切换保护。浏览器中检查含图片保存、快捷键反馈、双标签页冲突、失败时切换保护，以及拖拽和键盘排序。
+[navigation.test.ts](../../tests/backend/navigation.test.ts) 覆盖目录版本、排序和导航；[node-storage.test.ts](../../tests/backend/node-storage.test.ts) 检查含图片快照读写、并发与重启持久化；[snapshots.test.ts](../../tests/backend/snapshots.test.ts) 检查发布失败的新对象回收；[persistence-owner.test.ts](../../tests/backend/persistence-owner.test.ts) 检查保存资源的账户归属与请求取消；[frontend-controllers.test.ts](../../tests/backend/frontend-controllers.test.ts) 检查读取和切换保护。[canvas-cache.test.ts](../../tests/backend/canvas-cache.test.ts) 检查缓存、异步保存、乱序、草稿和账号边界；[conditional-snapshots.test.ts](../../tests/backend/conditional-snapshots.test.ts) 检查鉴权后条件读取和对象读取次数；[canvas-cache.spec.ts](../../tests/browser/canvas-cache.spec.ts) 在真实 Chromium 检查只读输入隔离、后台保存、素材库懒加载和受控时序。运行方式见[开发验证](testing.md)。

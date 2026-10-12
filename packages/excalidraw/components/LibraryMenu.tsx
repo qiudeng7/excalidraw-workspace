@@ -343,6 +343,30 @@ export const LibraryMenu = memo(() => {
     });
   }, [setAppState]);
 
+  if (appProps.libraryReady === false) {
+    return (
+      <div className="layer-ui__library">
+        <div role="status">素材库尚未加载，确认云端内容后可使用。</div>
+        {appProps.libraryPreview && (
+          <div {...({ inert: "" } as React.HTMLAttributes<HTMLDivElement>)}>
+            <LibraryMenuItems
+              isLoading={false}
+              libraryItems={appProps.libraryPreview}
+              pendingElements={[]}
+              onInsertLibraryItems={() => {}}
+              onAddToLibrary={() => {}}
+              onSelectItems={() => {}}
+              selectedItems={[]}
+              theme={appState.theme}
+              id={app.id}
+              libraryReturnUrl={appProps.libraryReturnUrl}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <LibraryMenuContent
       pendingElements={pendingElements}

@@ -3,11 +3,13 @@ import { defineApiHandler } from "../utils/api";
 import { apiRequest } from "../utils/request";
 import { requireUser } from "../utils/auth";
 import { requireCanvas } from "../utils/access";
-import { fail, json, body, validRevision } from "../utils/http";
+import { fail, json, body, validRevision, assertOwner } from "../utils/http";
 
 export default defineApiHandler(async (event) => {
   const req = apiRequest(event);
   const user = await requireUser(event);
+
+  assertOwner(apiRequest(event), user.id, "x-resource-owner");
 
   const data = await body(req);
   const revision = validRevision(data.revision);

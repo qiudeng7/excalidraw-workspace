@@ -10,6 +10,10 @@ import { register } from "./register";
 export const actionAddToLibrary = register({
   name: "addToLibrary",
   trackEvent: { category: "element" },
+  predicate: (_elements, _state, props) =>
+    props.libraryReady !== false &&
+    props.UIOptions?.defaultSidebar !== false &&
+    !props.syncReadOnly,
   perform: (elements, appState, _, app) => {
     const selectedElements = app.scene.getSelectedElements({
       selectedElementIds: appState.selectedElementIds,
