@@ -18,7 +18,7 @@ const newTabId = () =>
   ).join("");
 let tabScope: Promise<string> | undefined;
 
-function getTabScope() {
+export function getTabScope() {
   return (tabScope ??= (async () => {
     let previous: string | null = null;
 

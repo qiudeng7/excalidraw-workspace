@@ -15,6 +15,7 @@ export async function collectOrphans(
       const modified = new Date(object.uploadedAt).getTime();
 
       return (
+        !object.pathname.startsWith("collaboration/") &&
         Number.isFinite(modified) &&
         modified < now - grace &&
         (object.pathname.endsWith(".json") || object.pathname.endsWith(".tmp"))

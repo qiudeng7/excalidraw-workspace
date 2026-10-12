@@ -13,3 +13,5 @@
 | [账户设置](user-settings.md)  | [加载设置](user-settings.md#加载设置)、[修改与保存设置](user-settings.md#修改与保存设置)、[处理设置冲突](user-settings.md#处理设置冲突)                                                                                                                          |
 | [编辑器](editor.md)           | [调整绘图交互](editor.md#调整绘图交互)、[导入导出与复制](editor.md#导入导出与复制)                                                                                                                                                                               |
 | [更新公告与日志](releases.md) | 自动展示公告、回看历史更新、维护发布内容                                                                                                                                                                                                                         |
+
+| [协作与分享](collaboration.md) | 并发编辑、成员邀请与链接、三种查看模式、离线队列、权限撤销、房间迁移和恢复 |

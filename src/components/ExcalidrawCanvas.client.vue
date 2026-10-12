@@ -11,6 +11,7 @@ import {
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
+import "../assets/editor-layout.css";
 import type {
   AppState,
   ExcalidrawProps,
@@ -787,96 +788,5 @@ onBeforeUnmount(() => {
   border: 1px solid var(--app-warning-border);
   background: var(--app-surface);
   color: var(--app-text);
-}
-
-.canvas-host {
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  height: 100%;
-  container-type: inline-size;
-}
-
-.canvas-host :deep(.canvas-menu-group > .dropdown-menu-group-title) {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 1rem 0 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--color-gray-60);
-}
-
-.canvas-host :deep(.canvas-menu-group > .dropdown-menu-group-title)::before,
-.canvas-host :deep(.canvas-menu-group > .dropdown-menu-group-title)::after {
-  content: "";
-  height: 1px;
-  flex: 1;
-  background: var(--default-border-color);
-}
-
-/* 菜单较长，窄屏也沿用容器滚动，预留上下操作区。 */
-.canvas-host :deep(.dropdown-menu .dropdown-menu-container) {
-  max-height: calc(100dvh - 150px);
-  overflow-y: auto;
-}
-
-/* Radix measures the space on the menu's actual opening side. Include the
-   extra-tools menu's margin so its last item stays inside the viewport. */
-.canvas-host
-  :deep(.App-toolbar__extra-tools-dropdown .dropdown-menu-container) {
-  max-height: min(
-    calc(100dvh - 150px),
-    calc(var(--radix-dropdown-menu-content-available-height) - 0.375rem)
-  );
-}
-
-/* 工具栏以画布内部的 FixedSideContainer 为定位边界。 */
-.canvas-host.toolbar-bottom :deep(.App-menu_top) {
-  grid-template-columns: 1fr 1fr;
-}
-
-.canvas-host.toolbar-bottom :deep(.App-menu_top > .shapes-section) {
-  position: absolute;
-  inset-inline: 0;
-  bottom: env(safe-area-inset-bottom, 0px);
-  justify-self: stretch;
-}
-
-.canvas-host.toolbar-bottom :deep(.App-toolbar .HintViewer) {
-  top: auto;
-  bottom: 100%;
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-}
-
-/* 更多工具随工具栏向上展开，避免超出画布。 */
-.canvas-host.toolbar-bottom :deep(.App-toolbar__extra-tools-dropdown) {
-  top: auto;
-  bottom: calc(100% + 0.375rem);
-  margin-top: 0;
-}
-
-/* 移动工具栏原生置底；置顶时在顶部操作行下方排列，属性面板向下展开。 */
-.canvas-host.toolbar-top :deep(.excalidraw--mobile .App-bottom-bar) {
-  top: calc(3.5rem + env(safe-area-inset-top, 0px));
-  bottom: auto;
-  flex-direction: column-reverse;
-  max-height: calc(100% - 5rem);
-}
-
-@container (max-width: 960px) {
-  .canvas-host.toolbar-bottom :deep(.App-menu_top > .shapes-section) {
-    bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
-  }
-
-  .canvas-host :deep(.shapes-section > div) {
-    max-width: 100%;
-  }
-
-  .canvas-host :deep(.App-toolbar > .Stack_horizontal) {
-    flex-wrap: wrap;
-    justify-content: center;
-  }
 }
 </style>

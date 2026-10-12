@@ -36,6 +36,27 @@
       "when": 1791775054090,
       "tag": "0005_snapshot_object_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791806438521,
+      "tag": "0006_collaboration",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791807591813,
+      "tag": "0007_workspace_deletion_intent",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791808085285,
+      "tag": "0008_collaboration_directory",
+      "breakpoints": true
     }
   ]
 }

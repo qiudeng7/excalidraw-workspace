@@ -95,6 +95,7 @@ export async function createAccount(
           createdAt: sql<string>`${now}`.as("createdAt"),
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           catalogRevision: sql<number>`0`.as("catalogRevision"),
+          deleting: sql<number>`0`.as("deleting"),
         })
         .from(tables.users)
         .where(eq(tables.users.id, user.id)),
@@ -107,6 +108,8 @@ export async function createAccount(
           name: sql<string>`'未命名画布'`.as("name"),
           revision: sql<number>`0`.as("revision"),
           objectKey: sql<string | null>`NULL`.as("objectKey"),
+          syncMode: sql<"legacy">`'legacy'`.as("syncMode"),
+          roomEpoch: sql<string | null>`NULL`.as("roomEpoch"),
           createdAt: sql<string>`${now}`.as("createdAt"),
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           position: sql<number>`0`.as("position"),

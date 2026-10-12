@@ -873,6 +873,8 @@ export interface ExcalidrawProps {
    * note: only subscribes if the props.onIncrement is defined on initial render
    */
   onIncrement?: (event: DurableIncrement | EphemeralIncrement) => void;
+  /** Called before a local undo/redo so a collaboration host can attach version preconditions. */
+  onBeforeHistoryAction?: (action: "undo" | "redo") => void;
   initialData?:
     | (() => MaybePromise<ExcalidrawInitialDataState | null>)
     | MaybePromise<ExcalidrawInitialDataState | null>;

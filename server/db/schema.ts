@@ -59,6 +59,7 @@ export const workspaces = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     catalogRevision: integer("catalog_revision").notNull().default(0),
+    deleting: integer().notNull().default(0),
   },
   (table) => [index("workspace_owner").on(table.userId)],
 );
@@ -73,6 +74,12 @@ export const canvases = sqliteTable(
     name: text().notNull(),
     revision: integer().notNull().default(0),
     objectKey: text("object_key"),
+    syncMode: text("sync_mode", {
+      enum: ["legacy", "preparing", "collaborative"],
+    })
+      .notNull()
+      .default("legacy"),
+    roomEpoch: text("room_epoch"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     position: integer().notNull().default(0),
@@ -148,3 +155,29 @@ export const userSettings = sqliteTable(
   },
   (table) => [check("user_settings_revision", sql`${table.revision} >= 1`)],
 );
+
+// Node's authoritative rooms. Cloudflare stores these in each CanvasRoom's SQLite.
+// Deliberately no canvas FK: deletion tombstones must survive catalog deletion.
+export const collaborationRooms = sqliteTable("collaboration_rooms", {
+  id: text().primaryKey(),
+  generation: integer().notNull().default(0),
+  state: text().notNull(),
+});
+
+// Directory projection only. Every read rechecks the authoritative room grant.
+export const sharedCanvases = sqliteTable(
+  "shared_canvases",
+  {
+    canvasId: text("canvas_id").notNull(),
+    userId: text("user_id").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.canvasId, table.userId] }),
+    index("shared_canvas_user").on(table.userId),
+  ],
+);
+
+export const collaborationDirectory = sqliteTable("collaboration_directory", {
+  canvasId: text("canvas_id").primaryKey(),
+  revision: integer().notNull().default(-1),
+});

@@ -10,6 +10,9 @@ export function snapshotValidator(
 
 /** Canvas responses also contain mutable catalog metadata, even when scene revision is unchanged. */
 export function canvasValidator(canvas: import("./contracts").CanvasMeta) {
+  if (canvas.syncMode === "collaborative" && canvas.roomEpoch)
+    return `"collaboration:${canvas.roomEpoch}:${canvas.revision}:${encodeURIComponent(canvas.name)}"`;
+
   return snapshotValidator(
     "canvas",
     canvas.id,

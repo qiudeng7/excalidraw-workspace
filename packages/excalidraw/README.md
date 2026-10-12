@@ -92,6 +92,12 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 
 这些选项用于比较 Canvas 渲染组合，没有引入 HTML/SVG 显示层。直接绘制的元素不经过对应位图缓存，其效果不会再受该缓存的平滑开关控制。几何和文字绘制仍调用上游绘制函数，导出继续使用独立路径。
 
+## 协作共用入口
+
+宿主和权威房间通过 `@excalidraw/excalidraw/reconcile` 共用元素版本选择和 fractional index 修复算法。入口 [data/reconcileCore.ts](data/reconcileCore.ts) 与 [fractionalIndexCore.ts](lib/element/src/fractionalIndexCore.ts) 从上游实现抽出，不依赖 DOM、React、几何或字体；原编辑器入口继续调用它们，并保留编辑中的元素保护、验证及元素更新机制。服务端的授权、输入校验和修复版本戳由宿主管理。
+
+`onBeforeHistoryAction` 向宿主暴露撤销 / 重做前的元素版本，宿主据此提交事务前提，避免补偿操作覆盖其他人的新修改。更新上游时应同时检查共享核心和原编辑器包装入口，运行协作测试；详细流程见[协作与分享](../../docs/development/collaboration.md)。
+
 ## 构建适配与依赖
 
 上游包原本由 Yarn monorepo 构建。本仓库改用 pnpm，并在 [build.mjs](build.mjs) 中保留 esbuild 双产物构建方式，不依赖上游根目录脚本和环境文件。构建中关闭上游统计追踪，保留素材库相关地址。字体继续使用上游默认 CDN。

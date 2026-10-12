@@ -11,7 +11,12 @@ export const ownedWorkspaceIds = (user: string) =>
   db
     .select({ id: tables.workspaces.id })
     .from(tables.workspaces)
-    .where(eq(tables.workspaces.userId, user));
+    .where(
+      and(
+        eq(tables.workspaces.userId, user),
+        eq(tables.workspaces.deleting, 0),
+      ),
+    );
 
 export async function workspace(
   id: string,
@@ -33,7 +38,12 @@ export async function workspaces(user: string): Promise<Workspace[]> {
   return db
     .select(workspaceColumns)
     .from(tables.workspaces)
-    .where(eq(tables.workspaces.userId, user))
+    .where(
+      and(
+        eq(tables.workspaces.userId, user),
+        eq(tables.workspaces.deleting, 0),
+      ),
+    )
     .orderBy(asc(tables.workspaces.createdAt), asc(tables.workspaces.id));
 }
 

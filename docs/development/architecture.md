@@ -2,7 +2,7 @@
 
 [返回开发者指南](readme.md)
 
-应用由 Nuxt 页面、Vue 控制器、React 编辑器和 Nuxt 文件路由组成。Node 使用 SQLite 与私有文件目录，Workers 使用 D1 与私有 R2；两端共用 Drizzle 查询、权限校验与快照发布逻辑。功能流程从[模块与用例](readme.md#功能模块与用例)进入，本页说明跨功能的开发约束。
+应用由 Nuxt 页面、Vue 控制器、React 编辑器和 Nuxt 文件路由组成。Node 使用 SQLite 与私有文件目录，Workers 使用 D1 与私有 R2；协作房间分别由 DO SQLite 和本地 SQLite 保存权威状态，两端共用纯 TypeScript 合并与权限核心。功能流程从[模块与用例](readme.md#功能模块与用例)进入，本页说明跨功能的开发约束。
 
 ## 页面与状态边界
 
@@ -25,13 +25,13 @@
 
 ## 请求与权限边界
 
-[server/api/](../../server/api/) 负责请求校验、业务编排和响应；[server/db/](../../server/db/) 按资源组织查询。[defineApiHandler()](../../server/utils/api.ts) 统一来源校验、默认登录校验和 JSON 错误。公开账户接口显式使用 `{ public: true }`，仍执行来源校验。
+[server/api/](../../server/api/) 负责请求校验、业务编排和响应；[server/db/](../../server/db/) 按资源组织查询。[defineApiHandler()](../../server/utils/api.ts) 统一来源校验、默认登录校验和 JSON 错误。公开账户与分享接口显式使用 `{ public: true }`，仍执行来源校验。
 
 非 GET/HEAD 请求要求 `Origin` 等于配置的公开 origin，且 `X-Requested-With: excalidraw-demo`。来源和反向代理配置见[部署说明](../deployment.md#docker)。[http.ts](../../server/utils/http.ts) 解析 JSON 请求体并限制在 20 MB；[apiRequest()](../../server/utils/request.ts) 保留 Workers 的 DELETE 请求体。
 
 错误格式为 `{ error: { code, message } }`。未知 API 由 [兜底处理器](../../server/api/[...path].ts) 返回 JSON 错误；导航、账户设置、管理设置和排序路径另有无方法后缀的处理器，对不支持的方法返回 405，业务方法由同路径的 `.get.ts`、`.put.ts` 等文件实现。
 
-身份仅缓存在当前请求，资源查询显式传入登录用户 ID 并约束归属。访问不存在或属于其他账户的空间、画布均返回 404。素材库和设置的 owner 请求头用于发现页面账户已变化，实际授权仍以会话和数据库归属为准。
+身份仅缓存在当前请求，资源查询显式传入登录用户 ID 并约束归属。私有目录访问按账号归属校验；协作访问则使用房间所有者、成员或显式链接授权，见[协作权限](collaboration.md)。素材库和设置的 owner 请求头用于发现页面账户已变化，实际授权仍以会话和数据库归属为准。
 
 ## 版本与快照
 
@@ -39,7 +39,7 @@
 
 | 版本                       | 保护范围             | 冲突处理                           |
 | -------------------------- | -------------------- | ---------------------------------- |
-| 画布 / 素材库 `revision`   | 各自的内容快照       | 停止覆盖，提供备份与加载云端操作   |
+| 旧画布 / 素材库 `revision` | 各自的内容快照       | 停止覆盖，提供备份与加载云端操作   |
 | 工作空间 `catalogRevision` | 画布创建、删除与排序 | 重新确认目录，不自动重试旧操作     |
 | 导航 `revision`            | 最近打开位置         | 提示并读取最新版本，不切换当前画布 |
 | 账户设置 `revision`        | 完整用户设置         | 读取云端，让用户选择采用或重新提交 |
@@ -48,11 +48,13 @@
 
 画布和素材库的内容先写入不可变 JSON 快照，再更新数据库引用。[saveSnapshot()](../../server/utils/snapshots.ts) 等待 `blob.put()` 成功后，调用 [publishSnapshot()](../../server/db/snapshots.ts) 按预期版本发布新引用。数据库失败或版本冲突时后台删除新对象，发布成功后后台删除旧对象。数据库与 Blob 不在同一事务中，进程中断留下的对象由回收任务处理。
 
+协作画布使用独立 `epoch + seq` 和操作去重，不使用整图 revision CAS；新客户端首次读取会迁移旧画布并阻止旧 PUT 发布。协议、固定版本、图片引用和恢复路径见[协作与分享](collaboration.md)。
+
 ## 孤立快照回收
 
 [snapshots:cleanup](../../server/tasks/snapshots/cleanup.ts) 每小时执行，[collectOrphans()](../../server/utils/cleanup.ts) 仅删除超过 24 小时、没有数据库引用的 JSON 或旧临时对象，避免清理尚未发布的新写入。
 
-引用检查和删除按最多 100 个对象分批执行，两张引用表的 `object_key` 有索引。R2 使用 cursor 遍历；当前本地 Blob 驱动一次枚举整个目录，本地枚举内存仍随文件数增长。该任务独立于用户 API。
+引用检查和删除按最多 100 个对象分批执行，两张引用表的 `object_key` 有索引。R2 使用 cursor 遍历；当前本地 Blob 驱动一次枚举整个目录，本地枚举内存仍随文件数增长。该任务独立于用户 API，并跳过 `collaboration/` 命名空间；协作对象依据权威房间引用单独回收。
 
 ## 数据迁移
 

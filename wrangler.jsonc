@@ -8,7 +8,13 @@
     "binding": "ASSETS",
     "run_worker_first": true,
   },
-  "main": ".output/server/index.mjs",
+  "main": "server/worker.mjs",
+  "durable_objects": {
+    "bindings": [{ "name": "CANVAS_ROOMS", "class_name": "CanvasRoom" }],
+  },
+  "migrations": [
+    { "tag": "canvas-room-v1", "new_sqlite_classes": ["CanvasRoom"] },
+  ],
   "d1_databases": [
     {
       "binding": "DB",

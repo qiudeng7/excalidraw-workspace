@@ -30,6 +30,10 @@
     },
     "./utils/*": {
       "types": "./dist/types/lib/utils/src/*.d.ts"
+    },
+    "./reconcile": {
+      "types": "./dist/types/data/reconcileCore.d.ts",
+      "default": "./data/reconcileCore.ts"
     }
   },
   "files": [

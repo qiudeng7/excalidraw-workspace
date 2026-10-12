@@ -5,6 +5,11 @@ import AccountGate from "../components/AccountGate.vue";
 import QuietIcon from "../components/QuietIcon.vue";
 import ReleaseAnnouncement from "../components/ReleaseAnnouncement.vue";
 import { useReleaseAnnouncement } from "../composables/useReleaseAnnouncement";
+import {
+  flushCollaboration,
+  closeCollaboration,
+} from "../lib/collaboration/session";
+import { api } from "../lib/api";
 import { accountApi } from "../lib/accountApi";
 import type { CanvasResource } from "../lib/canvasResources";
 import { workspaceApi } from "../lib/workspaceApi";
@@ -31,14 +36,46 @@ const editor = ref<EditorHandle>();
 const saveBarrier = {
   checkpoint: async () => {
     editor.value?.capture();
+    await editor.value?.checkpoint?.();
     await canvasDocument.checkpoint();
   },
   flush: async () => {
     editor.value?.capture();
+    await editor.value?.flush();
+    if (account?.user.value) await flushCollaboration(account.user.value.id);
     await canvasDocument.flushAll();
   },
 };
 const settingsOpen = ref(false);
+const shareOpen = ref(false);
+const onlineCount = ref(0),
+  onlineLabel = ref("");
+const collaborationStatus = ref("正在连接协作…");
+const shared = ref<
+  { id: string; name: string; role: string; viewMode: string }[]
+>([]);
+const isCollaborative = computed(
+  () =>
+    document.value?.syncMode === "collaborative" &&
+    !current.value?.resource.dirty &&
+    current.value?.status !== "conflict",
+);
+const displayedSaveState = computed(() =>
+  isCollaborative.value ? collaborationStatus.value : saveState.value,
+);
+
+async function loadShared() {
+  try {
+    shared.value = (
+      await api<{ canvases: typeof shared.value }>("/api/shared-canvases")
+    ).canvases;
+  } catch (cause) {
+    operation.reportError(
+      cause instanceof Error ? cause.message : "共享画布加载失败",
+    );
+  }
+}
+
 const readyEditorKey = ref("");
 const sidebarOpen = ref(!window.matchMedia("(max-width: 760px)").matches);
 const saveShortcut = /Mac|iPhone|iPad/.test(navigator.platform)
@@ -156,7 +193,10 @@ const {
 
 watch(
   () => user.value?.id,
-  () => {
+  (id, previous) => {
+    if (previous) closeCollaboration(previous);
+    shared.value = [];
+    shareOpen.value = false;
     settingsOpen.value = false;
   },
 );
@@ -266,12 +306,29 @@ function protectDrafts(event: BeforeUnloadEvent) {
   }
 }
 
+watch(isCollaborative, (value) => {
+  if (value) void loadShared();
+});
+
+watch(
+  () => document.value?.id,
+  () => {
+    shareOpen.value = false;
+    collaborationStatus.value = "正在连接协作…";
+  },
+);
+
 window.addEventListener("beforeunload", protectDrafts);
 onBeforeUnmount(() => {
   cancelAppDialog();
   window.removeEventListener("beforeunload", protectDrafts);
+  closeCollaboration();
   canvasDocument.reset();
 });
+
+async function flushForShare() {
+  await editor.value?.flush();
+}
 </script>
 
 <template>
@@ -418,6 +475,15 @@ onBeforeUnmount(() => {
             </li>
           </ul>
         </div>
+      </div>
+      <div class="shared-canvases">
+        <button type="button" @click="loadShared">与我共享 · 刷新</button
+        ><NuxtLink
+          v-for="item in shared"
+          :key="item.id"
+          :to="`/c/${item.id}`"
+          >{{ item.name }}</NuxtLink
+        >
       </div>
       <div class="canvas-heading">
         <span
@@ -602,8 +668,14 @@ onBeforeUnmount(() => {
         </div>
         <div class="header-right">
           <span
+            v-if="isCollaborative && onlineCount"
             class="save-state"
-            :class="{ saved: saveState === '已保存' && !busy }"
+            :title="onlineLabel"
+            >{{ onlineCount }} 人在线</span
+          >
+          <span
+            class="save-state"
+            :class="{ saved: displayedSaveState === '已保存' && !busy }"
             :title="
               current?.status === 'checking'
                 ? '正在确认最新版本，暂时只读，可平移和缩放。'
@@ -611,8 +683,16 @@ onBeforeUnmount(() => {
             "
             role="status"
             ><span class="status-dot" />{{
-              busy && current?.status !== "checking" ? "处理中…" : saveState
+              busy && current?.status !== "checking"
+                ? "处理中…"
+                : displayedSaveState
             }}</span
+          ><button
+            v-if="isCollaborative"
+            class="save-button"
+            @click="shareOpen = true"
+          >
+            分享</button
           ><button
             class="save-button"
             :disabled="interactionLocked || !document"
@@ -691,7 +771,28 @@ onBeforeUnmount(() => {
         class="draw-editor"
         :inert="busy"
       >
+        <CollaborationCanvas
+          v-if="isCollaborative"
+          :key="`collaboration:${user.id}:${document.id}`"
+          ref="editor"
+          :canvas-id="document.id"
+          :user-id="user.id"
+          scope="account"
+          :initial-document="document"
+          :resources="resources"
+          :user-settings="settingsResource.state.settings"
+          :settings-open="settingsOpen || announcementOpen || shareOpen"
+          @status="collaborationStatus = $event"
+          @participants="
+            (count, label) => {
+              onlineCount = count;
+              onlineLabel = label;
+            }
+          "
+          @ready="readyEditorKey = editorKey"
+        />
         <ExcalidrawCanvas
+          v-else
           :key="editorKey"
           ref="editor"
           :document="document"
@@ -751,6 +852,13 @@ onBeforeUnmount(() => {
       @close="closeAnnouncement"
       @shown="releaseShown"
       @failed="announcementFailed"
+    />
+    <CanvasSharePanel
+      v-if="shareOpen && document"
+      :canvas-id="document.id"
+      :user-id="user.id"
+      :before-publish="flushForShare"
+      @close="shareOpen = false"
     />
   </section>
 </template>

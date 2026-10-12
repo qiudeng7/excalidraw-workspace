@@ -38,6 +38,7 @@ export async function publishSnapshot(
             and(
               eq(tables.canvases.id, id),
               eq(tables.canvases.revision, revision),
+              eq(tables.canvases.syncMode, "legacy"),
               inArray(tables.canvases.workspaceId, ownedWorkspaceIds(user)),
             ),
           )

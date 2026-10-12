@@ -3,7 +3,14 @@ const route = useRoute();
 </script>
 
 <template>
-  <header v-if="route.path !== '/'" class="app-header">
+  <header
+    v-if="
+      route.path !== '/' &&
+      !route.path.startsWith('/c/') &&
+      !route.path.startsWith('/share/')
+    "
+    class="app-header"
+  >
     <NuxtLink class="brand" to="/home">Excalidraw Workspace</NuxtLink>
     <nav aria-label="主导航">
       <NuxtLink to="/home">首页</NuxtLink>

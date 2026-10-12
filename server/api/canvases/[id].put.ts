@@ -14,6 +14,13 @@ export default defineApiHandler(async (event) => {
   assertOwner(req, user.id, "x-resource-owner");
   const row = await requireCanvas(id, user);
 
+  if (row.syncMode !== "legacy")
+    return fail(
+      409,
+      "COLLAB_PROTOCOL_REQUIRED",
+      "此画布已启用协作，请刷新页面后使用协作编辑器",
+    );
+
   const data = await body(req);
   const scene = data.scene;
 

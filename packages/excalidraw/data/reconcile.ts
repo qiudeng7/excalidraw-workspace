@@ -1,9 +1,7 @@
 import throttle from "lodash.throttle";
-
-import { arrayToMap, isDevEnv, isTestEnv } from "@excalidraw/common";
+import { isDevEnv, isTestEnv } from "@excalidraw/common";
 
 import {
-  orderByFractionalIndex,
   syncInvalidIndices,
   validateFractionalIndices,
 } from "@excalidraw/element";
@@ -13,36 +11,15 @@ import type { OrderedExcalidrawElement } from "@excalidraw/element/types";
 import type { MakeBrand } from "@excalidraw/common/utility-types";
 
 import type { AppState } from "../types";
+import { reconcileElementVersions } from "./reconcileCore";
+
+export { shouldDiscardRemoteElement } from "./reconcileCore";
 
 export type ReconciledExcalidrawElement = OrderedExcalidrawElement &
   MakeBrand<"ReconciledElement">;
 
 export type RemoteExcalidrawElement = OrderedExcalidrawElement &
   MakeBrand<"RemoteExcalidrawElement">;
-
-export const shouldDiscardRemoteElement = (
-  localAppState: AppState,
-  local: OrderedExcalidrawElement | undefined,
-  remote: RemoteExcalidrawElement,
-): boolean => {
-  if (
-    local &&
-    // local element is being edited
-    (local.id === localAppState.editingTextElement?.id ||
-      local.id === localAppState.resizingElement?.id ||
-      local.id === localAppState.newElement?.id ||
-      // local element is newer
-      local.version > remote.version ||
-      // resolve conflicting edits deterministically by taking the one with
-      // the lowest versionNonce
-      (local.version === remote.version &&
-        local.versionNonce <= remote.versionNonce))
-  ) {
-    return true;
-  }
-
-  return false;
-};
 
 const validateIndicesThrottled = throttle(
   (
@@ -76,39 +53,11 @@ export const reconcileElements = (
   remoteElements: readonly RemoteExcalidrawElement[],
   localAppState: AppState,
 ): ReconciledExcalidrawElement[] => {
-  const localElementsMap = arrayToMap(localElements);
-  const reconciledElements: OrderedExcalidrawElement[] = [];
-  const added = new Set<string>();
-
-  // process remote elements
-  for (const remoteElement of remoteElements) {
-    if (!added.has(remoteElement.id)) {
-      const localElement = localElementsMap.get(remoteElement.id);
-      const discardRemoteElement = shouldDiscardRemoteElement(
-        localAppState,
-        localElement,
-        remoteElement,
-      );
-
-      if (localElement && discardRemoteElement) {
-        reconciledElements.push(localElement);
-        added.add(localElement.id);
-      } else {
-        reconciledElements.push(remoteElement);
-        added.add(remoteElement.id);
-      }
-    }
-  }
-
-  // process remaining local elements
-  for (const localElement of localElements) {
-    if (!added.has(localElement.id)) {
-      reconciledElements.push(localElement);
-      added.add(localElement.id);
-    }
-  }
-
-  const orderedElements = orderByFractionalIndex(reconciledElements);
+  const orderedElements = reconcileElementVersions(
+    localElements,
+    remoteElements,
+    localAppState,
+  );
 
   validateIndicesThrottled(orderedElements, localElements, remoteElements);
 

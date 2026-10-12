@@ -59,6 +59,8 @@ export async function createCanvas(
           name: sql<string>`${name}`.as("name"),
           revision: sql<number>`0`.as("revision"),
           objectKey: sql<string | null>`NULL`.as("objectKey"),
+          syncMode: sql<"legacy">`'legacy'`.as("syncMode"),
+          roomEpoch: sql<string | null>`NULL`.as("roomEpoch"),
           createdAt: sql<string>`${now}`.as("createdAt"),
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           position: sql<number>`0`.as("position"),
@@ -68,6 +70,7 @@ export async function createCanvas(
           and(
             eq(tables.workspaces.id, workspace),
             eq(tables.workspaces.userId, user),
+            eq(tables.workspaces.deleting, 0),
             eq(tables.workspaces.catalogRevision, catalogRevision),
           ),
         ),
@@ -79,6 +82,7 @@ export async function createCanvas(
         and(
           eq(tables.workspaces.id, workspace),
           eq(tables.workspaces.userId, user),
+          eq(tables.workspaces.deleting, 0),
           eq(tables.workspaces.catalogRevision, catalogRevision),
         ),
       )
@@ -129,6 +133,7 @@ export async function deleteCanvas(
         and(
           eq(tables.workspaces.id, workspace),
           eq(tables.workspaces.userId, user),
+          eq(tables.workspaces.deleting, 0),
           eq(tables.workspaces.catalogRevision, catalogRevision),
         ),
       )
@@ -164,6 +169,7 @@ export async function reorderCanvases(
       and(
         eq(tables.workspaces.id, workspace),
         eq(tables.workspaces.userId, user),
+        eq(tables.workspaces.deleting, 0),
         eq(tables.workspaces.catalogRevision, revision),
       ),
     )
@@ -184,6 +190,7 @@ export async function canvasCatalog(workspace: string, user: string) {
         and(
           eq(tables.workspaces.id, workspace),
           eq(tables.workspaces.userId, user),
+          eq(tables.workspaces.deleting, 0),
         ),
       ),
     db
@@ -212,6 +219,7 @@ function catalogMatches(workspace: string, user: string, revision: number) {
         and(
           eq(tables.workspaces.id, workspace),
           eq(tables.workspaces.userId, user),
+          eq(tables.workspaces.deleting, 0),
           eq(tables.workspaces.catalogRevision, revision),
         ),
       ),

@@ -4,17 +4,18 @@
 
 在仓库根目录按变更范围运行。测试使用 Node.js 24+ 和仓库锁定的 pnpm 版本；先执行 `pnpm install --frozen-lockfile`。
 
-| 范围                | 命令                                                                       | 验证内容                                                                    |
-| ------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| 宿主类型            | `pnpm typecheck`                                                           | 依次生成编辑器声明、准备 Nuxt 并检查 Vue、宿主和服务端类型                  |
-| 隔离测试            | `pnpm test:unit`                                                           | 前端控制器、缓存、异步保存与快照失败处理；接口和存储使用替身                |
-| 进程内集成          | `pnpm test:integration`                                                    | SQLite、迁移、blob 驱动与真实 H3 处理器，包括认证并发时序、鉴权后的条件读取 |
-| 前端 UI             | `pnpm test:browser`                                                        | Chromium 中的真实界面和编辑器，API 全部模拟                                 |
-| 本地 Workers / D1   | `pnpm test:worker`                                                         | 临时 Worker 上的设置、改密、旧版设置兼容和缓存条件读取 HTTP 回归            |
-| 代码风格与工具      | `pnpm lint`、`pnpm format:check`、`pnpm test:lint`、`pnpm check:staged`    | 静态检查、规则自身回归及临时 Git 仓库中的暂存区检查回归                     |
-| 独立 HTTP 验收      | 本文后面的 `node tests/http/…` 命令                                        | API 重启持久化、目录与导航，分别使用全新测试库                              |
-| Workers / Node 构建 | 串行执行 `pnpm build`、`pnpm build:node`                                   | 两种部署产物                                                                |
-| 编辑器包            | [构建与 Chromium 检查](../../packages/excalidraw/README.md#验证与更新上游) | 包自身构建和专用浏览器验证                                                  |
+| 范围                | 命令                                                                       | 验证内容                                                                     |
+| ------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 宿主类型            | `pnpm typecheck`                                                           | 依次生成编辑器声明、准备 Nuxt 并检查 Vue、宿主和服务端类型                   |
+| 隔离测试            | `pnpm test:unit`                                                           | 前端控制器、缓存、异步保存与快照失败处理；接口和存储使用替身                 |
+| 进程内集成          | `pnpm test:integration`                                                    | SQLite、迁移、blob 驱动与真实 H3 处理器，包括认证并发时序、鉴权后的条件读取  |
+| 前端 UI             | `pnpm test:browser`                                                        | Chromium 中的真实界面和编辑器，常规用例模拟 API；真实协作用例使用专用 runner |
+| 本地 Workers / D1   | `pnpm test:worker`                                                         | 临时 Worker 上的设置、改密、旧版设置兼容和缓存条件读取 HTTP 回归             |
+| 真实协作浏览器      | `pnpm test:collaboration node`、`pnpm test:collaboration worker`           | 隔离真实服务，无 API mocks，并发编辑、三种查看模式、离线与撤销               |
+| 代码风格与工具      | `pnpm lint`、`pnpm format:check`、`pnpm test:lint`、`pnpm check:staged`    | 静态检查、规则自身回归及临时 Git 仓库中的暂存区检查回归                      |
+| 独立 HTTP 验收      | 本文后面的 `node tests/http/…` 命令                                        | API 重启持久化、目录与导航，分别使用全新测试库                               |
+| Workers / Node 构建 | 串行执行 `pnpm build`、`pnpm build:node`                                   | 两种部署产物                                                                 |
+| 编辑器包            | [构建与 Chromium 检查](../../packages/excalidraw/README.md#验证与更新上游) | 包自身构建和专用浏览器验证                                                   |
 
 手动执行 `pnpm check`，依次运行 `lint`、`format:check`、`test:lint`、`test:unit`、`test:integration` 和 `typecheck`。提交和推送不会自动触发项目检查。快速定位问题可先运行相关 unit；integration 不启动应用 HTTP 服务，但迁移回归会执行独立 Nuxt CLI。
 
@@ -109,7 +110,7 @@ BROWSER_BASE_URL=http://127.0.0.1:3000 CHROMIUM_PATH=/usr/bin/chromium pnpm test
 
 缓存回归可单独运行 `pnpm test:browser tests/browser/canvas-cache.spec.ts`，覆盖未打开素材库零请求、初始化不误保存空库、缓存校验期间修改入口隔离、旧画布后台保存和快返、失败重试、查看模式与工具恢复、克隆标签页草稿隔离，以及未加载素材库的 API 修改保护。时序用例输出本机小场景的 click-to-preview / click-to-editable，服务端响应由确定性屏障控制，用于比较受控加载时序。
 
-失败截图与 trace 保存在忽略的 `test-results/browser/`，成功用例不保存截图。用 `pnpm exec playwright show-trace <trace.zip路径>` 查看 trace。浏览器测试验证前端行为，API 为模拟响应；真实会话 SQL 和 D1 的结果由下面两套测试验证。
+失败截图与 trace 保存在忽略的 `test-results/browser/`，成功用例不保存截图。用 `pnpm exec playwright show-trace <trace.zip路径>` 查看 trace。浏览器测试验证前端行为，API 为模拟响应，测试服务关闭协作目录投影和对象清理后台任务；真实会话 SQL 和 D1 的结果由下面两套测试验证。
 
 ## 认证并发回归
 
@@ -147,8 +148,8 @@ pnpm test:worker http://127.0.0.1:3000
 pnpm build
 test_state=$(mktemp -d /tmp/excalidraw-http-test-XXXXXX)
 test_origin=http://127.0.0.1:18790
-pnpm exec wrangler d1 migrations apply DB --local --persist-to "$test_state"
-pnpm exec wrangler dev --local --ip 127.0.0.1 --port 18790 --inspector-port 0 \
+pnpm exec wrangler d1 migrations apply DB --config wrangler.jsonc --local --persist-to "$test_state"
+pnpm exec wrangler dev --config wrangler.jsonc --local --ip 127.0.0.1 --port 18790 --inspector-port 0 \
   --persist-to "$test_state" --var PUBLIC_ORIGIN:"$test_origin"
 ```
 
@@ -190,3 +191,16 @@ node tests/http/account-compatibility.mjs http://127.0.0.1:18790
 ```
 
 完成后停止 Worker，再删除这次的 `test_state`。手动使用已有服务时不自动停服或删除数据。页面变更还需浏览器验收，HTTP 脚本不覆盖编辑器交互。
+
+## 真实协作验收
+
+```sh
+CHROMIUM_PATH=/usr/bin/chromium pnpm test:collaboration node
+CHROMIUM_PATH=/usr/bin/chromium pnpm test:collaboration worker
+```
+
+两条命令串行执行。runner 构建对应目标，为 Node 创建临时数据库并应用当前 SQL，或向临时 Wrangler state 应用本地 D1 迁移，再在空闲回环端口启动独占服务。runner 先运行备份 CLI 的图片、固定版本、新 epoch 恢复及校验和拒绝测试，再由 Playwright 使用真实账号、HTTP 和 WebSocket 验证协作，结束、失败和终止均清理本次服务及状态。不会迁移默认开发数据或线上数据库。已有专用测试服务可用 `BROWSER_BASE_URL=http://127.0.0.1:端口 COLLABORATION_LIVE_TEST=1 pnpm test:browser collaboration.spec.ts` 跳过 runner；测试会留下随机账号和画布。
+
+可在 runner 命令后附加 Playwright 参数，例如 `pnpm test:collaboration node --grep 主画布` 定位单个浏览器用例。
+
+协作用例覆盖主画布分享面板、账号邀请与共享入口、同账号与匿名编辑会话、远端变更不回传、撤销隔离、离线重连、撤销链接，以及最新版 / 固定版不连接 WebSocket、不请求访客的私有资源。纯核心、客户端队列及后端集成另见 `tests/unit/collaboration*.test.ts` 和 `tests/integration/collaboration.test.ts`。

@@ -6,6 +6,8 @@ import { requireCanvas } from "../../utils/access";
 import { meta } from "../../utils/snapshots";
 import { json, body, name } from "../../utils/http";
 
+import { canvasCommand, projectMember } from "../../collaboration/service";
+
 export default defineApiHandler(async (event) => {
   const id = resourceId(event);
 
@@ -15,7 +17,11 @@ export default defineApiHandler(async (event) => {
 
   const data = await body(req);
 
-  await renameCanvas(id, user.id, name(data.name), new Date().toISOString());
+  if (row.syncMode !== "legacy") {
+    await canvasCommand(event, id, { type: "rename", name: name(data.name) });
+    await projectMember(event, id);
+  } else
+    await renameCanvas(id, user.id, name(data.name), new Date().toISOString());
 
   return json({ canvas: meta(await requireCanvas(id, user)) });
 });

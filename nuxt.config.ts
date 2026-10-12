@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-09-27",
   srcDir: "src/",
@@ -39,11 +41,20 @@ export default defineNuxtConfig({
   routeRules: {
     "/": { ssr: false },
     "/draw": { redirect: "/" },
+    "/c/**": { ssr: false },
+    "/share/**": { ssr: false },
     "/api/**": { headers: { "cache-control": "no-store" } },
   },
   nitro: {
     preset: process.env.NITRO_PRESET || "node-server",
-    experimental: { tasks: true },
+    plugins: process.env.NITRO_PRESET?.startsWith("cloudflare")
+      ? []
+      : [
+          fileURLToPath(
+            new URL("./server/collaboration/node-plugin.ts", import.meta.url),
+          ),
+        ],
+    experimental: { tasks: true, websocket: true },
     scheduledTasks: { "0 * * * *": ["snapshots:cleanup"] },
     cloudflare: {
       deployConfig: false,

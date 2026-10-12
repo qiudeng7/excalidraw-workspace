@@ -25,10 +25,13 @@ export const json = (
     headers: { "Cache-Control": "no-store", ...headers },
   });
 
-export async function body(req: Request): Promise<Record<string, unknown>> {
+export async function body(
+  req: Request,
+  maximumBytes = MAX_BODY,
+): Promise<Record<string, unknown>> {
   if (!req.headers.get("content-type")?.includes("application/json"))
     fail(415, "JSON_REQUIRED", "请使用 JSON 请求");
-  if (Number(req.headers.get("content-length")) > MAX_BODY)
+  if (Number(req.headers.get("content-length")) > maximumBytes)
     fail(413, "TOO_LARGE", "单次保存不能超过 20 MB");
   const reader = req.body?.getReader();
 
@@ -41,7 +44,7 @@ export async function body(req: Request): Promise<Record<string, unknown>> {
 
     if (done) break;
     size += value.byteLength;
-    if (size > MAX_BODY) {
+    if (size > maximumBytes) {
       await reader!.cancel();
       fail(413, "TOO_LARGE", "单次保存不能超过 20 MB");
     }

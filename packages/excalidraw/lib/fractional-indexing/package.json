@@ -24,7 +24,8 @@
   "devDependencies": {},
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts"
+      "types": "./dist/src/index.d.ts",
+      "default": "./src/index.ts"
     }
   },
   "publishConfig": {

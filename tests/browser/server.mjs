@@ -67,6 +67,14 @@ try {
   });
   let client;
 
+  // This suite mocks every API and deliberately has no migrated backend.
+  // Background projection/GC belongs to the real-service HTTP runners.
+  nuxt.hook("nitro:config", (config) => {
+    config.plugins = (config.plugins ?? []).filter(
+      (plugin) =>
+        plugin !== join(project, "server/collaboration/node-plugin.ts"),
+    );
+  });
   nuxt.hook("vite:serverCreated", (viteServer, { isClient }) => {
     if (isClient) client = viteServer.environments.client;
   });
