@@ -5,7 +5,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { nodeStorage } from "../../server/storage/node";
-import { handleApi } from "../../server/services/api";
+import { handleApi } from "./api";
 
 const legacy = await readFile(
   new URL("../../migrations/0001_accounts.sql", import.meta.url),
@@ -20,7 +20,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
   let close: () => unknown;
   let storage: Pick<
     Awaited<ReturnType<typeof nodeStorage>>,
-    "repository" | "objects"
+    "repository" | "storage"
   >;
   const db = new DatabaseSync(resolve(directory, "workspace.sqlite"));
 
@@ -63,7 +63,6 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
       {
         ...storage,
         publicOrigin: "https://demo.test",
-        clientIp: "192.0.2.1",
         waitUntil: (p) => promises.push(p),
       },
     );

@@ -4,9 +4,9 @@ import { mkdtemp, rm, utimes } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { nodeStorage } from "../../server/storage/node";
-import { handleApi } from "../../server/services/api";
+import { handleApi } from "./api";
 import { collectOrphans } from "../../server/storage/repository";
-import { clientIp, publicOrigin } from "../../server/services/security";
+import { clientIp, publicOrigin } from "../../server/utils/security";
 
 test("SQLite service preserves sessions, image snapshots and revisions across restarts", async () => {
   const directory = await mkdtemp(resolve(tmpdir(), "workspace-storage-"));
@@ -32,7 +32,6 @@ test("SQLite service preserves sessions, image snapshots and revisions across re
     const response = await handleApi(req, {
       ...storage,
       publicOrigin: "https://demo.test",
-      clientIp: "192.0.2.7",
       waitUntil: (p) => pending.push(p),
     });
 

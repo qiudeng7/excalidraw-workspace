@@ -1,23 +1,24 @@
 import { test } from "node:test";
+import { createApp, defineEventHandler, toWebHandler } from "h3";
+import { requestOrigin, requestClientIp } from "../../server/utils/request";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { nodeStorage } from "../../server/storage/node";
-import { handleApi, type BackendContext } from "../../server/services/api";
-import { digest } from "../../server/services/passwords";
+import { handleApi, type ApiFixture } from "./api";
+import { digest } from "../../server/utils/passwords";
 import { createDefaultUserSettings } from "../../shared/contracts";
 import type { User, UserSettingsDocument } from "../../shared/contracts";
 import { Repository } from "../../server/storage/repository";
 
-test("real request scopes isolate concurrent identities and do not dispose shared storage", async () => {
-  const directory = await mkdtemp(resolve(tmpdir(), "di-scope-"));
+test("request events isolate concurrent identities and keep shared storage available", async () => {
+  const directory = await mkdtemp(resolve(tmpdir(), "request-isolation-"));
   const storage = await nodeStorage(directory);
   const pending: Promise<unknown>[] = [];
-  const context: BackendContext = {
+  const context: ApiFixture = {
     ...storage,
     publicOrigin: "https://demo.test",
-    clientIp: "192.0.2.5",
     waitUntil(promise) {
       pending.push(promise);
     },
@@ -35,6 +36,14 @@ test("real request scopes isolate concurrent identities and do not dispose share
     role: "user",
   };
   const tokens = ["a".repeat(64), "b".repeat(64)];
+  let sessionQueries = 0;
+  const session = storage.repository.session.bind(storage.repository);
+
+  storage.repository.session = (...args) => {
+    sessionQueries++;
+
+    return session(...args);
+  };
 
   try {
     for (const [index, user] of [alice, bob].entries()) {
@@ -80,6 +89,12 @@ test("real request scopes isolate concurrent identities and do not dispose share
     });
 
     assert.equal(saved.status, 200);
+    assert.equal(
+      sessionQueries,
+      1,
+      "wrapper and handler reuse the request identity",
+    );
+    sessionQueries = 0;
     const results = await Promise.all(
       Array.from({ length: 24 }, async (_, index) => {
         const owner = index % 2;
@@ -102,9 +117,14 @@ test("real request scopes isolate concurrent identities and do not dispose share
     );
 
     assert.equal(results.length, 24);
+    assert.equal(
+      sessionQueries,
+      48,
+      "each HTTP request resolves its own identity exactly once",
+    );
     assert.equal((await call("/session", "c".repeat(64))).status, 200);
     assert.equal((await call("/user-settings", "c".repeat(64))).status, 401);
-    // A completed request scope does not close the process-owned SQLite connection.
+    // A completed request does not close the process-owned SQLite connection.
     assert.equal((await storage.repository.userByEmail(bob.email))?.id, bob.id);
     await Promise.all(pending);
   } finally {
@@ -113,16 +133,15 @@ test("real request scopes isolate concurrent identities and do not dispose share
   }
 });
 
-test("composition failures use the normal HTTP error boundary", async () => {
+test("platform initialization failures use the normal HTTP error boundary", async () => {
   const context = {
     get repository() {
-      throw new Error("invalid injected storage");
+      throw new Error("invalid platform storage");
     },
-    objects: {},
+    storage: {},
     publicOrigin: "https://demo.test",
-    clientIp: "unknown",
     waitUntil() {},
-  } as BackendContext;
+  } as ApiFixture;
   const original = console.error;
 
   console.error = () => {};
@@ -165,5 +184,93 @@ test("repository rejects malformed SQL rows at the storage boundary", async () =
   await assert.rejects(
     repository.session("hash", Date.now()),
     /Invalid stored role/,
+  );
+});
+
+test("native request config controls origins and preserves trusted proxy IP rules", async () => {
+  async function inspect(
+    config: { publicOrigin: string; trustedProxyIps: string },
+    peer: string,
+    forwarded: string,
+    cloudflare = false,
+  ) {
+    const app = createApp().use(
+      defineEventHandler((event) => {
+        event.context.nitro = { runtimeConfig: config };
+        Object.defineProperty(event.node.req.socket, "remoteAddress", {
+          value: peer,
+        });
+        if (cloudflare)
+          event.context.cloudflare = {
+            env: { PUBLIC_ORIGIN: "https://legacy.test" },
+          };
+
+        return { origin: requestOrigin(event), ip: requestClientIp(event) };
+      }),
+    );
+    const response = await toWebHandler(app)(
+      new Request("http://attacker.test/api/check", {
+        headers: {
+          "x-forwarded-for": forwarded,
+          "x-forwarded-host": "forged.test",
+          "x-forwarded-proto": "http",
+          "cf-connecting-ip": "203.0.113.20",
+        },
+      }),
+    );
+
+    assert.equal(response.status, 200);
+
+    return response.json();
+  }
+
+  assert.deepEqual(
+    await inspect(
+      { publicOrigin: "https://configured.test", trustedProxyIps: "" },
+      "192.0.2.1",
+      "198.51.100.8",
+    ),
+    {
+      origin: "https://configured.test",
+      ip: "192.0.2.1",
+    },
+  );
+  assert.deepEqual(
+    await inspect(
+      {
+        publicOrigin: "https://configured.test",
+        trustedProxyIps: "127.0.0.1,127.0.0.2",
+      },
+      "127.0.0.1",
+      "198.51.100.8,127.0.0.2",
+    ),
+    {
+      origin: "https://configured.test",
+      ip: "198.51.100.8",
+    },
+  );
+  assert.deepEqual(
+    await inspect(
+      { publicOrigin: "https://configured.test", trustedProxyIps: "" },
+      "192.0.2.1",
+      "198.51.100.8",
+      true,
+    ),
+    {
+      origin: "https://configured.test",
+      ip: "203.0.113.20",
+    },
+  );
+  assert.deepEqual(
+    await inspect(
+      { publicOrigin: "", trustedProxyIps: "" },
+      "192.0.2.1",
+      "198.51.100.8",
+      true,
+    ),
+    {
+      origin: "https://legacy.test",
+      ip: "203.0.113.20",
+    },
   );
 });

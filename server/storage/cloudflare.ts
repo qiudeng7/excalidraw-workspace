@@ -1,10 +1,8 @@
+import { createStorage } from "unstorage";
+import { objectStore, type SnapshotStorage } from "./objects";
+import { workspaceR2Driver } from "./r2";
 import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
-import {
-  Repository,
-  type SqlDriver,
-  type ObjectStore,
-  type Statement,
-} from "./repository";
+import { Repository, type SqlDriver, type Statement } from "./repository";
 
 export interface CloudflareBindings {
   DB: D1Database;
@@ -12,13 +10,24 @@ export interface CloudflareBindings {
   PUBLIC_ORIGIN?: string;
 }
 
-export function cloudflareStorage(env: CloudflareBindings) {
+export function cloudflareStorage(
+  env: CloudflareBindings,
+  storage?: SnapshotStorage,
+) {
+  return {
+    repository: cloudflareRepository(env.DB),
+    objects: cloudflareObjects(env.DATA, storage),
+  };
+}
+
+export function cloudflareRepository(database: D1Database) {
   const statement = (item: Statement) =>
-    env.DB.prepare(item.sql).bind(...item.values);
+    database.prepare(item.sql).bind(...item.values);
 
   const driver: SqlDriver = {
     async query(sql, values = []) {
-      const result = await env.DB.prepare(sql)
+      const result = await database
+        .prepare(sql)
         .bind(...values)
         .all();
 
@@ -26,7 +35,7 @@ export function cloudflareStorage(env: CloudflareBindings) {
     },
 
     async transaction(items) {
-      const results = await env.DB.batch<Record<string, unknown>>(
+      const results = await database.batch<Record<string, unknown>>(
         items.map(statement),
       );
 
@@ -37,26 +46,15 @@ export function cloudflareStorage(env: CloudflareBindings) {
     },
   };
 
-  const objects: ObjectStore = {
-    async read(key) {
-      const object = await env.DATA.get(key);
+  return new Repository(driver);
+}
 
-      return object ? object.json() : null;
-    },
-
-    async write(key, value) {
-      await env.DATA.put(key, JSON.stringify(value), {
-        httpMetadata: { contentType: "application/json" },
-      });
-    },
-
-    async delete(keys) {
-      for (let offset = 0; offset < keys.length; offset += 1000)
-        await env.DATA.delete(keys.slice(offset, offset + 1000));
-    },
-
-    async list(cursor) {
-      const page = await env.DATA.list({ cursor, limit: 1000 });
+export function cloudflareObjects(bucket: R2Bucket, storage?: SnapshotStorage) {
+  return objectStore(
+    storage ?? createStorage({ driver: workspaceR2Driver(bucket) }),
+    async (cursor) => {
+      // R2's page already includes upload times: do not spend one Worker subrequest per object.
+      const page = await bucket.list({ cursor, limit: 1000 });
 
       return {
         objects: page.objects.map((object) => ({
@@ -66,7 +64,10 @@ export function cloudflareStorage(env: CloudflareBindings) {
         cursor: page.truncated ? page.cursor : undefined,
       };
     },
-  };
-
-  return { repository: new Repository(driver), objects };
+    async (keys) => {
+      // Preserve R2 bulk deletion instead of spending a subrequest on every key.
+      for (let offset = 0; offset < keys.length; offset += 1000)
+        await bucket.delete(keys.slice(offset, offset + 1000));
+    },
+  );
 }

@@ -10,9 +10,20 @@ const workerStorage = fileURLToPath(
 export default defineNuxtConfig({
   compatibilityDate: "2026-09-27",
   srcDir: "src/",
-  alias: { "#workspace-node-storage": nodeStorage },
+  alias: {
+    "#workspace-node-storage": nodeStorage,
+    "#workspace-sqlite-driver": fileURLToPath(
+      import.meta.resolve("db0/connectors/node-sqlite"),
+    ),
+  },
   serverDir: "server/",
   modules: ["@pinia/nuxt"],
+  runtimeConfig: {
+    publicOrigin: "",
+    trustedProxyIps: "",
+    workspacePlatform:
+      process.env.NITRO_PRESET === "cloudflare-module" ? "cloudflare" : "node",
+  },
   css: ["~/style.css"],
   devtools: { enabled: false },
   app: {
@@ -36,9 +47,19 @@ export default defineNuxtConfig({
     "/api/**": { headers: { "cache-control": "no-store" } },
   },
   nitro: {
+    experimental: { database: true },
+    database: {
+      default:
+        process.env.NITRO_PRESET === "cloudflare-module"
+          ? { connector: "cloudflare-d1", options: { bindingName: "DB" } }
+          : { connector: "node-sqlite", options: {} },
+    },
     preset: process.env.NITRO_PRESET || "node-server",
     // Keep node:sqlite out of the Worker bundle, even behind a dynamic import.
     alias: {
+      "db0/connectors/node-sqlite": fileURLToPath(
+        new URL("./server/storage/connector.ts", import.meta.url),
+      ),
       "#workspace-node-storage":
         process.env.NITRO_PRESET === "cloudflare-module"
           ? workerStorage

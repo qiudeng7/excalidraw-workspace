@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createSnapshots } from "../../server/services/snapshots";
-import { ApiError } from "../../server/services/http";
+import { saveSnapshot } from "../../server/utils/snapshots";
+import { ApiError } from "../../server/utils/http";
 import type { User } from "../../shared/contracts";
-import type { ObjectStore } from "../../server/storage/repository";
+import type { H3Event } from "h3";
+import { withNativeStorage } from "./nitro";
 
 const user: User = {
   id: "alice",
@@ -17,41 +18,48 @@ test("snapshot CAS failures reclaim only the newly written object", async () => 
     const writes: string[] = [];
     const deletions: string[][] = [];
     const pending: Promise<unknown>[] = [];
-    const objects: ObjectStore = {
-      async read() {
+    const objects = {
+      async getItem() {
         return null;
       },
-      async write(key) {
+      async setItem(key: string) {
         writes.push(key);
       },
-      async delete(keys) {
-        deletions.push(keys);
+      async removeItem(key: string) {
+        deletions.push([key]);
       },
-      async list() {
-        return { objects: [] };
+      async getKeys() {
+        return [];
+      },
+      getMeta() {
+        return {};
       },
     };
-    const snapshots = createSnapshots({
-      objects,
-      repository: {
-        async saveSnapshot() {
-          assert.equal(writes.length, 1, "object exists before metadata CAS");
-          if (outcome === "error") throw new Error("database unavailable");
+    const event = {
+      context: {
+        repository: async () => ({
+          async saveSnapshot() {
+            assert.equal(writes.length, 1, "object exists before metadata CAS");
+            if (outcome === "error") throw new Error("database unavailable");
 
-          return outcome === "success" ? 1 : 0;
-        },
+            return outcome === "success" ? 1 : 0;
+          },
+        }),
       },
-      waitUntil(promise) {
+      waitUntil(promise: Promise<unknown>) {
         pending.push(promise);
       },
-    });
-    const save = snapshots.save(
-      user,
-      "canvas",
-      "canvas-id",
-      { revision: 2, objectKey: "old.json" },
-      2,
-      {},
+    } as unknown as H3Event;
+    const save = withNativeStorage(objects, () =>
+      saveSnapshot(
+        event,
+        user,
+        "canvas",
+        "canvas-id",
+        { revision: 2, objectKey: "old.json" },
+        2,
+        {},
+      ),
     );
 
     if (outcome === "success") assert.equal((await save).revision, 3);

@@ -1,14 +1,18 @@
-import { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from "node:sqlite";
 import {
   mkdir,
   readFile,
   readdir,
   rename,
   rm,
-  stat,
   writeFile,
 } from "node:fs/promises";
-import { resolve, dirname, relative } from "node:path";
+import { resolve, dirname } from "node:path";
+import { createStorage } from "unstorage";
+import fsDriver from "unstorage/drivers/fs-lite";
+import { createDatabase, type Database } from "db0";
+import nodeSqlite from "db0/connectors/node-sqlite";
+import { objectStore, type SnapshotStorage } from "./objects";
 import {
   Repository,
   type SqlDriver,
@@ -20,10 +24,17 @@ import {
 export async function nodeStorage(
   dataDir = process.env.DATA_DIR || resolve(".data"),
   migrationsDir = process.env.MIGRATIONS_DIR || resolve("migrations"),
+  native?: {
+    database: Pick<Database, "getInstance">;
+    storage: SnapshotStorage;
+  },
 ) {
   await mkdir(dataDir, { recursive: true, mode: 0o700 });
 
-  const db = new DatabaseSync(resolve(dataDir, "workspace.sqlite"));
+  const database =
+    native?.database ??
+    createDatabase(nodeSqlite({ path: resolve(dataDir, "workspace.sqlite") }));
+  const db = (await database.getInstance()) as DatabaseSync;
 
   db.exec(
     "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;",
@@ -50,7 +61,7 @@ export async function nodeStorage(
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
-    db.close();
+    if (!native) db.close();
     throw error;
   }
 
@@ -88,84 +99,9 @@ export async function nodeStorage(
     },
   };
 
-  const root = resolve(dataDir, "objects");
-
-  await mkdir(root, { recursive: true, mode: 0o700 });
-
-  function objectPath(key: string) {
-    if (!/^[a-zA-Z0-9/-]+\.json$/.test(key) || key.includes(".."))
-      throw new Error("Invalid private object key");
-
-    const path = resolve(root, key);
-
-    if (relative(root, path).startsWith(".."))
-      throw new Error("Invalid object path");
-
-    return path;
-  }
-
-  const objects: ObjectStore = {
-    async read(key) {
-      try {
-        return JSON.parse(await readFile(objectPath(key), "utf8"));
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-        throw error;
-      }
-    },
-
-    async write(key, value) {
-      const path = objectPath(key);
-
-      await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-
-      const temp = `${path}.${crypto.randomUUID()}.tmp`;
-
-      try {
-        await writeFile(temp, JSON.stringify(value), {
-          mode: 0o600,
-          flag: "wx",
-        });
-        await rename(temp, path);
-      } finally {
-        await rm(temp, { force: true });
-      }
-    },
-
-    async delete(keys) {
-      await Promise.all(
-        keys.map((key) => rm(objectPath(key), { force: true })),
-      );
-    },
-
-    async list() {
-      const entries = await readdir(root, {
-        recursive: true,
-        withFileTypes: true,
-      });
-      const result: {
-        key: string;
-        modified: number;
-      }[] = [];
-
-      for (const entry of entries) {
-        if (!entry.isFile()) continue;
-        const path = resolve(entry.parentPath, entry.name);
-        const key = relative(root, path).replaceAll("\\", "/");
-        const modified = (await stat(path)).mtimeMs;
-
-        if (entry.name.endsWith(".tmp")) {
-          if (modified < Date.now() - 24 * 60 * 60 * 1000)
-            await rm(path, { force: true });
-          continue;
-        }
-
-        if (entry.name.endsWith(".json")) result.push({ key, modified });
-      }
-
-      return { objects: result };
-    },
-  };
+  const storage =
+    native?.storage ?? createStorage({ driver: nodeObjectDriver(dataDir) });
+  const objects = objectStore(storage);
 
   const repository = new Repository(driver);
   const sweep = () =>
@@ -184,10 +120,53 @@ export async function nodeStorage(
   return {
     repository,
     objects,
+    storage,
 
     close() {
       clearInterval(timer);
-      db.close();
+      if (!native) db.close();
+    },
+  };
+}
+
+/** Native filesystem driver plus atomic publication of immutable JSON snapshots. */
+export function nodeObjectDriver(
+  dataDir = process.env.DATA_DIR || resolve(".data"),
+) {
+  const root = resolve(dataDir, "objects");
+  const driver = fsDriver({
+    base: root,
+    noClear: true,
+  });
+
+  return {
+    ...driver,
+    async getItem(key: string) {
+      const result: unknown = await driver.getItem!(key, {});
+
+      if (result instanceof Error) throw result;
+
+      return result;
+    },
+    async removeItem(key: string) {
+      const result: unknown = await driver.removeItem!(key, {});
+
+      if (result instanceof Error) throw result;
+    },
+    async setItem(key: string, value: string) {
+      const path = resolve(root, key.replaceAll(":", "/"));
+
+      if (key.includes("..") || !path.startsWith(`${root}/`))
+        throw new Error("Invalid private object key");
+      await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+      const temp = `${path}.${crypto.randomUUID()}.tmp`;
+
+      try {
+        await writeFile(temp, value, { mode: 0o600, flag: "wx" });
+        await rename(temp, path);
+      } finally {
+        await rm(temp, { force: true });
+      }
     },
   };
 }

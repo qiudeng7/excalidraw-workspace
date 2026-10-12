@@ -4,7 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { nodeStorage } from "../../server/storage/node";
-import { handleApi } from "../../server/services/api";
+import { handleApi } from "./api";
 import { createDefaultUserSettings } from "../../shared/contracts";
 
 test(`node: isolated user settings, initial CAS, validation and independent revisions`, async () => {
@@ -12,7 +12,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
   let close: () => unknown;
   let storage: Pick<
     Awaited<ReturnType<typeof nodeStorage>>,
-    "repository" | "objects"
+    "repository" | "storage"
   >;
   const node = await nodeStorage(directory);
 
@@ -43,7 +43,6 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
       {
         ...storage,
         publicOrigin: "https://demo.test",
-        clientIp: "192.0.2.1",
         waitUntil: (p) => pending.push(p),
       },
     );
