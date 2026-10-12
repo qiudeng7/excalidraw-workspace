@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { nodeStorage } from "./storage";
-import { handleApi } from "./api";
+import { nodeStorage } from "./support/storage";
+import { handleApi } from "./support/api";
 
 test("private snapshot validators authorize before 304 and skip object reads when unchanged", async () => {
   const directory = await mkdtemp(join(tmpdir(), "snapshot-validator-"));

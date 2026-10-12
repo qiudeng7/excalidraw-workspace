@@ -1,6 +1,6 @@
 import { registerHooks } from "node:module";
 
-// Redirect NuxtHub's generated modules in standalone H3 tests.
+// Redirect NuxtHub's generated modules in isolated unit and H3 integration tests.
 // Production always imports NuxtHub's real client; test databases are isolated per async scope.
 registerHooks({
   resolve(specifier, context, nextResolve) {

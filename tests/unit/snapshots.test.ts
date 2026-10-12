@@ -4,8 +4,8 @@ import { saveSnapshot } from "../../server/utils/snapshots";
 import { ApiError } from "../../server/utils/http";
 import type { User } from "../../shared/contracts";
 import type { H3Event } from "h3";
-import { withBlob, type TestBlob } from "./blobs";
-import { withDatabase, type TestDatabase } from "./database";
+import { withBlob, type TestBlob } from "../lib/blobs";
+import { withDatabase, type TestDatabase } from "../lib/database";
 
 const user: User = {
   id: "alice",

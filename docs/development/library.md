@@ -24,4 +24,4 @@
 
 ## 验证入口
 
-[node-storage.test.ts](../../tests/backend/node-storage.test.ts) 检查素材库读写、账户隔离与重启持久化，[snapshots.test.ts](../../tests/backend/snapshots.test.ts) 检查版本写入失败及新对象回收，[persistence-owner.test.ts](../../tests/backend/persistence-owner.test.ts) 检查旧账户保存取消。[canvas-cache.test.ts](../../tests/backend/canvas-cache.test.ts) 与 [canvas-cache.spec.ts](../../tests/browser/canvas-cache.spec.ts) 检查零提前读取、请求合并、空库不误保存及跨画布复用。浏览器中另检查双标签页冲突，以及素材库保存失败是否阻止退出。
+[node-storage.test.ts](../../tests/integration/node-storage.test.ts) 检查素材库读写、账户隔离与重启持久化，[snapshots.test.ts](../../tests/unit/snapshots.test.ts) 检查版本写入失败及新对象回收，[persistence-owner.test.ts](../../tests/unit/persistence-owner.test.ts) 检查旧账户保存取消。[canvas-cache.test.ts](../../tests/unit/canvas-cache.test.ts) 与 [canvas-cache.spec.ts](../../tests/browser/canvas-cache.spec.ts) 检查零提前读取、请求合并、空库不误保存及跨画布复用。浏览器中另检查双标签页冲突，以及素材库保存失败是否阻止退出。

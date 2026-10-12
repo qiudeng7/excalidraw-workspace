@@ -71,19 +71,34 @@ export default [
       ".wrangler/**",
       ".data/**",
       "**/dist/**",
+      "**/dist-ssr/**",
+      "**/.cache/**",
       "**/coverage/**",
     ],
   },
   {
-    files: ["**/*.{ts,tsx,vue}"],
+    files: ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,vue}"],
     // Formatting does not interpret upstream directives for unrelated lint rules.
     linterOptions: { noInlineConfig: true },
     languageOptions: {
-      parser: tseslint.parser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
     plugins: { "@stylistic": stylistic, "@typescript-eslint": tseslint.plugin },
     rules,
+  },
+  {
+    files: ["**/*.{js,mjs,cjs,jsx}"],
+    rules: {
+      // JS scripts keep Prettier spacing without migrating historical blank lines.
+      "@stylistic/padding-line-between-statements": "off",
+      "@stylistic/lines-between-class-members": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "no-unused-vars": rules["@typescript-eslint/no-unused-vars"],
+    },
+  },
+  {
+    files: ["**/*.{ts,mts,cts,tsx}"],
+    languageOptions: { parser: tseslint.parser },
   },
   {
     files: ["**/*.vue"],

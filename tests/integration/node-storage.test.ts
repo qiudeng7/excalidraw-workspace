@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "./storage";
-import { handleApi } from "./api";
+import { nodeStorage } from "./support/storage";
+import { handleApi } from "./support/api";
 import { clientIp, publicOrigin } from "../../server/utils/security";
 
 test("SQLite service preserves sessions, image snapshots and revisions across restarts", async () => {

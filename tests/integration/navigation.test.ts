@@ -4,8 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "./storage";
-import { handleApi } from "./api";
+import { nodeStorage } from "./support/storage";
+import { handleApi } from "./support/api";
 
 const legacy = await readFile(
   new URL(

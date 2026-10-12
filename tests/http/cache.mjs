@@ -1,7 +1,7 @@
 // Real local HTTP regression: conditional snapshots remain private and preserve CAS.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { localOrigin } from "../../scripts/local-smoke.mjs";
+import { localOrigin } from "./support/local-client.mjs";
 
 const origin = localOrigin(process.argv[2] ?? "http://127.0.0.1:3000");
 let cookie;
@@ -42,7 +42,7 @@ const canvas = (
   await (await request(`/workspaces/${space.id}/canvases`)).json()
 ).canvases[0];
 const scene = {
-  elements: [{ id: "cache-smoke", type: "rectangle" }],
+  elements: [{ id: "cache-http-test", type: "rectangle" }],
   appState: {},
   files: { image: { dataURL: "data:image/png;base64,dGVzdA==" } },
 };

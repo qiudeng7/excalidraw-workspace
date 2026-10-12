@@ -4,8 +4,8 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { sql } from "drizzle-orm";
-import { nodeStorage } from "./storage";
-import { handleApi } from "./api";
+import { nodeStorage } from "./support/storage";
+import { handleApi } from "./support/api";
 import { createDefaultUserSettings } from "../../shared/contracts";
 
 test(`node: isolated user settings, initial CAS, validation and independent revisions`, async () => {

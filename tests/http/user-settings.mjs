@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // 仅向本地测试服务创建独立账户，验证 Nitro/Workers 的实际配置与账户隔离。
-// node scripts/smoke-user-settings.mjs http://localhost:3000
+// node tests/http/user-settings.mjs http://localhost:3000
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { localClient, expect, report } from "./local-smoke.mjs";
+import { localClient, expect, report } from "./support/local-client.mjs";
 
 const request = localClient(process.argv[2] ?? "http://localhost:3000");
 

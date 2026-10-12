@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "./storage";
-import { withDatabase } from "./database";
-import { withBlob, type TestBlob } from "./blobs";
+import { nodeStorage } from "./support/storage";
+import { withDatabase } from "../lib/database";
+import { withBlob, type TestBlob } from "../lib/blobs";
 import { collectOrphans } from "../../server/utils/cleanup";
 
 test("cleanup crosses pages, checks references in batches and preserves fresh or undated objects", async () => {

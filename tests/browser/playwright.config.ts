@@ -1,5 +1,9 @@
 import { defineConfig } from "@playwright/test";
 import { createServer } from "node:net";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const project = fileURLToPath(new URL("../../", import.meta.url));
 
 // A fresh port and server belong to this run; never reuse a developer's service.
 const externalURL = process.env.BROWSER_BASE_URL;
@@ -22,12 +26,13 @@ await new Promise<void>((resolve, reject) =>
 );
 
 export default defineConfig({
-  testDir: "tests/browser",
+  testDir: fileURLToPath(new URL("./", import.meta.url)),
+  testMatch: "**/*.spec.ts",
   fullyParallel: false,
   workers: 1,
   timeout: 30000,
   expect: { timeout: 8000 },
-  outputDir: "test-results/browser",
+  outputDir: join(project, "test-results/browser"),
   reporter: "list",
   use: {
     baseURL,
@@ -48,7 +53,8 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: `pnpm build:editor && exec node scripts/browser-server.mjs ${port}`,
+          command: `pnpm build:editor && exec node tests/browser/server.mjs ${port}`,
+          cwd: project,
           url: baseURL,
           reuseExistingServer: false,
           gracefulShutdown: { signal: "SIGTERM", timeout: 10000 },

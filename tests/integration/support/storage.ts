@@ -10,17 +10,17 @@ import {
   copyDatabaseMigrationsToHubDir,
 } from "@nuxthub/core/db";
 import { sql } from "drizzle-orm";
-import * as schema from "../../server/db/schema";
-import * as accounts from "../../server/db/accounts";
-import * as sessions from "../../server/db/sessions";
-import * as workspaces from "../../server/db/workspaces";
-import * as canvases from "../../server/db/canvases";
-import * as navigation from "../../server/db/navigation";
-import * as snapshots from "../../server/db/snapshots";
-import * as settings from "../../server/db/user-settings";
-import { withBlob } from "./blobs";
-import { collectOrphans } from "../../server/utils/cleanup";
-import { withDatabase } from "./database";
+import * as schema from "../../../server/db/schema";
+import * as accounts from "../../../server/db/accounts";
+import * as sessions from "../../../server/db/sessions";
+import * as workspaces from "../../../server/db/workspaces";
+import * as canvases from "../../../server/db/canvases";
+import * as navigation from "../../../server/db/navigation";
+import * as snapshots from "../../../server/db/snapshots";
+import * as settings from "../../../server/db/user-settings";
+import { withBlob } from "../../lib/blobs";
+import { collectOrphans } from "../../../server/utils/cleanup";
+import { withDatabase } from "../../lib/database";
 
 const operations = {
   ...accounts,
