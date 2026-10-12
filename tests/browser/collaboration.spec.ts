@@ -92,6 +92,109 @@ async function draw(page: Page, x = 400) {
   await page.mouse.up();
 }
 
+test("旧画布的已保存浏览器缓存迁入协作后正常解锁，并在重开时复用新版本", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+
+  try {
+    const saved = await owner.context.request.put(`/api/canvases/${owner.id}`, {
+      headers: { Origin: baseURL!, "X-Requested-With": "excalidraw-demo" },
+      data: {
+        revision: 0,
+        scene: {
+          elements: [
+            {
+              id: "legacy-shape",
+              type: "rectangle",
+              x: 200,
+              y: 200,
+              width: 100,
+              height: 80,
+              angle: 0,
+              version: 1,
+              versionNonce: 10,
+              isDeleted: false,
+              index: "a0",
+            },
+          ],
+          appState: { viewBackgroundColor: "#ffffff" },
+          files: {},
+        },
+      },
+    });
+
+    expect(saved.status(), await saved.text()).toBe(200);
+    const legacy = (
+      await (
+        await owner.context.request.get(`/api/canvases/${owner.id}`)
+      ).json()
+    ).canvas;
+
+    expect(legacy.syncMode).toBe("legacy");
+    expect(legacy.revision).toBe(1);
+    const page = await owner.context.newPage();
+
+    // Seed the real browser's old disposable cache without loading the new editor yet.
+    await page.goto("/api/bootstrap");
+    await page.evaluate(
+      async ({ ownerId, canvas }) => {
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open("excalidraw-confirmed-cache", 1);
+
+          request.onupgradeneeded = () =>
+            request.result.createObjectStore("snapshots", { keyPath: "key" });
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const transaction = database.transaction("snapshots", "readwrite");
+
+            transaction.objectStore("snapshots").put({
+              key: JSON.stringify([1, ownerId, "canvas", canvas.id]),
+              value: canvas,
+              revision: canvas.revision,
+              bytes: new TextEncoder().encode(JSON.stringify(canvas))
+                .byteLength,
+              accessedAt: Date.now(),
+            });
+            transaction.oncomplete = () => resolve();
+            transaction.onabort = () => reject(transaction.error);
+          });
+        } finally {
+          database.close();
+        }
+      },
+      { ownerId: owner.user.id, canvas: legacy },
+    );
+    await open(page, "/", true);
+    await expect
+      .poll(() =>
+        editorState(page).then((state) =>
+          state.elements.map((element: { id: string }) => element.id),
+        ),
+      )
+      .toEqual(["legacy-shape"]);
+    const migrated = (
+      await (
+        await owner.context.request.get(`/api/canvases/${owner.id}`)
+      ).json()
+    ).canvas;
+
+    expect(migrated.syncMode).toBe("collaborative");
+    expect(migrated.revision).toBe(0);
+    await open(page, "/", true);
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements.length))
+      .toBe(1);
+  } finally {
+    await owner.context.close();
+  }
+});
+
 test("主画布的分享面板发布固定版本，并向已有账号提供共享入口", async ({
   browser,
   baseURL,

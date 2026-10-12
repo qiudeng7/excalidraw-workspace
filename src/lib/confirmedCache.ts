@@ -2,6 +2,7 @@
 export interface CacheEntry<T = unknown> {
   key: string;
   revision: number;
+  revisionScope?: string;
   value: T;
   bytes: number;
   accessedAt: number;
@@ -80,7 +81,12 @@ const disk: CacheDisk = {
         const entries = req.result as CacheEntry[];
         const previous = entries.find((item) => item.key === entry.key);
 
-        if (previous && previous.revision > entry.revision) return;
+        if (
+          previous &&
+          (previous.revisionScope ?? "") === (entry.revisionScope ?? "") &&
+          previous.revision > entry.revision
+        )
+          return;
         if (entry.bytes > limit) {
           store.delete(entry.key);
 
@@ -138,7 +144,14 @@ export class ConfirmedCache {
   }
 
   private remember(entry: CacheEntry) {
-    if ((this.memory.get(entry.key)?.revision ?? -1) > entry.revision) return;
+    const previous = this.memory.get(entry.key);
+
+    if (
+      previous &&
+      (previous.revisionScope ?? "") === (entry.revisionScope ?? "") &&
+      previous.revision > entry.revision
+    )
+      return;
     this.memory.delete(entry.key);
     if (entry.bytes > this.memoryBytes) return;
     this.memory.set(entry.key, entry);
@@ -171,11 +184,16 @@ export class ConfirmedCache {
     }
   }
 
-  async put<T extends { revision: number }>(key: string, value: T) {
+  async put<T extends { revision: number }>(
+    key: string,
+    value: T,
+    revisionScope = "",
+  ) {
     const snapshot = immutableSnapshot(value);
     const entry = {
       key,
       revision: value.revision,
+      revisionScope,
       value: snapshot,
       bytes: snapshotBytes(snapshot),
       accessedAt: Date.now(),

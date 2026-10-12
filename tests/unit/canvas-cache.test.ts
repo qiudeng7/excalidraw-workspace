@@ -54,7 +54,13 @@ function cache() {
   const disk: CacheDisk = {
     read: async (key) => entries.get(key),
     write: async (entry) => {
-      if ((entries.get(entry.key)?.revision ?? -1) <= entry.revision)
+      const previous = entries.get(entry.key);
+
+      if (
+        !previous ||
+        (previous.revisionScope ?? "") !== (entry.revisionScope ?? "") ||
+        previous.revision <= entry.revision
+      )
         entries.set(entry.key, structuredClone(entry));
     },
     remove: async (key) => {
@@ -66,6 +72,116 @@ function cache() {
 }
 
 const library = async () => ({ items: [], revision: 0 });
+
+test(
+  "a cached legacy revision cannot keep a migrated canvas checking forever",
+  { timeout: 5000 },
+  async () => {
+    const disk = cache();
+    const key = cacheKey("migration", "canvas", "legacy");
+    const legacy = canvas("legacy", 329);
+    const migrated: CanvasDocument = {
+      ...canvas("legacy", 0),
+      syncMode: "collaborative",
+      roomEpoch: "migrated-room",
+    };
+
+    await disk.cache.put(key, legacy);
+    let reads = 0;
+    const manager = new CanvasResources(
+      "migration",
+      {
+        readCanvas: async () => {
+          assert.equal(
+            ++reads,
+            1,
+            "migration must not retry a lower room sequence",
+          );
+
+          return migrated;
+        },
+        readLibrary: library,
+      },
+      () => {},
+      disk.cache,
+    );
+
+    try {
+      const entry = await manager.open("legacy", () => {});
+
+      assert.equal(entry.status, "ready");
+      assert.deepEqual(entry.document, migrated);
+      assert.equal(entry.resource.revision, 0);
+      assert.deepEqual(await disk.cache.get(key), migrated);
+      assert.deepEqual(disk.entries.get(key)?.value, migrated);
+    } finally {
+      manager.dispose();
+    }
+  },
+);
+
+test("cache memory and IndexedDB replace a previous epoch with a lower confirmed revision", async () => {
+  const key = cacheKey("restore-domain", "canvas", "restored");
+  const cache = new ConfirmedCache();
+  const old = {
+    ...canvas("restored", 100),
+    syncMode: "collaborative" as const,
+    roomEpoch: "before",
+  };
+  const restored = {
+    ...canvas("restored", 0),
+    syncMode: "collaborative" as const,
+    roomEpoch: "after",
+  };
+
+  try {
+    await cache.put(key, old, "collaboration:before");
+    await cache.put(key, restored, "collaboration:after");
+    assert.deepEqual(cache.peek(key), restored);
+    cache.clearMemory();
+    assert.deepEqual(await cache.get(key), restored);
+    await cache.put(key, { ...restored, revision: 2 }, "collaboration:after");
+    await cache.put(key, restored, "collaboration:after");
+    assert.equal(cache.peek<CanvasDocument>(key)?.revision, 2);
+    cache.clearMemory();
+    assert.equal((await cache.get<CanvasDocument>(key))?.revision, 2);
+  } finally {
+    await cache.remove(key);
+  }
+});
+
+test("migration preserves a dirty legacy draft even when its revision equals the new room sequence", async () => {
+  let migrated = false;
+  const manager = new CanvasResources(
+    "migration-draft",
+    {
+      readCanvas: async () => ({
+        ...canvas("dirty", 0),
+        ...(migrated
+          ? { syncMode: "collaborative" as const, roomEpoch: "new-room" }
+          : {}),
+      }),
+      readLibrary: library,
+    },
+    () => {},
+    cache().cache,
+  );
+
+  try {
+    const entry = await manager.open("dirty", () => {});
+
+    entry.resource.update(scene("unsaved-local"));
+    migrated = true;
+    await manager.open("dirty", () => {});
+    await manager.open("dirty", () => {});
+    assert.equal(entry.status, "conflict");
+    assert.equal(entry.resource.dirty, true);
+    assert.deepEqual(entry.resource.value, scene("unsaved-local"));
+    await assert.rejects(entry.resource.flush(), /冲突/);
+  } finally {
+    manager.dispose();
+  }
+});
 
 test("switching canvases sends zero library reads; first explicit library request deduplicates and reuses the resource", async () => {
   let reads = 0;
@@ -388,6 +504,10 @@ test("confirmed cache is immutable, rejects old revisions, and scopes account ke
 });
 
 test("clean memory LRU evicts old resources while preserving dirty resources and their drafts", async () => {
+  const originalNow = Date.now;
+  let now = originalNow();
+
+  Date.now = () => ++now;
   const manager = new CanvasResources(
     "lru",
     { readCanvas: async (id) => canvas(id), readLibrary: library },
@@ -425,6 +545,7 @@ test("clean memory LRU evicts old resources while preserving dirty resources and
     recovered.dispose();
   } finally {
     manager.dispose();
+    Date.now = originalNow;
   }
 });
 

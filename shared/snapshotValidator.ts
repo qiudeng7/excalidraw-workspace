@@ -8,6 +8,15 @@ export function snapshotValidator(
   return `"${encodeURIComponent(`${type}:${id}:${revision}:${updatedAt}`)}"`;
 }
 
+/** Revisions are comparable only within the same legacy stream or room epoch. */
+export function canvasRevisionScope(
+  canvas: Pick<import("./contracts").CanvasMeta, "syncMode" | "roomEpoch">,
+) {
+  return canvas.syncMode === "collaborative"
+    ? `collaboration:${canvas.roomEpoch ?? ""}`
+    : "";
+}
+
 /** Canvas responses also contain mutable catalog metadata, even when scene revision is unchanged. */
 export function canvasValidator(canvas: import("./contracts").CanvasMeta) {
   if (canvas.syncMode === "collaborative" && canvas.roomEpoch)

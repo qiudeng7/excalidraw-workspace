@@ -7,6 +7,7 @@ import type {
 } from "../../shared/contracts";
 import type { WorkspaceApi } from "./workspaceApi";
 import { ApiError } from "./api";
+import { canvasRevisionScope } from "../../shared/snapshotValidator";
 import {
   ConfirmedCache,
   cacheKey,
@@ -154,6 +155,7 @@ export class CanvasResources {
         void this.cache.put(
           cacheKey(this.owner, "canvas", document.id),
           entry.document,
+          canvasRevisionScope(entry.document),
         );
       },
       readRemote: async () => {
@@ -333,7 +335,10 @@ export class CanvasResources {
           await entry.resource.settle();
           if (entry.resource.hasUnconfirmedSave) await entry.resource.flush();
           if (
-            (!entry.confirmed || remote.revision >= entry.document.revision) &&
+            (!entry.confirmed ||
+              canvasRevisionScope(remote) !==
+                canvasRevisionScope(entry.document) ||
+              remote.revision >= entry.document.revision) &&
             metadataGeneration === entry.metadataGeneration
           )
             break;
@@ -345,7 +350,11 @@ export class CanvasResources {
 
       if (this.deleted.has(id))
         throw new ApiError(404, "NOT_FOUND", "画布已删除");
-      void this.cache.put(cacheKey(this.owner, "canvas", id), remote);
+      void this.cache.put(
+        cacheKey(this.owner, "canvas", id),
+        remote,
+        canvasRevisionScope(remote),
+      );
       if (!entry) {
         entry = this.create(remote);
         await entry.resource.restore();
@@ -354,9 +363,15 @@ export class CanvasResources {
       this.assertActive();
       entry.accessDenied = false;
       if (entry.resource.dirty) {
+        const changedScope =
+          canvasRevisionScope(entry.document) !== canvasRevisionScope(remote);
+
         entry.document = immutableSnapshot(remote);
         entry.confirmed = true;
-        entry.resource.conflict = entry.resource.revision !== remote.revision;
+        entry.resource.conflict =
+          remote.syncMode === "collaborative" ||
+          changedScope ||
+          entry.resource.revision !== remote.revision;
         entry.status = entry.resource.conflict ? "conflict" : "ready";
         if (entry.resource.conflict)
           entry.message =
