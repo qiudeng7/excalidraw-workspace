@@ -5,6 +5,9 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { nodeStorage } from "./storage";
 import { handleApi } from "./api";
+import type { TestDatabase } from "./database";
+import * as tables from "../../server/db/schema";
+import { eq } from "drizzle-orm";
 
 async function fixture() {
   const directory = await mkdtemp(resolve(tmpdir(), "account-password-"));
@@ -16,6 +19,7 @@ async function fixture() {
     cookie?: string,
     origin = "https://demo.test",
     owner?: string,
+    database = storage.database,
   ) => {
     const pending: Promise<unknown>[] = [];
     const response = await handleApi(
@@ -32,6 +36,7 @@ async function fixture() {
       }),
       {
         ...storage,
+        database,
         publicOrigin: "https://demo.test",
         waitUntil: (p) => pending.push(p),
       },
@@ -58,6 +63,132 @@ async function fixture() {
 
 const original = "Original-password-2026!";
 const next = "Updated-password-2026!";
+
+/** Stop the actual session write, after the handler has accepted credentials. */
+function pauseSessionInsert(database: TestDatabase) {
+  const reached = Promise.withResolvers<void>();
+  const resume = Promise.withResolvers<void>();
+  const hold = (query: any): any =>
+    new Proxy(query, {
+      get(target, key) {
+        if (key === "then")
+          return async (resolve: any, reject: any) => {
+            reached.resolve();
+            await resume.promise;
+
+            return target.then(resolve, reject);
+          };
+
+        const value = Reflect.get(target, key);
+
+        if (["values", "select", "returning"].includes(String(key)))
+          return (...args: any[]) => hold(value.apply(target, args));
+
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+
+  return {
+    reached: reached.promise,
+    resume: () => resume.resolve(),
+    database: new Proxy(database, {
+      get(target, key) {
+        if (key === "insert")
+          return (table: Parameters<TestDatabase["insert"]>[0]) => {
+            const builder = target.insert(table);
+
+            return table === tables.sessions ? hold(builder) : builder;
+          };
+
+        const value = Reflect.get(target, key);
+
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    }),
+  };
+}
+
+for (const entry of ["login", "setup", "register"] as const)
+  test(
+    `${entry} cannot publish a session after its accepted password is changed`,
+    { timeout: 10000 },
+    async () => {
+      const f = await fixture();
+      const barrier = pauseSessionInsert(f.storage.database);
+      let pending: ReturnType<typeof f.request> | undefined;
+
+      try {
+        if (entry !== "setup")
+          assert.equal(
+            (
+              await f.request("/setup", "POST", {
+                email: "admin@example.test",
+                password: original,
+              })
+            ).status,
+            200,
+          );
+        const email =
+          entry === "login" ? "admin@example.test" : "alice@example.test";
+
+        pending = f.request(
+          `/${entry}`,
+          "POST",
+          { email, password: original },
+          undefined,
+          "https://demo.test",
+          undefined,
+          barrier.database,
+        );
+        // No sleep or scheduling guess: the session INSERT is waiting here.
+        await barrier.reached;
+        const current = await f.request("/login", "POST", {
+          email,
+          password: original,
+        });
+
+        assert.equal(current.status, 200);
+        const changed = await f.request(
+          "/account/password",
+          "PUT",
+          { currentPassword: original, newPassword: next },
+          current.cookie,
+        );
+
+        assert.equal(changed.status, 200);
+        barrier.resume();
+        const stale = await pending;
+
+        assert.equal(stale.status, 401);
+        assert.equal(stale.body.error.code, "INVALID_CREDENTIALS");
+        assert.equal(stale.cookie, undefined);
+        assert.equal(
+          (await f.request("/session", "GET", undefined, current.cookie)).body
+            .user.id,
+          current.body.user.id,
+        );
+        const sessions = await f.storage.database
+          .select()
+          .from(tables.sessions)
+          .where(eq(tables.sessions.userId, current.body.user.id));
+
+        assert.equal(sessions.length, 1, "the stale insert wrote no session");
+        assert.equal(
+          (await f.request("/login", "POST", { email, password: original }))
+            .status,
+          401,
+        );
+        assert.equal(
+          (await f.request("/login", "POST", { email, password: next })).status,
+          200,
+        );
+      } finally {
+        barrier.resume();
+        await pending;
+        await f.close();
+      }
+    },
+  );
 
 test("password change verifies the original password, preserves the current session and revokes only other sessions of the same user", async () => {
   const f = await fixture();

@@ -76,14 +76,18 @@ export async function requireUser(event: H3Event): Promise<User> {
 export async function createSession(
   event: H3Event,
   user: User,
+  expectedPasswordHash: string,
 ): Promise<Response> {
   const token = random();
 
-  await storeSession(
+  const created = await storeSession(
     await digest(token),
     user.id,
     Date.now() + SESSION_SECONDS * 1000,
+    expectedPasswordHash,
   );
+
+  if (!created) return fail(401, "INVALID_CREDENTIALS", "邮箱或密码不正确");
 
   return json({ user }, 200, {
     "Set-Cookie": cookie(requestOrigin(event), token),

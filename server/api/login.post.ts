@@ -19,7 +19,7 @@ export default defineApiHandler(
       return fail(401, "INVALID_CREDENTIALS", "邮箱或密码不正确");
     const { passwordHash: _, ...user } = row;
 
-    return createSession(event, user);
+    return createSession(event, user, row.passwordHash);
   },
   { public: true },
 );
