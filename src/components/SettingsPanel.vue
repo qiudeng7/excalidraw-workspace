@@ -78,6 +78,15 @@ const current = computed(() =>
   sections.value.find((item) => item.key === section.value)!,
 );
 const state = computed(() => props.resource.state);
+const showSyncStatus = computed(
+  () =>
+    section.value === "features" ||
+    section.value === "debug" ||
+    !state.value.ready ||
+    state.value.status === "error" ||
+    state.value.status === "conflict" ||
+    !!state.value.cloudConflict,
+);
 const disabled = computed(
   () =>
     !state.value.ready ||
@@ -201,6 +210,9 @@ onBeforeUnmount(() => {
       @click.self="close"
       @keydown.stop
       @keyup.stop
+      @copy.stop
+      @cut.stop
+      @paste.stop
     >
       <div class="settings-card">
         <header class="settings-heading">
@@ -366,7 +378,7 @@ onBeforeUnmount(() => {
           </section>
         </div>
         <footer
-          v-if="section === 'features' || section === 'debug'"
+          v-if="showSyncStatus"
           class="settings-footer"
           :role="state.error || state.cloudConflict ? 'alert' : 'status'"
         >
