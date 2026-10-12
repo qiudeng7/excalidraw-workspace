@@ -46,7 +46,7 @@ test("renames are checked while deletion-only and empty indexes pass", (t) => {
   const f = fixture(t);
 
   assert.equal(f.run(process.execPath, ["scripts/check-staged.mjs"]).status, 0);
-  f.git("rm", "scripts/smoke-api.mjs");
+  f.git("rm", "tests/http/api.mjs");
   assert.equal(f.run(process.execPath, ["scripts/check-staged.mjs"]).status, 0);
   renameSync(
     join(f.root, "scripts/check-data-layout.mjs"),

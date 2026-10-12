@@ -53,10 +53,13 @@ pnpm dev
 
 ```sh
 pnpm typecheck       # 检查 Nuxt 前端与后端类型
-pnpm test:backend    # 本地存储与 API 集成测试
+pnpm test:unit       # 控制器、保存资源与快照的隔离测试
+pnpm test:integration # SQLite、存储驱动与 H3 处理器集成测试
 pnpm build           # 构建编辑器和 Workers 产物
 pnpm build:node      # 构建编辑器和 Node 服务 .output/
 ```
+
+应用测试的用例、配置和环境启动器统一放在 `tests/`，按 `unit`、`integration`、`browser`、`http` 划分；`hooks`、`lint` 验证开发工具，跨套件复用代码放在 `tests/lib/`。完整归属、执行边界和 HTTP 验收命令见[开发验证](docs/development/testing.md)。
 
 ### 代码检查和 Git hooks
 

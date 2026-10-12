@@ -37,4 +37,4 @@
 
 ## 验证入口
 
-[user-settings.test.ts](../../tests/backend/user-settings.test.ts) 检查字段、归属和版本，[user-settings-compat.test.ts](../../tests/backend/user-settings-compat.test.ts) 检查旧客户端写入、新增选项保留及补齐过程中的版本竞争，[user-settings-resource.test.ts](../../tests/backend/user-settings-resource.test.ts) 检查读取失败、预览、冲突选择及旧账户请求取消。浏览器中检查设置面板的分类切换、即时预览、重登录恢复、双标签页冲突，以及读取失败时控件只读。
+[user-settings.test.ts](../../tests/integration/user-settings.test.ts) 检查字段、归属和版本，[user-settings-compat.test.ts](../../tests/integration/user-settings-compat.test.ts) 检查旧客户端写入、新增选项保留及补齐过程中的版本竞争，[user-settings-resource.test.ts](../../tests/unit/user-settings-resource.test.ts) 检查读取失败、预览、冲突选择及旧账户请求取消。浏览器中检查设置面板的分类切换、即时预览、重登录恢复、双标签页冲突，以及读取失败时控件只读。

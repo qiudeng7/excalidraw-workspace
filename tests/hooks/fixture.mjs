@@ -56,6 +56,9 @@ export function fixture(t) {
   git("config", "user.email", "hooks@example.invalid");
   git("config", "--global", "core.hooksPath", original);
   cpSync(join(project, "scripts"), join(root, "scripts"), { recursive: true });
+  cpSync(join(project, "tests/http"), join(root, "tests/http"), {
+    recursive: true,
+  });
   for (const file of [
     "eslint.config.mjs",
     ".prettierrc.json",

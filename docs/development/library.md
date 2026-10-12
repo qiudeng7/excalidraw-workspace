@@ -20,4 +20,4 @@
 
 ## 验证入口
 
-[node-storage.test.ts](../../tests/backend/node-storage.test.ts) 检查素材库读写、账户隔离与重启持久化，[snapshots.test.ts](../../tests/backend/snapshots.test.ts) 检查版本写入失败及新对象回收，[persistence-owner.test.ts](../../tests/backend/persistence-owner.test.ts) 检查旧账户保存取消。浏览器中检查添加素材后切换画布、刷新恢复、双标签页冲突，以及素材库保存失败是否阻止退出。
+[node-storage.test.ts](../../tests/integration/node-storage.test.ts) 检查素材库读写、账户隔离与重启持久化，[snapshots.test.ts](../../tests/unit/snapshots.test.ts) 检查版本写入失败及新对象回收，[persistence-owner.test.ts](../../tests/unit/persistence-owner.test.ts) 检查旧账户保存取消。浏览器中检查添加素材后切换画布、刷新恢复、双标签页冲突，以及素材库保存失败是否阻止退出。

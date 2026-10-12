@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "./storage";
-import { handleApi } from "./api";
-import type { TestDatabase } from "./database";
+import { nodeStorage } from "./support/storage";
+import { handleApi } from "./support/api";
+import type { TestDatabase } from "../lib/database";
 import * as tables from "../../server/db/schema";
 import { eq } from "drizzle-orm";
 

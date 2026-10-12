@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 本地 API 验收：prepare 后真正重启进程/容器，再用 verify 检查同一持久卷。
-// node scripts/smoke-api.mjs prepare http://127.0.0.1:8787 /tmp/workspace-smoke.json
-// node scripts/smoke-api.mjs verify  http://127.0.0.1:8787 /tmp/workspace-smoke.json
+// node tests/http/api.mjs prepare http://127.0.0.1:8787 /tmp/workspace-smoke.json
+// node tests/http/api.mjs verify  http://127.0.0.1:8787 /tmp/workspace-smoke.json
 import assert from "node:assert/strict";
 import { readFile, writeFile, chmod } from "node:fs/promises";
 import { randomUUID } from "node:crypto";

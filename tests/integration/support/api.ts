@@ -1,9 +1,9 @@
 import { readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createApp, createRouter, defineEventHandler, toWebHandler } from "h3";
-import { withDatabase, type TestDatabase } from "./database";
+import { withDatabase, type TestDatabase } from "../../lib/database";
 import "./nitro";
-import { withBlob, type TestBlob } from "./blobs";
+import { withBlob, type TestBlob } from "../../lib/blobs";
 
 export interface ApiFixture {
   database: TestDatabase;
@@ -13,7 +13,7 @@ export interface ApiFixture {
 }
 
 /** Exercise the real file handlers with H3's router; production discovery belongs to Nitro. */
-const files = await readdir(new URL("../../server/api/", import.meta.url), {
+const files = await readdir(new URL("../../../server/api/", import.meta.url), {
   recursive: true,
 });
 const routes = await Promise.all(
@@ -32,7 +32,7 @@ const routes = await Promise.all(
           .replace(/\[\.\.\.(\w+)\]/g, "**:$1")
           .replace(/\[(\w+)\]/g, ":$1");
       const module = await import(
-        fileURLToPath(new URL(`../../server/api/${file}`, import.meta.url))
+        fileURLToPath(new URL(`../../../server/api/${file}`, import.meta.url))
       );
 
       return { route, method, handler: module.default };

@@ -1,7 +1,7 @@
 // Real HTTP regression for password/session SQL and legacy settings CAS.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { localClient, expect, report } from "./local-smoke.mjs";
+import { localClient, expect, report } from "./support/local-client.mjs";
 
 const request = localClient(process.argv[2] ?? "http://localhost:3000");
 const bootstrap = expect(await request("/bootstrap"), 200);

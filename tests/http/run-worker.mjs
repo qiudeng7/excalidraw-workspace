@@ -4,15 +4,18 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
-import { localOrigin } from "./local-smoke.mjs";
+import { localOrigin } from "./support/local-client.mjs";
 
 const children = new Map();
+const project = fileURLToPath(new URL("../../", import.meta.url));
 let stopping = false;
 
 function launch(args) {
   if (stopping) throw new Error("Test run is stopping");
   const child = spawn("pnpm", args, {
+    cwd: project,
     detached: true,
     stdio: "inherit",
     env: { ...process.env, WRANGLER_SEND_METRICS: "false" },
@@ -152,11 +155,11 @@ try {
       await delay(100);
     }
   }
-  await command(["exec", "node", "scripts/smoke-user-settings.mjs", origin]);
+  await command(["exec", "node", "tests/http/user-settings.mjs", origin]);
   await command([
     "exec",
     "node",
-    "scripts/smoke-account-compatibility.mjs",
+    "tests/http/account-compatibility.mjs",
     origin,
   ]);
 } finally {

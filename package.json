@@ -11,7 +11,7 @@
     "dev:worker": "wrangler dev --port 8787 --var PUBLIC_ORIGIN:http://localhost:8787",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "test:backend": "node --import ./tests/backend/loader.mjs --import tsx --test tests/backend/*.test.ts",
+    "test:backend": "pnpm test:unit && pnpm test:integration",
     "deploy": "pnpm build && pnpm db:migrate:remote && wrangler deploy",
     "build:node": "pnpm build:editor && NITRO_PRESET=node-server nuxt build",
     "typecheck": "nuxt typecheck",
@@ -24,8 +24,8 @@
     "db:migrate": "node scripts/check-data-layout.mjs && nuxt db migrate",
     "start:node": "pnpm db:migrate && node .output/server/index.mjs",
     "data:import": "node scripts/import-legacy-data.mjs",
-    "test:browser": "playwright test",
-    "test:worker": "node scripts/test-worker.mjs",
+    "test:browser": "playwright test --config tests/browser/playwright.config.ts",
+    "test:worker": "node tests/http/run-worker.mjs",
     "prepare": "node scripts/git-hooks/install.mjs",
     "hooks:install": "node scripts/git-hooks/install.mjs",
     "hooks:uninstall": "node scripts/git-hooks/install.mjs --uninstall",
@@ -33,7 +33,9 @@
     "check:staged": "node scripts/check-staged.mjs",
     "check:pre-push": "pnpm test:backend && pnpm typecheck:prepare && pnpm typecheck",
     "typecheck:prepare": "pnpm --filter @excalidraw/excalidraw exec tsc --project tsconfig.json && node packages/excalidraw/sync-types.mjs && nuxt prepare",
-    "test:hooks": "node --test tests/hooks/*.test.mjs"
+    "test:hooks": "node --test tests/hooks/*.test.mjs",
+    "test:unit": "node --import ./tests/lib/loader.mjs --import tsx --test tests/unit/*.test.ts",
+    "test:integration": "node --import ./tests/lib/loader.mjs --import tsx --test tests/integration/*.test.ts"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "workspace:*",

@@ -8,7 +8,7 @@ import { createDriver as fsDriver } from "@nuxthub/core/blob/drivers/fs";
 import { createDriver as r2Driver } from "@nuxthub/core/blob/drivers/cloudflare-r2";
 import type { R2Bucket } from "@cloudflare/workers-types";
 import { readSnapshot } from "../../server/utils/snapshots";
-import { withBlob } from "./blobs";
+import { withBlob } from "../lib/blobs";
 
 test("NuxtHub filesystem blobs read legacy snapshots without sidecar metadata", async () => {
   const directory = await mkdtemp(resolve(tmpdir(), "hub-objects-"));

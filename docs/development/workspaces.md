@@ -36,4 +36,4 @@
 
 ## 验证入口
 
-[frontend-controllers.test.ts](../../tests/backend/frontend-controllers.test.ts) 和 [navigation.test.ts](../../tests/backend/navigation.test.ts) 覆盖目录恢复、空空间、最近位置及控制器失败行为。浏览器中检查切换空间的保存保护、新建空空间、删除当前空间后的落点，以及下拉菜单键盘操作。
+[frontend-controllers.test.ts](../../tests/unit/frontend-controllers.test.ts) 和 [navigation.test.ts](../../tests/integration/navigation.test.ts) 覆盖目录恢复、空空间、最近位置及控制器失败行为。浏览器中检查切换空间的保存保护、新建空空间、删除当前空间后的落点，以及下拉菜单键盘操作。

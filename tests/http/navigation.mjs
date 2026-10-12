@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 本地全新数据库的目录排序/最近位置验收；不连接生产，不打印测试凭证。
-// node scripts/smoke-navigation.mjs http://localhost:3000
+// node tests/http/navigation.mjs http://localhost:3000
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 const base = new URL(process.argv[2] ?? "http://localhost:3000");

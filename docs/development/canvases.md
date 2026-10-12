@@ -69,4 +69,4 @@ flowchart TD
 
 ## 验证入口
 
-[navigation.test.ts](../../tests/backend/navigation.test.ts) 覆盖目录版本、排序和导航；[node-storage.test.ts](../../tests/backend/node-storage.test.ts) 检查含图片快照读写、并发与重启持久化；[snapshots.test.ts](../../tests/backend/snapshots.test.ts) 检查发布失败的新对象回收；[persistence-owner.test.ts](../../tests/backend/persistence-owner.test.ts) 检查保存资源的账户归属与请求取消；[frontend-controllers.test.ts](../../tests/backend/frontend-controllers.test.ts) 检查读取和切换保护。浏览器中检查含图片保存、快捷键反馈、双标签页冲突、失败时切换保护，以及拖拽和键盘排序。
+[navigation.test.ts](../../tests/integration/navigation.test.ts) 覆盖目录版本、排序和导航；[node-storage.test.ts](../../tests/integration/node-storage.test.ts) 检查含图片快照读写、并发与重启持久化；[snapshots.test.ts](../../tests/unit/snapshots.test.ts) 检查发布失败的新对象回收；[persistence-owner.test.ts](../../tests/unit/persistence-owner.test.ts) 检查保存资源的账户归属与请求取消；[frontend-controllers.test.ts](../../tests/unit/frontend-controllers.test.ts) 检查读取和切换保护。浏览器中检查含图片保存、快捷键反馈、双标签页冲突、失败时切换保护，以及拖拽和键盘排序。

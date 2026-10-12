@@ -38,7 +38,7 @@
 
 表单通过 [PUT /api/account/password](../../server/api/account/password.put.ts) 提交 `{ currentPassword, newPassword }`。请求携带 `X-Account-Owner` 校验页面账户与会话是否仍一致，后端按当前登录账户验证原密码，使用 PBKDF2 生成新摘要，再由 [changeAccountPassword()](../../server/db/accounts.ts) 在同一数据库批次中按已验证的旧摘要更新密码并删除其他会话。当前登录会话保留，其他登录会话失效，需要使用新密码重新登录；并发修改不能覆盖已更改的密码。密码验证尝试按账户限流，每 15 分钟时间桶最多 10 次。
 
-原密码错误返回 `403 INVALID_CURRENT_PASSWORD`，密码已被并发更改返回 `409 PASSWORD_CHANGED`，达到尝试上限返回 `429 RATE_LIMITED`。表单展示错误；成功后清空密码字段并显示确认。[account-password.test.ts](../../tests/backend/account-password.test.ts) 覆盖原密码校验、会话失效范围、并发修改、限流，以及登录、初始化和注册接受旧密码后延迟写入会话与改密的竞争。
+原密码错误返回 `403 INVALID_CURRENT_PASSWORD`，密码已被并发更改返回 `409 PASSWORD_CHANGED`，达到尝试上限返回 `429 RATE_LIMITED`。表单展示错误；成功后清空密码字段并显示确认。[account-password.test.ts](../../tests/integration/account-password.test.ts) 覆盖原密码校验、会话失效范围、并发修改、限流，以及登录、初始化和注册接受旧密码后延迟写入会话与改密的竞争。
 
 ## 管理注册权限
 
@@ -48,4 +48,4 @@
 
 ## 验证入口
 
-[node-storage.test.ts](../../tests/backend/node-storage.test.ts) 覆盖账户初始化、注册、会话及持久化，[request-context.test.ts](../../tests/backend/request-context.test.ts) 检查请求身份隔离，[user-settings-resource.test.ts](../../tests/backend/user-settings-resource.test.ts) 检查设置资源销毁与旧请求取消。浏览器中检查首次初始化、注册关闭、登录失败、刷新恢复，以及保存失败时退出是否被阻止。
+[node-storage.test.ts](../../tests/integration/node-storage.test.ts) 覆盖账户初始化、注册、会话及持久化，[request-context.test.ts](../../tests/integration/request-context.test.ts) 检查请求身份隔离，[user-settings-resource.test.ts](../../tests/unit/user-settings-resource.test.ts) 检查设置资源销毁与旧请求取消。浏览器中检查首次初始化、注册关闭、登录失败、刷新恢复，以及保存失败时退出是否被阻止。

@@ -90,6 +90,17 @@ export const test = base.extend<{
     };
 
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => {
+      if (message.text().includes("[NUXT_E1005]")) errors.push(message.text());
+    });
+    page.on("response", (response) => {
+      if (
+        response.request().resourceType() === "script" &&
+        response.status() >= 400
+      ) {
+        errors.push(`Script HTTP ${response.status()}: ${response.url()}`);
+      }
+    });
     await context.route("**/*", async (route) => {
       const request = route.request();
       const path = new URL(request.url()).pathname;
@@ -207,7 +218,14 @@ export const test = base.extend<{
       .poll(() => editorState(page).then((state) => state.elements.length))
       .toBe(0);
     await use({ dialog, mock, open, close, setBottomToolbar });
-    expect(errors, "page errors and unexpected API requests").toEqual([]);
+    await expect(
+      page.locator("[data-nuxt-dev-error], nuxt-error-overlay"),
+      "Nuxt must not retain a caught runtime error overlay",
+    ).toHaveCount(0);
+    expect(
+      errors,
+      "page/initialization errors, failed scripts and unexpected API requests",
+    ).toEqual([]);
   },
 });
 

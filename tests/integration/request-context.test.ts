@@ -5,13 +5,13 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
-import { nodeStorage } from "./storage";
-import { handleApi, type ApiFixture } from "./api";
+import { nodeStorage } from "./support/storage";
+import { handleApi, type ApiFixture } from "./support/api";
 import { digest } from "../../server/utils/passwords";
 import { createDefaultUserSettings } from "../../shared/contracts";
 import type { User, UserSettingsDocument } from "../../shared/contracts";
 import { sql } from "drizzle-orm";
-import { withDatabase } from "./database";
+import { withDatabase } from "../lib/database";
 
 test("request events isolate concurrent identities and keep shared storage available", async () => {
   const directory = await mkdtemp(resolve(tmpdir(), "request-isolation-"));
