@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -95,6 +96,72 @@ test("pre-push delivers identical stdin and arguments to both consumers", (t) =>
     17,
   );
   assert.equal(f.events(), "original:pre-push\n");
+});
+
+test("proc-receive negotiates before Git closes its input", async (t) => {
+  const f = fixture(t);
+  const protocol = `${f.log}.protocol.mjs`;
+
+  writeFileSync(
+    protocol,
+    `import assert from "node:assert/strict";
+import { readSync, writeSync } from "node:fs";
+function readExactly(size) {
+  const buffer = Buffer.alloc(size);
+  let offset = 0;
+  while (offset < size) {
+    const count = readSync(0, buffer, offset, size - offset);
+    if (!count) throw new Error("Unexpected protocol EOF");
+    offset += count;
+  }
+  return buffer;
+}
+const size = parseInt(readExactly(4).toString(), 16);
+assert.equal(readExactly(size - 4).toString(), "version=1\\0");
+assert.equal(readExactly(4).toString(), "0000");
+writeSync(1, "000eversion=1\\0" + "0000");
+process.stdin.resume();
+`,
+  );
+  f.hook("proc-receive", 'exec node "$HOOK_TEST_LOG.protocol.mjs"');
+  assert.equal(f.install().status, 0);
+  const child = spawn(
+    join(f.git("config", "--get", "core.hooksPath"), "proc-receive"),
+    [],
+    { cwd: f.root, env: f.env, stdio: ["pipe", "pipe", "pipe"] },
+  );
+  const finished = new Promise((resolve) => child.once("close", resolve));
+  const hello = Buffer.from("000eversion=1\0" + "0000");
+  let timer;
+  let stderr = "";
+
+  child.stderr.on("data", (chunk) => (stderr += chunk));
+  const response = new Promise((resolve, reject) => {
+    let output = Buffer.alloc(0);
+
+    child.once("error", reject);
+    child.stdout.on("data", (chunk) => {
+      output = Buffer.concat([output, chunk]);
+      if (output.length >= hello.length) resolve(output);
+    });
+    timer = setTimeout(
+      () => reject(new Error(`No protocol response before EOF: ${stderr}`)),
+      5000,
+    );
+  });
+
+  try {
+    child.stdin.write(hello);
+    assert.deepEqual(await response, hello);
+    child.stdin.end();
+    assert.equal(await finished, 0, stderr);
+    assert.equal(f.events(), "original:proc-receive\n");
+  } finally {
+    clearTimeout(timer);
+    child.stdin.end();
+    if (child.exitCode === null) child.kill("SIGTERM");
+    await finished;
+  }
 });
 
 test("install is idempotent and uninstall restores inherited or local hooks", (t) => {

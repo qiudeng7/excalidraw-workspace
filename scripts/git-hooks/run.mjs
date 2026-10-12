@@ -1,5 +1,5 @@
-// This file is copied next to state.json by the installer. Buffer stdin once:
-// pre-push and post-rewrite consumers must each receive the complete input.
+// This file is copied next to state.json by the installer. Only pre-push has
+// two consumers. Other hooks inherit stdin, including interactive proc-receive.
 import { spawnSync } from "node:child_process";
 import { constants, accessSync, existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -12,14 +12,7 @@ const state = JSON.parse(
     "utf8",
   ),
 );
-const buffered = [
-  "pre-push",
-  "post-rewrite",
-  "pre-receive",
-  "post-receive",
-  "reference-transaction",
-  "proc-receive",
-].includes(hook);
+const buffered = hook === "pre-push";
 const input = buffered ? readFileSync(0) : undefined;
 
 function run(command, commandArgs, cwd) {
