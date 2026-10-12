@@ -50,6 +50,14 @@ function sessionToken(event: H3Event) {
   return token && /^[a-f0-9]{64}$/.test(token) ? token : undefined;
 }
 
+export async function currentSessionHash(event: H3Event): Promise<string> {
+  const token = sessionToken(event);
+
+  if (!token) return fail(401, "UNAUTHENTICATED", "请先登录");
+
+  return digest(token);
+}
+
 /** Cache the identity on Nitro's request event, never in module-global state. */
 export function currentUser(event: H3Event): Promise<User | null> {
   return (event.context.currentUser ??= (async () => {

@@ -74,6 +74,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
     const original = { settings, revision: 0, configured: false };
 
     assert.equal(settings.features.disableDefaultSidebar, true);
+    assert.equal(settings.features.bottomToolbar, true);
     assert.deepEqual(
       (await request("/user-settings", "GET", undefined, alice.cookie)).body,
       original,
@@ -125,6 +126,10 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
       {
         ...settings,
         features: { ...settings.features, disableDefaultSidebar: "true" },
+      },
+      {
+        ...settings,
+        features: { ...settings.features, bottomToolbar: "true" },
       },
       { ...settings, debug: { ...settings.debug, sampling: 3 } },
       {
@@ -256,6 +261,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
     const legacy = structuredClone(next) as any;
 
     delete legacy.features.disableDefaultSidebar;
+    delete legacy.features.bottomToolbar;
     legacy.features.nunitoFont = false;
     await storage.database.run(
       sql`UPDATE user_settings SET settings_json = ${JSON.stringify(legacy)} WHERE user_id = ${alice.body.user.id}`,
@@ -268,9 +274,27 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
     assert.equal(upgraded.configured, true);
     assert.deepEqual(upgraded.settings, {
       ...legacy,
-      features: { ...legacy.features, disableDefaultSidebar: true },
+      features: {
+        ...legacy.features,
+        disableDefaultSidebar: true,
+        bottomToolbar: true,
+      },
     });
+    // Rows saved after the sidebar flag was introduced preserve an explicit false.
+    legacy.features.disableDefaultSidebar = false;
+    await storage.database.run(
+      sql`UPDATE user_settings SET settings_json = ${JSON.stringify(legacy)} WHERE user_id = ${alice.body.user.id}`,
+    );
+    const intermediate = (
+      await request("/user-settings", "GET", undefined, alice.cookie)
+    ).body;
+
+    assert.equal(intermediate.revision, 2);
+    assert.equal(intermediate.settings.features.disableDefaultSidebar, false);
+    assert.equal(intermediate.settings.features.bottomToolbar, true);
+    assert.equal(intermediate.settings.features.nunitoFont, false);
     upgraded.settings.features.disableDefaultSidebar = false;
+    upgraded.settings.features.bottomToolbar = false;
     const toggled = await request(
       "/user-settings",
       "PUT",
@@ -281,6 +305,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
     assert.equal(toggled.status, 200);
     assert.equal(toggled.body.revision, 3);
     assert.equal(toggled.body.settings.features.disableDefaultSidebar, false);
+    assert.equal(toggled.body.settings.features.bottomToolbar, false);
     assert.deepEqual(
       (await request("/user-settings", "GET", undefined, alice.cookie)).body,
       toggled.body,

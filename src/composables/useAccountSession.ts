@@ -69,7 +69,7 @@ export function useAccountSession({
   async function flushSettings() {
     if (settingsResource.value && !(await settingsResource.value.flush()))
       throw new Error(
-        "设置尚未同步，请在 flag 菜单处理设置提示后再退出或跳转。",
+        "设置尚未同步，请打开设置面板处理同步提示后再退出或跳转。",
       );
   }
 

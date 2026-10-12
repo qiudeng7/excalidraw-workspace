@@ -1,5 +1,5 @@
 import { db } from "@nuxthub/db";
-import { and, eq, exists, sql } from "drizzle-orm";
+import { and, eq, ne, exists, sql } from "drizzle-orm";
 import * as tables from "./schema";
 import type { User } from "../../shared/contracts";
 
@@ -149,4 +149,44 @@ export async function setRegistration(enabled: boolean) {
     .update(tables.settings)
     .set({ registrationEnabled: enabled ? 1 : 0 })
     .where(eq(tables.settings.id, 1));
+}
+
+/** Compare the verified hash and revoke other sessions in the same atomic batch. */
+export async function changeAccountPassword(
+  user: string,
+  expectedHash: string,
+  passwordHash: string,
+  currentSession: string,
+) {
+  const result = await db.batch([
+    db
+      .update(tables.users)
+      .set({ passwordHash })
+      .where(
+        and(
+          eq(tables.users.id, user),
+          eq(tables.users.passwordHash, expectedHash),
+        ),
+      )
+      .returning({ id: tables.users.id }),
+    db.delete(tables.sessions).where(
+      and(
+        eq(tables.sessions.userId, user),
+        ne(tables.sessions.tokenHash, currentSession),
+        exists(
+          db
+            .select({ id: tables.users.id })
+            .from(tables.users)
+            .where(
+              and(
+                eq(tables.users.id, user),
+                eq(tables.users.passwordHash, passwordHash),
+              ),
+            ),
+        ),
+      ),
+    ),
+  ]);
+
+  return result[0].length > 0;
 }

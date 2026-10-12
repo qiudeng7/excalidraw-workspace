@@ -17,6 +17,11 @@ export interface AccountApi {
     credentials: Credentials,
   ): Promise<User>;
   logout(): Promise<void>;
+  changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void>;
   setRegistration(enabled: boolean): Promise<boolean>;
 }
 
@@ -40,4 +45,11 @@ export const accountApi: AccountApi = {
         body: JSON.stringify({ registrationEnabled: enabled }),
       })
     ).registrationEnabled,
+  changePassword: async (userId, currentPassword, newPassword) => {
+    await api("/api/account/password", {
+      method: "PUT",
+      headers: { "X-Account-Owner": userId },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  },
 };

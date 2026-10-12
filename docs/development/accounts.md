@@ -30,9 +30,17 @@
 
 保存失败会中止退出并保留页面。修改退出入口时，须继续通过该控制器，确保未保存内容和旧账户请求得到处理。
 
+## 修改密码
+
+用户从工作空间侧边栏底部的“设置”进入“账号”。[AccountPasswordForm.vue](../../src/components/AccountPasswordForm.vue) 要求原密码、新密码及确认新密码；确认不一致时不提交。新密码需为 12–256 个字符，且不能与原密码相同。
+
+表单通过 [PUT /api/account/password](../../server/api/account/password.put.ts) 提交 `{ currentPassword, newPassword }`。请求携带 `X-Account-Owner` 校验页面账户与会话是否仍一致，后端按当前登录账户验证原密码，使用 PBKDF2 生成新摘要，再由 [changeAccountPassword()](../../server/db/accounts.ts) 在同一数据库批次中按已验证的旧摘要更新密码并删除其他会话。当前登录会话保留，其他登录会话失效，需要使用新密码重新登录；并发修改不能覆盖已更改的密码。密码验证尝试按账户限流，每 15 分钟时间桶最多 10 次。
+
+原密码错误返回 `403 INVALID_CURRENT_PASSWORD`，密码已被并发更改返回 `409 PASSWORD_CHANGED`，达到尝试上限返回 `429 RATE_LIMITED`。表单展示错误；成功后清空密码字段并显示确认。[account-password.test.ts](../../tests/backend/account-password.test.ts) 覆盖原密码校验、会话失效范围、并发修改和限流。
+
 ## 管理注册权限
 
-管理员在页面切换注册开关，通过 [PATCH /api/admin/settings](../../server/api/admin/settings.patch.ts) 提交 `{ registrationEnabled }`。后端验证管理员身份和布尔值，更新设置并返回实际状态；失败时页面保持原状态。关闭注册不影响已有账户登录。
+“系统设置”仅对管理员显示，位于设置面板左侧导航下方。管理员在“设置 → 系统设置”切换注册开关，通过 [PATCH /api/admin/settings](../../server/api/admin/settings.patch.ts) 提交 `{ registrationEnabled }`。后端验证管理员身份和布尔值，更新设置并返回实际状态；失败时页面保持原状态。关闭注册不影响已有账户登录。
 
 后端还提供 [GET /api/admin/settings](../../server/api/admin/settings.get.ts) 供管理员读取；当前页面从 [GET /api/bootstrap](../../server/api/bootstrap.get.ts) 取得初始开关值。
 

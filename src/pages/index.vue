@@ -30,6 +30,7 @@ const saveBarrier = {
     await editor.value?.flush();
   },
 };
+const settingsOpen = ref(false);
 const sidebarOpen = ref(!window.matchMedia("(max-width: 760px)").matches);
 const saveShortcut = /Mac|iPhone|iPad/.test(navigator.platform)
   ? "⌘ S"
@@ -423,21 +424,16 @@ onBeforeUnmount(cancelAppDialog);
         {{ workspaceId ? "这个空间还没有画布" : "还没有工作空间" }}
       </p>
       <div class="sidebar-bottom">
-        <div v-if="user.role === 'admin'" class="admin-settings">
-          <div class="section-label">
-            <strong>管理设置</strong><span class="admin-badge">ADMIN</span>
-          </div>
-          <label class="registration-switch"
-            ><span><span>开放注册</span><small>允许新用户创建账户</small></span
-            ><input
-              type="checkbox"
-              :checked="bootstrap.registrationEnabled"
-              :disabled="settingsBusy"
-              @change="toggleRegistration" /><span
-              class="switch-track"
-              aria-hidden="true"
-          /></label>
-        </div>
+        <button
+          type="button"
+          class="settings-entry"
+          aria-haspopup="dialog"
+          :aria-expanded="settingsOpen"
+          :disabled="interactionLocked || !settingsResource"
+          @click="settingsOpen = true"
+        >
+          <QuietIcon name="settings" :size="18" /><span>设置</span>
+        </button>
         <div class="account-info">
           <span class="avatar">{{
             (user.name || user.email).slice(0, 1).toUpperCase()
@@ -476,7 +472,6 @@ onBeforeUnmount(cancelAppDialog);
           ><span class="document-name">{{ document?.name ?? "我的画布" }}</span>
         </div>
         <div class="header-right">
-          <ThemeSwitcher />
           <span
             class="save-state"
             :class="{ saved: saveState === '已保存' && !busy }"
@@ -562,16 +557,8 @@ onBeforeUnmount(cancelAppDialog);
           :library="library"
           :user-id="user.id"
           :user-settings="settingsResource.state.settings"
-          :settings-ready="settingsResource.state.ready"
           :settings-status="settingsResource.state.status"
-          :settings-error="settingsResource.state.error"
-          :settings-configured="settingsResource.state.configured"
-          :settings-conflict="!!settingsResource.state.cloudConflict"
-          @settings-change="settingsResource.update($event)"
-          @settings-retry="settingsResource.retry()"
-          @settings-reload="settingsResource.load()"
-          @settings-use-cloud="settingsResource.useCloud()"
-          @settings-keep-local="settingsResource.keepLocal()"
+          :settings-open="settingsOpen"
           @save-state="setSaveState($event)"
         />
       </div>
@@ -603,6 +590,16 @@ onBeforeUnmount(cancelAppDialog);
         >
       </div>
     </div>
+    <SettingsPanel
+      v-if="settingsOpen && settingsResource"
+      :resource="settingsResource"
+      :user="user"
+      :registration-enabled="bootstrap.registrationEnabled"
+      :registration-busy="settingsBusy"
+      :system-error="error"
+      @registration-change="toggleRegistration"
+      @close="settingsOpen = false"
+    />
   </section>
 </template>
 
@@ -1003,73 +1000,30 @@ onBeforeUnmount(cancelAppDialog);
   margin-top: 26px;
   flex: none;
 }
-.admin-settings {
-  padding: 16px 0 19px;
-  border-top: 1px solid var(--line);
-}
-.admin-badge {
-  font-size: 8px;
-  letter-spacing: 0.09em;
-  color: var(--app-subtle);
-}
-.registration-switch {
+.settings-entry {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px 0;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 12px 8px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--app-muted);
+  font: inherit;
   font-size: 12px;
+  text-align: left;
   cursor: pointer;
 }
-.registration-switch > span:first-child {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 5px;
+.settings-entry:hover {
+  background: var(--app-hover);
+  color: var(--app-text);
 }
-.registration-switch small {
-  font-size: 10px;
-  color: var(--app-muted);
-}
-.registration-switch input {
-  position: absolute;
-  opacity: 0;
-  width: 1px;
-  height: 1px;
-  clip-path: inset(50%);
-}
-.switch-track {
-  flex: none;
-  width: 28px;
-  height: 16px;
-  border-radius: 10px;
-  background: var(--app-switch);
-  position: relative;
-  pointer-events: none;
-}
-.switch-track::after {
-  content: "";
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  top: 2px;
-  left: 2px;
-  border-radius: 50%;
-  background: var(--app-on-accent);
-  transition: transform 0.15s;
-  box-shadow: 0 1px 3px #0002;
-}
-.registration-switch input:checked + .switch-track {
-  background: var(--app-switch-active);
-}
-.registration-switch input:checked + .switch-track::after {
-  transform: translateX(12px);
-}
-.registration-switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--app-switch-active);
-  outline-offset: 3px;
-}
-.registration-switch input:disabled + .switch-track {
-  opacity: 0.5;
+.settings-entry:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
 }
 .account-info {
   display: flex;

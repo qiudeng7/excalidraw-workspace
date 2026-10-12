@@ -79,6 +79,7 @@ export interface UserSettings {
     solidFill: boolean;
     shortArrowheads: boolean;
     disableDefaultSidebar: boolean;
+    bottomToolbar: boolean;
   };
   debug: {
     sampling: 1 | 1.5 | 2;
@@ -109,6 +110,7 @@ export function createDefaultUserSettings(): UserSettings {
       solidFill: true,
       shortArrowheads: true,
       disableDefaultSidebar: true,
+      bottomToolbar: true,
     },
     debug: {
       sampling: 1,

@@ -26,6 +26,7 @@ export function validateUserSettings(value: unknown): value is UserSettings {
       "solidFill",
       "shortArrowheads",
       "disableDefaultSidebar",
+      "bottomToolbar",
     ])
   )
     return false;
@@ -51,15 +52,14 @@ export function readStoredUserSettings(value: unknown): UserSettings | null {
   if (value && typeof value === "object" && "features" in value) {
     const features = value.features;
 
-    if (
-      features &&
-      typeof features === "object" &&
-      !Array.isArray(features) &&
-      !Object.hasOwn(features, "disableDefaultSidebar")
-    ) {
+    if (features && typeof features === "object" && !Array.isArray(features)) {
       value = {
         ...value,
-        features: { ...features, disableDefaultSidebar: true },
+        features: {
+          disableDefaultSidebar: true,
+          bottomToolbar: true,
+          ...features,
+        },
       };
     }
   }

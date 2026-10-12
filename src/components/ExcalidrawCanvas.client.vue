@@ -2,7 +2,6 @@
 import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from "vue";
 import { createElement, Fragment } from "react";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
-import { CanvasFlagsMenu } from "./CanvasFlagsMenu";
 import { createRoot, type Root } from "react-dom/client";
 import {
   Excalidraw,
@@ -32,19 +31,11 @@ const props = defineProps<{
   library: LibraryDocument;
   userId: string;
   userSettings: UserSettings;
-  settingsReady: boolean;
   settingsStatus: UserSettingsStatus;
-  settingsError: string;
-  settingsConfigured: boolean;
-  settingsConflict: boolean;
+  settingsOpen: boolean;
 }>();
 const emit = defineEmits<{
   "save-state": [status: string];
-  "settings-change": [settings: UserSettings];
-  "settings-retry": [];
-  "settings-reload": [];
-  "settings-use-cloud": [];
-  "settings-keep-local": [];
 }>();
 const message = ref("");
 const { theme, preference, setPreference } = useTheme();
@@ -92,6 +83,18 @@ async function saveManually() {
 }
 
 function saveShortcut(event: KeyboardEvent) {
+  if (props.settingsOpen) {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      ["s", "f", "/", "p"].includes(event.key.toLowerCase())
+    ) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+
+    return;
+  }
+
   if (
     !(event.ctrlKey || event.metaKey) ||
     event.altKey ||
@@ -328,16 +331,7 @@ watch(
   },
 );
 watch(
-  () => [
-    theme.value,
-    preference.value,
-    props.userSettings,
-    props.settingsReady,
-    props.settingsStatus,
-    props.settingsError,
-    props.settingsConfigured,
-    props.settingsConflict,
-  ],
+  () => [theme.value, preference.value, props.userSettings, props.settingsOpen],
   () => {
     root?.render(createElement(CanvasEditor));
   },
@@ -346,6 +340,7 @@ watch(
 
 function CanvasEditor() {
   return createElement(Excalidraw, {
+    interaction: !props.settingsOpen,
     canvasSampling: props.userSettings.debug.sampling,
     canvasRenderingOptions: props.userSettings.debug.renderingOptions,
     arrowBindingOptimization: props.userSettings.features.edgeBinding,
@@ -379,10 +374,6 @@ function CanvasEditor() {
         children: createElement(
           Fragment,
           null,
-          createElement(MainMenu.ItemCustom, {
-            className: "canvas-navigation-hint",
-            children: "画布和素材库会自动保存，跳转前会等待保存完成。",
-          }),
           createElement(MainMenu.Item, {
             children: "首页",
             onSelect: () => {
@@ -396,23 +387,6 @@ function CanvasEditor() {
             },
           }),
         ),
-      }),
-      createElement(MainMenu.Group, {
-        title: "flag",
-        className: "canvas-menu-group",
-        children: createElement(CanvasFlagsMenu, {
-          settings: props.userSettings,
-          ready: props.settingsReady,
-          configured: props.settingsConfigured,
-          status: props.settingsStatus,
-          error: props.settingsError,
-          conflict: props.settingsConflict,
-          onChange: (settings) => emit("settings-change", settings),
-          onRetry: () => emit("settings-retry"),
-          onReload: () => emit("settings-reload"),
-          onUseCloud: () => emit("settings-use-cloud"),
-          onKeepLocal: () => emit("settings-keep-local"),
-        }),
       }),
     ),
     initialData: {
@@ -547,118 +521,17 @@ onBeforeUnmount(() => {
       </select>
       <button type="button" @click="downloadOtherDraft">下载所选草稿</button>
     </div>
-    <div ref="container" class="canvas-host" />
+    <div
+      ref="container"
+      class="canvas-host"
+      :class="
+        userSettings.features.bottomToolbar ? 'toolbar-bottom' : 'toolbar-top'
+      "
+    />
   </div>
 </template>
 
 <style scoped>
-.canvas-host :deep(.canvas-flags) {
-  width: 100%;
-  box-sizing: border-box;
-}
-.canvas-host :deep(.flag-submenu-toggle) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 8px 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-.canvas-host :deep(.flag-submenu-toggle span) {
-  color: var(--color-gray-60);
-}
-.canvas-host :deep(.flag-submenu-content) {
-  padding: 3px 0 9px;
-}
-.canvas-host :deep(.flag-feature-row) {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px 0;
-  font-size: 12px;
-}
-.canvas-host :deep(.flag-feature-row > label) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-}
-.canvas-host :deep(.flag-help) {
-  display: contents;
-}
-.canvas-host :deep(.flag-help-button) {
-  display: grid;
-  place-items: center;
-  width: 17px;
-  height: 17px;
-  border: 1px solid var(--default-border-color);
-  border-radius: 50%;
-  background: none;
-  color: var(--color-gray-60);
-  font-size: 11px;
-  cursor: pointer;
-}
-.canvas-host :deep(.flag-tooltip) {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 10;
-  pointer-events: none;
-  display: none;
-  width: 100%;
-  padding: 8px;
-  box-sizing: border-box;
-  border-radius: 4px;
-  background: var(--island-bg-color);
-  border: 1px solid var(--default-border-color);
-  box-shadow: 0 4px 12px #0002;
-  color: var(--color-gray-70);
-  font-size: 11px;
-  line-height: 1.6;
-}
-.canvas-host :deep(.flag-help:hover .flag-tooltip),
-.canvas-host :deep(.flag-help:focus-within .flag-tooltip),
-.canvas-host :deep(.flag-help.open .flag-tooltip) {
-  display: block;
-}
-.canvas-host :deep(.flag-save-status) {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-top: 9px;
-  border-top: 1px solid var(--default-border-color);
-  font-size: 11px;
-  color: var(--color-gray-60);
-}
-.canvas-host :deep(.flag-save-status small) {
-  font-size: 11px;
-  line-height: 1.5;
-}
-.canvas-host :deep(.flag-action) {
-  border: 1px solid var(--default-border-color);
-  border-radius: 4px;
-  background: var(--island-bg-color);
-  color: inherit;
-  padding: 5px 7px;
-  font: inherit;
-  font-size: 11px;
-  text-align: left;
-  cursor: pointer;
-}
-.canvas-host :deep(.flag-conflict-actions) {
-  display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
-}
-
 .canvas-editor-shell {
   position: relative;
   display: flex;
@@ -737,13 +610,6 @@ onBeforeUnmount(() => {
   background: var(--default-border-color);
 }
 
-.canvas-host :deep(.canvas-navigation-hint) {
-  max-width: 15rem;
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--color-gray-60);
-}
-
 /* 菜单较长，窄屏也沿用容器滚动，预留上下操作区。 */
 .canvas-host :deep(.dropdown-menu .dropdown-menu-container) {
   max-height: calc(100dvh - 150px);
@@ -751,18 +617,18 @@ onBeforeUnmount(() => {
 }
 
 /* 工具栏以画布内部的 FixedSideContainer 为定位边界。 */
-.canvas-host :deep(.App-menu_top) {
+.canvas-host.toolbar-bottom :deep(.App-menu_top) {
   grid-template-columns: 1fr 1fr;
 }
 
-.canvas-host :deep(.App-menu_top > .shapes-section) {
+.canvas-host.toolbar-bottom :deep(.App-menu_top > .shapes-section) {
   position: absolute;
   inset-inline: 0;
   bottom: env(safe-area-inset-bottom, 0px);
   justify-self: stretch;
 }
 
-.canvas-host :deep(.App-toolbar .HintViewer) {
+.canvas-host.toolbar-bottom :deep(.App-toolbar .HintViewer) {
   top: auto;
   bottom: 100%;
   margin-top: 0;
@@ -770,16 +636,22 @@ onBeforeUnmount(() => {
 }
 
 /* 更多工具随工具栏向上展开，避免超出画布。 */
-.canvas-host :deep(.App-toolbar__extra-tools-dropdown) {
+.canvas-host.toolbar-bottom :deep(.App-toolbar__extra-tools-dropdown) {
   top: auto;
   bottom: calc(100% + 0.375rem);
   margin-top: 0;
 }
 
-/* 新版移动工具栏原生位于 App-bottom-bar，无需额外定位。 */
+/* 移动工具栏原生置底；置顶时在顶部操作行下方排列，属性面板向下展开。 */
+.canvas-host.toolbar-top :deep(.excalidraw--mobile .App-bottom-bar) {
+  top: calc(3.5rem + env(safe-area-inset-top, 0px));
+  bottom: auto;
+  flex-direction: column-reverse;
+  max-height: calc(100% - 5rem);
+}
 
 @container (max-width: 960px) {
-  .canvas-host :deep(.App-menu_top > .shapes-section) {
+  .canvas-host.toolbar-bottom :deep(.App-menu_top > .shapes-section) {
     bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
   }
 
