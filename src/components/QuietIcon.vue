@@ -22,6 +22,7 @@ const paths: Record<string, string> = {
   settings: "M4 7h6m4 0h6M4 17h10m4 0h2M10 4v6M14 14v6",
   user: "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 21v-2a8 8 0 0 1 16 0v2",
   server: "M4 3h16v7H4ZM4 14h16v7H4ZM7 6.5h.01M7 17.5h.01M11 6.5h6M11 17.5h6",
+  history: "M3 11a9 9 0 1 1 2.6 7M3 4v7h7M12 7v5l3 2",
   folder: "M3 5h7l2 3h9v12H3Z",
   cloud:
     "M7 18H6a4 4 0 1 1 .5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1 0 9h-1M12 12v8m-3-3 3 3 3-3",

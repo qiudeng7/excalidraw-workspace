@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef } from "vue";
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "../components/AccountGate.vue";
 import QuietIcon from "../components/QuietIcon.vue";
+import ReleaseAnnouncement from "../components/ReleaseAnnouncement.vue";
+import { useReleaseAnnouncement } from "../composables/useReleaseAnnouncement";
 import { accountApi } from "../lib/accountApi";
 import type { CanvasResource } from "../lib/canvasResources";
 import { workspaceApi } from "../lib/workspaceApi";
@@ -37,6 +39,7 @@ const saveBarrier = {
   },
 };
 const settingsOpen = ref(false);
+const readyEditorKey = ref("");
 const sidebarOpen = ref(!window.matchMedia("(max-width: 760px)").matches);
 const saveShortcut = /Mac|iPhone|iPad/.test(navigator.platform)
   ? "⌘ S"
@@ -106,6 +109,7 @@ account = useAccountSession({
   run,
   reportError: operation.reportError,
   clearWorkspace: () => {
+    readyEditorKey.value = "";
     canvasDocument.reset();
     directory.reset();
     navigationController.reset();
@@ -125,6 +129,37 @@ const {
 } = account;
 const { document, current, resources, saveState, loadingCanvas } =
   canvasDocument;
+const editorKey = computed(() =>
+  user.value && document.value && current.value
+    ? `${user.value.id}:${document.value.id}:${current.value.version}`
+    : "",
+);
+const {
+  open: announcementOpen,
+  owner: announcementOwner,
+  notice: announcementNotice,
+  shown: releaseShown,
+  close: closeAnnouncement,
+  failed: announcementFailed,
+  retry: retryAnnouncement,
+} = useReleaseAnnouncement(
+  () => user.value?.id,
+  () =>
+    !starting.value &&
+    !!bootstrap.value &&
+    !!settingsResource.value &&
+    !interactionLocked.value &&
+    !loadingCanvas.value &&
+    !settingsOpen.value &&
+    (!editorKey.value || editorKey.value === readyEditorKey.value),
+);
+
+watch(
+  () => user.value?.id,
+  () => {
+    settingsOpen.value = false;
+  },
+);
 const {
   workspaces,
   canvases,
@@ -639,13 +674,18 @@ onBeforeUnmount(() => {
           </button></template
         >
       </div>
+      <div v-if="announcementNotice" class="settings-notice" role="status">
+        <span>{{ announcementNotice }}</span>
+        <button type="button" @click="retryAnnouncement">重试公告</button>
+        <button type="button" @click="announcementNotice = ''">关闭提示</button>
+      </div>
       <div
         v-if="document && current && resources && settingsResource"
         class="draw-editor"
         :inert="busy"
       >
         <ExcalidrawCanvas
-          :key="`${user.id}:${document.id}:${current.version}`"
+          :key="editorKey"
           ref="editor"
           :document="document"
           :entry="current"
@@ -653,7 +693,8 @@ onBeforeUnmount(() => {
           :user-id="user.id"
           :user-settings="settingsResource.state.settings"
           :settings-status="settingsResource.state.status"
-          :settings-open="settingsOpen"
+          :settings-open="settingsOpen || announcementOpen"
+          @ready="readyEditorKey = $event"
           @retry-load="retryCurrentCanvas"
         />
       </div>
@@ -693,7 +734,16 @@ onBeforeUnmount(() => {
       :registration-busy="settingsBusy"
       :system-error="error"
       @registration-change="toggleRegistration"
+      @release-shown="releaseShown"
       @close="settingsOpen = false"
+    />
+    <ReleaseAnnouncement
+      v-if="announcementOpen && announcementOwner"
+      :key="announcementOwner"
+      :owner="announcementOwner"
+      @close="closeAnnouncement"
+      @shown="releaseShown"
+      @failed="announcementFailed"
     />
   </section>
 </template>

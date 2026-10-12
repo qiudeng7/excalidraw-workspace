@@ -38,9 +38,11 @@ const props = defineProps<{
   settingsOpen: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   "retry-load": [];
+  ready: [key: string];
 }>();
+const instanceKey = `${props.userId}:${props.document.id}:${props.entry.version}`;
 const message = ref(props.entry.message);
 const { theme, preference, setPreference } = useTheme();
 const loading = ref(true);
@@ -348,8 +350,9 @@ onBeforeRouteLeave(async () => {
 
 function capture() {
   if (!editorApi || syncReadOnly()) return;
+  // Match onChange: saved scenes retain deleted elements, too.
   snapshot(
-    editorApi.getSceneElements(),
+    editorApi.getSceneElementsIncludingDeleted(),
     editorApi.getAppState(),
     editorApi.getFiles(),
   );
@@ -423,7 +426,7 @@ watch(
       // Subsequent real content changes continue through snapshot() during restoration.
       if (editorApi)
         sceneFingerprint = serializeAsJSON(
-          editorApi.getSceneElements(),
+          editorApi.getSceneElementsIncludingDeleted(),
           editorApi.getAppState(),
           editorApi.getFiles(),
           "local",
@@ -541,7 +544,7 @@ function CanvasEditor() {
       editorApi = editor;
       editor.updateScene({ appState: toolDefaults() });
       sceneFingerprint = serializeAsJSON(
-        editor.getSceneElements(),
+        editor.getSceneElementsIncludingDeleted(),
         editor.getAppState(),
         editor.getFiles(),
         "local",
@@ -557,6 +560,7 @@ function CanvasEditor() {
           ? message.value
           : undefined,
       );
+      emit("ready", instanceKey);
     },
     onChange: snapshot,
     onLibraryChange: (items) => {

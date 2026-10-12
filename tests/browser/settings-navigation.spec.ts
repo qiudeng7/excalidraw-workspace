@@ -16,6 +16,7 @@ for (const accountRole of ["user", "admin"] as const) {
           "通用",
           "编辑器",
           "账号",
+          "更新日志",
           "调试",
           ...(accountRole === "admin" ? ["系统设置"] : []),
         ];

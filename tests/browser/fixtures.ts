@@ -5,45 +5,73 @@ import {
   type Locator,
 } from "@playwright/test";
 import { createDefaultUserSettings } from "../../shared/contracts";
+import type { User } from "../../shared/contracts";
+import { currentRelease } from "../../src/data/releases";
+import { announcementKey } from "../../src/lib/releaseProgress";
 
 type Mode = "ok" | "unavailable" | "error" | "conflict";
 
-export const categories = ["通用", "账号", "系统设置", "调试", "编辑器"];
+export const categories = [
+  "通用",
+  "账号",
+  "系统设置",
+  "调试",
+  "编辑器",
+  "更新日志",
+];
 
 export async function editorState(page: Page) {
   // Read the real editor instance without adding a test hook to product code.
-  return page.locator(".excalidraw").evaluate((element) => {
-    const node = element as any;
-    let fiber =
-      node[Object.keys(node).find((key) => key.startsWith("__reactFiber$"))!];
+  const read = () =>
+    page.locator(".excalidraw").evaluate((element) => {
+      const node = element as any;
 
-    while (fiber) {
-      if (fiber.stateNode?.state?.activeTool) {
-        const app = fiber.stateNode;
+      let fiber =
+        node[Object.keys(node).find((key) => key.startsWith("__reactFiber$"))!];
 
-        return {
-          activeTool: app.state.activeTool,
-          selectedElementIds: app.state.selectedElementIds,
-          selectedGroupIds: app.state.selectedGroupIds,
-          viewModeEnabled: app.state.viewModeEnabled,
-          editingTextElement: app.state.editingTextElement?.id ?? null,
-          scrollX: app.state.scrollX,
-          scrollY: app.state.scrollY,
-          zoom: app.state.zoom,
-          elements: app.api.getSceneElements(),
-        };
+      while (fiber) {
+        if (fiber.stateNode?.state?.activeTool) {
+          const app = fiber.stateNode;
+
+          return {
+            activeTool: app.state.activeTool,
+            selectedElementIds: app.state.selectedElementIds,
+            selectedGroupIds: app.state.selectedGroupIds,
+            viewModeEnabled: app.state.viewModeEnabled,
+            editingTextElement: app.state.editingTextElement?.id ?? null,
+            scrollX: app.state.scrollX,
+            scrollY: app.state.scrollY,
+            zoom: app.state.zoom,
+            elements: app.api.getSceneElements(),
+          };
+        }
+
+        fiber = fiber.return;
       }
 
-      fiber = fiber.return;
-    }
+      return null;
+    });
+  let state = await read();
 
-    throw new Error("Editor state unavailable");
-  });
+  if (!state)
+    await expect
+      .poll(
+        async () => {
+          state = await read();
+
+          return !!state;
+        },
+        { message: "React editor instance must finish mounting" },
+      )
+      .toBe(true);
+
+  return state!;
 }
 
 export interface WorkspaceFixture {
   dialog: Locator;
   mock: {
+    user: User;
     settings: ReturnType<typeof createDefaultUserSettings>;
     revision: number;
     mode: Mode;
@@ -56,9 +84,11 @@ export interface WorkspaceFixture {
 export const test = base.extend<{
   workspace: WorkspaceFixture;
   accountRole: "admin" | "user";
+  announcementSeen: boolean;
 }>({
   accountRole: ["admin", { option: true }],
-  workspace: async ({ page, context, accountRole }, use) => {
+  announcementSeen: [true, { option: true }],
+  workspace: async ({ page, context, accountRole, announcementSeen }, use) => {
     const errors: string[] = [];
     const user = {
       id: "test-user",
@@ -66,6 +96,15 @@ export const test = base.extend<{
       name: "测试用户",
       role: accountRole,
     };
+
+    if (announcementSeen)
+      await context.addInitScript(
+        ({ key, id }) => localStorage.setItem(key, id),
+        {
+          key: announcementKey(user.id, currentRelease.sequence),
+          id: currentRelease.id,
+        },
+      );
     const workspace = {
       id: "test-space",
       name: "测试空间",
@@ -84,6 +123,7 @@ export const test = base.extend<{
       scene: { elements: [], appState: {}, files: {} },
     };
     const mock: WorkspaceFixture["mock"] = {
+      user,
       settings: createDefaultUserSettings(),
       revision: 0,
       mode: "ok",

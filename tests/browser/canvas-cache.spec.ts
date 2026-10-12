@@ -5,6 +5,8 @@ import {
   type CanvasDocument,
 } from "../../shared/contracts";
 import { editorState } from "./fixtures";
+import { currentRelease } from "../../src/data/releases";
+import { announcementKey } from "../../src/lib/releaseProgress";
 
 function deferred() {
   let resolve!: () => void;
@@ -45,7 +47,11 @@ function rectangle(id: string, x = 100) {
   };
 }
 
-async function fixture(page: Page, enabled = false) {
+async function fixture(
+  page: Page,
+  enabled = false,
+  options: { deletedElements?: boolean } = {},
+) {
   const settings = createDefaultUserSettings();
 
   settings.features.disableDefaultSidebar = !enabled;
@@ -55,6 +61,11 @@ async function fixture(page: Page, enabled = false) {
     name: "缓存测试",
     role: "admin",
   };
+
+  await page.addInitScript(({ key, id }) => localStorage.setItem(key, id), {
+    key: announcementKey(user.id, currentRelease.sequence),
+    id: currentRelease.id,
+  });
   const workspace = {
     id: "cache-space",
     name: "缓存空间",
@@ -73,7 +84,16 @@ async function fixture(page: Page, enabled = false) {
         revision: 0,
         createdAt: "2026-10-12",
         updatedAt: "2026-10-12",
-        scene: { elements: [rectangle(id)], appState: {}, files: {} },
+        scene: {
+          elements: [
+            rectangle(id),
+            ...(options.deletedElements
+              ? [{ ...rectangle(`${id}-deleted`), isDeleted: true }]
+              : []),
+          ],
+          appState: {},
+          files: {},
+        },
       },
     ]),
   );
@@ -388,10 +408,38 @@ test("cached preview stays read-only across keyboard, paste, drop and action pat
   expect(mock.errors).toEqual([]);
 });
 
+test("unchanged canvases with deleted elements do not save on initialization, viewing or switching", async ({
+  page,
+}) => {
+  const mock = await fixture(page, false, { deletedElements: true });
+
+  await mock.ready("a");
+  await page.getByTestId("toolbar-rectangle").first().click();
+  const box = (await page.locator(".excalidraw").boundingBox())!;
+
+  await page.mouse.move(box.x + 500, box.y + 350);
+  await page.mouse.wheel(0, 120);
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, -120);
+  await page.keyboard.up("Control");
+  for (const id of ["b", "a", "c", "a"]) {
+    await mock.select(id);
+    await mock.ready(id);
+    await expect(page.locator(".save-state")).toHaveText("已保存");
+  }
+
+  for (const id of ["a", "b", "c"]) {
+    expect(mock.counts.get(`PUT /api/canvases/${id}`) ?? 0).toBe(0);
+    expect(mock.canvases[id]!.revision).toBe(0);
+  }
+
+  expect(mock.errors).toEqual([]);
+});
+
 test("pending A network save does not delay B; fast return to A waits for its own save", async ({
   page,
 }) => {
-  const mock = await fixture(page);
+  const mock = await fixture(page, false, { deletedElements: true });
   const gate = deferred();
 
   mock.putGates.set("a", gate);
@@ -402,10 +450,12 @@ test("pending A network save does not delay B; fast return to A waits for its ow
 
     while (fiber && !fiber.stateNode?.api) fiber = fiber.return;
     const app = fiber.stateNode;
-    const elements = app.api.getSceneElements();
+    const elements = app.api.getSceneElementsIncludingDeleted();
 
     app.api.updateScene({
-      elements: [{ ...elements[0], width: 160, version: 2 }],
+      elements: elements.map((element: any, index: number) =>
+        index === 0 ? { ...element, width: 160, version: 2 } : element,
+      ),
     });
   });
   await expect.poll(() => mock.counts.get("PUT /api/canvases/a") ?? 0).toBe(1);
@@ -418,6 +468,12 @@ test("pending A network save does not delay B; fast return to A waits for its ow
   await mock.ready("a");
   expect((await editorState(page)).elements[0]!.width).toBe(160);
   expect(mock.canvases.a!.revision).toBe(1);
+  expect(mock.counts.get("PUT /api/canvases/a")).toBe(1);
+  expect(
+    mock.canvases.a!.scene.elements.find(
+      (element) => element.id === "a-deleted",
+    )?.isDeleted,
+  ).toBe(true);
   expect(mock.errors).toEqual([]);
 });
 
@@ -689,9 +745,13 @@ for (const status of [503, 409])
       await page
         .getByRole("button", { name: "加载云端版本", exact: true })
         .click();
-      await page
-        .getByRole("button", { name: "丢弃并加载云端", exact: true })
-        .click();
+      // Draft cleanup precedes reload; inspect the new document only after it arrives.
+      await Promise.all([
+        page.waitForEvent("domcontentloaded"),
+        page
+          .getByRole("button", { name: "丢弃并加载云端", exact: true })
+          .click(),
+      ]);
       await mock.ready("a");
       await page.locator(".default-sidebar-trigger").click();
       await expect.poll(() => mock.counts.get("GET /api/library") ?? 0).toBe(2);

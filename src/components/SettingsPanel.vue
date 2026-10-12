@@ -20,6 +20,8 @@ import {
 import QuietIcon from "./QuietIcon.vue";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import AccountPasswordForm from "./AccountPasswordForm.vue";
+import ReleaseNotes from "./ReleaseNotes.vue";
+import { currentRelease } from "../data/releases";
 
 const props = defineProps<{
   resource: UserSettingsResource;
@@ -31,6 +33,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   "registration-change": [event: Event];
+  "release-shown": [owner: string];
 }>();
 const sectionDefinitions = [
   {
@@ -50,6 +53,12 @@ const sectionDefinitions = [
     label: "账号",
     icon: "user",
     description: "管理你的登录密码。",
+  },
+  {
+    key: "updates",
+    label: "更新日志",
+    icon: "history",
+    description: "查看当前版本与历史更新。",
   },
   {
     key: "debug",
@@ -344,6 +353,11 @@ onBeforeUnmount(() => {
                 ><ThemeSwitcher />
               </div>
             </template>
+            <ReleaseNotes
+              v-else-if="section === 'updates'"
+              history
+              @shown="emit('release-shown', user.id)"
+            />
             <template v-else-if="section === 'system'">
               <label v-if="user.role === 'admin'" class="settings-row"
                 ><span class="settings-copy"
@@ -421,7 +435,9 @@ onBeforeUnmount(() => {
           <span>{{
             section === "account"
               ? "使用原密码验证身份后修改密码"
-              : "设置更改即时生效"
+              : section === "updates"
+                ? `当前版本 ${currentRelease.version} · ${currentRelease.date}`
+                : "设置更改即时生效"
           }}</span>
         </footer>
       </div>
