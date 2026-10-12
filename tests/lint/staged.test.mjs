@@ -15,9 +15,7 @@ test("staged snapshot protects partial staging, filenames with spaces and unstag
   writeFileSync(join(f.root, file), unstaged);
   writeFileSync(join(f.root, "eslint.config.mjs"), "invalid unstaged config {");
   const before = f.git("write-tree");
-  const result = f.run(process.execPath, [
-    "scripts/git-hooks/check-staged.mjs",
-  ]);
+  const result = f.run(process.execPath, ["scripts/check-staged.mjs"]);
 
   assert.equal(result.status, 0, result.stderr + result.stdout);
   assert.equal(readFileSync(join(f.root, file), "utf8"), unstaged);
@@ -36,9 +34,7 @@ test("staged lint, format and whitespace failures do not change the index", (t) 
     writeFileSync(join(f.root, "invalid.mjs"), source);
     f.git("add", "invalid.mjs");
     const before = f.git("write-tree");
-    const result = f.run(process.execPath, [
-      "scripts/git-hooks/check-staged.mjs",
-    ]);
+    const result = f.run(process.execPath, ["scripts/check-staged.mjs"]);
 
     assert.notEqual(result.status, 0);
     assert.equal(f.git("write-tree"), before);
@@ -49,15 +45,9 @@ test("staged lint, format and whitespace failures do not change the index", (t) 
 test("renames are checked while deletion-only and empty indexes pass", (t) => {
   const f = fixture(t);
 
-  assert.equal(
-    f.run(process.execPath, ["scripts/git-hooks/check-staged.mjs"]).status,
-    0,
-  );
-  f.git("rm", "tests/http/api.mjs");
-  assert.equal(
-    f.run(process.execPath, ["scripts/git-hooks/check-staged.mjs"]).status,
-    0,
-  );
+  assert.equal(f.run(process.execPath, ["scripts/check-staged.mjs"]).status, 0);
+  f.git("rm", "package.json");
+  assert.equal(f.run(process.execPath, ["scripts/check-staged.mjs"]).status, 0);
   const source = "rename source.mjs";
 
   writeFileSync(join(f.root, source), 'export const value = "rename";\n');
@@ -73,9 +63,7 @@ test("renames are checked while deletion-only and empty indexes pass", (t) => {
   renameSync(join(f.root, source), join(f.root, "renamed script.mjs"));
   f.git("add", "-A");
   assert.match(f.git("diff", "--cached", "--name-status"), /R100/);
-  const result = f.run(process.execPath, [
-    "scripts/git-hooks/check-staged.mjs",
-  ]);
+  const result = f.run(process.execPath, ["scripts/check-staged.mjs"]);
 
   assert.equal(result.status, 0, result.stderr + result.stdout);
 });
@@ -103,9 +91,7 @@ test("staged ESLint configuration checks its complete code scope", (t) => {
     readFileSync(config, "utf8") + "\n// Config change fixture.\n",
   );
   f.git("add", "eslint.config.mjs");
-  const result = f.run(process.execPath, [
-    "scripts/git-hooks/check-staged.mjs",
-  ]);
+  const result = f.run(process.execPath, ["scripts/check-staged.mjs"]);
 
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /existing.mjs/);

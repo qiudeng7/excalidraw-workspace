@@ -11,12 +11,12 @@
 | 进程内集成          | `pnpm test:integration`                                                    | SQLite、迁移、blob 驱动与真实 H3 处理器，包括认证并发时序、鉴权后的条件读取 |
 | 前端 UI             | `pnpm test:browser`                                                        | Chromium 中的真实界面和编辑器，API 全部模拟                                 |
 | 本地 Workers / D1   | `pnpm test:worker`                                                         | 临时 Worker 上的设置、改密、旧版设置兼容和缓存条件读取 HTTP 回归            |
-| 代码风格与工具      | `pnpm lint`、`pnpm format:check`、`pnpm test:lint`、`pnpm test:hooks`      | 静态检查、规则自身回归及临时 Git 仓库中的 hooks 测试                        |
+| 代码风格与工具      | `pnpm lint`、`pnpm format:check`、`pnpm test:lint`、`pnpm check:staged`    | 静态检查、规则自身回归及临时 Git 仓库中的暂存区检查回归                     |
 | 独立 HTTP 验收      | 本文后面的 `node tests/http/…` 命令                                        | API 重启持久化、目录与导航，分别使用全新测试库                              |
 | Workers / Node 构建 | 串行执行 `pnpm build`、`pnpm build:node`                                   | 两种部署产物                                                                |
 | 编辑器包            | [构建与 Chromium 检查](../../packages/excalidraw/README.md#验证与更新上游) | 包自身构建和专用浏览器验证                                                  |
 
-推送前检查 `pnpm check:pre-push` 依次运行 `test:unit`、`test:integration` 和 `typecheck`。快速定位问题可先运行相关 unit；integration 不启动应用 HTTP 服务，但迁移回归会执行独立 Nuxt CLI。
+手动执行 `pnpm check`，依次运行 `lint`、`format:check`、`test:lint`、`test:unit`、`test:integration` 和 `typecheck`。提交和推送不会自动触发项目检查。快速定位问题可先运行相关 unit；integration 不启动应用 HTTP 服务，但迁移回归会执行独立 Nuxt CLI。
 
 Nuxt 准备、类型检查和生产构建共用 `.nuxt` / `.output`，编辑器构建共用包内 `dist`，请在同一 checkout 串行执行。默认浏览器启动器独占临时 Nuxt 生成目录和 Vite 缓存，但仍先构建编辑器，不能与编辑器构建并行。各功能模块末尾还列有相关检查项。
 
@@ -60,10 +60,10 @@ tests/
 │   ├── account-compatibility.mjs
 │   ├── cache.mjs
 │   └── support/local-client.mjs
-├── hooks/
-│   ├── fixture.mjs
-│   └── *.test.mjs
-├── lint/error-handling.test.ts
+├── lint/
+│   ├── error-handling.test.ts
+│   ├── staged.test.mjs
+│   └── fixture.mjs
 └── lib/
     ├── loader.mjs
     ├── database.ts
@@ -76,7 +76,7 @@ tests/
 
 `integration/support/storage.ts` 创建真实的临时 SQLite、应用迁移并提供文件 blob；`api.ts` 发现真实 `server/api/` 路由并通过 H3 在进程内处理 Request，不监听端口；`nitro.ts` 提供独立执行处理器所需的运行时配置接口。浏览器 mock、HTTP client 和 Git fixture 分别留在所属套件，只有跨套件实际复用的代码进入 `tests/lib/`。
 
-Node 入口只发现对应目录中的 `*.test.ts`，hooks 使用 `*.test.mjs`；Playwright 配置只发现 `browser/**/*.spec.ts`，输出固定到仓库根的 `test-results/browser/`，启动命令的 cwd 固定为仓库根。HTTP `.mjs` 是有参数及状态前提的 CLI，runner 使用明确用例列表，不 glob 执行所有文件。`scripts/git-hooks/` 是被测试的开发工具，继续保留在 `scripts/`。
+Node 入口只发现对应目录中的 `*.test.ts`，`test:lint` 同时发现 `tests/lint/` 中的 `*.test.ts` 和 `*.test.mjs`；Playwright 配置只发现 `browser/**/*.spec.ts`，输出固定到仓库根的 `test-results/browser/`，启动命令的 cwd 固定为仓库根。HTTP `.mjs` 是有参数及状态前提的 CLI，runner 使用明确用例列表，不 glob 执行所有文件。`scripts/check-staged.mjs` 是被测试的开发工具，保留在 `scripts/`。
 
 `packages/excalidraw/tests/` 保留在编辑器包内，维护其上游测试源码、快照和专用 Chromium 脚本。宿主测试入口不会自动运行完整上游套件；可执行的编辑器验证以包内说明为准。
 

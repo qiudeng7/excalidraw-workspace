@@ -59,34 +59,24 @@ pnpm build           # 构建编辑器和 Workers 产物
 pnpm build:node      # 构建编辑器和 Node 服务 .output/
 ```
 
-### 代码检查和 Git hooks
+### 代码检查
 
-工程脚本放在 `scripts/` 下：`git-hooks/` 管理提交与推送检查。应用测试的用例、配置和环境启动器统一放在 `tests/`，按 `unit`、`integration`、`browser`、`http` 划分；`hooks`、`lint` 验证开发工具，跨套件复用代码放在 `tests/lib/`。完整归属、执行边界和 HTTP 验收命令见[开发验证](docs/development/testing.md)。
-
-首次执行 `pnpm install` 时，`postinstall` 准备 Nuxt，`prepare` 安装项目 Git hooks。重复安装依赖可能走快速检查并跳过生命周期脚本；补装或更新 hooks 可执行下方的安装命令。安装器仅设置当前仓库的 `core.hooksPath`，记录安装前的配置，并先执行原有 hooks；已有的全局文件检查和 `commit-msg` 规范仍然生效。一个仓库的多个 worktree 共用这次安装，各自在自己的目录运行项目检查。
+在仓库根目录手动运行检查：
 
 ```sh
+pnpm check           # lint、格式、工具回归、unit、integration 和类型检查
+pnpm check:staged    # 只检查 Git 暂存区中的新增、修改和重命名文件
 pnpm lint            # ESLint：代码规则与异常处理
 pnpm lint --fix      # 手动修复 ESLint 可修复的问题
 pnpm format:check    # Prettier：检查排版
 pnpm format          # 手动格式化，执行前先确认工作区改动
-pnpm check:staged    # 只检查 Git 暂存区中的新增、修改和重命名文件
-pnpm check:pre-push  # unit + integration、声明和 Nuxt 准备、类型检查
-pnpm test:hooks      # 在临时 Git 仓库验证 hooks，不修改当前仓库配置
 ```
 
-提交前，`pre-commit` 先执行原有 hook，再对暂存内容运行 ESLint、Prettier 和 `git diff --cached --check`。检查读取独立的暂存区快照，不自动修复文件，也不会把同一文件尚未暂存的修改带入提交；仅删除文件或没有暂存文件时同样可运行。修改 ESLint 配置时会检查完整代码范围。Prettier 忽略构建产物、生成的锁文件与迁移元数据，以及沿用上游格式的编辑器非 TypeScript 资源，具体范围见 [.prettierignore](.prettierignore)。
+`pnpm check` 会生成编辑器声明并准备 Nuxt；浏览器、Worker 和生产构建按变更范围另外运行，完整命令见[开发验证](docs/development/testing.md)。项目不安装 Git hooks，提交或推送不会自动运行这些检查。
 
-推送前，`pre-push` 先执行原有 hook，再运行 `check:pre-push`；任何一步失败都会停止推送。该检查会生成编辑器类型声明，不运行浏览器、Worker 或完整应用构建。手动运行这些检查不会发起提交或推送。
+`pnpm check:staged` 对独立的暂存区快照运行 ESLint、Prettier 和 Git 空白检查，不修改工作区或暂存区。它适合部分暂存后的提交检查；修改 ESLint 配置时会检查完整代码范围。Prettier 范围见 [.prettierignore](.prettierignore)。检查脚本放在 `scripts/`，其回归用例与 ESLint 规则测试放在 `tests/lint/`。
 
-如果安装依赖时使用了 `--ignore-scripts`，需要手动恢复 Nuxt 准备和 hooks：
-
-```sh
-pnpm exec nuxt prepare
-node scripts/git-hooks/install.mjs
-```
-
-安装脚本可重复执行，不会重复串联原有 hooks。卸载时在仓库根目录执行 `node scripts/git-hooks/install.mjs --uninstall`，会还原安装前的仓库配置，同仓库的 worktree 也一起恢复。CI、没有 `.git` 的源码归档自动跳过安装；本地需要保留当前 hook 配置时，可使用 `SKIP_PROJECT_HOOKS=1 pnpm install --frozen-lockfile`，之后运行 `node scripts/git-hooks/install.mjs` 补装。跳过安装不会卸载已经安装的 hooks。若 `config.worktree` 单独设置了 `core.hooksPath`，安装器会提示移除该覆盖后再安装，以免共享配置无法生效。
+安装依赖时，`postinstall` 准备 Nuxt。若使用了 `--ignore-scripts`，随后执行 `pnpm exec nuxt prepare`。
 
 验证本地 Cloudflare 适配器时，执行 `pnpm build`、`pnpm db:migrate:local`、`pnpm dev:worker`，打开 http://localhost:8787。Wrangler 模拟 D1 和 R2，数据在 `.wrangler/` 中，与 Node 开发目录和线上均独立。
 

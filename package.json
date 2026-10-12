@@ -23,12 +23,10 @@
     "test:integration": "node --import ./tests/lib/loader.mjs --import tsx --test tests/integration/*.test.ts",
     "test:browser": "playwright test --config tests/browser/playwright.config.ts",
     "test:worker": "node tests/http/run-worker.mjs",
-    "test:lint": "tsx --test tests/lint/*.test.ts",
-    "test:hooks": "node --test tests/hooks/*.test.mjs",
-    "check:staged": "node scripts/git-hooks/check-staged.mjs",
-    "check:pre-push": "pnpm test:unit && pnpm test:integration && pnpm typecheck",
+    "test:lint": "tsx --test tests/lint/*.test.ts tests/lint/*.test.mjs",
+    "check:staged": "node scripts/check-staged.mjs",
     "postinstall": "nuxt prepare",
-    "prepare": "node scripts/git-hooks/install.mjs"
+    "check": "pnpm lint && pnpm format:check && pnpm test:lint && pnpm test:unit && pnpm test:integration && pnpm typecheck"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "workspace:*",
