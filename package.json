@@ -24,7 +24,9 @@
     "db:generate": "nuxt db generate",
     "db:migrate": "node scripts/check-data-layout.mjs && nuxt db migrate",
     "start:node": "pnpm db:migrate && node .output/server/index.mjs",
-    "data:import": "node scripts/import-legacy-data.mjs"
+    "data:import": "node scripts/import-legacy-data.mjs",
+    "test:browser": "playwright test",
+    "test:worker": "node scripts/test-worker.mjs"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "workspace:*",
@@ -42,6 +44,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260927.1",
+    "@playwright/test": "1.64.0",
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "^26.6.3",
     "@types/react": "^18.3.31",
