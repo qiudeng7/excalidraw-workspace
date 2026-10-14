@@ -148,6 +148,12 @@ export const test = base.extend<{
       if (!(path === "/api" || path.startsWith("/api/")))
         return route.continue();
       const key = `${request.method()} ${path}`;
+
+      if (
+        request.method() === "POST" &&
+        /^\/api\/canvases\/[^/]+\/presence$/.test(path)
+      )
+        return route.fulfill({ json: { syncMode: "legacy" } });
       let data: unknown;
       const fail = (status: number, code: string, message: string) =>
         route.fulfill({ status, json: { error: { code, message } } });
@@ -192,6 +198,9 @@ export const test = base.extend<{
           break;
         case "GET /api/workspaces":
           data = { workspaces: [workspace] };
+          break;
+        case "GET /api/shared-canvases":
+          data = { canvases: [] };
           break;
         case "GET /api/workspaces/test-space/canvases":
           data = { canvases: [canvas], catalogRevision: 0 };

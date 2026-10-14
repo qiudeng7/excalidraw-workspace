@@ -23,6 +23,7 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import "@excalidraw/excalidraw/index.css";
 import "~/assets/editor-layout.css";
 import type {
+  AppState,
   ExcalidrawImperativeAPI,
   ExcalidrawProps,
   ExcalidrawInitialDataState,
@@ -34,9 +35,24 @@ import {
   type CanvasScene,
   type UserSettings,
 } from "#shared/contracts";
+import { wins, canonical } from "#shared/collaboration/merge";
+import type { Element } from "#shared/collaboration/types";
 import { collaborationSession } from "~/lib/collaboration/session";
 import type { CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
+import { defaultEditorTool } from "~/lib/editorTools";
+import { confirmDialog } from "~/lib/dialogs";
+import { getTabScope } from "~/lib/persistence";
+import {
+  richTextRecoveryStorageKey,
+  readRichTextRecovery,
+  writeRichTextRecovery,
+  downloadRichTextRecovery,
+} from "~/lib/richTextRecovery";
+import {
+  captureEditorHistory,
+  restoreEditorHistory,
+} from "~/lib/editorHistory";
 
 const props = defineProps<{
   canvasId: string;
@@ -67,8 +83,61 @@ const session = collaborationSession({
   scope: props.scope,
 });
 const error = ref("");
+const textRecovery = ref<ExcalidrawElement>();
+const textRecoveryPersisted = ref(false);
+let textRecoveryKey = "";
+
+function preserveText(element: ExcalidrawElement) {
+  textRecovery.value = JSON.parse(JSON.stringify(element));
+  textRecoveryPersisted.value = writeRichTextRecovery(textRecoveryKey, element);
+}
+
+function clearTextRecovery() {
+  textRecovery.value = undefined;
+  textRecoveryPersisted.value = false;
+  try {
+    if (textRecoveryKey) localStorage.removeItem(textRecoveryKey);
+  } catch (cause) {
+    console.warn("无法清除富文本恢复副本", cause);
+  }
+}
+
+async function recoverText() {
+  if (!editor || !session.editable || !textRecovery.value) return;
+  const source = textRecovery.value;
+  const copy = {
+    ...source,
+    id: crypto.randomUUID(),
+    containerId: null,
+    boundElements: null,
+    groupIds: [],
+    frameId: null,
+    x: source.x + 24,
+    y: source.y + 24,
+    isDeleted: false,
+    version: 1,
+    versionNonce: Math.floor(Math.random() * 0x7fffffff),
+    updated: Date.now(),
+    created: Date.now(),
+  };
+
+  editor.updateScene({
+    elements: [...editor.getSceneElementsIncludingDeleted(), copy] as never,
+    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+  capture();
+  try {
+    await session.flush();
+    clearTextRecovery();
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : "恢复副本同步失败";
+  }
+}
+
 const dirty = ref(false);
 const readOnly = ref(true);
+const recovery = ref(false);
+const discarding = ref(false);
 const initialized = ref(false);
 let root: Root | undefined;
 let editor: ExcalidrawImperativeAPI | undefined;
@@ -84,13 +153,30 @@ let lastPeers = "";
 let renderState = "";
 let historyPreconditions: Operation["preconditions"];
 let displayedElements: readonly ExcalidrawElement[] = [];
+const entry = props.resources?.canvases.get(props.canvasId);
+const initialTool =
+  (entry?.editorContext?.activeTool as AppState["activeTool"] | undefined) ??
+  defaultEditorTool(navigator);
+const initialHistory = entry?.editorContext?.history;
+const historyGeneration = entry?.historyGeneration;
+let historyRestorePending = true;
+const initialViewGeneration = session.viewGeneration;
+let confirmedThisMount = false;
+const canEdit = () => confirmedThisMount && session.editable;
 
 function applySession() {
   if (!alive) return;
+  if (session.viewGeneration > initialViewGeneration) confirmedThisMount = true;
   error.value = session.message;
   dirty.value = session.dirty;
-  readOnly.value = !session.editable;
-  emit("status", session.statusText);
+  readOnly.value = !canEdit();
+  recovery.value = session.status === "recovery";
+  emit(
+    "status",
+    confirmedThisMount || session.message
+      ? session.statusText
+      : "正在校验版本…",
+  );
   if (session.view) {
     emit("access", session.view.access.role, session.view.access.viewMode);
     emit("title", session.view.name);
@@ -125,7 +211,7 @@ function applySession() {
       .join("、"),
   );
   const nextRenderState = JSON.stringify([
-    session.editable,
+    canEdit(),
     session.view?.access.viewMode,
   ]);
 
@@ -134,8 +220,36 @@ function applySession() {
     root?.render(createElement(CanvasEditor));
   }
 
-  if (!editor || !session.view) return;
-  if (previousReadOnly && session.editable) {
+  if (!editor || !session.view || !confirmedThisMount) return;
+  const editing = editor.getAppState().editingTextElement;
+
+  if (editing) {
+    const local = editor
+      .getSceneElementsIncludingDeleted()
+      .find((element) => element.id === editing.id);
+    const remote = (session.view.scene.elements as Element[]).find(
+      (element) => element.id === editing.id,
+    );
+
+    if (
+      local?.type === "text" &&
+      local.richText &&
+      (!session.editable ||
+        (remote &&
+          wins(remote, local as unknown as Element) &&
+          canonical(remote) !== canonical(local)))
+    ) {
+      preserveText(local);
+      applying = true;
+      try {
+        flushSync(() => editor!.cancelTextEditing());
+      } finally {
+        applying = false;
+      }
+    }
+  }
+
+  if (previousReadOnly && canEdit()) {
     flushSync(() => root?.render(createElement(CanvasEditor)));
     flushSync(() =>
       editor!.updateScene({
@@ -145,7 +259,7 @@ function applySession() {
     );
   }
 
-  previousReadOnly = !session.editable;
+  previousReadOnly = !canEdit();
   const peers = JSON.stringify([...session.peers]);
 
   if (peers !== lastPeers) {
@@ -173,6 +287,13 @@ function applySession() {
   if (fingerprint === lastScene) return;
   applying = true;
   try {
+    const firstInstall = !initialized.value;
+
+    if (firstInstall) {
+      editor.history.clear();
+      initialized.value = true;
+    }
+
     editor.addFiles(Object.values(value.files) as never);
     flushSync(() =>
       editor!.updateScene({
@@ -186,11 +307,7 @@ function applySession() {
     );
     displayedElements = editor.getSceneElementsIncludingDeleted();
     lastScene = fingerprint;
-    if (!initialized.value) {
-      editor.history.clear();
-      initialized.value = true;
-      emit("ready");
-    }
+    if (firstInstall) emit("ready");
   } finally {
     applying = false;
   }
@@ -226,7 +343,36 @@ const onChange: NonNullable<ExcalidrawProps["onChange"]> = (
   appState,
   files,
 ) => {
-  if (!alive || applying || !initialized.value) return;
+  if (!alive || !initialized.value) return;
+  if (
+    historyRestorePending &&
+    editor &&
+    canEdit() &&
+    !appState.viewModeEnabled
+  ) {
+    historyRestorePending = false;
+    restoreEditorHistory(
+      editor,
+      initialHistory,
+      session.value,
+      session.view?.epoch ?? "",
+    );
+  }
+
+  if (applying) return;
+  if (entry)
+    entry.editorContext = {
+      ...entry.editorContext,
+      viewModeEnabled: appState.viewModeEnabled,
+      activeTool: canEdit()
+        ? { ...appState.activeTool }
+        : (entry.editorContext?.activeTool ?? initialTool),
+      viewport: {
+        scrollX: appState.scrollX,
+        scrollY: appState.scrollY,
+        zoom: { ...appState.zoom },
+      },
+    };
   const previousElements = displayedElements;
 
   displayedElements = elements;
@@ -235,7 +381,7 @@ const onChange: NonNullable<ExcalidrawProps["onChange"]> = (
     (!appState.openSidebar.tab || appState.openSidebar.tab === "library")
   )
     void ensureLibrary();
-  if (session.editable) {
+  if (canEdit()) {
     const serialized = JSON.parse(
       serializeAsJSON(elements, appState, files, "local"),
     ) as CanvasScene;
@@ -269,6 +415,16 @@ function capture() {
       editor.getAppState(),
       editor.getFiles(),
     );
+  if (
+    editor &&
+    entry?.editorContext &&
+    !historyRestorePending &&
+    historyGeneration === entry.historyGeneration
+  )
+    entry.editorContext.history = captureEditorHistory(
+      editor,
+      session.view?.epoch ?? "",
+    );
 }
 
 async function flush() {
@@ -291,31 +447,64 @@ async function saveManually() {
   }
 }
 
+function downloadFile(content: string, filename: string) {
+  const url = URL.createObjectURL(
+    new Blob([content], { type: "application/json" }),
+  );
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadTextRecovery() {
+  if (textRecovery.value)
+    void downloadRichTextRecovery(
+      textRecovery.value,
+      session.view?.name ?? props.initialDocument?.name ?? "画布",
+    );
+}
+
 function download() {
   capture();
   const value =
     session.value.elements.length || session.view
       ? session.value
       : props.initialDocument?.scene;
-  const url = URL.createObjectURL(
-    new Blob(
-      [
-        JSON.stringify({
-          type: "excalidraw",
-          version: 2,
-          source: location.origin,
-          ...value,
-        }),
-      ],
-      { type: "application/json" },
-    ),
-  );
-  const link = document.createElement("a");
 
-  link.href = url;
-  link.download = `${session.view?.name ?? props.initialDocument?.name ?? "画布"}-本地备份.excalidraw`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadFile(
+    JSON.stringify({
+      type: "excalidraw",
+      version: 2,
+      source: location.origin,
+      ...value,
+    }),
+    `${session.view?.name ?? props.initialDocument?.name ?? "画布"}-本地备份.excalidraw`,
+  );
+}
+
+async function discardDraft() {
+  const confirmed = await confirmDialog({
+    title: "放弃未同步草稿",
+    message:
+      "请先下载本地备份。继续将放弃当前未同步草稿，重新读取云端内容，无法撤销。当前账号若只有查看权限，重新读取后仍为只读。",
+    confirmLabel: "放弃并重新读取",
+    danger: true,
+  });
+
+  if (!confirmed || discarding.value) return;
+  discarding.value = true;
+  try {
+    if (await session.discardDraft(confirmed)) {
+      editor?.history.clear();
+      historyRestorePending = false;
+      props.resources?.releaseEditorHistory(props.canvasId);
+    }
+  } finally {
+    discarding.value = false;
+  }
 }
 
 function beforeUnload(event: BeforeUnloadEvent) {
@@ -345,9 +534,12 @@ function CanvasEditor() {
   const flags = settings.value;
 
   return createElement(Excalidraw, {
+    customColorPaletteStorageKey: props.userId
+      ? `workspace:color-palette:v1:${encodeURIComponent(props.userId)}`
+      : undefined,
     handleKeyboardGlobally: false,
-    syncReadOnly: !session.editable,
-    viewModeEnabled: session.editable ? undefined : true,
+    syncReadOnly: !canEdit(),
+    viewModeEnabled: canEdit() ? undefined : true,
     isCollaborating: session.view?.access.viewMode === "live",
     libraryReady:
       !!props.resources &&
@@ -358,6 +550,7 @@ function CanvasEditor() {
     canvasRenderingOptions: flags.debug.renderingOptions,
     arrowBindingOptimization: flags.features.edgeBinding,
     shortArrowheads: flags.features.shortArrowheads,
+    ctrlMultiSelect: flags.features.ctrlMultiSelect,
     UIOptions: {
       defaultSidebar:
         !!props.resources && !flags.features.disableDefaultSidebar,
@@ -395,6 +588,8 @@ function CanvasEditor() {
     initialData: {
       ...(props.initialDocument?.scene ?? session.value),
       appState: {
+        ...entry?.editorContext?.viewport,
+        activeTool: initialTool,
         viewBackgroundColor: String(
           props.initialDocument?.scene.appState.viewBackgroundColor ??
             "#ffffff",
@@ -444,7 +639,7 @@ function CanvasEditor() {
       )
         props.resources.library.update([...items]);
     },
-    onPaste: () => session.editable,
+    onPaste: () => canEdit(),
   });
 }
 
@@ -488,7 +683,20 @@ watch(
   () => root?.render(createElement(CanvasEditor)),
   { deep: true },
 );
-onMounted(() => {
+onMounted(async () => {
+  try {
+    textRecoveryKey = await richTextRecoveryStorageKey(
+      props,
+      await getTabScope(),
+    );
+    if (!alive) return;
+    textRecovery.value = readRichTextRecovery(textRecoveryKey);
+    textRecoveryPersisted.value = !!textRecovery.value;
+  } catch (cause) {
+    console.warn("读取富文本恢复副本失败", cause);
+  }
+
+  if (!alive) return;
   root = createRoot(host.value!);
   root.render(createElement(CanvasEditor));
   unsubscribe = session.subscribe(applySession);
@@ -498,6 +706,16 @@ onMounted(() => {
   applySession();
 });
 onBeforeUnmount(() => {
+  const active = editor?.getAppState().editingTextElement;
+
+  if (active && session.dirty) {
+    const local = editor
+      ?.getSceneElementsIncludingDeleted()
+      .find((element) => element.id === active.id);
+
+    if (local?.type === "text" && local.richText) preserveText(local);
+  }
+
   capture();
   alive = false;
   unsubscribe?.();
@@ -517,9 +735,34 @@ onBeforeUnmount(() => {
       <span>{{ error }}</span
       ><button type="button" @click="download">下载本地备份</button>
       <button type="button" @click="session.start()">重新连接</button>
+      <button
+        v-if="recovery && dirty"
+        type="button"
+        :disabled="discarding"
+        @click="discardDraft"
+      >
+        放弃草稿并重新读取
+      </button>
       <button v-if="!dirty" type="button" @click="session.refresh()">
         重新读取
       </button>
+    </div>
+    <div
+      v-if="textRecovery"
+      class="text-recovery"
+      :role="textRecoveryPersisted ? 'status' : 'alert'"
+    >
+      <span v-if="textRecoveryPersisted"
+        >文字编辑已结束，本地富文本副本已保留。</span
+      >
+      <span v-else
+        >文字编辑已结束，副本仅保留在当前页面；尚未写入浏览器，请刷新前下载。</span
+      >
+      <button v-if="!readOnly" type="button" @click="recoverText">
+        恢复为新文字
+      </button>
+      <button type="button" @click="downloadTextRecovery">下载文字副本</button>
+      <button type="button" @click="clearTextRecovery">忽略</button>
     </div>
     <div
       ref="host"
@@ -532,6 +775,34 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.text-recovery {
+  position: absolute;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.6rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: 0 2px 8px #0001;
+  font-size: 0.8rem;
+}
+.text-recovery button {
+  flex-shrink: 0;
+  font: inherit;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .collaboration-editor {
   display: flex;
   flex-direction: column;
@@ -544,6 +815,7 @@ onBeforeUnmount(() => {
 }
 .save-notice {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   padding: 8px 16px;
@@ -551,6 +823,10 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 .save-notice span {
-  flex: 1;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.save-notice button {
+  white-space: nowrap;
 }
 </style>

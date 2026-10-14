@@ -144,6 +144,7 @@ interface ColorPickerKeyNavHandlerProps {
   onEyeDropperToggle: (force?: boolean) => void;
   onEscape: (event: React.KeyboardEvent | KeyboardEvent) => void;
   excludedColors?: readonly string[];
+  savedPaletteEnabled?: boolean;
 }
 
 /**
@@ -162,6 +163,7 @@ export const colorPickerKeyNavHandler = ({
   onEyeDropperToggle,
   onEscape,
   excludedColors,
+  savedPaletteEnabled,
 }: ColorPickerKeyNavHandlerProps): boolean => {
   if (event[KEYS.CTRL_OR_CMD]) {
     return false;
@@ -197,6 +199,7 @@ export const colorPickerKeyNavHandler = ({
       baseColors: true,
       shades: colorObj?.shade != null,
       hex: true,
+      saved: !!savedPaletteEnabled,
     };
 
     const sections = Object.entries(sectionsMap).reduce((acc, [key, value]) => {

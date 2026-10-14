@@ -616,7 +616,13 @@
     "invalidColor": "",
     "invalidHexLength": "",
     "topPicksTip": "",
-    "resetTopPicks": ""
+    "resetTopPicks": "",
+    "savedPalette": "我的色板",
+    "applySavedColor": "使用收藏颜色",
+    "saveCurrentColor": "收藏当前颜色",
+    "colorSaved": "已收藏此颜色",
+    "removeSavedColor": "从色板移除当前颜色",
+    "paletteStorageError": "浏览器无法保存色板，颜色仅保留到本页关闭。"
   },
   "overwriteConfirm": {
     "action": {

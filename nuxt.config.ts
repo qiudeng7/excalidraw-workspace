@@ -39,6 +39,11 @@ export default defineNuxtConfig({
       // Resolve the theme before styles paint, including pages rendered on the server.
       script: [
         {
+          key: "editor-assets",
+          tagPriority: "critical",
+          innerHTML: 'window.EXCALIDRAW_ASSET_PATH="/editor-assets/";',
+        },
+        {
           key: "initial-theme",
           tagPriority: "critical",
           innerHTML: `(function(){var preference=document.cookie.match(/(?:^|;\\s*)workspace-theme=(light|dark|system)(?:;|$)/);var value=preference?preference[1]:"system";document.documentElement.dataset.theme=value==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):value})()`,
@@ -55,6 +60,15 @@ export default defineNuxtConfig({
     "/api/**": { headers: { "cache-control": "no-store" } },
   },
   nitro: {
+    publicAssets: [
+      {
+        dir: fileURLToPath(
+          new URL("./packages/excalidraw/dist/prod/fonts", import.meta.url),
+        ),
+        baseURL: "/editor-assets/fonts",
+        maxAge: 3600,
+      },
+    ],
     preset: process.env.NITRO_PRESET || "node-server",
     plugins: process.env.NITRO_PRESET?.startsWith("cloudflare")
       ? []

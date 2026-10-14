@@ -22,6 +22,8 @@ export interface CanvasDocumentController {
   renameLoadedCanvas(id: string, name: string): void;
   clearDocument(message?: string): void;
   invalidateCanvas(id: string): boolean;
+  restoreCanvas(id: string): Promise<void>;
+  releaseEditorHistory(id: string): void;
   reset(): void;
   setSaveState(message: string): void;
 }
@@ -33,12 +35,14 @@ export interface CanvasDocumentDependencies {
   >;
   ownerId(): string;
   onLoaded(): void;
+  prepareHandoff?(id: string): Promise<void>;
 }
 
 export function useCanvasDocument({
   api,
   ownerId,
   onLoaded,
+  prepareHandoff,
 }: CanvasDocumentDependencies): CanvasDocumentController {
   const document = shallowRef<CanvasDocument>();
   const library = shallowRef<LibraryDocument>();
@@ -84,7 +88,13 @@ export function useCanvasDocument({
     if (resources.value?.owner !== owner) {
       resources.value?.dispose();
       current.value = undefined;
-      resources.value = new CanvasResources(owner, api, publish);
+      resources.value = new CanvasResources(
+        owner,
+        api,
+        publish,
+        undefined,
+        prepareHandoff,
+      );
     }
 
     return resources.value!;
@@ -94,6 +104,10 @@ export function useCanvasDocument({
     const generation = ++selection;
 
     selectedId = id;
+    // Keep the original editor mounted until native text/IME has committed.
+    if (current.value?.document.id === id && prepareHandoff)
+      await prepareHandoff(id);
+    if (generation !== selection) return;
 
     loadingCanvas.value = true;
     const store = manager();
@@ -143,6 +157,10 @@ export function useCanvasDocument({
     loadingCanvas: shallowReadonly(loadingCanvas),
     loadCanvas,
     clearDocument,
+    releaseEditorHistory: (id) => resources.value?.releaseEditorHistory(id),
+    restoreCanvas: async (id) => {
+      await resources.value?.revive(id);
+    },
     invalidateCanvas(id) {
       const selected = selectedId === id || current.value?.document.id === id;
 

@@ -6,6 +6,8 @@ node_modules/
 dist/
 **/dist/
 coverage/
+test-results/
+playwright-report/
 **/dist-ssr/
 **/.cache/
 

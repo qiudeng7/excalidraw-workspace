@@ -25,6 +25,7 @@ export interface Workspace {
 export interface CanvasMeta {
   syncMode?: "legacy" | "preparing" | "collaborative";
   roomEpoch?: string | null;
+  migrationEpoch?: string | null;
   position: number;
   id: string;
   workspaceId: string;
@@ -85,6 +86,7 @@ export interface UserSettings {
     shortArrowheads: boolean;
     disableDefaultSidebar: boolean;
     bottomToolbar: boolean;
+    ctrlMultiSelect: boolean;
   };
   debug: {
     sampling: 1 | 1.5 | 2;
@@ -116,6 +118,7 @@ export function createDefaultUserSettings(): UserSettings {
       shortArrowheads: true,
       disableDefaultSidebar: true,
       bottomToolbar: true,
+      ctrlMultiSelect: true,
     },
     debug: {
       sampling: 1,
@@ -129,4 +132,14 @@ export function createDefaultUserSettings(): UserSettings {
       },
     },
   };
+}
+
+export interface RecycleEntry {
+  id: string;
+  kind: "workspace" | "canvas";
+  name: string;
+  workspaceId?: string;
+  workspaceName?: string;
+  deletedAt: string;
+  expiresAt: string;
 }

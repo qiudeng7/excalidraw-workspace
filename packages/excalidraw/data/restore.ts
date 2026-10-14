@@ -1,4 +1,8 @@
 import {
+  isRichTextV1,
+  richTextPlainText,
+} from "../lib/element/src/richTextDocument";
+import {
   clamp,
   isFiniteNumber,
   isValidPoint,
@@ -575,7 +579,10 @@ export const restoreElement = (
         textAlign: element.textAlign || DEFAULT_TEXT_ALIGN,
         verticalAlign: element.verticalAlign || DEFAULT_VERTICAL_ALIGN,
         containerId: element.containerId ?? null,
-        originalText: element.originalText || text,
+        originalText: isRichTextV1(element.richText)
+          ? richTextPlainText(element.richText)
+          : element.originalText || text,
+        ...(element.richText ? { richText: element.richText } : {}),
         autoResize: element.autoResize ?? true,
         lineHeight,
         labelPosition: isFiniteNumber(element.labelPosition)

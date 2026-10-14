@@ -1,3 +1,4 @@
+import { layoutRichText } from "./richTextLayout";
 import rough from "roughjs/bin/rough";
 
 import {
@@ -655,6 +656,26 @@ const drawElementOnCanvas = (
           renderConfig.theme === THEME.DARK,
         );
         context.textAlign = element.textAlign as CanvasTextAlign;
+
+        const richLayout = layoutRichText(element, element.width);
+
+        if (richLayout) {
+          context.textBaseline = "alphabetic";
+          for (const run of richLayout.runs) {
+            context.font = run.font;
+            context.direction = run.direction;
+            context.textAlign = run.direction === "rtl" ? "right" : "left";
+            context.fillText(
+              run.text,
+              run.x + (run.direction === "rtl" ? run.width : 0),
+              run.baseline,
+            );
+          }
+
+          context.restore();
+          if (shouldTemporarilyAttach) context.canvas.remove();
+          break;
+        }
 
         // Canvas does not support multiline text by default
         const lines = element.text.replace(/\r\n?/g, "\n").split("\n");

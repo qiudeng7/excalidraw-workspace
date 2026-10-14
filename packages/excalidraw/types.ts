@@ -1,4 +1,5 @@
 import type { CanvasRenderingOptions } from "./renderer/renderingOptions";
+import type { History } from "./history";
 import type {
   IMAGE_MIME_TYPES,
   UserIdleState,
@@ -850,6 +851,8 @@ export interface ExcalidrawProps {
   /** 屏幕采样倍率，独立于场景缩放及导出分辨率。 */
   arrowBindingOptimization?: boolean;
   shortArrowheads?: boolean;
+  /** Let Ctrl+left click extend selection; opt-in for standalone editor users. */
+  ctrlMultiSelect?: boolean;
   canvasSampling?: 1 | 1.5 | 2;
   canvasRenderingOptions?: CanvasRenderingOptions;
   className?: string;
@@ -1022,6 +1025,8 @@ export interface ExcalidrawProps {
   theme?: Theme;
   // @TODO come with better API before v0.18.0
   name?: string;
+  /** Opt-in browser-local personal color palette; the host scopes the key per account. */
+  customColorPaletteStorageKey?: string;
   renderCustomStats?: (
     elements: readonly NonDeletedExcalidrawElement[],
     appState: UIAppState,
@@ -1369,6 +1374,8 @@ export interface ExcalidrawImperativeAPI {
   /** Whether the editor has been unmounted and the API is no longer usable. */
   isDestroyed: boolean;
   updateScene: InstanceType<typeof App>["updateScene"];
+  /** Ends text editing and discards its pending submit callback/history. */
+  cancelTextEditing: InstanceType<typeof App>["cancelTextEditing"];
   applyDeltas: InstanceType<typeof App>["applyDeltas"];
   mutateElement: InstanceType<typeof App>["mutateElement"];
   updateLibrary: InstanceType<typeof Library>["updateLibrary"];
@@ -1381,6 +1388,8 @@ export interface ExcalidrawImperativeAPI {
   >["getSceneElementsMapIncludingDeleted"];
   history: {
     clear: InstanceType<typeof App>["resetHistory"];
+    getSnapshot: History["getSnapshot"];
+    restoreSnapshot: History["restoreSnapshot"];
   };
   getSceneElements: InstanceType<typeof App>["getSceneElements"];
   getAppState: () => InstanceType<typeof App>["state"];

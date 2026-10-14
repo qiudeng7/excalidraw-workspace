@@ -1,6 +1,6 @@
 import { db } from "@nuxthub/db";
-import { and, eq, sql } from "drizzle-orm";
-import { collaborationRooms } from "#server/db/schema";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { collaborationRooms, canvases, workspaces } from "#server/db/schema";
 import { execute, type Command } from "#shared/collaboration/room";
 import { reject } from "#shared/collaboration/merge";
 import type { Principal, RoomState } from "#shared/collaboration/types";
@@ -17,6 +17,30 @@ export async function nodeCommand(
   command: Command,
   seed?: RoomState,
 ): Promise<unknown> {
+  if (
+    !["recycle", "delete", "projection", "projectionAck"].includes(command.type)
+  ) {
+    const active = await db
+      .select({ id: canvases.id, pending: canvases.recyclePending })
+      .from(canvases)
+      .innerJoin(workspaces, eq(canvases.workspaceId, workspaces.id))
+      .where(
+        and(
+          eq(canvases.id, id),
+          isNull(canvases.deletedAt),
+          isNull(workspaces.deletedAt),
+          eq(canvases.purging, 0),
+          eq(workspaces.deleting, 0),
+        ),
+      )
+      .limit(1);
+
+    if (!active.length)
+      reject("CANVAS_DELETED", "画布已移入回收站或彻底删除", 410);
+    if (active[0]!.pending)
+      reject("RECYCLE_SYNC_PENDING", "正在恢复画布，请稍后重试", 503);
+  }
+
   if (seed)
     await db
       .insert(collaborationRooms)

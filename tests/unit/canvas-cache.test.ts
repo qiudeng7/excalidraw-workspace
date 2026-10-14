@@ -150,7 +150,7 @@ test("cache memory and IndexedDB replace a previous epoch with a lower confirmed
   }
 });
 
-test("migration preserves a dirty legacy draft even when its revision equals the new room sequence", async () => {
+test("migration preserves an older draft without a saved baseline even when its revision equals the room sequence", async () => {
   let migrated = false;
   const manager = new CanvasResources(
     "migration-draft",
@@ -171,6 +171,7 @@ test("migration preserves a dirty legacy draft even when its revision equals the
     const entry = await manager.open("dirty", () => {});
 
     entry.resource.update(scene("unsaved-local"));
+    entry.resource.baseline = undefined; // Old browser drafts predate baseline storage.
     migrated = true;
     await manager.open("dirty", () => {});
     await manager.open("dirty", () => {});
@@ -1231,5 +1232,135 @@ test("invalidating a cold loading canvas prevents its late successful GET from p
     );
   } finally {
     controller.reset();
+  }
+});
+
+test("accepting a clean remote version also advances the persisted draft baseline for a later collaborative handoff", async () => {
+  let revision = 0;
+  const manager = new CanvasResources(
+    "updated-baseline",
+    {
+      readCanvas: async () =>
+        canvas("baseline", revision, `remote-${revision}`),
+      readLibrary: library,
+    },
+    () => {},
+    cache().cache,
+  );
+
+  try {
+    const entry = await manager.open("baseline", () => {});
+
+    revision = 1;
+    await manager.open("baseline", () => {});
+    assert.deepEqual(entry.resource.baseline, scene("remote-1"));
+    entry.resource.update(scene("local"));
+    await entry.resource.checkpoint();
+    const restored = new PersistentResource({
+      key: "updated-baseline:canvas:baseline",
+      path: "/unused",
+      field: "scene",
+      value: scene("future-server"),
+      revision: 2,
+      changed: () => {},
+    });
+
+    try {
+      await restored.restore();
+      assert.deepEqual(restored.baseline, scene("remote-1"));
+      assert.deepEqual(restored.value, scene("local"));
+    } finally {
+      restored.dispose();
+    }
+  } finally {
+    manager.dispose();
+  }
+});
+
+test("legacy drafts with baselines remain recoverable instead of being replayed into a restored room epoch", async () => {
+  let restored = false;
+  const manager = new CanvasResources(
+    "restored-migration",
+    {
+      readCanvas: async () => ({
+        ...canvas("restored-migration"),
+        ...(restored
+          ? {
+              syncMode: "collaborative" as const,
+              roomEpoch: "restored",
+              migrationEpoch: "original-migration",
+            }
+          : {}),
+      }),
+      readLibrary: library,
+    },
+    () => {},
+    cache().cache,
+  );
+
+  try {
+    const entry = await manager.open("restored-migration", () => {});
+
+    entry.resource.update(scene("unsaved-local"));
+    assert.ok(entry.resource.baseline);
+    restored = true;
+    await manager.open("restored-migration", () => {});
+    assert.equal(entry.status, "conflict");
+    assert.equal(entry.resource.dirty, true);
+    assert.deepEqual(entry.resource.value, scene("unsaved-local"));
+  } finally {
+    manager.dispose();
+  }
+});
+
+test("authoritative restore revives the same id while an old deleted read cannot replace it or unrelated drafts", async () => {
+  const oldRead = deferred<CanvasDocument>();
+  let reads = 0;
+  const manager = new CanvasResources(
+    "recycle-revive",
+    {
+      readCanvas: async (id) =>
+        id === "a" && ++reads === 1
+          ? oldRead.promise
+          : canvas(id, 2, "restored"),
+      readLibrary: library,
+    },
+    () => {},
+    cache().cache,
+  );
+
+  try {
+    const unrelated = await manager.open("b", () => {});
+
+    unrelated.resource.update(scene("unrelated-draft"));
+    const previews: string[] = [];
+    const loading = manager.open("a", (entry) =>
+      previews.push(entry.document.scene.elements[0] as string),
+    );
+    const rejected = assert.rejects(
+      loading,
+      (error: unknown) =>
+        error instanceof DOMException && error.name === "AbortError",
+    );
+
+    await manager.invalidate("a");
+    await assert.rejects(
+      manager.open("a", () => {}),
+      /画布已删除/,
+    );
+    await manager.revive("a");
+    const restored = await manager.open("a", () => {});
+
+    oldRead.resolve(canvas("a", 0, "stale"));
+    await rejected;
+    assert.equal(restored.resource.revision, 2);
+    assert.equal(manager.canvases.get("a"), restored);
+    assert.ok(!previews.length);
+    assert.equal(manager.canvases.get("b"), unrelated);
+    assert.equal(unrelated.resource.dirty, true);
+    assert.deepEqual(unrelated.resource.value, scene("unrelated-draft"));
+  } finally {
+    oldRead.resolve(canvas("a"));
+    manager.dispose();
   }
 });

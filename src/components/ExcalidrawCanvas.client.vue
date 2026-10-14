@@ -28,6 +28,11 @@ import type { CanvasResource, CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
 import type { UserSettingsStatus } from "~/lib/userSettings";
 import { confirmDialog, isAppDialogOpen } from "~/lib/dialogs";
+import { defaultEditorTool } from "~/lib/editorTools";
+import {
+  captureEditorHistory,
+  restoreEditorHistory,
+} from "~/lib/editorHistory";
 
 const props = defineProps<{
   document: CanvasDocument;
@@ -182,6 +187,12 @@ let userViewMode =
   props.entry.editorContext?.viewModeEnabled ??
   !!props.document.scene.appState.viewModeEnabled;
 let restoringContext = false;
+const initialTool =
+  (props.entry.editorContext?.activeTool as
+    AppState["activeTool"] | undefined) ?? defaultEditorTool(navigator);
+const initialHistory = props.entry.editorContext?.history;
+const historyGeneration = props.entry.historyGeneration;
+let historyRestorePending = true;
 let injectedLibrary = false;
 
 let injectingLibrary: Promise<void> | undefined;
@@ -296,6 +307,38 @@ const snapshot: NonNullable<ExcalidrawProps["onChange"]> = (
   files,
 ) => {
   if (!active) return;
+  // App commits its Store before onChange; onInitialize runs before that commit.
+  if (
+    historyRestorePending &&
+    editorApi &&
+    !syncReadOnly() &&
+    appState.viewModeEnabled === userViewMode
+  ) {
+    historyRestorePending = false;
+    restoreEditorHistory(
+      editorApi,
+      initialHistory,
+      {
+        elements: [...elements],
+        appState: { viewBackgroundColor: appState.viewBackgroundColor },
+        files,
+      },
+      props.document.migrationEpoch ?? "",
+    );
+  }
+
+  const viewport = {
+    scrollX: appState.scrollX,
+    scrollY: appState.scrollY,
+    zoom: { ...appState.zoom },
+  };
+
+  props.entry.editorContext = {
+    ...props.entry.editorContext,
+    viewModeEnabled: userViewMode,
+    activeTool: props.entry.editorContext?.activeTool ?? initialTool,
+    viewport,
+  };
   if (
     appState.openSidebar?.name === "default" &&
     (!appState.openSidebar.tab || appState.openSidebar.tab === "library") &&
@@ -306,8 +349,10 @@ const snapshot: NonNullable<ExcalidrawProps["onChange"]> = (
   if (!restoringContext) {
     userViewMode = appState.viewModeEnabled;
     props.entry.editorContext = {
+      ...props.entry.editorContext,
       viewModeEnabled: userViewMode,
       activeTool: { ...appState.activeTool },
+      viewport,
     };
   }
 
@@ -350,16 +395,64 @@ onBeforeRouteLeave(async () => {
 });
 
 function capture() {
-  if (!editorApi || syncReadOnly()) return;
+  if (!editorApi || !active) return;
   // Match onChange: saved scenes retain deleted elements, too.
   snapshot(
     editorApi.getSceneElementsIncludingDeleted(),
     editorApi.getAppState(),
     editorApi.getFiles(),
   );
+  if (
+    props.entry.editorContext &&
+    !historyRestorePending &&
+    historyGeneration === props.entry.historyGeneration
+  )
+    props.entry.editorContext.history = captureEditorHistory(
+      editorApi,
+      props.document.migrationEpoch ?? "",
+    );
 }
 
-defineExpose<EditorHandle>({ capture, flush, saveManually });
+let composing = false;
+const compositionWaiters = new Set<() => void>();
+const compositionStart = () => {
+  composing = true;
+};
+const compositionEnd = () => {
+  composing = false;
+  for (const resolve of compositionWaiters) resolve();
+  compositionWaiters.clear();
+};
+
+async function prepareHandoff() {
+  while (composing && active)
+    await new Promise<void>((resolve) => compositionWaiters.add(resolve));
+  if (!active || !editorApi) return;
+  const focused = container.value?.ownerDocument.activeElement;
+
+  // Native text submission runs on blur. Capture afterward even if the old
+  // PUT was already fenced and its wrapper has entered conflict/read-only.
+  if (focused instanceof HTMLElement && container.value?.contains(focused))
+    focused.blur();
+  await Promise.resolve();
+  if (!active || !editorApi) return;
+  const serialized = serializeAsJSON(
+    editorApi.getSceneElementsIncludingDeleted(),
+    editorApi.getAppState(),
+    editorApi.getFiles(),
+    "local",
+  );
+
+  if (serialized !== sceneFingerprint) {
+    sceneFingerprint = serialized;
+    sceneResource.update(JSON.parse(serialized) as CanvasScene);
+  }
+
+  sceneResource.pauseAutosave();
+  await sceneResource.checkpoint();
+}
+
+defineExpose<EditorHandle>({ capture, flush, saveManually, prepareHandoff });
 
 const container = useTemplateRef<HTMLDivElement>("container");
 const router = useRouter();
@@ -474,6 +567,9 @@ function CanvasEditor() {
   return createElement(Excalidraw, {
     // Native modal inertness isolates pointer input; keep editor state intact.
     // Keyboard input stays scoped to the editor, not the teleported settings.
+    customColorPaletteStorageKey: props.userId
+      ? `workspace:color-palette:v1:${encodeURIComponent(props.userId)}`
+      : undefined,
     handleKeyboardGlobally: false,
     syncReadOnly: syncReadOnly(),
     viewModeEnabled: syncReadOnly() ? true : undefined,
@@ -486,6 +582,7 @@ function CanvasEditor() {
     canvasRenderingOptions: props.userSettings.debug.renderingOptions,
     arrowBindingOptimization: props.userSettings.features.edgeBinding,
     shortArrowheads: props.userSettings.features.shortArrowheads,
+    ctrlMultiSelect: props.userSettings.features.ctrlMultiSelect,
     UIOptions: {
       defaultSidebar: !props.userSettings.features.disableDefaultSidebar,
     },
@@ -535,10 +632,9 @@ function CanvasEditor() {
       appState: {
         ...sceneResource.value.appState,
         ...toolDefaults(),
+        ...props.entry.editorContext?.viewport,
         viewModeEnabled: userViewMode,
-        ...(props.entry.editorContext
-          ? { activeTool: props.entry.editorContext.activeTool }
-          : {}),
+        activeTool: initialTool,
       },
     } as ExcalidrawInitialDataState,
     onInitialize: (editor) => {
@@ -622,13 +718,19 @@ onMounted(async () => {
   }
 
   if (!container.value) return;
+  container.value.addEventListener("compositionstart", compositionStart);
+  container.value.addEventListener("compositionend", compositionEnd);
   loading.value = false;
   root = createRoot(container.value);
   root.render(createElement(CanvasEditor));
 });
 
 onBeforeUnmount(() => {
+  capture();
   active = false;
+  compositionEnd();
+  container.value?.removeEventListener("compositionstart", compositionStart);
+  container.value?.removeEventListener("compositionend", compositionEnd);
   window.removeEventListener("beforeunload", beforeUnload);
   window.removeEventListener("keydown", saveShortcut, true);
   clearTimeout(feedbackTimer);

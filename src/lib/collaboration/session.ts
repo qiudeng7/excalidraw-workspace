@@ -10,7 +10,11 @@ import { orderElements, wins } from "#shared/collaboration/merge";
 import { api, ApiError } from "~/lib/api";
 import { ConfirmedCache } from "~/lib/confirmedCache";
 import { getTabScope } from "~/lib/persistence";
-import { draftStorage, type Draft } from "~/lib/collaboration/storage";
+import {
+  draftStorage,
+  findRecoveryDraft,
+  type Draft,
+} from "~/lib/collaboration/storage";
 import ReconnectingWebSocket from "partysocket/ws";
 
 export type HydratedView = Omit<CanvasView, "scene"> & { scene: CanvasScene };
@@ -51,7 +55,8 @@ export class CollaborationSession {
   private socket?: ReconnectingWebSocket;
   private connecting?: Promise<void>;
   private sending?: Promise<void>;
-  private sendingOpId = "";
+  private submittedOperations = new Set<string>();
+  private discarding = false;
   private loading?: Promise<void>;
   private writes?: Promise<void>;
   private checkpointPending = false;
@@ -62,11 +67,16 @@ export class CollaborationSession {
   private subscribed = false;
   private authorizedOnce = false;
   private failures = 0;
+  private confirmedViews = 0;
 
   constructor(readonly options: SessionOptions) {}
 
   get dirty() {
     return this.operations.length > 0;
+  }
+
+  get viewGeneration() {
+    return this.confirmedViews;
   }
 
   get inactive() {
@@ -75,6 +85,7 @@ export class CollaborationSession {
 
   get editable() {
     return (
+      !this.discarding &&
       this.authorizedOnce &&
       this.view?.access.role !== "viewer" &&
       !["checking", "connecting", "recovery", "denied", "error"].includes(
@@ -150,16 +161,17 @@ export class CollaborationSession {
     );
   }
 
-  async start() {
-    if (this.connecting || this.disposed) return this.connecting;
-    this.connecting = this.initialize().finally(() => {
+  async start(connect = true) {
+    if (this.connecting || this.disposed || this.discarding)
+      return this.connecting;
+    this.connecting = this.initialize(connect).finally(() => {
       this.connecting = undefined;
     });
 
     return this.connecting;
   }
 
-  private async initialize() {
+  private async initialize(connect: boolean) {
     try {
       const access = await this.request<Access>("access");
 
@@ -200,13 +212,30 @@ export class CollaborationSession {
         this.changed();
       }
 
-      const draft = await draftStorage(this.draftKey, "get");
+      let draft = await draftStorage(this.draftKey, "get");
+      const recovery = !draft?.operations.length
+        ? await findRecoveryDraft(this.draftKey)
+        : undefined;
+
+      if (recovery) {
+        this.draftKey = recovery.key;
+        draft = recovery.draft;
+      }
 
       this.clientId = draft?.clientId ?? crypto.randomUUID();
       this.clientSeq = draft?.clientSeq ?? 0;
       this.operations = draft?.operations ?? [];
+      // A restored operation may already have reached the server before its ACK
+      // was lost. Its identity must never be reused with a changed payload.
+      this.submittedOperations = new Set(this.operations.map((op) => op.opId));
       this.files = draft?.files ?? {};
       if (this.dirty && draft?.scene) this.value = draft.scene;
+      if (recovery)
+        throw new ApiError(
+          409,
+          "DRAFT_RECOVERY_REQUIRED",
+          "发现权限变更前尚未同步的草稿，请下载本地备份后手动恢复",
+        );
       if (access.role === "viewer" && this.dirty)
         throw new ApiError(
           409,
@@ -216,7 +245,7 @@ export class CollaborationSession {
       await this.refresh();
       if (this.disposed) return;
       this.authorizedOnce = true;
-      if (access.viewMode === "live") await this.connect();
+      if (access.viewMode === "live" && connect) await this.connect();
       else {
         this.status = "ready";
         this.changed();
@@ -255,10 +284,19 @@ export class CollaborationSession {
           "DRAFT_RECOVERY_REQUIRED",
           "画布已恢复或替换，离线草稿需要下载后手动恢复",
         );
-      if (this.view?.epoch === next.epoch && next.seq < this.view.seq) return;
+      if (this.view?.epoch === next.epoch && next.seq < this.view.seq) {
+        // The current view is newer, but a reopening editor still needs proof
+        // that this refresh completed successfully before it can leave read-only.
+        this.confirmedViews++;
+        this.changed();
+
+        return;
+      }
+
       this.view = next;
       this.rebase();
       await cache.put(this.cacheScope(next), { ...next, revision: next.seq });
+      this.confirmedViews++;
       this.changed();
     })().finally(() => {
       this.loading = undefined;
@@ -341,7 +379,7 @@ export class CollaborationSession {
 
     if (
       tail &&
-      tail.opId !== this.sendingOpId &&
+      !this.submittedOperations.has(tail.opId) &&
       !preconditions &&
       !tail.preconditions
     ) {
@@ -359,6 +397,7 @@ export class CollaborationSession {
     } else
       this.operations.push({
         protocolVersion: 1,
+        textFormatVersion: 1,
         epoch: this.view.epoch,
         clientId: this.clientId,
         clientSeq: ++this.clientSeq,
@@ -379,7 +418,81 @@ export class CollaborationSession {
     return true;
   }
 
+  /** Migrate only locally changed elements, keeping remote additions and tombstones. */
+  async adoptLegacyDraft(
+    baseline: CanvasScene,
+    local: CanvasScene,
+    expectedEpoch: string,
+  ) {
+    if (!this.editable || !this.view)
+      throw new Error("协作尚未就绪，原草稿已保留");
+    if (this.view.epoch !== expectedEpoch)
+      throw new ApiError(
+        409,
+        "DRAFT_RECOVERY_REQUIRED",
+        "画布已恢复，原草稿已保留，请下载后手动恢复",
+      );
+    const before = new Map(
+      (baseline.elements as Element[]).map((element) => [element.id, element]),
+    );
+    const remoteIds = new Set(
+      (this.value.elements as Element[]).map((element) => element.id),
+    );
+    const changed = (local.elements as Element[]).filter((element) => {
+      const original = before.get(element.id);
+
+      // A locally created-and-deleted element was never shared. In particular,
+      // its image data may already be pruned by the native serializer.
+      if (element.isDeleted && !original && !remoteIds.has(element.id))
+        return false;
+
+      return (
+        !original ||
+        original.version !== element.version ||
+        original.versionNonce !== element.versionNonce
+      );
+    });
+    // Excalidraw snapshots omit deleted elements. Encode only deletions relative
+    // to the old confirmed baseline, never deletions of new remote elements.
+    const present = new Set(
+      (local.elements as Element[]).map((element) => element.id),
+    );
+
+    for (const element of before.values())
+      if (!element.isDeleted && !present.has(element.id))
+        changed.push({
+          ...element,
+          isDeleted: true,
+          version: element.version + 1,
+          versionNonce: 0,
+        });
+    const merged = new Map(
+      (this.value.elements as Element[]).map((element) => [
+        element.id,
+        element,
+      ]),
+    );
+
+    for (const element of changed) merged.set(element.id, element);
+    const appState = { ...this.value.appState };
+    const baseBackground = baseline.appState.viewBackgroundColor ?? "#ffffff";
+    const localBackground = local.appState.viewBackgroundColor ?? "#ffffff";
+
+    if (
+      localBackground !== baseBackground &&
+      (appState.viewBackgroundColor ?? "#ffffff") === baseBackground
+    )
+      appState.viewBackgroundColor = localBackground;
+    this.update({
+      elements: [...merged.values()],
+      appState,
+      files: { ...this.value.files, ...local.files },
+    });
+    await this.checkpoint();
+  }
+
   checkpoint() {
+    if (this.discarding) return this.writes ?? Promise.resolve();
     if (!this.draftKey) return Promise.resolve();
     this.checkpointPending = true;
     this.writes ??= (async () => {
@@ -405,9 +518,61 @@ export class CollaborationSession {
     return this.writes;
   }
 
+  /** Only an explicit confirmation may discard this selected local queue. */
+  async discardDraft(confirmed: boolean) {
+    if (
+      !confirmed ||
+      !this.dirty ||
+      this.status !== "recovery" ||
+      this.discarding
+    )
+      return false;
+    const selectedKey = this.draftKey;
+
+    this.discarding = true;
+    this.changed();
+    try {
+      await this.connecting;
+      // Confirm there is still a readable destination before deleting the backup.
+      await this.request<Access>("access");
+      await this.sending?.catch(() => {
+        // flush() already reported this error. Wait for settlement before the
+        // explicitly confirmed discard so no late ACK can rewrite its draft.
+      });
+      await this.writes;
+      if (this.draftKey !== selectedKey)
+        throw new Error("当前草稿已切换，请重新确认要放弃的草稿");
+      await draftStorage(selectedKey, "delete");
+      this.disconnect();
+      clearTimeout(this.saveTimer);
+      this.operations = [];
+      this.submittedOperations.clear();
+      this.files = {};
+      this.draftKey = "";
+      this.view = undefined;
+      this.value = { elements: [], appState: {}, files: {} };
+      this.authorizedOnce = false;
+      this.status = "checking";
+      this.message = "";
+      this.changed();
+      this.discarding = false;
+      await this.start(this.listeners.size > 0);
+
+      return true;
+    } catch (error) {
+      this.failed(error);
+
+      return false;
+    } finally {
+      this.discarding = false;
+      this.changed();
+    }
+  }
+
   async flush(): Promise<void> {
+    if (this.discarding) return;
     await this.checkpoint();
-    if (!this.dirty) return;
+    if (this.discarding || !this.dirty) return;
     if (this.sending) {
       await this.sending;
       if (this.dirty && this.editable) return this.flush();
@@ -427,17 +592,17 @@ export class CollaborationSession {
       })
       .finally(() => {
         this.sending = undefined;
-        this.sendingOpId = "";
       });
 
     return this.sending;
   }
 
   private async sendPending() {
-    while (this.operations.length && !this.disposed) {
+    while (this.operations.length && !this.disposed && !this.discarding) {
       const op = this.operations[0]!;
 
-      this.sendingOpId = op.opId;
+      // Keep attempted operations immutable until ACK, including network errors.
+      this.submittedOperations.add(op.opId);
 
       this.status = "saving";
       this.changed();
@@ -460,6 +625,7 @@ export class CollaborationSession {
       this.operations = this.operations.filter(
         (pending) => pending.opId !== op.opId,
       );
+      this.submittedOperations.delete(op.opId);
       await this.accept(commit);
       const referenced = new Set(
         this.operations.flatMap((pending) =>
@@ -765,6 +931,13 @@ export async function flushCollaboration(userId: string) {
     [...sessions.values()]
       .filter((session) => session.options.userId === userId)
       .map((session) => session.flush()),
+  );
+}
+
+/** Closed views may still own an offline or in-flight operation queue. */
+export function hasUnsyncedCollaboration(userId: string) {
+  return [...sessions.values()].some(
+    (session) => session.options.userId === userId && session.dirty,
   );
 }
 

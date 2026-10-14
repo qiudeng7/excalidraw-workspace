@@ -6,6 +6,7 @@ import {
   exists,
   getTableColumns,
   inArray,
+  isNull,
   sql,
 } from "drizzle-orm";
 import * as tables from "#server/db/schema";
@@ -24,6 +25,7 @@ export async function canvas(id: string, user: string) {
         .where(
           and(
             eq(tables.canvases.id, id),
+            isNull(tables.canvases.deletedAt),
             inArray(tables.canvases.workspaceId, ownedWorkspaceIds(user)),
           ),
         )
@@ -48,6 +50,7 @@ export async function createCanvas(
       .where(
         and(
           eq(tables.canvases.workspaceId, workspace),
+          isNull(tables.canvases.deletedAt),
           catalogMatches(workspace, user, catalogRevision),
         ),
       ),
@@ -61,9 +64,14 @@ export async function createCanvas(
           objectKey: sql<string | null>`NULL`.as("objectKey"),
           syncMode: sql<"legacy">`'legacy'`.as("syncMode"),
           roomEpoch: sql<string | null>`NULL`.as("roomEpoch"),
+          migrationEpoch: sql<string | null>`NULL`.as("migrationEpoch"),
           createdAt: sql<string>`${now}`.as("createdAt"),
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           position: sql<number>`0`.as("position"),
+          deletedAt: sql<string | null>`NULL`.as("deletedAt"),
+          recycleRevision: sql<number>`0`.as("recycleRevision"),
+          recyclePending: sql<number>`0`.as("recyclePending"),
+          purging: sql<number>`0`.as("purging"),
         })
         .from(tables.workspaces)
         .where(
@@ -71,6 +79,7 @@ export async function createCanvas(
             eq(tables.workspaces.id, workspace),
             eq(tables.workspaces.userId, user),
             eq(tables.workspaces.deleting, 0),
+            isNull(tables.workspaces.deletedAt),
             eq(tables.workspaces.catalogRevision, catalogRevision),
           ),
         ),
@@ -83,6 +92,7 @@ export async function createCanvas(
           eq(tables.workspaces.id, workspace),
           eq(tables.workspaces.userId, user),
           eq(tables.workspaces.deleting, 0),
+          isNull(tables.workspaces.deletedAt),
           eq(tables.workspaces.catalogRevision, catalogRevision),
         ),
       )
@@ -104,6 +114,7 @@ export async function renameCanvas(
     .where(
       and(
         eq(tables.canvases.id, id),
+        isNull(tables.canvases.deletedAt),
         inArray(tables.canvases.workspaceId, ownedWorkspaceIds(user)),
       ),
     );
@@ -121,7 +132,9 @@ export async function deleteCanvas(
       .where(
         and(
           eq(tables.canvases.id, id),
+          isNull(tables.canvases.deletedAt),
           eq(tables.canvases.workspaceId, workspace),
+          isNull(tables.canvases.deletedAt),
           catalogMatches(workspace, user, catalogRevision),
         ),
       )
@@ -134,6 +147,7 @@ export async function deleteCanvas(
           eq(tables.workspaces.id, workspace),
           eq(tables.workspaces.userId, user),
           eq(tables.workspaces.deleting, 0),
+          isNull(tables.workspaces.deletedAt),
           eq(tables.workspaces.catalogRevision, catalogRevision),
         ),
       )
@@ -156,7 +170,9 @@ export async function reorderCanvases(
       .where(
         and(
           eq(tables.canvases.id, id),
+          isNull(tables.canvases.deletedAt),
           eq(tables.canvases.workspaceId, workspace),
+          isNull(tables.canvases.deletedAt),
           catalogMatches(workspace, user, revision),
         ),
       )
@@ -170,6 +186,7 @@ export async function reorderCanvases(
         eq(tables.workspaces.id, workspace),
         eq(tables.workspaces.userId, user),
         eq(tables.workspaces.deleting, 0),
+        isNull(tables.workspaces.deletedAt),
         eq(tables.workspaces.catalogRevision, revision),
       ),
     )
@@ -191,6 +208,7 @@ export async function canvasCatalog(workspace: string, user: string) {
           eq(tables.workspaces.id, workspace),
           eq(tables.workspaces.userId, user),
           eq(tables.workspaces.deleting, 0),
+          isNull(tables.workspaces.deletedAt),
         ),
       ),
     db
@@ -199,6 +217,7 @@ export async function canvasCatalog(workspace: string, user: string) {
       .where(
         and(
           eq(tables.canvases.workspaceId, workspace),
+          isNull(tables.canvases.deletedAt),
           inArray(tables.canvases.workspaceId, ownedWorkspaceIds(user)),
         ),
       )
@@ -220,6 +239,7 @@ function catalogMatches(workspace: string, user: string, revision: number) {
           eq(tables.workspaces.id, workspace),
           eq(tables.workspaces.userId, user),
           eq(tables.workspaces.deleting, 0),
+          isNull(tables.workspaces.deletedAt),
           eq(tables.workspaces.catalogRevision, revision),
         ),
       ),

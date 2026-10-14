@@ -6,6 +6,9 @@ import type {
   SaveResult,
 } from "#shared/contracts";
 import type { WorkspaceApi } from "~/lib/workspaceApi";
+import { collaborationSession } from "~/lib/collaboration/session";
+import type { AppState } from "@excalidraw/excalidraw/types";
+import type { EditorHistory } from "~/lib/editorHistory";
 import { ApiError } from "~/lib/api";
 import { canvasRevisionScope } from "#shared/snapshotValidator";
 import {
@@ -25,7 +28,13 @@ export interface CanvasResource {
   version: number;
   confirmed: boolean;
   metadataGeneration: number;
-  editorContext?: { viewModeEnabled: boolean; activeTool: unknown };
+  historyGeneration: number;
+  editorContext?: {
+    viewModeEnabled: boolean;
+    activeTool: unknown;
+    viewport?: Pick<AppState, "scrollX" | "scrollY" | "zoom">;
+    history?: EditorHistory;
+  };
   accessDenied: boolean;
 }
 
@@ -45,11 +54,17 @@ export class CanvasResources {
   libraryMessage = "";
   libraryPreview?: unknown[];
   private deleted = new Set<string>();
+  private incarnations = new Map<string, number>();
+  private invalidations = new Map<string, Promise<void>>();
   private flights = new Map<string, Promise<CanvasResource>>();
   private libraryFlight?: Promise<void>;
   private reads = new Set<AbortController>();
   private disposed = false;
   private activeId = "";
+  private editorContexts = new Map<
+    string,
+    NonNullable<CanvasResource["editorContext"]>
+  >();
   private pendingWrites = 0;
   private writeWaiters: (() => void)[] = [];
 
@@ -58,6 +73,7 @@ export class CanvasResources {
     private api: ReadApi,
     private changed: () => void,
     readonly cache = new ConfirmedCache(undefined, 0),
+    private prepareHandoff?: (id: string) => Promise<void>,
   ) {}
 
   private async runRequest(task: () => Promise<SaveResult>) {
@@ -84,16 +100,48 @@ export class CanvasResources {
   }
 
   async invalidate(id: string) {
+    this.incarnations.set(id, (this.incarnations.get(id) ?? 0) + 1);
     this.deleted.add(id);
+    this.flights.delete(id);
     this.canvases.get(id)?.resource.dispose();
     this.canvases.delete(id);
-    await this.cache.remove(cacheKey(this.owner, "canvas", id));
+    this.editorContexts.delete(id);
+    const removing = this.cache.remove(cacheKey(this.owner, "canvas", id));
+
+    this.invalidations.set(id, removing);
+    await removing;
     this.notify();
+  }
+
+  /** Only an authoritative live catalog may revive a locally invalidated identity. */
+  async revive(id: string) {
+    if (!this.deleted.has(id)) return;
+    const incarnation = this.incarnations.get(id);
+
+    await this.invalidations.get(id);
+    this.assertActive();
+    if (this.incarnations.get(id) !== incarnation) return;
+    this.deleted.delete(id);
+    this.invalidations.delete(id);
   }
 
   setActive(id: string) {
     this.activeId = id;
     this.evict();
+  }
+
+  releaseEditorHistory(id: string) {
+    const entry = this.canvases.get(id);
+
+    if (entry) {
+      // A closing wrapper must not put its just-discarded history back on unmount.
+      entry.historyGeneration++;
+      if (entry.editorContext) delete entry.editorContext.history;
+    }
+
+    const context = this.editorContexts.get(id);
+
+    if (context) delete context.history;
   }
 
   private evict() {
@@ -114,6 +162,8 @@ export class CanvasResources {
 
       bytes += snapshotBytes(entry.document);
       if (index >= 4 || bytes > 64 * 1024 * 1024) {
+        if (entry.editorContext)
+          this.editorContexts.set(entry.document.id, entry.editorContext);
         entry.resource.dispose();
         this.canvases.delete(entry.document.id);
       }
@@ -129,8 +179,12 @@ export class CanvasResources {
       version: 0,
       confirmed: true,
       metadataGeneration: 0,
+      historyGeneration: 0,
       accessDenied: false,
+      editorContext: this.editorContexts.get(document.id),
     } as CanvasResource;
+
+    this.editorContexts.delete(document.id);
 
     entry.resource = new PersistentResource({
       key: `${this.owner}:canvas:${document.id}`,
@@ -143,6 +197,14 @@ export class CanvasResources {
         entry.message = message ?? (entry.resource.dirty ? entry.message : "");
         if (entry.resource.conflict) entry.status = "conflict";
         this.notify();
+      },
+      onCollaborationRequired: async () => {
+        await this.prepareHandoff?.(document.id);
+        // The old final-publish CAS was fenced by a concurrent room upgrade.
+        queueMicrotask(() => {
+          if (!this.disposed && !this.flights.has(document.id))
+            void this.open(document.id, () => {}).catch(() => {});
+        });
       },
       confirmed: (scene, saved) => {
         entry.confirmed = true;
@@ -211,6 +273,9 @@ export class CanvasResources {
     const existing = this.canvases.get(id);
 
     if (existing) {
+      if (existing.document.syncMode !== "collaborative" && this.prepareHandoff)
+        await this.prepareHandoff(id);
+      this.assertActive();
       existing.resource.pauseAutosave();
       existing.touched = Date.now();
       existing.status = "checking";
@@ -243,6 +308,15 @@ export class CanvasResources {
     preview: (entry: CanvasResource) => void,
     metadata?: CanvasMeta,
   ) {
+    const incarnation = this.incarnations.get(id) ?? 0;
+    const assertCurrent = () => {
+      this.assertActive();
+      if (
+        incarnation !== (this.incarnations.get(id) ?? 0) ||
+        this.deleted.has(id)
+      )
+        throw new DOMException("Canvas invalidated", "AbortError");
+    };
     let entry = this.canvases.get(id);
     const controller = new AbortController();
 
@@ -275,7 +349,7 @@ export class CanvasResources {
             ),
           ]);
 
-          this.assertActive();
+          assertCurrent();
           if (cached) entry = this.create(cached);
           else if (draft) {
             entry = this.create({
@@ -300,7 +374,7 @@ export class CanvasResources {
         }
       }
 
-      this.assertActive();
+      assertCurrent();
       if (entry) {
         entry.resource.pauseAutosave();
         entry.status = "checking";
@@ -318,7 +392,14 @@ export class CanvasResources {
         }
       }
 
-      if (entry?.resource.hasUnconfirmedSave) await entry.resource.flush();
+      if (entry?.resource.hasUnconfirmedSave) {
+        try {
+          await entry.resource.flush();
+        } catch (error) {
+          if (!entry.resource.conflict) throw error;
+        }
+      }
+
       let metadataGeneration = entry?.metadataGeneration ?? 0;
       let remote = await (remoteTask ??
         this.readCanvas(
@@ -327,13 +408,18 @@ export class CanvasResources {
           controller.signal,
         ));
 
-      this.assertActive();
+      assertCurrent();
       // Explicit retry/logout saves remain allowed while checking. Never roll an accepted
       // local revision back to a GET that started before that write completed.
       if (entry) {
         for (;;) {
-          await entry.resource.settle();
-          if (entry.resource.hasUnconfirmedSave) await entry.resource.flush();
+          try {
+            await entry.resource.settle();
+            if (entry.resource.hasUnconfirmedSave) await entry.resource.flush();
+          } catch (error) {
+            if (!entry.resource.conflict) throw error;
+          }
+
           if (
             (!entry.confirmed ||
               canvasRevisionScope(remote) !==
@@ -344,7 +430,7 @@ export class CanvasResources {
             break;
           metadataGeneration = entry.metadataGeneration;
           remote = await this.readCanvas(id, entry.document, controller.signal);
-          this.assertActive();
+          assertCurrent();
         }
       }
 
@@ -360,8 +446,35 @@ export class CanvasResources {
         await entry.resource.restore();
       }
 
-      this.assertActive();
+      assertCurrent();
       entry.accessDenied = false;
+      if (
+        entry.resource.dirty &&
+        remote.syncMode === "collaborative" &&
+        remote.migrationEpoch &&
+        remote.migrationEpoch === remote.roomEpoch &&
+        entry.resource.baseline
+      ) {
+        const session = collaborationSession({
+          canvasId: id,
+          userId: this.owner,
+          scope: "account",
+        });
+
+        await session.start(false);
+        assertCurrent();
+        await session.adoptLegacyDraft(
+          entry.resource.baseline,
+          entry.resource.value,
+          remote.migrationEpoch,
+        );
+        assertCurrent();
+        // New queue is durable before removing the old snapshot draft. A crash
+        // between these steps can replay the delta, but cannot lose it.
+        await entry.resource.discardDraft();
+        assertCurrent();
+      }
+
       if (entry.resource.dirty) {
         const changedScope =
           canvasRevisionScope(entry.document) !== canvasRevisionScope(remote);
@@ -386,6 +499,7 @@ export class CanvasResources {
 
         entry.document = immutableSnapshot(remote);
         entry.resource.value = immutableSnapshot(remote.scene);
+        entry.resource.baseline = immutableSnapshot(remote.scene);
         entry.resource.revision = remote.revision;
         entry.status = "ready";
         entry.resource.resumeAutosave();
@@ -398,7 +512,7 @@ export class CanvasResources {
 
       return entry;
     } catch (error) {
-      this.assertActive();
+      assertCurrent();
       if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
         if (entry) {
           entry.accessDenied = true;
@@ -576,6 +690,7 @@ export class CanvasResources {
     this.library?.dispose();
     this.writeWaiters.splice(0).forEach((resolve) => resolve());
     this.canvases.clear();
+    this.editorContexts.clear();
     this.cache.clearMemory();
   }
 }

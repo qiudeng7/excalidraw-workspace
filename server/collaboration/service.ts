@@ -49,6 +49,7 @@ export async function canvasRow(id: string) {
         canvas: canvases,
         ownerId: workspaces.userId,
         deleting: workspaces.deleting,
+        workspaceDeletedAt: workspaces.deletedAt,
       })
       .from(canvases)
       .innerJoin(workspaces, eq(canvases.workspaceId, workspaces.id))
@@ -56,29 +57,14 @@ export async function canvasRow(id: string) {
   )[0];
 }
 
-/** Freeze the legacy final-publish CAS, seed exactly that revision, then activate. */
-export async function ensureRoom(
-  event: H3Event,
-  id: string,
-  actor: Principal,
-  allowDeleting = false,
+/** Used by migration and its persistent recycle outbox after an interrupted seed. */
+export async function buildRoomSeed(
+  row: Pick<
+    NonNullable<Awaited<ReturnType<typeof canvasRow>>>,
+    "canvas" | "ownerId"
+  >,
 ) {
-  let row = await canvasRow(id);
-
-  if (!row) return fail(404, "NOT_FOUND", "画布不存在");
-  if (row.deleting && !allowDeleting)
-    return fail(410, "CANVAS_DELETED", "工作空间已删除");
-  if (row.canvas.syncMode === "collaborative") return;
-  if (actor.userId !== row.ownerId || actor.capabilityHash)
-    return fail(404, "NOT_FOUND", "画布不存在");
-  if (row.canvas.syncMode === "legacy") {
-    await db
-      .update(canvases)
-      .set({ syncMode: "preparing", roomEpoch: crypto.randomUUID() })
-      .where(and(eq(canvases.id, id), eq(canvases.syncMode, "legacy")));
-    row = (await canvasRow(id))!;
-  }
-
+  const id = row.canvas.id;
   const legacy = (await readSnapshot(row.canvas.objectKey, {
     elements: [],
     appState: {},
@@ -115,13 +101,45 @@ export async function ensureRoom(
         : {},
     files,
   };
-  const seed = createRoom(
+
+  return createRoom(
     id,
     row.ownerId,
     row.canvas.name,
     row.canvas.roomEpoch!,
     scene,
   );
+}
+
+/** Freeze the legacy final-publish CAS, seed exactly that revision, then activate. */
+export async function ensureRoom(
+  event: H3Event,
+  id: string,
+  actor: Principal,
+  allowDeleting = false,
+) {
+  let row = await canvasRow(id);
+
+  if (!row) return fail(404, "NOT_FOUND", "画布不存在");
+  if (
+    (row.deleting || row.workspaceDeletedAt || row.canvas.deletedAt) &&
+    !allowDeleting
+  )
+    return fail(410, "CANVAS_DELETED", "工作空间已删除");
+  if (row.canvas.syncMode === "collaborative") return;
+  if (actor.userId !== row.ownerId || actor.capabilityHash)
+    return fail(404, "NOT_FOUND", "画布不存在");
+  if (row.canvas.syncMode === "legacy") {
+    const epoch = crypto.randomUUID();
+
+    await db
+      .update(canvases)
+      .set({ syncMode: "preparing", roomEpoch: epoch, migrationEpoch: epoch })
+      .where(and(eq(canvases.id, id), eq(canvases.syncMode, "legacy")));
+    row = (await canvasRow(id))!;
+  }
+
+  const seed = await buildRoomSeed(row);
 
   // Existing room wins during interrupted/repeated migrations. Never seed over its updates.
   await roomCommand(event, id, actor, { type: "access" }, seed);

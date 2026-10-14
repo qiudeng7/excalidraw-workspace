@@ -83,6 +83,8 @@ export interface PublishedVersion {
 
 export interface Operation {
   protocolVersion: 1;
+  /** Clients must understand structured text before rewriting a rich-text scene. */
+  textFormatVersion?: 1;
   epoch: string;
   clientId: string;
   clientSeq: number;
@@ -114,6 +116,8 @@ export interface RoomState {
   minMergeSeq: number;
   accessRevision: number;
   deleted: boolean;
+  recycledAt?: string | null;
+  recycleRevision?: number;
   directoryPending: boolean;
   scene: SharedScene;
   members: Member[];

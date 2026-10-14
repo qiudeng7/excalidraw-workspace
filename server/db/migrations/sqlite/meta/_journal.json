@@ -57,6 +57,20 @@
       "when": 1791808085285,
       "tag": "0008_collaboration_directory",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791940559316,
+      "tag": "0009_canvas_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791949644209,
+      "tag": "0010_recycle_bin",
+      "breakpoints": true
     }
   ]
 }

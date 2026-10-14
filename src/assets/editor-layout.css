@@ -6,6 +6,106 @@
   container-type: inline-size;
 }
 
+/* Keep native editor context menus in the workspace theme. The scroll surface
+   belongs to this popover only; color pickers and other editor popovers retain
+   their own layout and behavior. */
+.canvas-host .excalidraw .context-menu-popover {
+  box-sizing: border-box;
+  max-width: calc(100% - 20px);
+  max-height: calc(100% - 20px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-border-strong) transparent;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 9px;
+  box-shadow: 0 6px 24px var(--app-shadow);
+  color: var(--app-text);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+.canvas-host .excalidraw .context-menu {
+  box-sizing: border-box;
+  min-width: min(248px, calc(100cqw - 22px));
+  max-width: min(320px, calc(100cqw - 22px));
+  padding: 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.canvas-host .excalidraw .context-menu-item {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 29px;
+  padding: 5px 9px 5px 23px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 20px;
+  border-radius: 5px;
+  color: var(--app-text);
+  font-size: 12px;
+  line-height: 19px;
+  white-space: normal;
+}
+
+.canvas-host .excalidraw .context-menu-item__label {
+  margin-inline-end: 0;
+  overflow-wrap: anywhere;
+}
+
+.canvas-host .excalidraw .context-menu-item__shortcut {
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 1;
+  white-space: nowrap;
+}
+
+.canvas-host .excalidraw .context-menu-item__shortcut:empty {
+  display: none;
+}
+
+.canvas-host .excalidraw .context-menu-item.checkmark::before {
+  inset-inline-start: 7px;
+  color: var(--app-selected-text);
+  font-size: 11px;
+}
+
+.canvas-host .excalidraw .context-menu-item:hover,
+.canvas-host .excalidraw .context-menu-item:focus-visible {
+  color: var(--app-text);
+  background: var(--app-hover);
+}
+
+.canvas-host .excalidraw .context-menu-item:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: -2px;
+}
+
+.canvas-host
+  .excalidraw
+  .context-menu-item.dangerous
+  .context-menu-item__label {
+  color: var(--app-danger);
+}
+
+.canvas-host .excalidraw .context-menu-item.dangerous:hover,
+.canvas-host .excalidraw .context-menu-item.dangerous:focus-visible {
+  background: var(--app-danger-bg);
+}
+
+.canvas-host .excalidraw .context-menu-item-separator {
+  margin: 4px 8px;
+  border-top: 1px solid var(--app-border);
+}
+
 .canvas-host .canvas-menu-group > .dropdown-menu-group-title {
   display: flex;
   align-items: center;

@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import type { CanvasMeta } from "#shared/contracts";
 import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "~/components/AccountGate.vue";
 import QuietIcon from "~/components/QuietIcon.vue";
+import RecycleBinPanel from "~/components/RecycleBinPanel.vue";
+import CanvasTabs from "~/components/CanvasTabs.vue";
 import ReleaseAnnouncement from "~/components/ReleaseAnnouncement.vue";
 import { useReleaseAnnouncement } from "~/composables/useReleaseAnnouncement";
 import {
   flushCollaboration,
   closeCollaboration,
+  hasUnsyncedCollaboration,
 } from "~/lib/collaboration/session";
 import { api } from "~/lib/api";
 import { accountApi } from "~/lib/accountApi";
@@ -20,6 +24,7 @@ import {
   useAccountSession,
   type AccountSessionController,
 } from "~/composables/useAccountSession";
+import { useCanvasPresence } from "~/composables/useCanvasPresence";
 import { useCanvasDocument } from "~/composables/useCanvasDocument";
 import { useWorkspaceNavigation } from "~/composables/useWorkspaceNavigation";
 import {
@@ -47,10 +52,16 @@ const saveBarrier = {
   },
 };
 const settingsOpen = ref(false);
+const recycleOpen = ref(false);
 const shareOpen = ref(false);
+const shareButton = ref<HTMLButtonElement>();
 const onlineCount = ref(0),
   onlineLabel = ref("");
 const collaborationStatus = ref("正在连接协作…");
+const sharedOpen = ref(false);
+const sharedLoading = ref(false);
+const sharedLoaded = ref(false);
+let sharedRequest = 0;
 const shared = ref<
   { id: string; name: string; role: string; viewMode: string }[]
 >([]);
@@ -65,15 +76,31 @@ const displayedSaveState = computed(() =>
 );
 
 async function loadShared() {
+  if (sharedLoading.value || !user.value?.id) return;
+  const requestId = ++sharedRequest;
+
+  sharedLoading.value = true;
   try {
-    shared.value = (
-      await api<{ canvases: typeof shared.value }>("/api/shared-canvases")
-    ).canvases;
+    const result = await api<{ canvases: typeof shared.value }>(
+      "/api/shared-canvases",
+    );
+
+    if (requestId !== sharedRequest) return;
+    shared.value = result.canvases;
+    sharedLoaded.value = true;
   } catch (cause) {
+    if (requestId !== sharedRequest) return;
     operation.reportError(
       cause instanceof Error ? cause.message : "共享画布加载失败",
     );
+  } finally {
+    if (requestId === sharedRequest) sharedLoading.value = false;
   }
+}
+
+function toggleShared() {
+  sharedOpen.value = !sharedOpen.value;
+  if (sharedOpen.value && !sharedLoaded.value) void loadShared();
 }
 
 const readyEditorKey = ref("");
@@ -94,6 +121,10 @@ const canvasDocument = useCanvasDocument({
     if (!account.user.value) throw new Error("请先登录");
 
     return account.user.value.id;
+  },
+  prepareHandoff: async (id) => {
+    if (canvasDocument.document.value?.id === id)
+      await editor.value?.prepareHandoff?.();
   },
   onLoaded: () => {
     if (window.matchMedia("(max-width: 760px)").matches)
@@ -166,6 +197,22 @@ const {
 } = account;
 const { document, current, resources, saveState, loadingCanvas } =
   canvasDocument;
+
+useCanvasPresence(
+  () =>
+    user.value && document.value
+      ? {
+          id: document.value.id,
+          owner: user.value.id,
+          mode: document.value.syncMode,
+        }
+      : undefined,
+  async (id) => {
+    editor.value?.capture();
+    await canvasDocument.loadCanvas(id);
+  },
+  operation.reportError,
+);
 const editorKey = computed(() =>
   user.value && document.value && current.value
     ? `${user.value.id}:${document.value.id}:${current.value.version}`
@@ -188,6 +235,7 @@ const {
     !interactionLocked.value &&
     !loadingCanvas.value &&
     !settingsOpen.value &&
+    !recycleOpen.value &&
     (!editorKey.value || editorKey.value === readyEditorKey.value),
 );
 
@@ -195,10 +243,19 @@ watch(
   () => user.value?.id,
   (id, previous) => {
     if (previous) closeCollaboration(previous);
+
+    sharedRequest++;
+    sharedLoading.value = false;
+
     shared.value = [];
+    sharedOpen.value = false;
+    sharedLoaded.value = false;
     shareOpen.value = false;
     settingsOpen.value = false;
+    recycleOpen.value = false;
+    if (id) void loadShared();
   },
+  { immediate: true },
 );
 const {
   workspaces,
@@ -207,6 +264,8 @@ const {
   currentWorkspace,
   directoryStale,
   directoryLocked,
+  canvasTabs,
+  closeCanvasTab,
   refreshDirectory,
   loadWorkspaces,
   selectCanvas,
@@ -217,6 +276,20 @@ const {
   renameCanvas,
   deleteCanvas,
 } = directory;
+let sidebarSelection = Promise.resolve();
+
+function selectSidebarCanvas(event: MouseEvent, id: string) {
+  // The second click of a double-click must not replace the pending selection.
+  if (event.detail > 1) return;
+  sidebarSelection = selectCanvas(id);
+}
+
+async function renameSidebarCanvas(canvas: CanvasMeta) {
+  // An unopened canvas may still be loading after the first click.
+  await sidebarSelection;
+  await renameCanvas(canvas);
+}
+
 const { navigationNotice, clearNotice } = navigationController;
 const {
   drag,
@@ -252,6 +325,15 @@ async function selectWorkspace(id: string) {
   if (interactionLocked.value) return;
   closeWorkspaceMenu(true);
   await directory.selectWorkspace(id);
+}
+
+async function openResourceCanvas(entry: CanvasResource) {
+  const targetWorkspace = entry.document.workspaceId;
+
+  if (workspaceId.value !== targetWorkspace)
+    await selectWorkspace(targetWorkspace);
+  if (workspaceId.value === targetWorkspace)
+    await selectCanvas(entry.document.id);
 }
 
 function closeActionMenu(event: MouseEvent) {
@@ -300,15 +382,14 @@ function downloadResourceBackup(entry: CanvasResource) {
 }
 
 function protectDrafts(event: BeforeUnloadEvent) {
-  if (resources.value?.hasDirty()) {
+  if (
+    resources.value?.hasDirty() ||
+    (user.value && hasUnsyncedCollaboration(user.value.id))
+  ) {
     event.preventDefault();
     event.returnValue = "";
   }
 }
-
-watch(isCollaborative, (value) => {
-  if (value) void loadShared();
-});
 
 watch(
   () => document.value?.id,
@@ -325,6 +406,19 @@ onBeforeUnmount(() => {
   closeCollaboration();
   canvasDocument.reset();
 });
+
+async function openShare() {
+  if (!document.value || !user.value) return;
+  await run(async () => {
+    await saveBarrier.flush();
+    // Sharing creates durable permissions, so this is an explicit activation.
+    await api(
+      `/api/canvases/${encodeURIComponent(document.value!.id)}/collaboration/access`,
+    );
+    await canvasDocument.loadCanvas(document.value!.id);
+    shareOpen.value = true;
+  });
+}
 
 async function flushForShare() {
   await editor.value?.flush();
@@ -477,13 +571,60 @@ async function flushForShare() {
         </div>
       </div>
       <div class="shared-canvases">
-        <button type="button" @click="loadShared">与我共享 · 刷新</button
-        ><NuxtLink
-          v-for="item in shared"
-          :key="item.id"
-          :to="`/c/${item.id}`"
-          >{{ item.name }}</NuxtLink
+        <div class="shared-heading">
+          <button
+            class="shared-toggle"
+            type="button"
+            aria-label="与我共享"
+            :aria-expanded="sharedOpen"
+            aria-controls="shared-canvas-list"
+            @click="toggleShared"
+          >
+            <QuietIcon name="users" :size="16" /><span>与我共享</span
+            ><span v-if="shared.length" class="count">{{ shared.length }}</span
+            ><QuietIcon
+              class="shared-chevron"
+              :class="{ expanded: sharedOpen }"
+              name="chevron"
+              :size="13"
+            />
+          </button>
+          <button
+            v-if="sharedOpen"
+            class="icon-button"
+            type="button"
+            aria-label="刷新共享画布"
+            title="刷新共享画布"
+            :disabled="sharedLoading"
+            @click="loadShared"
+          >
+            <QuietIcon name="refresh" :size="14" />
+          </button>
+        </div>
+        <div
+          v-if="sharedOpen"
+          id="shared-canvas-list"
+          class="shared-list"
+          :aria-busy="sharedLoading"
         >
+          <NuxtLink
+            v-for="item in shared"
+            :key="item.id"
+            :to="`/c/${item.id}`"
+            :title="item.name"
+            ><QuietIcon name="canvas" :size="15" /><span>{{ item.name }}</span
+            ><QuietIcon v-if="item.role === 'editor'" name="edit" :size="12"
+          /></NuxtLink>
+          <p v-if="!shared.length" class="sidebar-empty">
+            {{
+              sharedLoading
+                ? "正在加载…"
+                : sharedLoaded
+                  ? "他人邀请的画布会显示在这里"
+                  : "暂时无法加载，请重试"
+            }}
+          </p>
+        </div>
       </div>
       <div class="canvas-heading">
         <span
@@ -539,7 +680,8 @@ async function flushForShare() {
             :title="canvas.name"
             :aria-current="document?.id === canvas.id ? 'page' : undefined"
             :disabled="interactionLocked"
-            @click="selectCanvas(canvas.id)"
+            @click="selectSidebarCanvas($event, canvas.id)"
+            @dblclick="renameSidebarCanvas(canvas)"
           >
             <QuietIcon name="canvas" :size="16" /><span>{{ canvas.name }}</span>
             <small
@@ -600,6 +742,16 @@ async function flushForShare() {
       <div class="sidebar-bottom">
         <button
           type="button"
+          class="settings-entry recycle-entry"
+          aria-haspopup="dialog"
+          :aria-expanded="recycleOpen"
+          :disabled="interactionLocked"
+          @click="recycleOpen = true"
+        >
+          <QuietIcon name="trash" :size="18" /><span>回收站</span>
+        </button>
+        <button
+          type="button"
           class="settings-entry"
           aria-haspopup="dialog"
           :aria-expanded="settingsOpen"
@@ -641,7 +793,7 @@ async function flushForShare() {
         role="alert"
       >
         <span>{{ entry.document.name }}：{{ entry.message }}</span>
-        <button @click="selectCanvas(entry.document.id)">查看画布</button>
+        <button @click="openResourceCanvas(entry)">查看画布</button>
         <button @click="downloadResourceBackup(entry)">下载本地备份</button>
         <button
           v-if="!entry.resource.conflict"
@@ -661,17 +813,20 @@ async function flushForShare() {
         >
           <QuietIcon name="panel" :size="18" />
         </button>
-        <div class="breadcrumb">
-          <span class="workspace-crumb">{{ currentWorkspace?.name }}</span
-          ><span class="crumb-divider">/</span
-          ><span class="document-name">{{ document?.name ?? "我的画布" }}</span>
-        </div>
+        <CanvasTabs
+          :tabs="canvasTabs"
+          :active-id="document?.id"
+          :locked="interactionLocked"
+          :closing-locked="directoryLocked"
+          @select="selectCanvas"
+          @close="closeCanvasTab"
+        />
         <div class="header-right">
           <span
             v-if="isCollaborative && onlineCount"
-            class="save-state"
+            class="save-state presence-state"
             :title="onlineLabel"
-            >{{ onlineCount }} 人在线</span
+            ><QuietIcon name="users" :size="13" />{{ onlineCount }} 人在线</span
           >
           <span
             class="save-state"
@@ -688,11 +843,12 @@ async function flushForShare() {
                 : displayedSaveState
             }}</span
           ><button
-            v-if="isCollaborative"
+            v-if="document"
+            ref="shareButton"
             class="save-button"
-            @click="shareOpen = true"
+            @click="openShare"
           >
-            分享</button
+            <QuietIcon name="link" :size="14" />分享</button
           ><button
             class="save-button"
             :disabled="interactionLocked || !document"
@@ -766,74 +922,103 @@ async function flushForShare() {
         <button type="button" @click="retryAnnouncement">重试公告</button>
         <button type="button" @click="announcementNotice = ''">关闭提示</button>
       </div>
-      <div
-        v-if="document && current && resources && settingsResource"
-        class="draw-editor"
-        :inert="busy"
+      <section
+        id="canvas-tab-panel"
+        role="tabpanel"
+        :aria-labelledby="document ? `canvas-tab-${document.id}` : undefined"
+        class="canvas-panel"
       >
-        <CollaborationCanvas
-          v-if="isCollaborative"
-          :key="`collaboration:${user.id}:${document.id}`"
-          ref="editor"
-          :canvas-id="document.id"
-          :user-id="user.id"
-          scope="account"
-          :initial-document="document"
-          :resources="resources"
-          :user-settings="settingsResource.state.settings"
-          :settings-open="settingsOpen || announcementOpen || shareOpen"
-          @status="collaborationStatus = $event"
-          @participants="
-            (count, label) => {
-              onlineCount = count;
-              onlineLabel = label;
-            }
-          "
-          @ready="readyEditorKey = editorKey"
-        />
-        <ExcalidrawCanvas
-          v-else
-          :key="editorKey"
-          ref="editor"
-          :document="document"
-          :entry="current"
-          :resources="resources"
-          :user-id="user.id"
-          :user-settings="settingsResource.state.settings"
-          :settings-status="settingsResource.state.status"
-          :settings-open="settingsOpen || announcementOpen"
-          @ready="readyEditorKey = $event"
-          @retry-load="retryCurrentCanvas"
-        />
-      </div>
-      <div v-else class="loading">
-        <template v-if="busy">正在加载画布…</template
-        ><template v-else-if="!workspaces.length"
-          ><p>创建工作空间，开始整理你的画布。</p>
-          <button
-            class="empty-create"
-            :disabled="interactionLocked"
-            @click="createWorkspace"
-          >
-            新建工作空间
-          </button></template
-        ><template v-else-if="!canvases.length"
-          ><p>这个工作空间还没有画布。</p>
-          <button
-            class="empty-create"
-            :disabled="directoryLocked"
-            @click="createCanvas"
-          >
-            新建画布
-          </button></template
-        ><template v-else
-          ><p>暂时无法加载画布，请重试。</p>
-          <button :disabled="directoryLocked" @click="run(loadWorkspaces)">
-            重新加载
-          </button></template
+        <div
+          v-if="document && current && resources && settingsResource"
+          class="draw-editor"
+          :inert="busy"
         >
-      </div>
+          <CollaborationCanvas
+            v-if="isCollaborative"
+            :key="`collaboration:${user.id}:${document.id}`"
+            ref="editor"
+            :canvas-id="document.id"
+            :user-id="user.id"
+            scope="account"
+            :initial-document="document"
+            :resources="resources"
+            :user-settings="settingsResource.state.settings"
+            :settings-open="settingsOpen || announcementOpen || shareOpen"
+            @status="collaborationStatus = $event"
+            @participants="
+              (count, label) => {
+                onlineCount = count;
+                onlineLabel = label;
+              }
+            "
+            @ready="readyEditorKey = editorKey"
+          />
+          <ExcalidrawCanvas
+            v-else
+            :key="editorKey"
+            ref="editor"
+            :document="document"
+            :entry="current"
+            :resources="resources"
+            :user-id="user.id"
+            :user-settings="settingsResource.state.settings"
+            :settings-status="settingsResource.state.status"
+            :settings-open="settingsOpen || announcementOpen"
+            @ready="readyEditorKey = $event"
+            @retry-load="retryCurrentCanvas"
+          />
+        </div>
+        <div v-else class="loading">
+          <template v-if="busy">正在加载画布…</template
+          ><template v-else-if="!workspaces.length"
+            ><p>创建工作空间，开始整理你的画布。</p>
+            <button
+              class="empty-create"
+              :disabled="interactionLocked"
+              @click="createWorkspace"
+            >
+              新建工作空间
+            </button></template
+          ><template v-else-if="!canvases.length"
+            ><p>这个工作空间还没有画布。</p>
+            <button
+              class="empty-create"
+              :disabled="directoryLocked"
+              @click="createCanvas"
+            >
+              新建画布
+            </button></template
+          ><template v-else-if="!canvasTabs.length"
+            ><p>从侧边栏打开画布，或新建一张画布。</p>
+            <button
+              id="open-canvas-sidebar"
+              class="empty-create"
+              @click="sidebarOpen = true"
+            >
+              打开侧边栏
+            </button>
+            <button
+              class="empty-create"
+              :disabled="directoryLocked"
+              @click="createCanvas"
+            >
+              新建画布
+            </button> </template
+          ><template v-else
+            ><p>暂时无法加载画布，请重试。</p>
+            <button :disabled="directoryLocked" @click="run(loadWorkspaces)">
+              重新加载
+            </button></template
+          >
+        </div>
+      </section>
     </div>
+    <RecycleBinPanel
+      v-if="recycleOpen && user"
+      :key="user.id"
+      :refresh="directory.refreshAfterRestore"
+      @close="recycleOpen = false"
+    />
     <SettingsPanel
       v-if="settingsOpen && settingsResource"
       :resource="settingsResource"
@@ -858,6 +1043,7 @@ async function flushForShare() {
       :canvas-id="document.id"
       :user-id="user.id"
       :before-publish="flushForShare"
+      :return-focus="shareButton"
       @close="shareOpen = false"
     />
   </section>
@@ -908,6 +1094,67 @@ async function flushForShare() {
 }
 .canvas-name {
   padding-left: 5px !important;
+}
+.shared-canvases {
+  margin: 16px 0 8px;
+}
+.shared-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.shared-toggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  font-size: 12px;
+  color: var(--app-muted);
+  text-align: left;
+}
+.shared-toggle:hover,
+.shared-list a:hover {
+  background: var(--app-hover);
+  border-radius: 6px;
+}
+.shared-chevron {
+  margin-left: auto;
+  transition: transform 0.15s;
+}
+.shared-chevron.expanded {
+  transform: rotate(90deg);
+}
+.shared-list {
+  display: grid;
+  gap: 3px;
+  padding: 4px 0 0 12px;
+}
+.shared-list a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--app-muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+.shared-list a > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shared-list svg {
+  flex-shrink: 0;
+}
+.shared-toggle:focus-visible,
+.shared-list a:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
 }
 .sidebar-empty {
   padding: 0 8px;
@@ -1277,6 +1524,10 @@ async function flushForShare() {
   text-align: left;
   cursor: pointer;
 }
+.recycle-entry {
+  margin-bottom: 0;
+  padding-bottom: 8px;
+}
 .settings-entry:hover {
   background: var(--app-hover);
   color: var(--app-text);
@@ -1325,6 +1576,12 @@ async function flushForShare() {
   font-size: 10px;
   color: var(--app-muted);
 }
+.canvas-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
 .canvas-header {
   display: flex;
   align-items: center;
@@ -1335,31 +1592,6 @@ async function flushForShare() {
   padding: 0 20px 0 13px;
   border-bottom: 1px solid var(--line);
   color: var(--app-muted);
-}
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  min-width: 0;
-  flex: 1;
-}
-.workspace-crumb {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  max-width: 200px;
-  color: var(--app-muted);
-}
-.crumb-divider {
-  color: var(--app-subtle);
-}
-.document-name {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: var(--app-text);
-  font-weight: 500;
 }
 .header-right {
   display: flex;
@@ -1450,9 +1682,6 @@ button:focus-visible {
   .save-button kbd {
     display: none;
   }
-  .workspace-crumb {
-    max-width: 120px;
-  }
 }
 @media (max-width: 760px) {
   .workspace-sidebar {
@@ -1475,10 +1704,6 @@ button:focus-visible {
     padding-inline: 10px;
     height: 47px;
     gap: 8px;
-  }
-  .workspace-crumb,
-  .crumb-divider {
-    display: none;
   }
   .header-right {
     gap: 6px;

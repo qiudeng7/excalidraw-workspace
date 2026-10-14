@@ -1,3 +1,4 @@
+import type { RichText } from "./richTextDocument";
 import type { LocalPoint, Radians } from "@excalidraw/math";
 
 import type {
@@ -279,6 +280,8 @@ export type ExcalidrawTextElement = _ExcalidrawElementBase &
     verticalAlign: VerticalAlign;
     containerId: ExcalidrawTextContainer["id"] | null;
     originalText: string;
+    /** Structured content is authoritative; originalText/text are projections. */
+    richText?: RichText;
     /**
      * If `true` the width will fit the text. If `false`, the text will
      * wrap to fit the width.

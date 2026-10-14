@@ -6,6 +6,7 @@ import type { NavigationController } from "~/composables/useWorkspaceNavigation"
 import type { CanvasDocumentController } from "~/composables/useCanvasDocument";
 import type { SaveBarrier } from "~/lib/editor";
 import type { promptDialog, confirmDialog } from "~/lib/dialogs";
+import { useCanvasTabs } from "~/composables/useCanvasTabs";
 
 export interface WorkspaceDirectoryDependencies {
   api: Pick<
@@ -24,14 +25,16 @@ export interface WorkspaceDirectoryDependencies {
     NavigationController,
     "navigation" | "refreshNavigationQuietly" | "recordOpened"
   >;
-  canvasDocument: Pick<
-    CanvasDocumentController,
-    | "document"
-    | "loadCanvas"
-    | "clearDocument"
-    | "renameLoadedCanvas"
-    | "invalidateCanvas"
-  >;
+  canvasDocument: Partial<Pick<CanvasDocumentController, "restoreCanvas">> &
+    Pick<
+      CanvasDocumentController,
+      | "document"
+      | "loadCanvas"
+      | "clearDocument"
+      | "renameLoadedCanvas"
+      | "invalidateCanvas"
+      | "releaseEditorHistory"
+    >;
   editor: SaveBarrier;
   interactionLocked: Readonly<Ref<boolean>>;
   run(action: () => Promise<void>): Promise<void>;
@@ -45,8 +48,11 @@ export interface WorkspaceDirectoryController {
   currentWorkspace: Readonly<Ref<Workspace | undefined>>;
   directoryStale: Readonly<Ref<boolean>>;
   directoryLocked: Readonly<Ref<boolean>>;
+  canvasTabs: Readonly<Ref<readonly CanvasMeta[]>>;
+  closeCanvasTab(id: string): Promise<void>;
   reset(): void;
   refreshDirectory(): Promise<void>;
+  refreshAfterRestore(): Promise<void>;
   loadWorkspaces(): Promise<void>;
   reorderCanvas(ids: string[]): Promise<void>;
   selectWorkspace(id: string): Promise<void>;
@@ -72,6 +78,14 @@ export function useWorkspaceDirectory({
   const selecting = ref(false);
   const canvases = ref<CanvasMeta[]>([]);
   const workspaceId = ref("");
+  const tabs = useCanvasTabs();
+  const canvasTabs = computed(() =>
+    tabs.ids(workspaceId.value).flatMap((id) => {
+      const canvas = canvases.value.find((entry) => entry.id === id);
+
+      return canvas ? [canvas] : [];
+    }),
+  );
 
   type Directory = CanvasCatalog;
 
@@ -100,10 +114,28 @@ export function useWorkspaceDirectory({
     workspaceId.value = "";
     catalogRevision.value = 0;
     directoryStale.value = false;
+    tabs.reset();
+  }
+
+  async function refreshAfterRestore() {
+    const entries = await api.listWorkspaces();
+
+    workspaces.value = entries;
+    if (
+      workspaceId.value &&
+      entries.some((entry) => entry.id === workspaceId.value)
+    )
+      await refreshDirectory();
+    else if (!document.value) await loadWorkspaces();
   }
 
   async function readDirectory(id: string) {
-    return api.readCatalog(id);
+    const catalog = await api.readCatalog(id);
+
+    for (const canvas of catalog.canvases)
+      await canvasDocument.restoreCanvas?.(canvas.id);
+
+    return catalog;
   }
 
   function setDirectory(id: string, data: Directory) {
@@ -111,6 +143,10 @@ export function useWorkspaceDirectory({
     canvases.value = data.canvases;
     catalogRevision.value = data.catalogRevision;
     directoryStale.value = false;
+    tabs.reconcile(
+      id,
+      data.canvases.map((canvas) => canvas.id),
+    );
   }
 
   async function refreshDirectory() {
@@ -134,12 +170,21 @@ export function useWorkspaceDirectory({
     const data = await readDirectory(id);
 
     if (generation !== switchGeneration) return;
+    tabs.reconcile(
+      id,
+      data.canvases.map((canvas) => canvas.id),
+    );
     const remembered =
-      preferred ??
-      navigation.value?.workspaces.find((item) => item.workspaceId === id)
-        ?.lastCanvasId;
+      tabs.active(id) !== undefined
+        ? tabs.active(id)
+        : (preferred ??
+          navigation.value?.workspaces.find((item) => item.workspaceId === id)
+            ?.lastCanvasId);
     const selected =
-      data.canvases.find((item) => item.id === remembered) ?? data.canvases[0];
+      remembered === null && tabs.active(id) === null
+        ? undefined
+        : (data.canvases.find((item) => item.id === remembered) ??
+          data.canvases[0]);
 
     // Scene loading is independent of the account-level lazy library.
     if (selected) await loadCanvas(selected.id, selected);
@@ -149,6 +194,7 @@ export function useWorkspaceDirectory({
 
     if (generation !== switchGeneration) return;
     setDirectory(id, data);
+    if (selected) tabs.open(id, selected.id);
     if (selected && (explicit || !navigation.value?.lastCanvasId))
       void recordOpened(selected.id);
   }
@@ -294,7 +340,11 @@ export function useWorkspaceDirectory({
   }
 
   async function selectCanvas(id: string) {
-    if (interactionLocked.value || id === document.value?.id) return;
+    if (
+      interactionLocked.value ||
+      (id === document.value?.id && !selecting.value)
+    )
+      return;
     const generation = ++switchGeneration;
 
     requestedWorkspace = "";
@@ -306,7 +356,49 @@ export function useWorkspaceDirectory({
         id,
         canvases.value.find((item) => item.id === id),
       );
-      if (generation === switchGeneration) void recordOpened(id);
+      if (generation === switchGeneration) {
+        tabs.open(workspaceId.value, id);
+        void recordOpened(id);
+      }
+    } catch (error) {
+      if (generation === switchGeneration)
+        await run(async () => {
+          throw error;
+        });
+    } finally {
+      if (generation === switchGeneration) selecting.value = false;
+    }
+  }
+
+  async function closeCanvasTab(id: string) {
+    if (directoryLocked.value || !tabs.ids(workspaceId.value).includes(id))
+      return;
+    if (id !== document.value?.id) {
+      canvasDocument.releaseEditorHistory(id);
+      tabs.close(workspaceId.value, id);
+
+      return;
+    }
+
+    const generation = ++switchGeneration;
+
+    selecting.value = true;
+    try {
+      // Capture and durably protect edits before removing the only mounted editor.
+      // Resources remain account-owned and continue saving after the view closes.
+      await checkpoint();
+      if (generation !== switchGeneration) return;
+      canvasDocument.releaseEditorHistory(id);
+      tabs.close(workspaceId.value, id);
+      const next = tabs.active(workspaceId.value);
+
+      if (next) {
+        await loadCanvas(
+          next,
+          canvases.value.find((canvas) => canvas.id === next),
+        );
+        if (generation === switchGeneration) void recordOpened(next);
+      } else canvasDocument.clearDocument("没有打开的画布");
     } catch (error) {
       if (generation === switchGeneration)
         await run(async () => {
@@ -360,16 +452,29 @@ export function useWorkspaceDirectory({
     if (directoryLocked.value) return;
     if (
       !(await dialogs.confirm({
-        title: "删除工作空间",
-        message: `删除「${currentWorkspace.value?.name}」及其中所有画布？此操作无法撤销。`,
-        confirmLabel: "删除工作空间",
+        title: "移入回收站",
+        message: `将「${currentWorkspace.value?.name}」及其中所有画布移入回收站？30 天内可以恢复。`,
+        confirmLabel: "移入回收站",
         danger: true,
       }))
     )
       return;
     await run(async () => {
       await flush();
-      await api.deleteWorkspace(workspaceId.value);
+      const deletingId = workspaceId.value;
+      let failure: unknown;
+
+      try {
+        await api.deleteWorkspace(deletingId);
+      } catch (cause) {
+        failure = cause;
+      }
+
+      if (
+        failure &&
+        (await api.listWorkspaces()).some((entry) => entry.id === deletingId)
+      )
+        throw failure;
       for (const canvas of canvases.value)
         canvasDocument.invalidateCanvas(canvas.id);
       canvasDocument.clearDocument();
@@ -381,10 +486,11 @@ export function useWorkspaceDirectory({
 
   async function createCanvas() {
     if (directoryLocked.value || !workspaceId.value) return;
+    const now = new Date();
     const name = await dialogs.prompt({
       title: "新建画布",
       label: "画布名称",
-      initialValue: "未命名画布",
+      initialValue: `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`,
       confirmLabel: "创建",
     });
 
@@ -406,6 +512,7 @@ export function useWorkspaceDirectory({
 
       await refreshDirectory();
       await loadCanvas(canvas.id);
+      tabs.open(workspaceId.value, canvas.id);
       await recordOpened(canvas.id);
     });
   }
@@ -435,9 +542,9 @@ export function useWorkspaceDirectory({
     if (directoryLocked.value) return;
     if (
       !(await dialogs.confirm({
-        title: "删除画布",
-        message: `删除画布「${canvas.name}」？此操作无法撤销。`,
-        confirmLabel: "删除画布",
+        title: "移入回收站",
+        message: `将画布「${canvas.name}」移入回收站？30 天内可以恢复。`,
+        confirmLabel: "移入回收站",
         danger: true,
       }))
     )
@@ -457,7 +564,7 @@ export function useWorkspaceDirectory({
         throw failure;
       if (canvasDocument.invalidateCanvas(canvas.id)) {
         await refreshNavigationQuietly();
-        await loadWorkspace(workspaceId.value, canvases.value[0]?.id);
+        await loadWorkspace(workspaceId.value);
       }
     });
   }
@@ -469,8 +576,11 @@ export function useWorkspaceDirectory({
     currentWorkspace,
     directoryStale: shallowReadonly(directoryStale),
     directoryLocked,
+    canvasTabs,
+    closeCanvasTab,
     reset,
     refreshDirectory,
+    refreshAfterRestore,
     loadWorkspaces,
     reorderCanvas,
     selectWorkspace,

@@ -97,6 +97,7 @@ export async function createAccount(
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           catalogRevision: sql<number>`0`.as("catalogRevision"),
           deleting: sql<number>`0`.as("deleting"),
+          deletedAt: sql<string | null>`NULL`.as("deletedAt"),
         })
         .from(tables.users)
         .where(eq(tables.users.id, user.id)),
@@ -111,9 +112,14 @@ export async function createAccount(
           objectKey: sql<string | null>`NULL`.as("objectKey"),
           syncMode: sql<"legacy">`'legacy'`.as("syncMode"),
           roomEpoch: sql<string | null>`NULL`.as("roomEpoch"),
+          migrationEpoch: sql<string | null>`NULL`.as("migrationEpoch"),
           createdAt: sql<string>`${now}`.as("createdAt"),
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           position: sql<number>`0`.as("position"),
+          deletedAt: sql<string | null>`NULL`.as("deletedAt"),
+          recycleRevision: sql<number>`0`.as("recycleRevision"),
+          recyclePending: sql<number>`0`.as("recyclePending"),
+          purging: sql<number>`0`.as("purging"),
         })
         .from(tables.workspaces)
         .where(eq(tables.workspaces.id, workspace)),

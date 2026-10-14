@@ -429,3 +429,81 @@
     background-position: left center;
   }
 }
+
+.excalidraw .color-picker-content--saved-palette {
+  max-height: calc(var(--radix-popover-content-available-height, 100vh) - 2rem);
+  overflow-y: auto;
+}
+
+.excalidraw .saved-color-palette {
+  padding: 0.65rem 0.5rem 0.25rem;
+  border-top: 1px solid var(--app-border, var(--default-border-color));
+  color: var(--app-text, var(--color-on-surface));
+
+  &__heading {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--app-muted, var(--color-gray-60));
+  }
+
+  &__colors {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.3rem;
+    margin-bottom: 0.5rem;
+
+    button {
+      width: 1.5rem;
+      height: 1.5rem;
+      padding: 0;
+
+      &[aria-pressed="true"] {
+        outline: 2px solid var(--app-focus, var(--color-primary));
+        outline-offset: 1px;
+      }
+    }
+  }
+
+  &__actions {
+    display: flex;
+    gap: 0.35rem;
+
+    button {
+      min-height: 1.875rem;
+      border: 1px solid var(--app-border, var(--default-border-color));
+      border-radius: 6px;
+      background: var(--app-surface, var(--color-surface-lowest));
+      color: inherit;
+      font: inherit;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.55rem;
+      cursor: pointer;
+
+      &:hover:not(:disabled) {
+        background: var(--app-hover, var(--color-surface-mid));
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+    }
+  }
+
+  &__add {
+    flex: 1;
+  }
+
+  button:focus-visible {
+    outline: 2px solid var(--app-focus, var(--color-primary));
+    outline-offset: 2px;
+  }
+
+  &__error {
+    font-size: 0.75rem;
+    line-height: 1.5;
+    margin-top: 0.35rem;
+  }
+}
