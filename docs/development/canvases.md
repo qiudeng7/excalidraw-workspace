@@ -106,7 +106,7 @@ flowchart TD
 
 [db/recycle-bin.ts](../../server/db/recycle-bin.ts) 原子提交元数据与导航。房间暂停使用持久 `recycleRevision` / `recyclePending` 世代，等待房间同步完成再恢复协作访问，目录投影失败继续重试；重试不会重复换代，迟到的旧暂停不能覆盖新恢复。已中断的 `preparing` 迁移使用原冻结快照补齐房间。暂停期间场景、固定版本和图片仍是有效对象引用，不参与孤儿清理。
 
-清理复用每小时的 [snapshots:cleanup](../../server/tasks/snapshots/cleanup.ts)，Node 另在现有每分钟维护中重试。先锁定不可恢复的清理意图，再永久 tombstone 房间并清空内容/权限，最后删除目录与快照。中途失败保留意图重试；协作图片由既有房间 GC 按 24 小时对象保护窗口回收，避免误删正在上传的对象。
+清理复用每小时的 [snapshots:cleanup](../../server/tasks/snapshots/cleanup.ts)，Node 另在现有每分钟维护中重试。先锁定不可恢复的清理意图，再永久 tombstone 房间并清空内容/权限，最后删除目录与快照。中途失败保留意图重试；各回收项目及两类存储清理独立执行，一个房间故障不会阻塞其他项目或孤儿快照 GC。协作图片由既有房间 GC 按 24 小时对象保护窗口回收，避免误删正在上传的对象。
 
 [recycle-bin.test.ts](../../tests/integration/recycle-bin.test.ts) 覆盖到期边界、权限、选择性恢复、迟到保存、迁移中断、失序重试和回收期间 GC；[recycle-bin.spec.ts](../../tests/browser/recycle-bin.spec.ts) 检查面板操作、确认、错误恢复和移动端布局。真实 Node / Worker 的回收与在线撤权用例位于 [collaboration.spec.ts](../../tests/browser/collaboration.spec.ts)。
 

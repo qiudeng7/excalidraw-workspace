@@ -1,3 +1,5 @@
+import { collectRecycleBin } from "#server/utils/recycle-bin";
+import type { RoomNamespace } from "#server/collaboration/transport";
 import { blob } from "@nuxthub/blob";
 import { referencedObjects } from "#server/db/snapshots";
 import { deleteSnapshots } from "#server/utils/snapshots";
@@ -36,4 +38,21 @@ export async function collectOrphans(
     cursor = page.hasMore ? page.cursor : undefined;
     if (page.hasMore && !cursor) throw new Error("Missing blob listing cursor");
   } while (cursor);
+}
+
+/** Failures in one storage authority must not suppress the other collector. */
+export async function collectStorageGarbage(
+  namespace?: RoomNamespace,
+  now = Date.now(),
+) {
+  const results = await Promise.allSettled([
+    collectRecycleBin(namespace, now),
+    collectOrphans(now),
+  ]);
+  const errors = results.flatMap((result) =>
+    result.status === "rejected" ? [result.reason] : [],
+  );
+
+  if (errors.length)
+    throw new AggregateError(errors, "部分存储清理失败，将在下次维护重试");
 }
