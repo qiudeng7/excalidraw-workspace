@@ -1136,3 +1136,471 @@ test("owner/share remounts serialize a delayed old touch before the new lease an
     }
   }
 });
+
+async function handshakeFixture(socket: typeof Socket = Socket) {
+  const names = [
+    "navigator",
+    "sessionStorage",
+    "location",
+    "WebSocket",
+    "fetch",
+    "window",
+    "document",
+  ];
+  const originals = new Map(
+    names.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
+  );
+  const room = createRoom(crypto.randomUUID(), "owner", "Handshake", "epoch", {
+    elements: [],
+    appState: {},
+    files: {},
+  });
+  const define = (key: string, value: unknown) =>
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+  const signals = new Map<string, AbortSignal | null | undefined>();
+  const calls = new Map<string, number>();
+  let intercept:
+    | ((path: string, init: RequestInit) => Promise<Response> | undefined)
+    | undefined;
+
+  define("navigator", {});
+  define("sessionStorage", { getItem: () => room.id, setItem() {} });
+  define("location", { origin: "https://handshake.test" });
+  define("WebSocket", socket);
+  define("window", new EventTarget());
+  define(
+    "document",
+    Object.assign(new EventTarget(), { visibilityState: "visible" }),
+  );
+  define("fetch", async (url: string, init: RequestInit) => {
+    const path = url.split("/").at(-1)!;
+
+    signals.set(path, init.signal);
+    calls.set(path, (calls.get(path) ?? 0) + 1);
+    const response = intercept?.(path, init);
+
+    if (response) return response;
+    if (path === "ticket") return Response.json({ ticket: "secret-ticket" });
+    if (path === "presence")
+      return Response.json({
+        participants: 2,
+        realtime: true,
+        leaseExpiresAt: Date.now() + 60000,
+      });
+    const command: Command =
+      path === "update"
+        ? {
+            type: "update",
+            operation: JSON.parse(String(init.body)),
+            digest: canonical(JSON.parse(String(init.body))),
+          }
+        : { type: path as "access" | "view" };
+
+    return Response.json(
+      execute(room, { userId: "owner", name: "Owner" }, command, Date.now()),
+    );
+  });
+  const session = new CollaborationSession({
+    canvasId: room.id,
+    userId: "owner",
+    scope: room.id,
+  });
+  const unsubscribe = session.subscribe(() => {});
+
+  return {
+    session,
+    room,
+    signals,
+    calls,
+    unsubscribe,
+    intercept(value: typeof intercept) {
+      intercept = value;
+    },
+    async cleanup() {
+      unsubscribe();
+      await session.dispose();
+      for (const [key, descriptor] of originals) {
+        if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+        else Reflect.deleteProperty(globalThis, key);
+      }
+    },
+  };
+}
+
+test("OPEN without READY times out, retries with a fresh ticket, ignores old callbacks, and preserves HTTP saving", async (t) => {
+  class SilentSocket extends Socket {
+    send() {}
+  }
+
+  const fixture = await handshakeFixture(SilentSocket);
+  const { session, room, calls } = fixture;
+  const warnings: unknown[][] = [];
+
+  t.mock.method(console, "warn", (...values: unknown[]) =>
+    warnings.push(values),
+  );
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    await session.start();
+    await until(() => session.realtimeStatus === "connecting");
+    t.mock.timers.tick(0);
+    await until(() => session.connectionDiagnostic?.stage === "ready");
+    const staleMessage = (
+      session as unknown as {
+        socket: { onmessage(event: MessageEvent): void };
+      }
+    ).socket.onmessage;
+
+    t.mock.timers.tick(10_001);
+    assert.equal(session.realtimeStatus, "unavailable");
+    assert.deepEqual(
+      { ...session.connectionDiagnostic, at: 0 },
+      { stage: "ready", state: "failed", reason: "timeout", at: 0 },
+    );
+    assert.equal(session.editable, true);
+    session.update({ elements: [element("a")], appState: {}, files: {} });
+    await session.flush();
+    assert.equal(room.scene.elements.length, 1);
+    assert.equal(fixture.signals.get("update"), undefined);
+    t.mock.timers.tick(1001);
+    await until(() => session.realtimeStatus === "connecting");
+    t.mock.timers.tick(0);
+    await until(() => calls.get("ticket") === 2);
+    await until(() => session.connectionDiagnostic?.stage === "ready");
+    staleMessage(
+      new MessageEvent("message", { data: JSON.stringify({ type: "READY" }) }),
+    );
+    await setImmediate();
+    assert.equal(session.realtimeStatus, "connecting");
+    assert.equal(calls.get("view"), 1);
+    const diagnostic = session.connectionDiagnostic;
+
+    fixture.unsubscribe();
+    t.mock.timers.tick(60_000);
+    await setImmediate();
+    assert.equal(calls.get("ticket"), 2);
+    assert.deepEqual(session.connectionDiagnostic, diagnostic);
+    fixture.session.dispose();
+    t.mock.timers.tick(60_000);
+    assert.equal(calls.get("ticket"), 2);
+    assert.doesNotMatch(
+      JSON.stringify(warnings),
+      /secret-ticket|owner|epoch|scene/,
+    );
+  } finally {
+    await fixture.cleanup();
+    t.mock.timers.reset();
+  }
+});
+
+test("access and ticket deadlines abort stalled HTTP before Upgrade and view has a longer deadline", async (t) => {
+  const fixture = await handshakeFixture();
+  const { session } = fixture;
+  const deadlines: number[] = [];
+  const actualTimeout = AbortSignal.timeout.bind(AbortSignal);
+
+  t.mock.method(AbortSignal, "timeout", (milliseconds: number) => {
+    deadlines.push(milliseconds);
+
+    return actualTimeout(5);
+  });
+  t.mock.method(console, "warn", () => {});
+  fixture.intercept((_path, init) => {
+    if (!init.signal) return undefined;
+
+    return new Promise((_resolve, reject) => {
+      init.signal!.addEventListener(
+        "abort",
+        () => reject(init.signal!.reason),
+        {
+          once: true,
+        },
+      );
+    });
+  });
+  try {
+    // Keep the event loop alive while Node's AbortSignal timeout is unref'ed.
+    const alive = setInterval(() => {}, 1000);
+
+    try {
+      for (const path of ["access", "ticket", "view"]) {
+        await assert.rejects(session.request(path), { name: "TimeoutError" });
+        assert.equal(session.connectionDiagnostic?.stage, path);
+        assert.equal(session.connectionDiagnostic?.reason, "timeout");
+      }
+    } finally {
+      clearInterval(alive);
+    }
+
+    assert.deepEqual(deadlines, [10_000, 10_000, 120_000]);
+    fixture.intercept(undefined);
+    await session.start();
+    await until(() => session.realtimeStatus === "connected");
+    assert.equal(session.editable, true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+test("READY still waits for the authoritative view, whose timeout is diagnosed and retried", async (t) => {
+  const fixture = await handshakeFixture();
+  const { session } = fixture;
+  const actualTimeout = AbortSignal.timeout.bind(AbortSignal);
+  let failReadyView = true;
+
+  t.mock.method(console, "warn", () => {});
+  t.mock.method(AbortSignal, "timeout", (milliseconds: number) =>
+    actualTimeout(milliseconds === 120_000 ? 30 : milliseconds),
+  );
+  fixture.intercept((path, init) => {
+    if (path !== "view" || fixture.calls.get("view") !== 2 || !failReadyView)
+      return undefined;
+
+    const body = new ReadableStream({
+      start(controller) {
+        init.signal!.addEventListener(
+          "abort",
+          () => controller.error(init.signal!.reason),
+          { once: true },
+        );
+      },
+    });
+
+    return Promise.resolve(new Response(body, { status: 200 }));
+  });
+  try {
+    await session.start();
+    await until(() => session.connectionDiagnostic?.stage === "ready-view");
+    assert.notEqual(session.realtimeStatus, "connected");
+    await until(() => session.connectionDiagnostic?.reason === "timeout");
+    assert.equal(session.connectionDiagnostic?.stage, "ready-view");
+    assert.equal(session.realtimeStatus, "unavailable");
+    assert.equal(session.status, "offline");
+    failReadyView = false;
+    await until(() => session.realtimeStatus === "connected");
+    assert.equal(session.status, "ready");
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+for (const phase of ["access", "ticket"] as const)
+  test(`stalled ${phase} during URL preparation aborts before Upgrade and reconnects`, async (t) => {
+    const fixture = await handshakeFixture();
+    const { session } = fixture;
+    const originalInstances = Socket.instances.length;
+    const actualTimeout = AbortSignal.timeout.bind(AbortSignal);
+    let stalled = false;
+
+    t.mock.method(console, "warn", () => {});
+    t.mock.method(AbortSignal, "timeout", (milliseconds: number) =>
+      actualTimeout(milliseconds === 10_000 ? 10 : milliseconds),
+    );
+    fixture.intercept((path, init) => {
+      if (
+        stalled ||
+        path !== phase ||
+        (phase === "access" && fixture.calls.get("access") === 1)
+      )
+        return undefined;
+      stalled = true;
+
+      return new Promise((_resolve, reject) => {
+        init.signal!.addEventListener(
+          "abort",
+          () => reject(init.signal!.reason),
+          { once: true },
+        );
+      });
+    });
+    try {
+      await session.start();
+      await until(() => session.connectionDiagnostic?.reason === "timeout");
+      assert.equal(session.connectionDiagnostic?.stage, phase);
+      assert.equal(Socket.instances.length, originalInstances);
+      assert.equal(session.editable, true);
+      await until(() => session.realtimeStatus === "connected");
+      assert.equal(session.connectionDiagnostic?.state, "complete");
+      assert.equal(Socket.instances.length, originalInstances + 1);
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+test("HTTP denial during the READY view still closes the editor", async (t) => {
+  const fixture = await handshakeFixture();
+  const { session } = fixture;
+
+  t.mock.method(console, "warn", () => {});
+  fixture.intercept((path) => {
+    if (path !== "view" || fixture.calls.get("view") !== 2) return undefined;
+
+    return Promise.resolve(
+      Response.json(
+        { error: { code: "ACCESS_CHANGED", message: "权限已撤销" } },
+        { status: 403 },
+      ),
+    );
+  });
+  try {
+    await session.start();
+    await until(() => session.status === "denied");
+    assert.equal(session.editable, false);
+    assert.notEqual(session.realtimeStatus, "connected");
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+test("a late READY view cannot resurrect a socket closed while the view was loading", async (t) => {
+  const fixture = await handshakeFixture();
+  const { session, room } = fixture;
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  t.mock.method(console, "warn", () => {});
+  fixture.intercept((path) => {
+    if (path !== "view" || fixture.calls.get("view") !== 2) return undefined;
+
+    return waiting.then(() =>
+      Response.json(
+        execute(
+          room,
+          { userId: "owner", name: "Owner" },
+          { type: "view" },
+          Date.now(),
+        ),
+      ),
+    );
+  });
+  try {
+    await session.start();
+    await until(() => session.connectionDiagnostic?.stage === "ready-view");
+    Socket.instances.at(-1)!.close();
+    assert.equal(session.realtimeStatus, "unavailable");
+    release();
+    await setImmediate();
+    assert.notEqual(session.realtimeStatus, "connected");
+    assert.notEqual(session.connectionDiagnostic?.state, "complete");
+    await until(() => session.realtimeStatus === "connected");
+    assert.equal(session.editable, true);
+  } finally {
+    release();
+    await fixture.cleanup();
+  }
+});
+
+test("known HTTP denial stays authoritative when its response body times out", async (t) => {
+  const fixture = await handshakeFixture();
+  const { session } = fixture;
+  const actualTimeout = AbortSignal.timeout.bind(AbortSignal);
+
+  t.mock.method(console, "warn", () => {});
+  try {
+    await session.start();
+    await until(() => session.realtimeStatus === "connected");
+    t.mock.method(AbortSignal, "timeout", () => actualTimeout(10));
+    fixture.intercept((path, init) => {
+      if (path !== "access") return undefined;
+      const body = new ReadableStream({
+        start(controller) {
+          init.signal!.addEventListener(
+            "abort",
+            () => controller.error(init.signal!.reason),
+            { once: true },
+          );
+        },
+      });
+
+      return Promise.resolve(new Response(body, { status: 403 }));
+    });
+    window.dispatchEvent(new Event("online"));
+    await until(() => session.status === "denied");
+    assert.equal(session.editable, false);
+    assert.notEqual(session.connectionDiagnostic?.reason, "timeout");
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+test("a ticket network failure is diagnosed before Upgrade rather than blamed on WebSocket", async (t) => {
+  const fixture = await handshakeFixture();
+  const { session } = fixture;
+  const instances = Socket.instances.length;
+
+  t.mock.method(console, "warn", () => {});
+  fixture.intercept((path) => {
+    if (path !== "ticket" || fixture.calls.get("ticket") !== 1)
+      return undefined;
+
+    return Promise.reject(new TypeError("Failed to fetch"));
+  });
+  try {
+    await session.start();
+    await until(() => session.connectionDiagnostic?.state === "failed");
+    assert.equal(session.connectionDiagnostic?.stage, "ticket");
+    assert.equal(session.connectionDiagnostic?.reason, "transport");
+    assert.equal(Socket.instances.length, instances);
+    assert.equal(session.editable, true);
+    await until(() => session.realtimeStatus === "connected");
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+test("a late view after WS ERROR cannot undo a concurrent authoritative HTTP denial", async (t) => {
+  const fixture = await handshakeFixture();
+  const { session, room } = fixture;
+  let deny = false;
+  let entered = false;
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  t.mock.method(console, "warn", () => {});
+  try {
+    await session.start();
+    await until(() => session.realtimeStatus === "connected");
+    fixture.intercept((path) => {
+      if (path === "access" && deny)
+        return Promise.resolve(
+          Response.json(
+            { error: { code: "ACCESS_CHANGED", message: "权限已撤销" } },
+            { status: 403 },
+          ),
+        );
+      if (path !== "view") return undefined;
+      entered = true;
+
+      return waiting.then(() =>
+        Response.json(
+          execute(
+            room,
+            { userId: "owner", name: "Owner" },
+            { type: "view" },
+            Date.now(),
+          ),
+        ),
+      );
+    });
+    Socket.instances.at(-1)!.dispatchEvent(
+      new MessageEvent("message", {
+        data: JSON.stringify({ type: "ERROR", message: "票据失效" }),
+      }),
+    );
+    await until(() => entered);
+    deny = true;
+    window.dispatchEvent(new Event("online"));
+    await until(() => session.status === "denied");
+    release();
+    await setImmediate();
+    assert.equal(session.status, "denied");
+    assert.equal(session.editable, false);
+  } finally {
+    release();
+    await fixture.cleanup();
+  }
+});
