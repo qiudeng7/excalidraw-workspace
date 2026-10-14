@@ -28,6 +28,8 @@ export const richTextBlockStyle = (element: TextStyle, width: number) => ({
   fontSize: `${element.fontSize}px`,
   fontWeight: "400",
   fontStyle: "normal",
+  // Canvas synthesizes missing bold/italic faces even when the host disables CSS synthesis.
+  fontSynthesis: "weight style",
   lineHeight: String(element.lineHeight),
   whiteSpace: "pre-wrap",
   overflowWrap: "anywhere",

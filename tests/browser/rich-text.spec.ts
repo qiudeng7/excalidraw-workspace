@@ -12,6 +12,11 @@ test("Markdown shortcuts edit formatted text and retain it across Canvas, SVG an
   await expect(input).toBeVisible();
   await input.pressSequentially("**Bold**", { delay: 25 });
   await expect(input.locator("strong")).toHaveText("Bold");
+  await expect(input).toHaveCSS("font-synthesis", "weight style");
+  await expect(input.locator("strong")).toHaveCSS(
+    "font-synthesis",
+    "weight style",
+  );
   await expect
     .poll(() =>
       page.evaluate(async () => {
