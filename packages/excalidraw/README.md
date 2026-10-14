@@ -71,7 +71,7 @@ Alt 保持上游内部连接，Meta/Cmd 及组合键优先沿用上游规则；�
 
 账户和工作空间的输入、删除确认及冲突草稿舍弃使用宿主的 [AppDialog](../../src/components/AppDialog.vue)；刷新或关闭页面时的未保存提醒仍由浏览器提供。
 
-Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局，继续由 [Vue 包装组件](../../src/components/ExcalidrawCanvas.client.vue) 配置。采样倍率菜单由 [canvasSampling.ts](../../src/components/canvasSampling.ts) 提供，通过编辑器的 `canvasSampling` 属性传入 `1`、`1.5` 或 `2`（默认 `1`）。采样与渲染设置由宿主按账户保存到后端，不再自动读取无用户归属的旧 localStorage；不写入场景数据或撤销历史。
+Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局，继续由 [Vue 包装组件](../../src/components/ExcalidrawCanvas.client.vue) 配置。采样倍率菜单位于 [SettingsPanel.vue](../../src/components/SettingsPanel.vue)，通过编辑器的 `canvasSampling` 属性传入 `1`、`1.5` 或 `2`（默认 `1`）。采样与渲染设置由宿主按账户保存到后端，不再自动读取无用户归属的旧 localStorage；不写入场景数据或撤销历史。
 
 采样倍率乘以设备原生像素密度，应用于静态画布、交互层、新元素层及元素缓存；倍率变化会使元素与链接图标缓存重新生成。高倍率使用浏览器平滑缩小显示，画布 CSS 尺寸、坐标和导出分辨率保持原有语义。`2×` 的画布像素数约为 `1×` 的四倍，内存和渲染成本随之增加；元素缓存仍受上游尺寸上限限制。
 
@@ -79,7 +79,7 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 
 ## 渲染实验开关
 
-[canvasRenderingOptions.ts](../../src/components/canvasRenderingOptions.ts) 提供选项定义，账户菜单由宿主管理，通过 `canvasRenderingOptions` 属性传给编辑器。全部开关默认关闭，关闭后保持原有采样策略；“恢复调试默认”还会将采样倍率恢复为 `1×`。设置不写入场景、撤销历史或导出配置。
+[SettingsPanel.vue](../../src/components/SettingsPanel.vue) 展示渲染选项，默认值由 [settingsControls.ts](../../src/lib/settingsControls.ts) 读取共享设置定义，宿主通过 `canvasRenderingOptions` 属性传给编辑器。全部开关默认关闭，关闭后保持原有采样策略；“恢复调试默认”还会将采样倍率恢复为 `1×`。设置不写入场景、撤销历史或导出配置。
 
 | 开关 | 作用与限制 |
 | --- | --- |
