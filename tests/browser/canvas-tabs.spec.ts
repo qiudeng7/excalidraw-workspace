@@ -585,8 +585,8 @@ test("tabs support keyboard navigation, adjacent close focus, rename, delete and
     .getByRole("button", { name: "删除画布 新的标签名称", exact: true })
     .click();
   await page
-    .getByRole("dialog", { name: "删除画布", exact: true })
-    .getByRole("button", { name: "删除画布", exact: true })
+    .getByRole("dialog", { name: "移入回收站", exact: true })
+    .getByRole("button", { name: "移入回收站", exact: true })
     .click();
   await expect(
     page.getByRole("tab", { name: "新的标签名称", exact: true }),
