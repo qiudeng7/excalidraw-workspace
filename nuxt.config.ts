@@ -74,6 +74,15 @@ export default defineNuxtConfig({
     "/api/**": { headers: { "cache-control": "no-store" } },
   },
   nitro: {
+    externals: process.env.NITRO_PRESET?.startsWith("cloudflare")
+      ? undefined
+      : {
+          traceInclude: [
+            "@libsql/client",
+            "drizzle-orm",
+            "drizzle-orm/libsql",
+          ].map((name) => fileURLToPath(import.meta.resolve(name))),
+        },
     publicAssets: [
       {
         dir: fileURLToPath(

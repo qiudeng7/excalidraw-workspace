@@ -4,54 +4,38 @@
 
 ## Docker
 
-安装 Docker 与 Compose。提供从 GHCR 拉取镜像和从源码构建两种方式，均使用单实例 Node 服务。
+安装 Docker 与 Compose。容器启动时会自动应用数据库迁移，成功后才开始提供服务；首次部署和后续更新使用相同流程。容器以普通用户运行，Docker 使用单实例，数据与在线应用独立。
 
 ### GHCR 镜像
 
-镜像由 [Container images 工作流](../.github/workflows/containers.yml) 构建。**首次发布需先将工作流合入 `main` 并等待成功，再将 GitHub 仓库 Packages 中的 `excalidraw-workspace` 设为 Public**，公开仓库不会自动使包公开；已存在的包还需允许本仓库 Actions 写入。需要重试主分支发布时，可在 Actions → Container images → Run workflow 选择 `main` 手动运行；手动运行其他分支会跳过构建与发布。可在[包页面](https://github.com/qiudeng7/excalidraw-workspace/pkgs/container/excalidraw-workspace)核对已发布版本及可用标签。目前发布 `linux/amd64` 镜像。
-
-下载同一提交的 [compose.ghcr.yaml](../compose.ghcr.yaml)，放入部署目录并创建 `.env`：
-
-```dotenv
-# 从包页面选择实际存在的版本，例如 0.5.1 或 sha-<完整提交号>。
-WORKSPACE_VERSION=sha-<完整提交号>
-PORT=8080
-PUBLIC_ORIGIN=http://localhost:8080
-```
-
-运行：
+下载 [compose.ghcr.yaml](../compose.ghcr.yaml) 到部署目录，执行：
 
 ```sh
 docker compose -f compose.ghcr.yaml pull
-docker compose -f compose.ghcr.yaml up -d
-docker compose -f compose.ghcr.yaml logs migrations app
+docker compose -f compose.ghcr.yaml up -d --remove-orphans
+docker compose -f compose.ghcr.yaml logs app
 ```
 
-`WORKSPACE_VERSION` 同时选择应用和迁移镜像，迁移镜像自动追加 `-migrations`，不要单独改用其他版本。每次 `main` 推送生成 `main`、`latest` 和 `sha-<完整提交号>`；推送与 `package.json` 版本一致的 `v<版本>` tag 生成不带 `v` 的版本标签及 SHA 标签，预发行版也保留完整版本号。`latest` 始终跟随 `main`，工作流成功后再使用新标签；两张镜像不是原子发布，正式部署优先选固定版本或 SHA，避免拉取过程中浮动标签变化。自建 fork 的镜像可通过 `WORKSPACE_IMAGE=ghcr.io/你的账号/仓库名` 指定。
+打开 http://localhost:8080。默认拉取 `ghcr.io/qiudeng7/excalidraw-workspace:latest`，当前支持 `linux/amd64`。更新时先[备份数据](#备份和恢复)，再执行同样的 `pull` 和 `up` 命令。应用重建后先完成迁移，再接收请求；迁移失败会退出，查看 `logs app` 排查原因。回退应用版本前确认数据库兼容性或恢复备份。
 
-更新前[备份数据](#备份和恢复)，将 `.env` 的 `WORKSPACE_VERSION` 换为新标签，随后执行：
+如需固定版本，可在 `.env` 设置 `WORKSPACE_VERSION=0.5.1`（以[包页面](https://github.com/qiudeng7/excalidraw-workspace/pkgs/container/excalidraw-workspace)的实际标签为准）；自建 fork 可设置 `WORKSPACE_IMAGE=ghcr.io/你的账号/仓库名`。`latest` 和 `main` 跟随主分支，`v<版本>` tag 生成不带 `v` 的版本标签，预发行版保留完整版本号，同时提供完整 SHA 标签。
 
-```sh
-docker compose -f compose.ghcr.yaml pull
-docker compose -f compose.ghcr.yaml stop app
-docker compose -f compose.ghcr.yaml up -d --force-recreate
-docker compose -f compose.ghcr.yaml logs migrations app
-```
-
-先拉齐两张镜像再停止应用；停止旧应用后才执行新迁移，避免旧进程继续写入。`--force-recreate` 保证迁移容器重新运行，成功后才启动新应用。失败时先检查迁移日志，不要跳过迁移直接启动应用。迁移可能不向后兼容，回退应用版本前确认兼容性或恢复备份。从已有源码部署切换时，也按以上更新流程先备份并停止旧应用，再执行新迁移；保持原部署目录和 Compose 项目名（使用过 `-p` 时沿用相同值），才能继续使用原命名卷。
+镜像由 [Container images 工作流](../.github/workflows/containers.yml) 构建。首次发布需先将工作流合入 `main` 并等待成功，再将 GitHub 仓库 Packages 中的 `excalidraw-workspace` 设为 Public；公开仓库不会自动使包公开，已存在的包还需允许本仓库 Actions 写入。需要重试时，在 Actions → Container images → Run workflow 选择 `main`；手动运行其他分支会跳过构建与发布。
 
 ### 源码构建
 
 在仓库根目录执行：
 
 ```sh
-docker compose up --build -d
-docker compose logs migrations app
+docker compose up --build -d --remove-orphans
+docker compose logs app
 ```
 
-### 访问与配置
+源码更新后先备份，再执行相同命令重新构建和启动。
 
-两种方式均打开 http://localhost:8080。容器以普通用户运行，不需要 Cloudflare 账户；Docker 使用单实例，数据与在线应用独立。数据库和快照保存在命名卷 `workspace-data`，挂载到 `/app/.data`；迁移成功后应用才启动。迁移失败时修复错误后重新执行启动命令。
+### 数据与访问配置
+
+数据库和快照保存在命名卷 `workspace-data`，挂载到 `/app/.data`。从旧版双容器方案或源码方式切换时，保持原部署目录和 Compose 项目名（使用过 `-p` 时沿用相同值），以继续使用原命名卷；`--remove-orphans` 会移除旧迁移容器，保留数据卷。
 
 对外提供服务时，由反向代理提供 HTTPS，并在 `.env` 设置：
 
@@ -60,7 +44,7 @@ PORT=8080
 PUBLIC_ORIGIN=https://draw.example.com
 ```
 
-端口只绑定回环地址。`PUBLIC_ORIGIN` 填浏览器实际访问的完整 origin，不含路径；仅修改本地端口时，也须同步修改该值。代理须保留 Cookie、Origin 和请求头，不缓存 `/api/*`，并支持 WebSocket Upgrade 和持续连接。按客户端 IP 限流时，将代理连接 IP 填入 `TRUSTED_PROXY_IPS`。修改环境变量后，源码方式执行 `docker compose up -d`，GHCR 方式执行 `docker compose -f compose.ghcr.yaml up -d`。
+端口只绑定回环地址。`PUBLIC_ORIGIN` 填浏览器实际访问的完整 origin，不含路径；仅修改本地端口时，也须同步修改该值。代理须保留 Cookie、Origin 和请求头，不缓存 `/api/*`，并支持 WebSocket Upgrade 和持续连接。按客户端 IP 限流时，将代理连接 IP 填入 `TRUSTED_PROXY_IPS`。修改环境变量后，源码方式执行 `docker compose up -d --remove-orphans`，GHCR 方式执行 `docker compose -f compose.ghcr.yaml up -d --remove-orphans`。
 
 ## Cloudflare Workers
 
@@ -95,7 +79,7 @@ pnpm build:node
 PUBLIC_ORIGIN=http://localhost:3000 pnpm start:node
 ```
 
-Node 协作广播仅支持一个应用进程，不支持多副本或 cluster；数据库 CAS 不能替代跨进程广播。数据位于工作目录的 `.data/db/sqlite.db` 和 `.data/blob/`。启动命令先应用迁移；若仅分发 `.output/`，部署流程须先迁移相同数据目录，再执行 `node .output/server/index.mjs`。
+Node 协作广播仅支持一个应用进程，不支持多副本或 cluster；数据库 CAS 不能替代跨进程广播。数据位于工作目录的 `.data/db/sqlite.db` 和 `.data/blob/`。启动入口 `.output/server/start.mjs` 会先应用迁移；迁移失败时退出并停止启动。分发 `.output/` 后，在安装 Node.js 24 及以上版本的主机上，于其父目录执行 `PUBLIC_ORIGIN=http://localhost:3000 node .output/server/start.mjs`，不需要安装 Nuxt CLI。
 
 ## 备份和恢复
 
