@@ -750,6 +750,7 @@ test("移动端协作画布解锁使用抓手，手动选择工具后远端更�
   baseURL,
 }) => {
   const owner = await account(browser, baseURL!);
+
   // These regressions target the collaboration wrapper, not lazy activation.
   await call(owner.context, baseURL!, owner.id, "access");
   const other = await browser.newContext({ baseURL });
@@ -866,6 +867,7 @@ test("协作编辑器即时应用 Ctrl 多选开关，独立选择不写入共�
   baseURL,
 }) => {
   const owner = await account(browser, baseURL!);
+
   // These regressions target the collaboration wrapper, not lazy activation.
   await call(owner.context, baseURL!, owner.id, "access");
   const guestContext = await browser.newContext({
