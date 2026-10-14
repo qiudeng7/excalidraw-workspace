@@ -26,6 +26,14 @@
 
 实现入口为 [richTextWysiwyg.ts](../../packages/excalidraw/wysiwyg/richTextWysiwyg.ts) 与 [richTextEditor.ts](../../packages/excalidraw/wysiwyg/richTextEditor.ts)。共享校验见 [richTextDocument.ts](../../packages/excalidraw/lib/element/src/richTextDocument.ts)，Canvas/SVG 布局见 [richTextLayout.ts](../../packages/excalidraw/lib/element/src/richTextLayout.ts)，后端兼容保护见 [richText.ts](../../server/utils/richText.ts)。回归入口为 `tests/browser/rich-text.spec.ts`、标签页中的持久化与文件往返用例，以及真实协作测试中的远端胜出、删除和撤权恢复用例。
 
+## 收藏与复用颜色
+
+描边、填充和画布背景的原生颜色弹层共用「我的色板」。在原有颜色输入框输入颜色，或选取现有颜色后，点击「收藏当前颜色」；点击收藏色即可应用，点击旁边的移除按钮可取消收藏。支持原生输入框接受的颜色格式，保存时统一为十六进制或透明色；重复颜色不会新增，每个账号最多收藏 24 色。Tab 可从原有颜色输入框进入色板，Enter/Space 应用，Delete/Backspace 移除聚焦的收藏色，Escape 关闭弹层；删除收藏不修改画布元素。
+
+色板是浏览器中的个人偏好：两个宿主组件通过 `customColorPaletteStorageKey` 传入包含账号 ID 的 localStorage key，跨工作区、画布和刷新复用，同一浏览器其他标签的修改通过 `storage` 事件更新。不同账号使用不同 key，未登录的公开查看页面不启用色板。颜色不会进入画布数据、协作消息或后端账户设置，也不跨设备同步。浏览器存储不可写时，当前编辑器仍可使用临时色板，并显示保存失败提示；关闭或切换编辑器后可能丢失这部分临时颜色。
+
+入口为 [SavedColorPalette.tsx](../../packages/excalidraw/components/ColorPicker/SavedColorPalette.tsx)，原生 [Picker.tsx](../../packages/excalidraw/components/ColorPicker/Picker.tsx) 复用现有 `onChange` 颜色动作，持久化数据的校验和数量限制见 [savedColors.ts](../../packages/excalidraw/components/ColorPicker/savedColors.ts)。该功能由宿主显式传 key 开启，独立使用编辑器时保留上游行为。持久化回归见 [saved-colors.test.ts](../../tests/unit/saved-colors.test.ts) 与 [saved-colors.spec.ts](../../tests/browser/saved-colors.spec.ts)。
+
 ## 导入导出与复制
 
 画布文件导入、SVG/PNG 导出和复制在浏览器内执行，没有单独的导入导出 API；导入导致的画布内容变化随后进入[保存内容](canvases.md#保存内容)流程。个人素材库导入后走[保存素材库](library.md#保存素材库)。

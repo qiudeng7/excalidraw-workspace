@@ -567,6 +567,9 @@ function CanvasEditor() {
   return createElement(Excalidraw, {
     // Native modal inertness isolates pointer input; keep editor state intact.
     // Keyboard input stays scoped to the editor, not the teleported settings.
+    customColorPaletteStorageKey: props.userId
+      ? `workspace:color-palette:v1:${encodeURIComponent(props.userId)}`
+      : undefined,
     handleKeyboardGlobally: false,
     syncReadOnly: syncReadOnly(),
     viewModeEnabled: syncReadOnly() ? true : undefined,

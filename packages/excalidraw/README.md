@@ -92,6 +92,10 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 
 这些选项用于比较 Canvas 渲染组合，没有引入 HTML/SVG 显示层。直接绘制的元素不经过对应位图缓存，其效果不会再受该缓存的平滑开关控制。几何和文字绘制仍调用上游绘制函数，导出继续使用独立路径。
 
+## 浏览器个人色板
+
+宿主可通过 `customColorPaletteStorageKey` 开启描边、填充及画布背景共用的收藏色板，并负责按账号隔离 key。收藏、应用、移除和键盘操作复用原生 Picker 的颜色应用动作；偏好写入浏览器 localStorage，不写入场景或协作数据。入口在 `components/ColorPicker/SavedColorPalette.tsx`，数据格式与容量限制在 `savedColors.ts`，完整用例见[开发指南](../../docs/development/editor.md#收藏与复用颜色)。升级上游颜色弹层或键盘导航时，保留 `saved` 分区并运行 `tests/browser/saved-colors.spec.ts`。
+
 ## 协作共用入口
 
 宿主和权威房间通过 `@excalidraw/excalidraw/reconcile` 共用元素版本选择和 fractional index 修复算法。入口 [data/reconcileCore.ts](data/reconcileCore.ts) 与 [fractionalIndexCore.ts](lib/element/src/fractionalIndexCore.ts) 从上游实现抽出，不依赖 DOM、React、几何或字体；原编辑器入口继续调用它们，并保留编辑中的元素保护、验证及元素更新机制。服务端的授权、输入校验和修复版本戳由宿主管理。
