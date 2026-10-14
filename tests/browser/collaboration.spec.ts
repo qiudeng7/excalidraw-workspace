@@ -705,3 +705,135 @@ test("移动端协作画布解锁使用抓手，手动选择工具后远端更�
     await other.close();
   }
 });
+
+test("协作编辑器即时应用 Ctrl 多选开关，独立选择不写入共享场景", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const guestContext = await browser.newContext({
+    baseURL,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  try {
+    const page = await owner.context.newPage();
+
+    await open(page, "/", true);
+    await draw(page, 600);
+    await draw(page, 850);
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements.length))
+      .toBe(2);
+    const link = await call(owner.context, baseURL!, owner.id, "links", {
+      role: "editor",
+      requireLogin: false,
+    });
+    const guest = await guestContext.newPage();
+
+    await open(guest, link.path, true);
+    await expect
+      .poll(() => editorState(guest).then((state) => state.elements.length))
+      .toBe(2);
+    const before = await call(owner.context, baseURL!, owner.id, "view");
+    const clickShape = async (
+      target: Page,
+      index: number,
+      modifier?: "Control" | "Shift",
+    ) => {
+      const state = await editorState(target);
+      const element = state.elements[index];
+      const box = (await target
+        .locator(".excalidraw canvas")
+        .last()
+        .boundingBox())!;
+
+      if (modifier) await target.keyboard.down(modifier);
+      await target.mouse.click(
+        box.x +
+          (element.x + element.width / 2 + state.scrollX) * state.zoom.value,
+        box.y + (element.y + state.scrollY) * state.zoom.value,
+      );
+      if (modifier) await target.keyboard.up(modifier);
+    };
+    const exercise = async (target: Page) => {
+      // Clicking the active selection toolbar button toggles the native lasso.
+      if ((await editorState(target)).activeTool.type !== "selection")
+        await target.getByTestId("toolbar-selection").first().click();
+      await expect
+        .poll(() => editorState(target).then((state) => state.activeTool.type))
+        .toBe("selection");
+      await clickShape(target, 0);
+      await expect
+        .poll(() =>
+          editorState(target).then(
+            (state) => Object.keys(state.selectedElementIds).length,
+          ),
+        )
+        .toBe(1);
+      await clickShape(target, 1, "Control");
+      await expect
+        .poll(() =>
+          editorState(target).then(
+            (state) => Object.keys(state.selectedElementIds).length,
+          ),
+        )
+        .toBe(2);
+      await clickShape(target, 0, "Control");
+      await expect
+        .poll(() =>
+          editorState(target).then(
+            (state) => Object.keys(state.selectedElementIds).length,
+          ),
+        )
+        .toBe(1);
+    };
+
+    await exercise(page);
+    await exercise(guest);
+    expect((await call(owner.context, baseURL!, owner.id, "view")).seq).toBe(
+      before.seq,
+    );
+    await page.getByRole("button", { name: "设置", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "设置", exact: true });
+
+    await dialog.getByRole("tab", { name: "编辑器", exact: true }).click();
+    const checkbox = dialog.getByRole("checkbox", {
+      name: "Ctrl 点击多选",
+      exact: true,
+    });
+
+    await expect(checkbox).toBeChecked();
+    await checkbox.locator("..").click();
+    await expect
+      .poll(
+        async () =>
+          (await (await owner.context.request.get("/api/user-settings")).json())
+            .settings.features.ctrlMultiSelect,
+      )
+      .toBe(false);
+    await dialog.getByRole("button", { name: "关闭设置" }).click();
+    await clickShape(page, 0, "Control");
+    await expect
+      .poll(() =>
+        editorState(page).then(
+          (state) => Object.keys(state.selectedElementIds).length,
+        ),
+      )
+      .toBe(1);
+    await clickShape(page, 1, "Shift");
+    await expect
+      .poll(() =>
+        editorState(page).then(
+          (state) => Object.keys(state.selectedElementIds).length,
+        ),
+      )
+      .toBe(2);
+    expect((await call(owner.context, baseURL!, owner.id, "view")).seq).toBe(
+      before.seq,
+    );
+  } finally {
+    await guestContext.close();
+    await owner.context.close();
+  }
+});

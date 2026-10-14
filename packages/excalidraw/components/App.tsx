@@ -9917,6 +9917,29 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
+  // Treat Ctrl as additive selection only here: do not rewrite pointer events,
+  // since Shift also constrains drawing, transforms and linear editor points.
+  private isCtrlMultiSelection = (
+    event: Pick<
+      PointerEvent,
+      "button" | "buttons" | "ctrlKey" | "metaKey" | "altKey"
+    >,
+  ): boolean =>
+    !!this.props.ctrlMultiSelect &&
+    (event.button === 0 || (event.buttons & 1) === 1) &&
+    event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    this.state.activeTool.type === "selection" &&
+    !this.state.selectedLinearElement?.isEditing;
+
+  private isAdditiveSelection = (
+    event: Pick<
+      PointerEvent,
+      "button" | "buttons" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey"
+    >,
+  ): boolean => event.shiftKey || this.isCtrlMultiSelection(event);
+
   private initialPointerDownState(
     event: React.PointerEvent<HTMLElement>,
   ): PointerDownState {
@@ -9927,7 +9950,8 @@ class App extends React.Component<AppProps, AppState> {
 
     return {
       origin,
-      withCmdOrCtrl: event[KEYS.CTRL_OR_CMD],
+      withCmdOrCtrl:
+        event[KEYS.CTRL_OR_CMD] && !this.isCtrlMultiSelection(event),
       originInGrid: tupleToCoors(
         getGridPoint(
           origin.x,
@@ -10294,7 +10318,7 @@ class App extends React.Component<AppProps, AppState> {
 
         if (
           (hitElement === null || !someHitElementIsSelected) &&
-          !event.shiftKey &&
+          !this.isAdditiveSelection(event) &&
           !pointerDownState.hit.hasHitCommonBoundingBoxOfSelectedElements &&
           (!this.state.selectedLinearElement?.isEditing ||
             (hitElement &&
@@ -10327,7 +10351,7 @@ class App extends React.Component<AppProps, AppState> {
         } else if (hitElement != null) {
           // == deep selection ==
           // on CMD/CTRL, drill down to hit element regardless of groups etc.
-          if (event[KEYS.CTRL_OR_CMD]) {
+          if (event[KEYS.CTRL_OR_CMD] && !this.isCtrlMultiSelection(event)) {
             if (event.altKey) {
               // ctrl + alt means we're lasso selecting - start lasso trail and switch to lasso tool
 
@@ -11959,7 +11983,10 @@ class App extends React.Component<AppProps, AppState> {
         } else {
           let shouldReuseSelection = true;
 
-          if (!event.shiftKey && isSomeElementSelected(elements, this.state)) {
+          if (
+            !this.isAdditiveSelection(event) &&
+            isSomeElementSelected(elements, this.state)
+          ) {
             if (
               pointerDownState.withCmdOrCtrl &&
               pointerDownState.hit.element
@@ -12912,7 +12939,7 @@ class App extends React.Component<AppProps, AppState> {
       ) {
         // when inside line editor, shift selects points instead
         if (
-          childEvent.shiftKey &&
+          this.isAdditiveSelection(childEvent) &&
           !this.state.selectedLinearElement?.isEditing
         ) {
           if (this.state.selectedElementIds[hitElement.id]) {

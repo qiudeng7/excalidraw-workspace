@@ -6,10 +6,13 @@ import {
 type UserSettingsWrite = Omit<UserSettings, "features"> & {
   features: Omit<
     UserSettings["features"],
-    "disableDefaultSidebar" | "bottomToolbar"
+    "disableDefaultSidebar" | "bottomToolbar" | "ctrlMultiSelect"
   > &
     Partial<
-      Pick<UserSettings["features"], "disableDefaultSidebar" | "bottomToolbar">
+      Pick<
+        UserSettings["features"],
+        "disableDefaultSidebar" | "bottomToolbar" | "ctrlMultiSelect"
+      >
     >;
 };
 
@@ -40,6 +43,7 @@ export function validateUserSettings(value: unknown): value is UserSettings {
       "shortArrowheads",
       "disableDefaultSidebar",
       "bottomToolbar",
+      "ctrlMultiSelect",
     ])
   )
     return false;
@@ -71,6 +75,7 @@ export function readStoredUserSettings(value: unknown): UserSettings | null {
         features: {
           disableDefaultSidebar: true,
           bottomToolbar: true,
+          ctrlMultiSelect: true,
           ...features,
         },
       };
@@ -89,8 +94,10 @@ export function validateUserSettingsWrite(
 
   // bottomToolbar was introduced after disableDefaultSidebar; this shape never shipped.
   return (
-    !Object.hasOwn(features, "bottomToolbar") ||
-    Object.hasOwn(features, "disableDefaultSidebar")
+    (!Object.hasOwn(features, "bottomToolbar") ||
+      Object.hasOwn(features, "disableDefaultSidebar")) &&
+    (!Object.hasOwn(features, "ctrlMultiSelect") ||
+      Object.hasOwn(features, "bottomToolbar"))
   );
 }
 
@@ -104,6 +111,7 @@ export function completeUserSettingsWrite(
     features: {
       disableDefaultSidebar: previous.features.disableDefaultSidebar,
       bottomToolbar: previous.features.bottomToolbar,
+      ctrlMultiSelect: previous.features.ctrlMultiSelect,
       ...value.features,
     },
   };
