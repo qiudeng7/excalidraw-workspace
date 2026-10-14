@@ -1794,7 +1794,7 @@ test("回收站同页删除恢复重新打开，实时成员立即失去访问�
     });
     await open(page, "/", true);
     await open(memberPage, `/c/${owner.id}`, true);
-    await draw(page);
+    await draw(page, 700);
     await expect
       .poll(
         async () =>
