@@ -13,6 +13,7 @@ const legacySettings = (sidebar: boolean) => {
   const settings: any = createDefaultUserSettings();
 
   delete settings.features.bottomToolbar;
+  delete settings.features.ctrlMultiSelect;
   if (!sidebar) delete settings.features.disableDefaultSidebar;
 
   return settings;
@@ -117,11 +118,13 @@ test("released v1 writes retain omitted flags, initialize defaults and reject ma
       !sidebar,
     );
     assert.equal(initial.body.settings.features.bottomToolbar, true);
+    assert.equal(initial.body.settings.features.ctrlMultiSelect, true);
     assert.equal(initial.body.settings.features.nunitoFont, false);
     const modern = createDefaultUserSettings();
 
     modern.features.disableDefaultSidebar = false;
     modern.features.bottomToolbar = false;
+    modern.features.ctrlMultiSelect = false;
     assert.equal(
       (
         await request(
@@ -146,6 +149,7 @@ test("released v1 writes retain omitted flags, initialize defaults and reject ma
     assert.equal(saved.body.revision, 3);
     assert.equal(saved.body.settings.features.disableDefaultSidebar, sidebar);
     assert.equal(saved.body.settings.features.bottomToolbar, false);
+    assert.equal(saved.body.settings.features.ctrlMultiSelect, false);
     assert.equal(saved.body.settings.features.nunitoFont, false);
     assert.deepEqual(
       (await request("/user-settings", "GET", undefined, account.cookie)).body,
@@ -304,6 +308,7 @@ test(
       const modern = createDefaultUserSettings();
 
       modern.features.bottomToolbar = false;
+      modern.features.ctrlMultiSelect = false;
       modern.features.disableDefaultSidebar = false;
       const winner = await request(
         "/user-settings",
@@ -395,6 +400,7 @@ test("pre-deployment resources save, retry and resolve conflicts through the rea
 
       modern.features.disableDefaultSidebar = false;
       modern.features.bottomToolbar = false;
+      modern.features.ctrlMultiSelect = false;
       const winner = await request(
         "/user-settings",
         "PUT",
@@ -414,10 +420,76 @@ test("pre-deployment resources save, retry and resolve conflicts through the rea
 
       assert.equal(saved.settings.debug.sampling, 2);
       assert.equal(saved.settings.features.bottomToolbar, false);
+      assert.equal(saved.settings.features.ctrlMultiSelect, false);
       assert.equal(saved.settings.features.disableDefaultSidebar, sidebar);
       assert.equal(saved.revision, winner.body.revision + 1);
     } finally {
       resource.dispose();
     }
   }
+});
+
+test("pre-Ctrl v1 payload preserves disabled Ctrl selection while malformed new flag shapes fail", async (t) => {
+  const { request, alice } = await fixture(t);
+  const defaults = (
+    await request("/user-settings", "GET", undefined, alice.cookie)
+  ).body;
+
+  assert.equal(defaults.settings.features.ctrlMultiSelect, true);
+  const settings: any = createDefaultUserSettings();
+
+  settings.features.ctrlMultiSelect = false;
+  assert.equal(
+    (
+      await request(
+        "/user-settings",
+        "PUT",
+        { settings, revision: 0 },
+        alice.cookie,
+      )
+    ).status,
+    200,
+  );
+  const legacy = structuredClone(settings);
+
+  delete legacy.features.ctrlMultiSelect;
+  legacy.features.formalLines = false;
+  const saved = await request(
+    "/user-settings",
+    "PUT",
+    { settings: legacy, revision: 1 },
+    alice.cookie,
+  );
+
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.settings.features.ctrlMultiSelect, false);
+  assert.equal(saved.body.settings.features.formalLines, false);
+  for (const invalid of [
+    { ...legacy.features, ctrlMultiSelect: "false" },
+    { ...legacy.features, ctrlMultiSelect: null },
+    { ...legacy.features, ctrlMultiSelect: false, unexpected: true },
+    { ...legacy.features, ctrlMultiSelect: false, bottomToolbar: undefined },
+    {
+      ...legacy.features,
+      ctrlMultiSelect: false,
+      disableDefaultSidebar: undefined,
+    },
+  ]) {
+    assert.equal(
+      (
+        await request(
+          "/user-settings",
+          "PUT",
+          { settings: { ...legacy, features: invalid }, revision: 2 },
+          alice.cookie,
+        )
+      ).status,
+      400,
+    );
+  }
+
+  assert.deepEqual(
+    (await request("/user-settings", "GET", undefined, alice.cookie)).body,
+    saved.body,
+  );
 });

@@ -215,6 +215,7 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
         <App
           arrowBindingOptimization={props.arrowBindingOptimization}
           shortArrowheads={props.shortArrowheads}
+          ctrlMultiSelect={props.ctrlMultiSelect}
           canvasSampling={props.canvasSampling}
           canvasRenderingOptions={props.canvasRenderingOptions}
           onExport={onExport}

@@ -131,6 +131,10 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
         ...settings,
         features: { ...settings.features, bottomToolbar: "true" },
       },
+      {
+        ...settings,
+        features: { ...settings.features, ctrlMultiSelect: "true" },
+      },
       { ...settings, debug: { ...settings.debug, sampling: 3 } },
       {
         ...settings,
@@ -262,6 +266,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
 
     delete legacy.features.disableDefaultSidebar;
     delete legacy.features.bottomToolbar;
+    delete legacy.features.ctrlMultiSelect;
     legacy.features.nunitoFont = false;
     await storage.database.run(
       sql`UPDATE user_settings SET settings_json = ${JSON.stringify(legacy)} WHERE user_id = ${alice.body.user.id}`,
@@ -278,6 +283,7 @@ test(`node: isolated user settings, initial CAS, validation and independent revi
         ...legacy.features,
         disableDefaultSidebar: true,
         bottomToolbar: true,
+        ctrlMultiSelect: true,
       },
     });
     // Rows saved after the sidebar flag was introduced preserve an explicit false.

@@ -850,6 +850,8 @@ export interface ExcalidrawProps {
   /** 屏幕采样倍率，独立于场景缩放及导出分辨率。 */
   arrowBindingOptimization?: boolean;
   shortArrowheads?: boolean;
+  /** Let Ctrl+left click extend selection; opt-in for standalone editor users. */
+  ctrlMultiSelect?: boolean;
   canvasSampling?: 1 | 1.5 | 2;
   canvasRenderingOptions?: CanvasRenderingOptions;
   className?: string;
