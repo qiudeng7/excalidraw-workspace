@@ -6,6 +6,7 @@ import type { NavigationController } from "~/composables/useWorkspaceNavigation"
 import type { CanvasDocumentController } from "~/composables/useCanvasDocument";
 import type { SaveBarrier } from "~/lib/editor";
 import type { promptDialog, confirmDialog } from "~/lib/dialogs";
+import { useCanvasTabs } from "~/composables/useCanvasTabs";
 
 export interface WorkspaceDirectoryDependencies {
   api: Pick<
@@ -31,6 +32,7 @@ export interface WorkspaceDirectoryDependencies {
     | "clearDocument"
     | "renameLoadedCanvas"
     | "invalidateCanvas"
+    | "releaseEditorHistory"
   >;
   editor: SaveBarrier;
   interactionLocked: Readonly<Ref<boolean>>;
@@ -45,6 +47,8 @@ export interface WorkspaceDirectoryController {
   currentWorkspace: Readonly<Ref<Workspace | undefined>>;
   directoryStale: Readonly<Ref<boolean>>;
   directoryLocked: Readonly<Ref<boolean>>;
+  canvasTabs: Readonly<Ref<readonly CanvasMeta[]>>;
+  closeCanvasTab(id: string): Promise<void>;
   reset(): void;
   refreshDirectory(): Promise<void>;
   loadWorkspaces(): Promise<void>;
@@ -72,6 +76,14 @@ export function useWorkspaceDirectory({
   const selecting = ref(false);
   const canvases = ref<CanvasMeta[]>([]);
   const workspaceId = ref("");
+  const tabs = useCanvasTabs();
+  const canvasTabs = computed(() =>
+    tabs.ids(workspaceId.value).flatMap((id) => {
+      const canvas = canvases.value.find((entry) => entry.id === id);
+
+      return canvas ? [canvas] : [];
+    }),
+  );
 
   type Directory = CanvasCatalog;
 
@@ -100,6 +112,7 @@ export function useWorkspaceDirectory({
     workspaceId.value = "";
     catalogRevision.value = 0;
     directoryStale.value = false;
+    tabs.reset();
   }
 
   async function readDirectory(id: string) {
@@ -111,6 +124,10 @@ export function useWorkspaceDirectory({
     canvases.value = data.canvases;
     catalogRevision.value = data.catalogRevision;
     directoryStale.value = false;
+    tabs.reconcile(
+      id,
+      data.canvases.map((canvas) => canvas.id),
+    );
   }
 
   async function refreshDirectory() {
@@ -134,12 +151,21 @@ export function useWorkspaceDirectory({
     const data = await readDirectory(id);
 
     if (generation !== switchGeneration) return;
+    tabs.reconcile(
+      id,
+      data.canvases.map((canvas) => canvas.id),
+    );
     const remembered =
-      preferred ??
-      navigation.value?.workspaces.find((item) => item.workspaceId === id)
-        ?.lastCanvasId;
+      tabs.active(id) !== undefined
+        ? tabs.active(id)
+        : (preferred ??
+          navigation.value?.workspaces.find((item) => item.workspaceId === id)
+            ?.lastCanvasId);
     const selected =
-      data.canvases.find((item) => item.id === remembered) ?? data.canvases[0];
+      remembered === null && tabs.active(id) === null
+        ? undefined
+        : (data.canvases.find((item) => item.id === remembered) ??
+          data.canvases[0]);
 
     // Scene loading is independent of the account-level lazy library.
     if (selected) await loadCanvas(selected.id, selected);
@@ -149,6 +175,7 @@ export function useWorkspaceDirectory({
 
     if (generation !== switchGeneration) return;
     setDirectory(id, data);
+    if (selected) tabs.open(id, selected.id);
     if (selected && (explicit || !navigation.value?.lastCanvasId))
       void recordOpened(selected.id);
   }
@@ -294,7 +321,11 @@ export function useWorkspaceDirectory({
   }
 
   async function selectCanvas(id: string) {
-    if (interactionLocked.value || id === document.value?.id) return;
+    if (
+      interactionLocked.value ||
+      (id === document.value?.id && !selecting.value)
+    )
+      return;
     const generation = ++switchGeneration;
 
     requestedWorkspace = "";
@@ -306,7 +337,49 @@ export function useWorkspaceDirectory({
         id,
         canvases.value.find((item) => item.id === id),
       );
-      if (generation === switchGeneration) void recordOpened(id);
+      if (generation === switchGeneration) {
+        tabs.open(workspaceId.value, id);
+        void recordOpened(id);
+      }
+    } catch (error) {
+      if (generation === switchGeneration)
+        await run(async () => {
+          throw error;
+        });
+    } finally {
+      if (generation === switchGeneration) selecting.value = false;
+    }
+  }
+
+  async function closeCanvasTab(id: string) {
+    if (directoryLocked.value || !tabs.ids(workspaceId.value).includes(id))
+      return;
+    if (id !== document.value?.id) {
+      canvasDocument.releaseEditorHistory(id);
+      tabs.close(workspaceId.value, id);
+
+      return;
+    }
+
+    const generation = ++switchGeneration;
+
+    selecting.value = true;
+    try {
+      // Capture and durably protect edits before removing the only mounted editor.
+      // Resources remain account-owned and continue saving after the view closes.
+      await checkpoint();
+      if (generation !== switchGeneration) return;
+      canvasDocument.releaseEditorHistory(id);
+      tabs.close(workspaceId.value, id);
+      const next = tabs.active(workspaceId.value);
+
+      if (next) {
+        await loadCanvas(
+          next,
+          canvases.value.find((canvas) => canvas.id === next),
+        );
+        if (generation === switchGeneration) void recordOpened(next);
+      } else canvasDocument.clearDocument("没有打开的画布");
     } catch (error) {
       if (generation === switchGeneration)
         await run(async () => {
@@ -407,6 +480,7 @@ export function useWorkspaceDirectory({
 
       await refreshDirectory();
       await loadCanvas(canvas.id);
+      tabs.open(workspaceId.value, canvas.id);
       await recordOpened(canvas.id);
     });
   }
@@ -458,7 +532,7 @@ export function useWorkspaceDirectory({
         throw failure;
       if (canvasDocument.invalidateCanvas(canvas.id)) {
         await refreshNavigationQuietly();
-        await loadWorkspace(workspaceId.value, canvases.value[0]?.id);
+        await loadWorkspace(workspaceId.value);
       }
     });
   }
@@ -470,6 +544,8 @@ export function useWorkspaceDirectory({
     currentWorkspace,
     directoryStale: shallowReadonly(directoryStale),
     directoryLocked,
+    canvasTabs,
+    closeCanvasTab,
     reset,
     refreshDirectory,
     loadWorkspaces,

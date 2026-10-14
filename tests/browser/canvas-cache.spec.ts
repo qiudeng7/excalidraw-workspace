@@ -150,6 +150,14 @@ async function fixture(
       case "GET /api/workspaces":
         body = { workspaces: [workspace] };
         break;
+      case "GET /api/shared-canvases":
+        body = { canvases: [] };
+        break;
+      case "POST /api/canvases/a/presence":
+      case "POST /api/canvases/b/presence":
+      case "POST /api/canvases/c/presence":
+        body = { syncMode: "legacy" };
+        break;
       case "GET /api/workspaces/cache-space/canvases":
         body = { canvases: Object.values(canvases), catalogRevision: 0 };
         break;

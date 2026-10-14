@@ -22,6 +22,7 @@ export interface CanvasDocumentController {
   renameLoadedCanvas(id: string, name: string): void;
   clearDocument(message?: string): void;
   invalidateCanvas(id: string): boolean;
+  releaseEditorHistory(id: string): void;
   reset(): void;
   setSaveState(message: string): void;
 }
@@ -155,6 +156,7 @@ export function useCanvasDocument({
     loadingCanvas: shallowReadonly(loadingCanvas),
     loadCanvas,
     clearDocument,
+    releaseEditorHistory: (id) => resources.value?.releaseEditorHistory(id),
     invalidateCanvas(id) {
       const selected = selectedId === id || current.value?.document.id === id;
 

@@ -39,6 +39,10 @@ import { collaborationSession } from "~/lib/collaboration/session";
 import type { CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
 import { defaultEditorTool } from "~/lib/editorTools";
+import {
+  captureEditorHistory,
+  restoreEditorHistory,
+} from "~/lib/editorHistory";
 
 const props = defineProps<{
   canvasId: string;
@@ -90,13 +94,25 @@ const entry = props.resources?.canvases.get(props.canvasId);
 const initialTool =
   (entry?.editorContext?.activeTool as AppState["activeTool"] | undefined) ??
   defaultEditorTool(navigator);
+const initialHistory = entry?.editorContext?.history;
+const historyGeneration = entry?.historyGeneration;
+let historyRestorePending = true;
+const initialViewGeneration = session.viewGeneration;
+let confirmedThisMount = false;
+const canEdit = () => confirmedThisMount && session.editable;
 
 function applySession() {
   if (!alive) return;
+  if (session.viewGeneration > initialViewGeneration) confirmedThisMount = true;
   error.value = session.message;
   dirty.value = session.dirty;
-  readOnly.value = !session.editable;
-  emit("status", session.statusText);
+  readOnly.value = !canEdit();
+  emit(
+    "status",
+    confirmedThisMount || session.message
+      ? session.statusText
+      : "正在校验版本…",
+  );
   if (session.view) {
     emit("access", session.view.access.role, session.view.access.viewMode);
     emit("title", session.view.name);
@@ -131,7 +147,7 @@ function applySession() {
       .join("、"),
   );
   const nextRenderState = JSON.stringify([
-    session.editable,
+    canEdit(),
     session.view?.access.viewMode,
   ]);
 
@@ -140,8 +156,8 @@ function applySession() {
     root?.render(createElement(CanvasEditor));
   }
 
-  if (!editor || !session.view) return;
-  if (previousReadOnly && session.editable) {
+  if (!editor || !session.view || !confirmedThisMount) return;
+  if (previousReadOnly && canEdit()) {
     flushSync(() => root?.render(createElement(CanvasEditor)));
     flushSync(() =>
       editor!.updateScene({
@@ -151,7 +167,7 @@ function applySession() {
     );
   }
 
-  previousReadOnly = !session.editable;
+  previousReadOnly = !canEdit();
   const peers = JSON.stringify([...session.peers]);
 
   if (peers !== lastPeers) {
@@ -179,6 +195,13 @@ function applySession() {
   if (fingerprint === lastScene) return;
   applying = true;
   try {
+    const firstInstall = !initialized.value;
+
+    if (firstInstall) {
+      editor.history.clear();
+      initialized.value = true;
+    }
+
     editor.addFiles(Object.values(value.files) as never);
     flushSync(() =>
       editor!.updateScene({
@@ -192,11 +215,7 @@ function applySession() {
     );
     displayedElements = editor.getSceneElementsIncludingDeleted();
     lastScene = fingerprint;
-    if (!initialized.value) {
-      editor.history.clear();
-      initialized.value = true;
-      emit("ready");
-    }
+    if (firstInstall) emit("ready");
   } finally {
     applying = false;
   }
@@ -232,7 +251,36 @@ const onChange: NonNullable<ExcalidrawProps["onChange"]> = (
   appState,
   files,
 ) => {
-  if (!alive || applying || !initialized.value) return;
+  if (!alive || !initialized.value) return;
+  if (
+    historyRestorePending &&
+    editor &&
+    canEdit() &&
+    !appState.viewModeEnabled
+  ) {
+    historyRestorePending = false;
+    restoreEditorHistory(
+      editor,
+      initialHistory,
+      session.value,
+      session.view?.epoch ?? "",
+    );
+  }
+
+  if (applying) return;
+  if (entry)
+    entry.editorContext = {
+      ...entry.editorContext,
+      viewModeEnabled: appState.viewModeEnabled,
+      activeTool: canEdit()
+        ? { ...appState.activeTool }
+        : (entry.editorContext?.activeTool ?? initialTool),
+      viewport: {
+        scrollX: appState.scrollX,
+        scrollY: appState.scrollY,
+        zoom: { ...appState.zoom },
+      },
+    };
   const previousElements = displayedElements;
 
   displayedElements = elements;
@@ -241,12 +289,7 @@ const onChange: NonNullable<ExcalidrawProps["onChange"]> = (
     (!appState.openSidebar.tab || appState.openSidebar.tab === "library")
   )
     void ensureLibrary();
-  if (session.editable) {
-    if (entry)
-      entry.editorContext = {
-        viewModeEnabled: appState.viewModeEnabled,
-        activeTool: { ...appState.activeTool },
-      };
+  if (canEdit()) {
     const serialized = JSON.parse(
       serializeAsJSON(elements, appState, files, "local"),
     ) as CanvasScene;
@@ -279,6 +322,16 @@ function capture() {
       editor.getSceneElementsIncludingDeleted(),
       editor.getAppState(),
       editor.getFiles(),
+    );
+  if (
+    editor &&
+    entry?.editorContext &&
+    !historyRestorePending &&
+    historyGeneration === entry.historyGeneration
+  )
+    entry.editorContext.history = captureEditorHistory(
+      editor,
+      session.view?.epoch ?? "",
     );
 }
 
@@ -357,8 +410,8 @@ function CanvasEditor() {
 
   return createElement(Excalidraw, {
     handleKeyboardGlobally: false,
-    syncReadOnly: !session.editable,
-    viewModeEnabled: session.editable ? undefined : true,
+    syncReadOnly: !canEdit(),
+    viewModeEnabled: canEdit() ? undefined : true,
     isCollaborating: session.view?.access.viewMode === "live",
     libraryReady:
       !!props.resources &&
@@ -407,6 +460,7 @@ function CanvasEditor() {
     initialData: {
       ...(props.initialDocument?.scene ?? session.value),
       appState: {
+        ...entry?.editorContext?.viewport,
         activeTool: initialTool,
         viewBackgroundColor: String(
           props.initialDocument?.scene.appState.viewBackgroundColor ??
@@ -457,7 +511,7 @@ function CanvasEditor() {
       )
         props.resources.library.update([...items]);
     },
-    onPaste: () => session.editable,
+    onPaste: () => canEdit(),
   });
 }
 

@@ -4,6 +4,7 @@ import {
   arrayToMap,
   MOBILE_ACTION_BUTTON_BG,
 } from "@excalidraw/common";
+import { useCallback, useSyncExternalStore } from "react";
 
 import { CaptureUpdateAction } from "@excalidraw/element";
 
@@ -13,8 +14,6 @@ import type { SceneElementsMap } from "@excalidraw/element/types";
 
 import { IconButton } from "../components/IconButton";
 import { UndoIcon, RedoIcon } from "../components/icons";
-import { HistoryChangedEvent } from "../history";
-import { useEmitter } from "../hooks/useEmitter";
 import { t } from "../i18n";
 
 import { useStylesPanelMode } from "../components/App";
@@ -84,12 +83,14 @@ export const createUndoAction: ActionCreator = (history) => ({
   keyTest: (event) =>
     event[KEYS.CTRL_OR_CMD] && matchKey(event, KEYS.Z) && !event.shiftKey,
   PanelComponent: ({ appState, updateData, data, app }) => {
-    const { isUndoStackEmpty } = useEmitter<HistoryChangedEvent>(
-      history.onHistoryChangedEmitter,
-      new HistoryChangedEvent(
-        history.isUndoStackEmpty,
-        history.isRedoStackEmpty,
-      ),
+    const subscribe = useCallback(
+      (changed: () => void) => history.onHistoryChangedEmitter.on(changed),
+      [history],
+    );
+    const isUndoStackEmpty = useSyncExternalStore(
+      subscribe,
+      () => history.isUndoStackEmpty,
+      () => true,
     );
     const isMobile = useStylesPanelMode() === "mobile";
 
@@ -127,12 +128,14 @@ export const createRedoAction: ActionCreator = (history) => ({
     (event[KEYS.CTRL_OR_CMD] && event.shiftKey && matchKey(event, KEYS.Z)) ||
     (event[KEYS.CTRL_OR_CMD] && !event.shiftKey && matchKey(event, KEYS.Y)),
   PanelComponent: ({ appState, updateData, data, app }) => {
-    const { isRedoStackEmpty } = useEmitter(
-      history.onHistoryChangedEmitter,
-      new HistoryChangedEvent(
-        history.isUndoStackEmpty,
-        history.isRedoStackEmpty,
-      ),
+    const subscribe = useCallback(
+      (changed: () => void) => history.onHistoryChangedEmitter.on(changed),
+      [history],
+    );
+    const isRedoStackEmpty = useSyncExternalStore(
+      subscribe,
+      () => history.isRedoStackEmpty,
+      () => true,
     );
     const isMobile = useStylesPanelMode() === "mobile";
 

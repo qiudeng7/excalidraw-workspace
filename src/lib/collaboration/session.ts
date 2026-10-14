@@ -62,11 +62,16 @@ export class CollaborationSession {
   private subscribed = false;
   private authorizedOnce = false;
   private failures = 0;
+  private confirmedViews = 0;
 
   constructor(readonly options: SessionOptions) {}
 
   get dirty() {
     return this.operations.length > 0;
+  }
+
+  get viewGeneration() {
+    return this.confirmedViews;
   }
 
   get inactive() {
@@ -255,10 +260,19 @@ export class CollaborationSession {
           "DRAFT_RECOVERY_REQUIRED",
           "画布已恢复或替换，离线草稿需要下载后手动恢复",
         );
-      if (this.view?.epoch === next.epoch && next.seq < this.view.seq) return;
+      if (this.view?.epoch === next.epoch && next.seq < this.view.seq) {
+        // The current view is newer, but a reopening editor still needs proof
+        // that this refresh completed successfully before it can leave read-only.
+        this.confirmedViews++;
+        this.changed();
+
+        return;
+      }
+
       this.view = next;
       this.rebase();
       await cache.put(this.cacheScope(next), { ...next, revision: next.seq });
+      this.confirmedViews++;
       this.changed();
     })().finally(() => {
       this.loading = undefined;
@@ -838,6 +852,13 @@ export async function flushCollaboration(userId: string) {
     [...sessions.values()]
       .filter((session) => session.options.userId === userId)
       .map((session) => session.flush()),
+  );
+}
+
+/** Closed views may still own an offline or in-flight operation queue. */
+export function hasUnsyncedCollaboration(userId: string) {
+  return [...sessions.values()].some(
+    (session) => session.options.userId === userId && session.dirty,
   );
 }
 
