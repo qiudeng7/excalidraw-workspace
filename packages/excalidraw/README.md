@@ -100,7 +100,7 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 
 ## 构建适配与依赖
 
-上游包原本由 Yarn monorepo 构建。本仓库改用 pnpm，并在 [build.mjs](build.mjs) 中保留 esbuild 双产物构建方式，不依赖上游根目录脚本和环境文件。构建中关闭上游统计追踪，保留素材库相关地址。字体继续使用上游默认 CDN。
+上游包原本由 Yarn monorepo 构建。本仓库改用 pnpm，并在 [build.mjs](build.mjs) 中保留 esbuild 双产物构建方式，不依赖上游根目录脚本和环境文件。构建中关闭上游统计追踪，保留素材库相关地址。字体通过宿主的 `/editor-assets/fonts/` 提供，来自本地编辑器构建产物；上游 CDN 仅保留为加载失败时的回退。
 
 为减小源码接入时的兼容变更，编辑器暂时保留上游 TypeScript 5.9.3、esbuild 0.19.10、esbuild-sass-plugin 2.16.0 和 Sass 1.51.0；Vite 5 与 Node 18 类型仅供编辑器旧工具链的类型检查。宿主应用使用 Nuxt 4、Vite 8、TypeScript 6 和 Node 类型。运行环境以[根目录 README](../../README.md#本地启动)为准；Node 类型版本不决定运行时版本。
 

@@ -299,6 +299,18 @@ export function execute(
       if (op.protocolVersion !== PROTOCOL_VERSION)
         reject("PROTOCOL_REQUIRED", "请刷新页面更新协作协议", 409);
       if (
+        (room.scene.elements.some(
+          (element) => element.richText !== undefined,
+        ) ||
+          op.elements?.some?.((element) => element.richText !== undefined)) &&
+        op.textFormatVersion !== 1
+      )
+        reject(
+          "TEXT_FORMAT_REQUIRED",
+          "画布包含富文本，请刷新页面后继续编辑",
+          409,
+        );
+      if (
         typeof op.opId !== "string" ||
         !op.opId ||
         op.opId.length > 100 ||

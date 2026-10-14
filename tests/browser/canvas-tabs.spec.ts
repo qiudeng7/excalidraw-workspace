@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import type { CanvasDocument } from "../../shared/contracts";
 import { test, expect, editorState } from "./fixtures";
@@ -690,4 +691,103 @@ test("tab strip fits a narrow viewport and follows theme tokens", async ({
     ),
   ).toBe(true);
   await page.screenshot({ path: "/tmp/canvas-tabs-mobile.png" });
+});
+
+test("rich text survives tab changes, reload and an actual .excalidraw file round trip", async ({
+  page,
+  workspace,
+}) => {
+  await page.addInitScript(() => {
+    // Exercise the standard browser download path instead of an OS file picker.
+    Reflect.deleteProperty(window, "showOpenFilePicker");
+    Reflect.deleteProperty(window, "showSaveFilePicker");
+  });
+  const fixture = await tabsFixture(page);
+
+  await page.getByTestId("toolbar-text").first().click();
+  await page.mouse.click(700, 350);
+  const input = page.locator(".excalidraw-wysiwyg");
+
+  await input.pressSequentially("**Persistent** plain *italic* `code`", {
+    delay: 10,
+  });
+  await input.press("Enter");
+  await input.press("Enter");
+  await input.pressSequentially("中文 👩‍💻");
+  await input.press("Escape");
+  const expected = (await editorState(page)).elements[0] as any;
+
+  await page.getByRole("button", { name: "保存 Ctrl S", exact: true }).click();
+  await expect
+    .poll(() => (fixture.canvas("a").scene.elements[0] as any)?.richText)
+    .toEqual(expected.richText);
+  await openCanvas(page, "b");
+  expect((await editorState(page)).elements).toHaveLength(0);
+  await page.locator("#canvas-tab-a").click();
+  await expect
+    .poll(() =>
+      editorState(page).then((state) => (state.elements[0] as any)?.richText),
+    )
+    .toEqual(expected.richText);
+  await page.reload();
+  await expect
+    .poll(() =>
+      editorState(page).then((state) => (state.elements[0] as any)?.richText),
+    )
+    .toEqual(expected.richText);
+  await page.mouse.dblclick(705, 355);
+  await expect(input.locator("strong")).toHaveText("Persistent");
+  await expect(input.locator("em")).toHaveText("italic");
+  await expect(input.locator("code")).toHaveText("code");
+  await input.press("Escape");
+  const downloaded = page.waitForEvent("download");
+
+  await page.locator(".excalidraw").evaluate(async (node) => {
+    const host = node as any;
+    let fiber =
+      host[Object.keys(host).find((key) => key.startsWith("__reactFiber$"))!];
+
+    while (fiber && !fiber.stateNode?.api?.getSceneElements)
+      fiber = fiber.return;
+    const app = fiber.stateNode;
+
+    await app.actionManager.actions.saveFileToDisk.perform(
+      app.api.getSceneElements(),
+      app.state,
+      null,
+      app,
+    );
+  });
+  const download = await downloaded;
+  const file = await readFile((await download.path())!, "utf8");
+
+  expect(download.suggestedFilename()).toMatch(/\.excalidraw$/);
+  expect(JSON.parse(file).elements[0].richText).toEqual(expected.richText);
+  await openCanvas(page, "b");
+  await page.locator(".excalidraw").evaluate((node, contents) => {
+    const transfer = new DataTransfer();
+
+    transfer.items.add(
+      new File([contents], "rich-text.excalidraw", {
+        type: "application/vnd.excalidraw+json",
+      }),
+    );
+    node.dispatchEvent(
+      new DragEvent("drop", {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: transfer,
+        clientX: 700,
+        clientY: 350,
+      }),
+    );
+  }, file);
+  await expect
+    .poll(() =>
+      editorState(page).then((state) => (state.elements[0] as any)?.richText),
+    )
+    .toEqual(expected.richText);
+  expect((await editorState(page)).elements[0]?.originalText).toBe(
+    expected.originalText,
+  );
 });

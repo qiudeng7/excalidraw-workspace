@@ -1,3 +1,7 @@
+import {
+  isRichTextV1,
+  richTextPlainText,
+} from "@excalidraw/excalidraw/rich-text";
 import type { Element, SharedScene } from "#shared/collaboration/types";
 import {
   shouldDiscardRemoteElement,
@@ -96,6 +100,13 @@ export function validateElement(value: unknown): asserts value is Element {
     (typeof element.text !== "string" || element.text.length > 1000000)
   )
     reject("INVALID_ELEMENT", "文本内容无效");
+  if (
+    element.richText !== undefined &&
+    (element.type !== "text" ||
+      !isRichTextV1(element.richText) ||
+      element.originalText !== richTextPlainText(element.richText))
+  )
+    reject("INVALID_RICH_TEXT", "富文本格式或文本投影无效");
 }
 
 /** Excalidraw's deterministic version/nonce winner, without its local active-edit guard. */

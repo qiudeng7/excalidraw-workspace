@@ -1,3 +1,4 @@
+import { isRichTextV1 } from "../lib/element/src/richTextDocument";
 import clsx from "clsx";
 import throttle from "lodash.throttle";
 import React, { useContext } from "react";
@@ -954,6 +955,7 @@ class App extends React.Component<AppProps, AppState> {
     const api: ExcalidrawImperativeAPI = {
       isDestroyed: false,
       updateScene: this.updateScene,
+      cancelTextEditing: this.cancelTextEditing,
       applyDeltas: this.applyDeltas,
       mutateElement: this.mutateElement,
       updateLibrary: this.library.updateLibrary,
@@ -4191,6 +4193,8 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   public componentWillUnmount() {
+    this.unmounted = true;
+    this.textWysiwygSubmitHandler?.(true);
     // we're recreating the api object reference so that the
     // <ExcalidrawAPIContext.Provider/> picks up on it
     this.api = { ...this.api, isDestroyed: true };
@@ -6895,6 +6899,8 @@ class App extends React.Component<AppProps, AppState> {
     return width > 0 ? width / this.state.zoom.value : Infinity;
   };
 
+  public cancelTextEditing = () => this.textWysiwygSubmitHandler?.(true);
+
   private handleTextWysiwyg(
     element: NonDeleted<ExcalidrawTextElement>,
     {
@@ -6909,9 +6915,22 @@ class App extends React.Component<AppProps, AppState> {
       initialCaretSceneCoords?: { x: number; y: number } | null;
     },
   ) {
+    if (element.richText && !isRichTextV1(element.richText)) {
+      this.setState({ editingTextElement: null, newElement: null });
+      this.setToast({
+        message: "此文字使用了暂不支持的富文本格式，请更新后编辑",
+      });
+
+      return;
+    }
+
     const elementsMap = this.scene.getElementsMapIncludingDeleted();
 
-    const updateElement = (nextOriginalText: string, isDeleted: boolean) => {
+    const updateElement = (
+      nextOriginalText: string,
+      isDeleted: boolean,
+      richText = element.richText,
+    ) => {
       const latestTextElement = this.scene.getElement<ExcalidrawTextElement>(
         element.id,
       );
@@ -6925,9 +6944,13 @@ class App extends React.Component<AppProps, AppState> {
         container && isStickyNoteElement(container) ? container : null;
       // sticky notes: the fit owns both the label and the note geometry
       const stickyLayout = stickyContainer
-        ? getStickyNoteLayout(stickyContainer, latestTextElement, {
-            originalText: nextOriginalText,
-          })
+        ? getStickyNoteLayout(
+            stickyContainer,
+            { ...latestTextElement, richText },
+            {
+              originalText: nextOriginalText,
+            },
+          )
         : null;
       // a free text stops growing at the view's width and wraps from there
       const maxWidth = this.getMaxTextWidth();
@@ -6946,11 +6969,12 @@ class App extends React.Component<AppProps, AppState> {
           if (_element.id === latestTextElement.id && isTextElement(_element)) {
             return newElementWith(_element, {
               originalText: nextOriginalText,
+              richText,
               isDeleted: isDeleted ?? _element.isDeleted,
               ...(stickyLayout?.text ??
                 // returns (wrapped) text and new dimensions
                 refreshTextDimensions(
-                  _element,
+                  { ..._element, richText },
                   getContainerElement(_element, elementsMap),
                   elementsMap,
                   nextOriginalText,
@@ -7019,73 +7043,87 @@ class App extends React.Component<AppProps, AppState> {
           viewportY - this.state.offsetTop,
         ];
       },
-      onChange: withBatchedUpdates((nextOriginalText) => {
-        updateElement(nextOriginalText, false);
-        if (isNonDeletedElement(element)) {
-          updateBoundElements(element, this.scene);
-        }
-      }),
-      onSubmit: withBatchedUpdates(({ viaKeyboard, nextOriginalText }) => {
-        this.textWysiwygSubmitHandler = null;
+      onChange: (nextOriginalText, richText) =>
+        withBatchedUpdates(() => {
+          updateElement(nextOriginalText, false, richText);
+          if (isNonDeletedElement(element)) {
+            updateBoundElements(element, this.scene);
+          }
+        })(),
+      onSubmit: withBatchedUpdates(
+        ({ viaKeyboard, nextOriginalText, richText, cancelled }) => {
+          this.textWysiwygSubmitHandler = null;
+          if (cancelled) {
+            if (!this.unmounted)
+              flushSync(() =>
+                this.setState({ newElement: null, editingTextElement: null }),
+              );
 
-        const isDeleted = !nextOriginalText.trim();
+            return;
+          }
 
-        updateElement(nextOriginalText, isDeleted);
+          const isDeleted = !nextOriginalText.trim();
 
-        // keyboard-submit keeps focus on the edited object. For bound text, keep
-        // the container selected even if the text becomes empty and is deleted.
-        // The autoshape tool stays active through the editing session and never
-        // selects anything — don't fight the finalize action's selection reset.
-        const elementIdToSelect =
-          viaKeyboard &&
-          !this.isToolLocked() &&
-          this.state.activeTool.type !== "autoshape"
-            ? element.containerId || (!isDeleted ? element.id : null)
-            : null;
+          updateElement(nextOriginalText, isDeleted, richText);
 
-        if (elementIdToSelect) {
-          // needed to ensure state is updated before "finalize" action
-          // that's invoked on keyboard-submit as well
-          // TODO either move this into finalize as well, or handle all state
-          // updates in one place, skipping finalize action
+          // keyboard-submit keeps focus on the edited object. For bound text, keep
+          // the container selected even if the text becomes empty and is deleted.
+          // The autoshape tool stays active through the editing session and never
+          // selects anything — don't fight the finalize action's selection reset.
+          const elementIdToSelect =
+            viaKeyboard &&
+            !this.isToolLocked() &&
+            this.state.activeTool.type !== "autoshape"
+              ? element.containerId || (!isDeleted ? element.id : null)
+              : null;
+
+          if (elementIdToSelect) {
+            // needed to ensure state is updated before "finalize" action
+            // that's invoked on keyboard-submit as well
+            // TODO either move this into finalize as well, or handle all state
+            // updates in one place, skipping finalize action
+            flushSync(() => {
+              this.setState((prevState) => ({
+                selectedElementIds: makeNextSelectedElementIds(
+                  {
+                    ...prevState.selectedElementIds,
+                    [elementIdToSelect]: true,
+                  },
+                  prevState,
+                ),
+              }));
+            });
+          }
+
+          if (isDeleted) {
+            fixBindingsAfterDeletion(this.scene.getNonDeletedElements(), [
+              element,
+            ]);
+          }
+
+          if (!isDeleted || isExistingElement) {
+            this.store.scheduleCapture();
+          }
+
           flushSync(() => {
-            this.setState((prevState) => ({
-              selectedElementIds: makeNextSelectedElementIds(
-                {
-                  ...prevState.selectedElementIds,
-                  [elementIdToSelect]: true,
-                },
-                prevState,
-              ),
-            }));
+            this.setState({
+              newElement: null,
+              editingTextElement: null,
+            });
           });
-        }
 
-        if (isDeleted) {
-          fixBindingsAfterDeletion(this.scene.getNonDeletedElements(), [
-            element,
-          ]);
-        }
+          // tools that survive the submit (locked, or autoshape's
+          // double-click-to-type flow) need their cursor back
+          if (
+            this.isToolLocked() ||
+            this.state.activeTool.type === "autoshape"
+          ) {
+            this.cursor.applyForTool();
+          }
 
-        if (!isDeleted || isExistingElement) {
-          this.store.scheduleCapture();
-        }
-
-        flushSync(() => {
-          this.setState({
-            newElement: null,
-            editingTextElement: null,
-          });
-        });
-
-        // tools that survive the submit (locked, or autoshape's
-        // double-click-to-type flow) need their cursor back
-        if (this.isToolLocked() || this.state.activeTool.type === "autoshape") {
-          this.cursor.applyForTool();
-        }
-
-        this.focusContainer();
-      }),
+          this.focusContainer();
+        },
+      ),
       element,
       excalidrawContainer: this.excalidrawContainerRef.current,
       app: this,

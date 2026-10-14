@@ -1372,6 +1372,8 @@ export interface ExcalidrawImperativeAPI {
   /** Whether the editor has been unmounted and the API is no longer usable. */
   isDestroyed: boolean;
   updateScene: InstanceType<typeof App>["updateScene"];
+  /** Ends text editing and discards its pending submit callback/history. */
+  cancelTextEditing: InstanceType<typeof App>["cancelTextEditing"];
   applyDeltas: InstanceType<typeof App>["applyDeltas"];
   mutateElement: InstanceType<typeof App>["mutateElement"];
   updateLibrary: InstanceType<typeof Library>["updateLibrary"];

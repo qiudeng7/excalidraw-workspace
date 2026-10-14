@@ -14,6 +14,18 @@
 
 打开画布时，前端根据浏览器 UA 为移动设备默认选择抓手（平移工具），桌面保留指针默认行为；iPad 的桌面 UA 结合多点触摸识别，不将窄窗口或普通触摸电脑视为移动设备。判断只用于初始化，不控制后续工具选择；版本校验结束、远端更新和重连不重新设置工具。用户手动选择的工具通过当前账号内该画布的内存 `editorContext` 在切换画布时保留；刷新页面或重新登录后恢复设备默认工具，工具不写入服务端画布或共享给其他编辑者。入口见 [editorTools.ts](../../src/lib/editorTools.ts) 和两个画布包装组件。
 
+## 编辑富文本
+
+双击画布文字后直接编辑格式化内容：键入 `**粗体**`、`__粗体__`、`*斜体*` 或 `` `代码` ``，结束标记会转换为样式。再次进入编辑仍显示格式化结果；现有纯文本和粘贴的文本不会被自动解释成 Markdown。首版支持粗体、斜体、行内代码与普通换行，不提供格式工具栏或原始 HTML。
+
+`Ctrl / ⌘ B`、`I`、`E` 切换对应格式，`Ctrl / ⌘ \` 清除选区格式；输入转换后按 Backspace 或撤销可恢复字面标记。Enter 换行，Escape 或 `Ctrl / ⌘ Enter` 结束编辑。编辑态使用 ProseMirror；离开编辑后由 Canvas 绘制，SVG 与 PNG 复用同一份布局测量。字体随编辑器构建产物由本站 `/editor-assets/fonts/` 提供；字体加载完成后清除测量缓存并重新绘制，避免依赖无法匹配本地版本号的外部 CDN。
+
+元素保留纯文本 `originalText`，同时以 `richText: { version: 1, doc }` 保存单段落结构及样式。元素复制、个人素材库、`.excalidraw` 导入导出均保留该字段；未知格式版本显示纯文本投影并阻止编辑，避免静默丢失原始结构。协议写入声明 `textFormatVersion: 1`，后端拒绝不支持富文本的旧客户端覆盖已有富文本。相关接口沿用[画布保存](canvases.md#保存内容)、[素材库保存](library.md#保存素材库)和[协作更新](collaboration.md)，没有新增富文本专属 API。
+
+协作仍按整个文字元素合并；另一会话的版本胜出、删除元素或撤销编辑权限时，结束当前编辑并保留可恢复的本地副本。恢复会创建新元素，不覆盖远端胜出的内容；恢复入口也提供下载副本。
+
+实现入口为 [richTextWysiwyg.ts](../../packages/excalidraw/wysiwyg/richTextWysiwyg.ts) 与 [richTextEditor.ts](../../packages/excalidraw/wysiwyg/richTextEditor.ts)。共享校验见 [richTextDocument.ts](../../packages/excalidraw/lib/element/src/richTextDocument.ts)，Canvas/SVG 布局见 [richTextLayout.ts](../../packages/excalidraw/lib/element/src/richTextLayout.ts)，后端兼容保护见 [richText.ts](../../server/utils/richText.ts)。回归入口为 `tests/browser/rich-text.spec.ts`、标签页中的持久化与文件往返用例，以及真实协作测试中的远端胜出、删除和撤权恢复用例。
+
 ## 导入导出与复制
 
 画布文件导入、SVG/PNG 导出和复制在浏览器内执行，没有单独的导入导出 API；导入导致的画布内容变化随后进入[保存内容](canvases.md#保存内容)流程。个人素材库导入后走[保存素材库](library.md#保存素材库)。

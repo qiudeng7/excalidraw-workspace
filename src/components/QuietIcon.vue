@@ -5,6 +5,13 @@ const props = withDefaults(defineProps<{ name: string; size?: number }>(), {
   size: 18,
 });
 const paths: Record<string, string> = {
+  users:
+    "M9 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM3 21v-4a6 6 0 0 1 12 0v4M16 3a3 3 0 0 1 0 6M18 12a5 5 0 0 1 3 5v4",
+  link: "m10 13 4-4M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M13 8l1-1a4 4 0 1 1 6 6l-4 4a4 4 0 0 1-6 0",
+  copy: "M9 8h12v13H9ZM5 16H3V3h12v2",
+  lock: "M5 10h14v11H5ZM8 10V6a4 4 0 0 1 8 0v4M12 14v3",
+  refresh: "M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M18 18a8 8 0 0 1-14-6",
+  chevron: "m9 5 7 7-7 7",
   sun: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5",
   moon: "M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z",
   monitor: "M3 4h18v13H3ZM8 21h8M12 17v4",

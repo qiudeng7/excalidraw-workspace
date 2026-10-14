@@ -35,6 +35,9 @@ import {
   type CanvasScene,
   type UserSettings,
 } from "#shared/contracts";
+import { isRichTextV1 } from "@excalidraw/excalidraw/rich-text";
+import { wins, canonical } from "#shared/collaboration/merge";
+import type { Element } from "#shared/collaboration/types";
 import { collaborationSession } from "~/lib/collaboration/session";
 import type { CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
@@ -73,6 +76,59 @@ const session = collaborationSession({
   scope: props.scope,
 });
 const error = ref("");
+const textRecovery = ref<ExcalidrawElement>();
+const textRecoveryKey = `excalidraw-rich-text-recovery:${props.scope}:${props.canvasId}`;
+
+function preserveText(element: ExcalidrawElement) {
+  textRecovery.value = JSON.parse(JSON.stringify(element));
+  try {
+    localStorage.setItem(textRecoveryKey, JSON.stringify(element));
+  } catch (cause) {
+    console.warn("富文本恢复副本无法写入本地存储", cause);
+  }
+}
+
+function clearTextRecovery() {
+  textRecovery.value = undefined;
+  try {
+    localStorage.removeItem(textRecoveryKey);
+  } catch (cause) {
+    console.warn("无法清除富文本恢复副本", cause);
+  }
+}
+
+async function recoverText() {
+  if (!editor || !session.editable || !textRecovery.value) return;
+  const source = textRecovery.value;
+  const copy = {
+    ...source,
+    id: crypto.randomUUID(),
+    containerId: null,
+    boundElements: null,
+    groupIds: [],
+    frameId: null,
+    x: source.x + 24,
+    y: source.y + 24,
+    isDeleted: false,
+    version: 1,
+    versionNonce: Math.floor(Math.random() * 0x7fffffff),
+    updated: Date.now(),
+    created: Date.now(),
+  };
+
+  editor.updateScene({
+    elements: [...editor.getSceneElementsIncludingDeleted(), copy] as never,
+    captureUpdate: CaptureUpdateAction.IMMEDIATELY,
+  });
+  capture();
+  try {
+    await session.flush();
+    clearTextRecovery();
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : "恢复副本同步失败";
+  }
+}
+
 const dirty = ref(false);
 const readOnly = ref(true);
 const initialized = ref(false);
@@ -157,6 +213,34 @@ function applySession() {
   }
 
   if (!editor || !session.view || !confirmedThisMount) return;
+  const editing = editor.getAppState().editingTextElement;
+
+  if (editing) {
+    const local = editor
+      .getSceneElementsIncludingDeleted()
+      .find((element) => element.id === editing.id);
+    const remote = (session.view.scene.elements as Element[]).find(
+      (element) => element.id === editing.id,
+    );
+
+    if (
+      local?.type === "text" &&
+      local.richText &&
+      (!session.editable ||
+        (remote &&
+          wins(remote, local as unknown as Element) &&
+          canonical(remote) !== canonical(local)))
+    ) {
+      preserveText(local);
+      applying = true;
+      try {
+        flushSync(() => editor!.cancelTextEditing());
+      } finally {
+        applying = false;
+      }
+    }
+  }
+
   if (previousReadOnly && canEdit()) {
     flushSync(() => root?.render(createElement(CanvasEditor)));
     flushSync(() =>
@@ -355,31 +439,61 @@ async function saveManually() {
   }
 }
 
+function downloadFile(content: string, filename: string) {
+  const url = URL.createObjectURL(
+    new Blob([content], { type: "application/json" }),
+  );
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function downloadTextRecovery() {
+  const source = textRecovery.value;
+
+  if (!source || source.type !== "text") return;
+  // Export only the retained local document. Do not capture/flush the denied room.
+  const element = {
+    ...source,
+    containerId: null,
+    boundElements: null,
+    groupIds: [],
+    frameId: null,
+    autoResize: false,
+    isDeleted: false,
+  };
+  const content = serializeAsJSON(
+    [element],
+    { viewBackgroundColor: "#ffffff" },
+    {},
+    "local",
+  );
+
+  downloadFile(
+    content,
+    `${session.view?.name ?? props.initialDocument?.name ?? "画布"}-文字恢复副本.excalidraw`,
+  );
+}
+
 function download() {
   capture();
   const value =
     session.value.elements.length || session.view
       ? session.value
       : props.initialDocument?.scene;
-  const url = URL.createObjectURL(
-    new Blob(
-      [
-        JSON.stringify({
-          type: "excalidraw",
-          version: 2,
-          source: location.origin,
-          ...value,
-        }),
-      ],
-      { type: "application/json" },
-    ),
-  );
-  const link = document.createElement("a");
 
-  link.href = url;
-  link.download = `${session.view?.name ?? props.initialDocument?.name ?? "画布"}-本地备份.excalidraw`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadFile(
+    JSON.stringify({
+      type: "excalidraw",
+      version: 2,
+      source: location.origin,
+      ...value,
+    }),
+    `${session.view?.name ?? props.initialDocument?.name ?? "画布"}-本地备份.excalidraw`,
+  );
 }
 
 function beforeUnload(event: BeforeUnloadEvent) {
@@ -556,6 +670,16 @@ watch(
   { deep: true },
 );
 onMounted(() => {
+  try {
+    const raw = localStorage.getItem(textRecoveryKey);
+    const saved = raw && raw.length < 2000000 ? JSON.parse(raw) : undefined;
+
+    if (saved?.type === "text" && isRichTextV1(saved.richText))
+      textRecovery.value = saved;
+  } catch (cause) {
+    console.warn("读取富文本恢复副本失败", cause);
+  }
+
   root = createRoot(host.value!);
   root.render(createElement(CanvasEditor));
   unsubscribe = session.subscribe(applySession);
@@ -565,6 +689,16 @@ onMounted(() => {
   applySession();
 });
 onBeforeUnmount(() => {
+  const active = editor?.getAppState().editingTextElement;
+
+  if (active && session.dirty) {
+    const local = editor
+      ?.getSceneElementsIncludingDeleted()
+      .find((element) => element.id === active.id);
+
+    if (local?.type === "text" && local.richText) preserveText(local);
+  }
+
   capture();
   alive = false;
   unsubscribe?.();
@@ -588,6 +722,14 @@ onBeforeUnmount(() => {
         重新读取
       </button>
     </div>
+    <div v-if="textRecovery" class="text-recovery" role="status">
+      <span>文字编辑已结束，本地富文本副本已保留。</span>
+      <button v-if="!readOnly" type="button" @click="recoverText">
+        恢复为新文字
+      </button>
+      <button type="button" @click="downloadTextRecovery">下载文字副本</button>
+      <button type="button" @click="clearTextRecovery">忽略</button>
+    </div>
     <div
       ref="host"
       class="canvas-host"
@@ -599,6 +741,34 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.text-recovery {
+  position: absolute;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.6rem;
+  background: var(--app-surface);
+  color: var(--app-text);
+  box-shadow: 0 2px 8px #0001;
+  font-size: 0.8rem;
+}
+.text-recovery button {
+  flex-shrink: 0;
+  font: inherit;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .collaboration-editor {
   display: flex;
   flex-direction: column;

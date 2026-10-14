@@ -1,4 +1,8 @@
 import {
+  layoutRichText,
+  RICH_TEXT_CODE_FONT,
+} from "../lib/element/src/richTextLayout";
+import {
   BOUND_TEXT_PADDING,
   FRAME_STYLE,
   MAX_DECIMALS_FOR_SVG_EXPORT,
@@ -880,7 +884,51 @@ const renderElementToSvg = (
               ? "end"
               : "start";
 
-        for (let i = 0; i < lines.length; i++) {
+        const richLayout = layoutRichText(element, element.width);
+
+        if (richLayout) {
+          for (const run of richLayout.runs) {
+            const text = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
+
+            text.setAttribute(
+              "x",
+              String(run.x + (run.direction === "rtl" ? run.width : 0)),
+            );
+            text.setAttribute("y", String(run.baseline));
+            text.setAttribute(
+              "font-family",
+              run.marks.includes("code")
+                ? RICH_TEXT_CODE_FONT
+                : getFontFamilyString(element),
+            );
+            text.setAttribute("font-size", `${element.fontSize}px`);
+            text.setAttribute(
+              "font-weight",
+              run.marks.includes("bold") ? "700" : "400",
+            );
+            text.setAttribute(
+              "font-style",
+              run.marks.includes("italic") ? "italic" : "normal",
+            );
+            text.setAttribute("direction", run.direction);
+            text.setAttribute(
+              "text-anchor",
+              run.direction === "rtl" ? "end" : "start",
+            );
+            text.setAttribute("style", "white-space:pre");
+            text.setAttribute(
+              "fill",
+              applyDarkModeFilter(
+                element.strokeColor,
+                renderConfig.theme === THEME.DARK,
+              ),
+            );
+            text.textContent = run.text;
+            node.append(text);
+          }
+        }
+
+        for (let i = 0; !richLayout && i < lines.length; i++) {
           const text = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
 
           text.textContent = lines[i];
