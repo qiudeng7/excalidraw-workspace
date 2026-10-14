@@ -27,16 +27,6 @@ jobs:
           persist-credentials: false
       - name: Set up Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Build migrations image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: migrations
-          platforms: linux/amd64
-          load: true
-          tags: workspace-check:migrations
-          cache-from: type=gha,scope=migrations
-          cache-to: type=gha,mode=max,scope=migrations
       - name: Build runtime image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -47,24 +37,8 @@ jobs:
           tags: workspace-check:runtime
           cache-from: type=gha,scope=runtime
           cache-to: type=gha,mode=max,scope=runtime
-      - name: Verify migration and bootstrap
-        shell: bash
-        run: |
-          set -euo pipefail
-          trap 'docker logs workspace-check-app || true; docker rm -f workspace-check-app || true; docker volume rm workspace-check-data || true' EXIT
-          docker volume create workspace-check-data
-          docker run --rm -v workspace-check-data:/app/.data workspace-check:migrations
-          docker run --rm -v workspace-check-data:/app/.data workspace-check:migrations
-          docker run -d --name workspace-check-app -v workspace-check-data:/app/.data -e PUBLIC_ORIGIN=http://localhost:3000 workspace-check:runtime
-          for attempt in {1..60}; do
-            echo "Bootstrap check ${attempt}/60"
-            if docker exec workspace-check-app node -e "fetch('http://127.0.0.1:3000/api/bootstrap').then(async r => { const body = await r.json(); if (!r.ok || !body.needsSetup) process.exit(1); })"; then
-              docker exec workspace-check-app sh -c 'test "$(id -u)" != 0 && test -w /app/.data && test -w /app/.data/db && mkdir -p /app/.data/blob && test -w /app/.data/blob'
-              exit 0
-            fi
-            sleep 2
-          done
-          exit 1
+      - name: Verify automatic migrations and startup
+        run: node tests/http/container-start.mjs workspace-check:runtime
 
   publish:
     name: Publish to GHCR
@@ -116,31 +90,6 @@ jobs:
             type=sha,format=long
           labels: |
             org.opencontainers.image.licenses=MIT
-      - name: Migration tags and labels
-        id: migrations
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ghcr.io/${{ github.repository }}
-          flavor: |
-            latest=false
-            suffix=-migrations
-          tags: |
-            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=semver,pattern={{version}}
-            type=sha,format=long
-          labels: |
-            org.opencontainers.image.licenses=MIT
-      - name: Publish migrations image
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          target: migrations
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.migrations.outputs.tags }}
-          labels: ${{ steps.migrations.outputs.labels }}
-          cache-from: type=gha,scope=migrations
       - name: Publish runtime image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:

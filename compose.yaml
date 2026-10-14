@@ -1,18 +1,8 @@
 services:
-  migrations:
-    build:
-      context: .
-      target: migrations
-    volumes:
-      - workspace-data:/app/.data
-
   app:
     build:
       context: .
       target: runtime
-    depends_on:
-      migrations:
-        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${PORT:-8080}:3000"
     environment:

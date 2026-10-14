@@ -60,4 +60,4 @@
 
 修改 [schema.ts](../../server/db/schema.ts) 后在仓库根目录执行 `pnpm db:generate`，检查并提交生成的 SQL、schema 快照和 journal。迁移位于 [server/db/migrations/sqlite/](../../server/db/migrations/sqlite/)，两端共用；已发布迁移保持不变，新变更增加迁移文件。
 
-开发与 Node 启动先由脚本运行 NuxtHub 迁移，Docker 由迁移服务成功后启动应用；D1 使用 Wrangler 及既有 `d1_migrations` 记录。构建和开发插件不自动迁移。数据路径、部署与备份见[部署说明](../deployment.md)。
+开发启动先由脚本运行 NuxtHub 迁移；Node 与 Docker 使用统一启动入口，先应用 NuxtHub 官方迁移，成功后才监听请求，失败时退出。D1 仍使用 Wrangler 及既有 `d1_migrations` 记录。构建和开发插件不自动迁移。数据路径、部署与备份见[部署说明](../deployment.md)。
