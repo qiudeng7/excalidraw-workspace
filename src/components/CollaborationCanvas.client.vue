@@ -35,13 +35,18 @@ import {
   type CanvasScene,
   type UserSettings,
 } from "#shared/contracts";
-import { isRichTextV1 } from "@excalidraw/excalidraw/rich-text";
 import { wins, canonical } from "#shared/collaboration/merge";
 import type { Element } from "#shared/collaboration/types";
 import { collaborationSession } from "~/lib/collaboration/session";
 import type { CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
 import { defaultEditorTool } from "~/lib/editorTools";
+import { getTabScope } from "~/lib/persistence";
+import {
+  richTextRecoveryStorageKey,
+  readRichTextRecovery,
+  downloadRichTextRecovery,
+} from "~/lib/richTextRecovery";
 import {
   captureEditorHistory,
   restoreEditorHistory,
@@ -77,12 +82,13 @@ const session = collaborationSession({
 });
 const error = ref("");
 const textRecovery = ref<ExcalidrawElement>();
-const textRecoveryKey = `excalidraw-rich-text-recovery:${props.scope}:${props.canvasId}`;
+let textRecoveryKey = "";
 
 function preserveText(element: ExcalidrawElement) {
   textRecovery.value = JSON.parse(JSON.stringify(element));
   try {
-    localStorage.setItem(textRecoveryKey, JSON.stringify(element));
+    if (textRecoveryKey)
+      localStorage.setItem(textRecoveryKey, JSON.stringify(element));
   } catch (cause) {
     console.warn("富文本恢复副本无法写入本地存储", cause);
   }
@@ -91,7 +97,7 @@ function preserveText(element: ExcalidrawElement) {
 function clearTextRecovery() {
   textRecovery.value = undefined;
   try {
-    localStorage.removeItem(textRecoveryKey);
+    if (textRecoveryKey) localStorage.removeItem(textRecoveryKey);
   } catch (cause) {
     console.warn("无法清除富文本恢复副本", cause);
   }
@@ -452,30 +458,11 @@ function downloadFile(content: string, filename: string) {
 }
 
 function downloadTextRecovery() {
-  const source = textRecovery.value;
-
-  if (!source || source.type !== "text") return;
-  // Export only the retained local document. Do not capture/flush the denied room.
-  const element = {
-    ...source,
-    containerId: null,
-    boundElements: null,
-    groupIds: [],
-    frameId: null,
-    autoResize: false,
-    isDeleted: false,
-  };
-  const content = serializeAsJSON(
-    [element],
-    { viewBackgroundColor: "#ffffff" },
-    {},
-    "local",
-  );
-
-  downloadFile(
-    content,
-    `${session.view?.name ?? props.initialDocument?.name ?? "画布"}-文字恢复副本.excalidraw`,
-  );
+  if (textRecovery.value)
+    void downloadRichTextRecovery(
+      textRecovery.value,
+      session.view?.name ?? props.initialDocument?.name ?? "画布",
+    );
 }
 
 function download() {
@@ -669,17 +656,19 @@ watch(
   () => root?.render(createElement(CanvasEditor)),
   { deep: true },
 );
-onMounted(() => {
+onMounted(async () => {
   try {
-    const raw = localStorage.getItem(textRecoveryKey);
-    const saved = raw && raw.length < 2000000 ? JSON.parse(raw) : undefined;
-
-    if (saved?.type === "text" && isRichTextV1(saved.richText))
-      textRecovery.value = saved;
+    textRecoveryKey = await richTextRecoveryStorageKey(
+      props,
+      await getTabScope(),
+    );
+    if (!alive) return;
+    textRecovery.value = readRichTextRecovery(textRecoveryKey);
   } catch (cause) {
     console.warn("读取富文本恢复副本失败", cause);
   }
 
+  if (!alive) return;
   root = createRoot(host.value!);
   root.render(createElement(CanvasEditor));
   unsubscribe = session.subscribe(applySession);

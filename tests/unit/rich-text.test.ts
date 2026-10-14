@@ -189,3 +189,24 @@ test("legacy clients cannot rewrite or strip rich text after it enters a room", 
   );
   assert.deepEqual(state.scene.elements[0].richText, value.richText);
 });
+
+test("rich-text recovery stays discoverable after reload and isolates accounts, capabilities and browser tabs", async () => {
+  const { richTextRecoveryStorageKey } =
+    await import("../../src/lib/richTextRecovery");
+  const options = {
+    canvasId: "canvas",
+    userId: "owner",
+    token: "private-capability",
+  };
+  const key = await richTextRecoveryStorageKey(options, "tab-a");
+
+  assert.equal(key, await richTextRecoveryStorageKey({ ...options }, "tab-a"));
+  assert.ok(!key.includes(options.token));
+  for (const [candidate, tab] of [
+    [{ ...options, userId: "other" }, "tab-a"],
+    [{ ...options, token: "other-capability" }, "tab-a"],
+    [{ ...options, canvasId: "other" }, "tab-a"],
+    [options, "tab-b"],
+  ] as const)
+    assert.notEqual(key, await richTextRecoveryStorageKey(candidate, tab));
+});

@@ -1405,6 +1405,14 @@ test("富文本会话在远端胜出/删除及撤权时结束，恢复副本生�
       await expect(
         second.getByRole("button", { name: "恢复为新文字" }),
       ).toHaveCount(0);
+      await second.reload();
+      await expect(
+        second.getByText("文字编辑已结束，本地富文本副本已保留。"),
+      ).toBeVisible();
+      await expect(second.locator(".excalidraw-wysiwyg")).toHaveCount(0);
+      await expect(
+        second.getByRole("button", { name: "恢复为新文字" }),
+      ).toHaveCount(0);
       const beforeDownload = await call(
         owner.context,
         baseURL!,
@@ -1448,6 +1456,37 @@ test("富文本会话在远端胜出/删除及撤权时结束，恢复副本生�
       expect((await call(owner.context, baseURL!, owner.id, "view")).seq).toBe(
         beforeDownload.seq,
       );
+      const protectedReads: string[] = [];
+
+      second.on("request", (request) => {
+        if (
+          /\/collaboration\/(view|access)$/.test(
+            new URL(request.url()).pathname,
+          )
+        )
+          protectedReads.push(request.url());
+      });
+      // A hash-only navigation keeps the old component alive; reopen the URL in a fresh document.
+      await second.goto("about:blank");
+      await second.goto(link.path);
+      await expect(second.getByText("暂时无法打开画布")).toBeVisible();
+      await expect(
+        second.getByText("文字编辑已结束，本地富文本副本已保留。"),
+      ).toBeVisible();
+      await expect(second.locator(".excalidraw")).toHaveCount(0);
+      const localDownload = second.waitForEvent("download");
+
+      await second
+        .getByRole("button", { name: "下载文字副本", exact: true })
+        .click();
+      const localFile = await localDownload;
+      const localData = JSON.parse(
+        await readFile((await localFile.path())!, "utf8"),
+      );
+
+      expect(localData.elements[0].originalText).toBe("guest draft");
+      expect(protectedReads).toEqual([]);
+      expect(writes).toEqual([]);
     } finally {
       await guest.close();
     }

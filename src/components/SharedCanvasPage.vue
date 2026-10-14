@@ -3,6 +3,13 @@ import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { accountApi } from "~/lib/accountApi";
 import { api, ApiError } from "~/lib/api";
 import { closeCollaboration } from "~/lib/collaboration/session";
+import { getTabScope } from "~/lib/persistence";
+import {
+  richTextRecoveryStorageKey,
+  readRichTextRecovery,
+  downloadRichTextRecovery,
+} from "~/lib/richTextRecovery";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import type { Bootstrap, User } from "#shared/contracts";
 import type { EditorHandle } from "~/lib/editor";
 import {
@@ -24,6 +31,8 @@ const bootstrap = ref<Bootstrap>();
 const editor = ref<EditorHandle>();
 const shareOpen = ref(false);
 const shareButton = ref<HTMLButtonElement>();
+const deniedTextRecovery = ref<ExcalidrawElement>();
+let deniedRecoveryKey = "";
 const personalSettings = shallowRef<UserSettingsResource>();
 const onlineCount = ref(0),
   onlineLabel = ref("");
@@ -33,6 +42,7 @@ const scope = `public:${crypto.randomUUID()}`;
 async function initialize() {
   error.value = "";
   login.value = false;
+  deniedTextRecovery.value = undefined;
   try {
     user.value = await accountApi.session();
     if (user.value && personalSettings.value?.userId !== user.value.id) {
@@ -67,8 +77,41 @@ async function initialize() {
     if (cause instanceof ApiError && cause.status === 401) {
       login.value = true;
       bootstrap.value = await accountApi.bootstrap();
-    } else
+    } else {
       error.value = cause instanceof Error ? cause.message : "无法打开画布";
+      // A revoked original URL can fail before mounting an editor. Only read the
+      // previous capability's local recovery entry; never request its scene.
+      try {
+        const previousToken = props.share
+          ? (sessionStorage.getItem(
+              `canvas-share:${props.canvasId}:${user.value?.id ?? "guest"}`,
+            ) ?? undefined)
+          : undefined;
+
+        if (!props.share || previousToken) {
+          deniedRecoveryKey = await richTextRecoveryStorageKey(
+            {
+              canvasId: props.canvasId,
+              userId: user.value?.id,
+              token: previousToken,
+            },
+            await getTabScope(),
+          );
+          deniedTextRecovery.value = readRichTextRecovery(deniedRecoveryKey);
+        }
+      } catch (recoveryError) {
+        console.warn("无法读取本地文字恢复副本", recoveryError);
+      }
+    }
+  }
+}
+
+function clearDeniedRecovery() {
+  try {
+    localStorage.removeItem(deniedRecoveryKey);
+    deniedTextRecovery.value = undefined;
+  } catch (cause) {
+    console.warn("无法清除本地文字恢复副本", cause);
   }
 }
 
@@ -149,6 +192,16 @@ async function flushForShare() {
         <QuietIcon name="lock" :size="22" /><strong>暂时无法打开画布</strong>
         <p>{{ error }}</p>
         <button type="button" @click="initialize">重试</button>
+        <div v-if="deniedTextRecovery" class="local-recovery" role="status">
+          <p>文字编辑已结束，本地富文本副本已保留。</p>
+          <button
+            type="button"
+            @click="downloadRichTextRecovery(deniedTextRecovery)"
+          >
+            下载文字副本
+          </button>
+          <button type="button" @click="clearDeniedRecovery">忽略</button>
+        </div>
       </div>
       <ClientOnly
         ><CollaborationCanvas
@@ -276,6 +329,14 @@ async function flushForShare() {
   border-radius: 6px;
   padding: 7px 9px;
   cursor: pointer;
+}
+.local-recovery {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--app-border);
+}
+.local-recovery button + button {
+  margin-left: 8px;
 }
 .shared-page button:hover {
   background: var(--app-hover);

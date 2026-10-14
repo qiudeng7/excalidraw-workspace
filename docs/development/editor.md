@@ -22,7 +22,7 @@
 
 元素保留纯文本 `originalText`，同时以 `richText: { version: 1, doc }` 保存单段落结构及样式。元素复制、个人素材库、`.excalidraw` 导入导出均保留该字段；未知格式版本显示纯文本投影并阻止编辑，避免静默丢失原始结构。协议写入声明 `textFormatVersion: 1`，后端拒绝不支持富文本的旧客户端覆盖已有富文本。相关接口沿用[画布保存](canvases.md#保存内容)、[素材库保存](library.md#保存素材库)和[协作更新](collaboration.md)，没有新增富文本专属 API。
 
-协作仍按整个文字元素合并；另一会话的版本胜出、删除元素或撤销编辑权限时，结束当前编辑并保留可恢复的本地副本。恢复会创建新元素，不覆盖远端胜出的内容；恢复入口也提供下载副本。
+协作仍按整个文字元素合并；另一会话的版本胜出、删除元素或撤销编辑权限时，结束当前编辑并保留可恢复的本地副本。恢复会创建新元素，不覆盖远端胜出的内容；恢复入口也提供下载副本。副本在当前浏览器内按账号、分享凭证哈希与浏览器标签隔离，刷新后仍可下载；不会保存明文分享凭证，也不会覆盖另一个标签的副本。重新打开已失效的原始分享链接时，拒绝页仍提供本标签的本地副本下载，不挂载编辑器或读取远端场景。
 
 实现入口为 [richTextWysiwyg.ts](../../packages/excalidraw/wysiwyg/richTextWysiwyg.ts) 与 [richTextEditor.ts](../../packages/excalidraw/wysiwyg/richTextEditor.ts)。共享校验见 [richTextDocument.ts](../../packages/excalidraw/lib/element/src/richTextDocument.ts)，Canvas/SVG 布局见 [richTextLayout.ts](../../packages/excalidraw/lib/element/src/richTextLayout.ts)，后端兼容保护见 [richText.ts](../../server/utils/richText.ts)。回归入口为 `tests/browser/rich-text.spec.ts`、标签页中的持久化与文件往返用例，以及真实协作测试中的远端胜出、删除和撤权恢复用例。
 
