@@ -535,6 +535,22 @@ test("recycle synchronization keeps retry intent and stale commands cannot suspe
       await f.request(`/canvases/${f.id}/collaboration/view`)
     ).json();
 
+    assert.notEqual(active.epoch, original.epoch);
+    assert.equal(
+      (
+        await f.request(`/canvases/${f.id}/collaboration/update`, "POST", {
+          protocolVersion: 1,
+          epoch: original.epoch,
+          baseSeq: original.seq,
+          clientId: "missing-pause-client",
+          clientSeq: 1,
+          opId: "missing-pause-stale-operation",
+          elements: [],
+        })
+      ).status,
+      409,
+    );
+
     await f.context(() =>
       nodeCommand(
         f.id,
