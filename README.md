@@ -18,3 +18,7 @@ Excalidraw Workspace 是一个可以管理多个无限画布、云同步、画�
 | [编辑器](docs/development/editor.md)            | [调整绘图交互](docs/development/editor.md#调整绘图交互)、[编辑富文本](docs/development/editor.md#编辑富文本)、[收藏与复用颜色](docs/development/editor.md#收藏与复用颜色)、[导入导出与复制](docs/development/editor.md#导入导出与复制)                                                                                                                                                                                                             |
 | [更新公告与日志](docs/development/releases.md)  | [自动展示公告](docs/development/releases.md#自动展示公告)、[回看历史更新](docs/development/releases.md#回看历史更新)、[维护发布内容](docs/development/releases.md#发布新公告)                                                                                                                                                                                                                                                                      |
 | [协作与分享](docs/development/collaboration.md) | [并发编辑](docs/development/collaboration.md#并发编辑)、[成员邀请与链接](docs/development/collaboration.md#成员邀请与链接)、[三种查看模式](docs/development/collaboration.md#三种查看模式)、[离线队列](docs/development/collaboration.md#离线队列)、[权限撤销](docs/development/collaboration.md#权限撤销)、[房间迁移和恢复](docs/development/collaboration.md#迁移删除图片与备份)                                                                 |
+
+## License
+
+本项目自己的代码采用 [MIT](LICENSE) 许可证，纳入仓库的 Excalidraw 代码保留[上游 MIT 版权与许可声明](packages/excalidraw/LICENSE)。发布产物随附这两份许可原文，可在“设置 → 通用 → 开源许可”查看；详情见[许可证文档](docs/license.md)。

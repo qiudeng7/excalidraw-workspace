@@ -352,6 +352,20 @@ onBeforeUnmount(() => {
                   ></span
                 ><ThemeSwitcher />
               </div>
+              <div class="settings-row">
+                <span class="settings-copy"
+                  ><strong>开源许可</strong
+                  ><small
+                    >查看本项目与 Excalidraw 的版权和许可声明。</small
+                  ></span
+                >
+                <a
+                  href="/licenses.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >查看声明</a
+                >
+              </div>
             </template>
             <ReleaseNotes
               v-else-if="section === 'updates'"
