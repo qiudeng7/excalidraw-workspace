@@ -25,15 +25,16 @@ export interface WorkspaceDirectoryDependencies {
     NavigationController,
     "navigation" | "refreshNavigationQuietly" | "recordOpened"
   >;
-  canvasDocument: Pick<
-    CanvasDocumentController,
-    | "document"
-    | "loadCanvas"
-    | "clearDocument"
-    | "renameLoadedCanvas"
-    | "invalidateCanvas"
-    | "releaseEditorHistory"
-  >;
+  canvasDocument: Partial<Pick<CanvasDocumentController, "restoreCanvas">> &
+    Pick<
+      CanvasDocumentController,
+      | "document"
+      | "loadCanvas"
+      | "clearDocument"
+      | "renameLoadedCanvas"
+      | "invalidateCanvas"
+      | "releaseEditorHistory"
+    >;
   editor: SaveBarrier;
   interactionLocked: Readonly<Ref<boolean>>;
   run(action: () => Promise<void>): Promise<void>;
@@ -51,6 +52,7 @@ export interface WorkspaceDirectoryController {
   closeCanvasTab(id: string): Promise<void>;
   reset(): void;
   refreshDirectory(): Promise<void>;
+  refreshAfterRestore(): Promise<void>;
   loadWorkspaces(): Promise<void>;
   reorderCanvas(ids: string[]): Promise<void>;
   selectWorkspace(id: string): Promise<void>;
@@ -115,8 +117,25 @@ export function useWorkspaceDirectory({
     tabs.reset();
   }
 
+  async function refreshAfterRestore() {
+    const entries = await api.listWorkspaces();
+
+    workspaces.value = entries;
+    if (
+      workspaceId.value &&
+      entries.some((entry) => entry.id === workspaceId.value)
+    )
+      await refreshDirectory();
+    else if (!document.value) await loadWorkspaces();
+  }
+
   async function readDirectory(id: string) {
-    return api.readCatalog(id);
+    const catalog = await api.readCatalog(id);
+
+    for (const canvas of catalog.canvases)
+      await canvasDocument.restoreCanvas?.(canvas.id);
+
+    return catalog;
   }
 
   function setDirectory(id: string, data: Directory) {
@@ -433,16 +452,29 @@ export function useWorkspaceDirectory({
     if (directoryLocked.value) return;
     if (
       !(await dialogs.confirm({
-        title: "删除工作空间",
-        message: `删除「${currentWorkspace.value?.name}」及其中所有画布？此操作无法撤销。`,
-        confirmLabel: "删除工作空间",
+        title: "移入回收站",
+        message: `将「${currentWorkspace.value?.name}」及其中所有画布移入回收站？30 天内可以恢复。`,
+        confirmLabel: "移入回收站",
         danger: true,
       }))
     )
       return;
     await run(async () => {
       await flush();
-      await api.deleteWorkspace(workspaceId.value);
+      const deletingId = workspaceId.value;
+      let failure: unknown;
+
+      try {
+        await api.deleteWorkspace(deletingId);
+      } catch (cause) {
+        failure = cause;
+      }
+
+      if (
+        failure &&
+        (await api.listWorkspaces()).some((entry) => entry.id === deletingId)
+      )
+        throw failure;
       for (const canvas of canvases.value)
         canvasDocument.invalidateCanvas(canvas.id);
       canvasDocument.clearDocument();
@@ -510,9 +542,9 @@ export function useWorkspaceDirectory({
     if (directoryLocked.value) return;
     if (
       !(await dialogs.confirm({
-        title: "删除画布",
-        message: `删除画布「${canvas.name}」？此操作无法撤销。`,
-        confirmLabel: "删除画布",
+        title: "移入回收站",
+        message: `将画布「${canvas.name}」移入回收站？30 天内可以恢复。`,
+        confirmLabel: "移入回收站",
         danger: true,
       }))
     )
@@ -548,6 +580,7 @@ export function useWorkspaceDirectory({
     closeCanvasTab,
     reset,
     refreshDirectory,
+    refreshAfterRestore,
     loadWorkspaces,
     reorderCanvas,
     selectWorkspace,

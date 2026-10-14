@@ -1,5 +1,13 @@
 import { db } from "@nuxthub/db";
-import { and, asc, eq, exists, getTableColumns, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  exists,
+  getTableColumns,
+  isNull,
+  sql,
+} from "drizzle-orm";
 import * as tables from "#server/db/schema";
 import type { Navigation } from "#shared/contracts";
 
@@ -53,6 +61,9 @@ export async function recordNavigation(
             and(
               eq(tables.canvases.id, canvas),
               eq(tables.workspaces.userId, user),
+              eq(tables.workspaces.deleting, 0),
+              isNull(tables.workspaces.deletedAt),
+              isNull(tables.canvases.deletedAt),
               eq(tables.userNavigation.revision, revision),
             ),
           ),
@@ -87,6 +98,9 @@ export async function recordNavigation(
                 and(
                   eq(tables.canvases.id, canvas),
                   eq(tables.workspaces.userId, user),
+                  eq(tables.workspaces.deleting, 0),
+                  isNull(tables.workspaces.deletedAt),
+                  isNull(tables.canvases.deletedAt),
                 ),
               ),
           ),

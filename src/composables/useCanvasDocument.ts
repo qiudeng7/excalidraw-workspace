@@ -22,6 +22,7 @@ export interface CanvasDocumentController {
   renameLoadedCanvas(id: string, name: string): void;
   clearDocument(message?: string): void;
   invalidateCanvas(id: string): boolean;
+  restoreCanvas(id: string): Promise<void>;
   releaseEditorHistory(id: string): void;
   reset(): void;
   setSaveState(message: string): void;
@@ -157,6 +158,9 @@ export function useCanvasDocument({
     loadCanvas,
     clearDocument,
     releaseEditorHistory: (id) => resources.value?.releaseEditorHistory(id),
+    restoreCanvas: async (id) => {
+      await resources.value?.revive(id);
+    },
     invalidateCanvas(id) {
       const selected = selectedId === id || current.value?.document.id === id;
 

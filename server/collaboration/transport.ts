@@ -5,6 +5,13 @@ import { CollaborationError } from "#shared/collaboration/merge";
 import type { Principal, RoomState } from "#shared/collaboration/types";
 import { ApiError } from "#server/utils/http";
 
+export interface RoomNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): {
+    fetch(url: string, options: RequestInit): Promise<Response>;
+  };
+}
+
 export async function roomCommand<T>(
   event: H3Event,
   id: string,
@@ -12,16 +19,24 @@ export async function roomCommand<T>(
   command: Command,
   seed?: RoomState,
 ): Promise<T> {
-  try {
-    const namespace = event.context.cloudflare?.env?.CANVAS_ROOMS as
-      | {
-          idFromName(name: string): unknown;
-          get(id: unknown): {
-            fetch(url: string, options: RequestInit): Promise<Response>;
-          };
-        }
-      | undefined;
+  return dispatchRoomCommand(
+    event.context.cloudflare?.env?.CANVAS_ROOMS,
+    id,
+    principal,
+    command,
+    seed,
+  );
+}
 
+/** Scheduled cleanup has the same authority/transport as an HTTP request. */
+export async function dispatchRoomCommand<T>(
+  namespace: RoomNamespace | undefined,
+  id: string,
+  principal: Principal,
+  command: Command,
+  seed?: RoomState,
+): Promise<T> {
+  try {
     if (!namespace)
       return (await nodeCommand(id, principal, command, seed)) as T;
     const stub = namespace.get(namespace.idFromName(id));

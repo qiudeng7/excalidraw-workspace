@@ -4,6 +4,7 @@ import type { CanvasMeta } from "#shared/contracts";
 import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "~/components/AccountGate.vue";
 import QuietIcon from "~/components/QuietIcon.vue";
+import RecycleBinPanel from "~/components/RecycleBinPanel.vue";
 import CanvasTabs from "~/components/CanvasTabs.vue";
 import ReleaseAnnouncement from "~/components/ReleaseAnnouncement.vue";
 import { useReleaseAnnouncement } from "~/composables/useReleaseAnnouncement";
@@ -51,6 +52,7 @@ const saveBarrier = {
   },
 };
 const settingsOpen = ref(false);
+const recycleOpen = ref(false);
 const shareOpen = ref(false);
 const shareButton = ref<HTMLButtonElement>();
 const onlineCount = ref(0),
@@ -233,6 +235,7 @@ const {
     !interactionLocked.value &&
     !loadingCanvas.value &&
     !settingsOpen.value &&
+    !recycleOpen.value &&
     (!editorKey.value || editorKey.value === readyEditorKey.value),
 );
 
@@ -249,6 +252,7 @@ watch(
     sharedLoaded.value = false;
     shareOpen.value = false;
     settingsOpen.value = false;
+    recycleOpen.value = false;
     if (id) void loadShared();
   },
   { immediate: true },
@@ -738,6 +742,16 @@ async function flushForShare() {
       <div class="sidebar-bottom">
         <button
           type="button"
+          class="settings-entry recycle-entry"
+          aria-haspopup="dialog"
+          :aria-expanded="recycleOpen"
+          :disabled="interactionLocked"
+          @click="recycleOpen = true"
+        >
+          <QuietIcon name="trash" :size="18" /><span>回收站</span>
+        </button>
+        <button
+          type="button"
           class="settings-entry"
           aria-haspopup="dialog"
           :aria-expanded="settingsOpen"
@@ -999,6 +1013,12 @@ async function flushForShare() {
         </div>
       </section>
     </div>
+    <RecycleBinPanel
+      v-if="recycleOpen && user"
+      :key="user.id"
+      :refresh="directory.refreshAfterRestore"
+      @close="recycleOpen = false"
+    />
     <SettingsPanel
       v-if="settingsOpen && settingsResource"
       :resource="settingsResource"
@@ -1503,6 +1523,10 @@ async function flushForShare() {
   font-size: 12px;
   text-align: left;
   cursor: pointer;
+}
+.recycle-entry {
+  margin-bottom: 0;
+  padding-bottom: 8px;
 }
 .settings-entry:hover {
   background: var(--app-hover);

@@ -1,5 +1,5 @@
 import { db } from "@nuxthub/db";
-import { and, asc, eq, getTableColumns, inArray } from "drizzle-orm";
+import { and, asc, eq, getTableColumns, inArray, isNull } from "drizzle-orm";
 import * as tables from "#server/db/schema";
 import type { Workspace } from "#shared/contracts";
 
@@ -15,6 +15,7 @@ export const ownedWorkspaceIds = (user: string) =>
       and(
         eq(tables.workspaces.userId, user),
         eq(tables.workspaces.deleting, 0),
+        isNull(tables.workspaces.deletedAt),
       ),
     );
 
@@ -28,7 +29,12 @@ export async function workspace(
         .select(workspaceColumns)
         .from(tables.workspaces)
         .where(
-          and(eq(tables.workspaces.id, id), eq(tables.workspaces.userId, user)),
+          and(
+            eq(tables.workspaces.id, id),
+            eq(tables.workspaces.userId, user),
+            eq(tables.workspaces.deleting, 0),
+            isNull(tables.workspaces.deletedAt),
+          ),
         )
     )[0] ?? null
   );
@@ -42,6 +48,7 @@ export async function workspaces(user: string): Promise<Workspace[]> {
       and(
         eq(tables.workspaces.userId, user),
         eq(tables.workspaces.deleting, 0),
+        isNull(tables.workspaces.deletedAt),
       ),
     )
     .orderBy(asc(tables.workspaces.createdAt), asc(tables.workspaces.id));
@@ -68,7 +75,12 @@ export async function renameWorkspace(
     .update(tables.workspaces)
     .set({ name, updatedAt: now })
     .where(
-      and(eq(tables.workspaces.id, id), eq(tables.workspaces.userId, user)),
+      and(
+        eq(tables.workspaces.id, id),
+        eq(tables.workspaces.userId, user),
+        eq(tables.workspaces.deleting, 0),
+        isNull(tables.workspaces.deletedAt),
+      ),
     );
 }
 
@@ -86,7 +98,12 @@ export async function deleteWorkspace(id: string, user: string) {
     db
       .delete(tables.workspaces)
       .where(
-        and(eq(tables.workspaces.id, id), eq(tables.workspaces.userId, user)),
+        and(
+          eq(tables.workspaces.id, id),
+          eq(tables.workspaces.userId, user),
+          eq(tables.workspaces.deleting, 0),
+          isNull(tables.workspaces.deletedAt),
+        ),
       ),
   ]);
 

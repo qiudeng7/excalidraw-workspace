@@ -1,5 +1,5 @@
 import { db } from "@nuxthub/db";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import * as tables from "#server/db/schema";
 import { ownedWorkspaceIds } from "#server/db/workspaces";
 
@@ -37,6 +37,7 @@ export async function publishSnapshot(
           .where(
             and(
               eq(tables.canvases.id, id),
+              isNull(tables.canvases.deletedAt),
               eq(tables.canvases.revision, revision),
               eq(tables.canvases.syncMode, "legacy"),
               inArray(tables.canvases.workspaceId, ownedWorkspaceIds(user)),

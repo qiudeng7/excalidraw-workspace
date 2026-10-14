@@ -54,6 +54,8 @@ export class CanvasResources {
   libraryMessage = "";
   libraryPreview?: unknown[];
   private deleted = new Set<string>();
+  private incarnations = new Map<string, number>();
+  private invalidations = new Map<string, Promise<void>>();
   private flights = new Map<string, Promise<CanvasResource>>();
   private libraryFlight?: Promise<void>;
   private reads = new Set<AbortController>();
@@ -98,12 +100,29 @@ export class CanvasResources {
   }
 
   async invalidate(id: string) {
+    this.incarnations.set(id, (this.incarnations.get(id) ?? 0) + 1);
     this.deleted.add(id);
+    this.flights.delete(id);
     this.canvases.get(id)?.resource.dispose();
     this.canvases.delete(id);
     this.editorContexts.delete(id);
-    await this.cache.remove(cacheKey(this.owner, "canvas", id));
+    const removing = this.cache.remove(cacheKey(this.owner, "canvas", id));
+
+    this.invalidations.set(id, removing);
+    await removing;
     this.notify();
+  }
+
+  /** Only an authoritative live catalog may revive a locally invalidated identity. */
+  async revive(id: string) {
+    if (!this.deleted.has(id)) return;
+    const incarnation = this.incarnations.get(id);
+
+    await this.invalidations.get(id);
+    this.assertActive();
+    if (this.incarnations.get(id) !== incarnation) return;
+    this.deleted.delete(id);
+    this.invalidations.delete(id);
   }
 
   setActive(id: string) {
@@ -289,6 +308,15 @@ export class CanvasResources {
     preview: (entry: CanvasResource) => void,
     metadata?: CanvasMeta,
   ) {
+    const incarnation = this.incarnations.get(id) ?? 0;
+    const assertCurrent = () => {
+      this.assertActive();
+      if (
+        incarnation !== (this.incarnations.get(id) ?? 0) ||
+        this.deleted.has(id)
+      )
+        throw new DOMException("Canvas invalidated", "AbortError");
+    };
     let entry = this.canvases.get(id);
     const controller = new AbortController();
 
@@ -321,7 +349,7 @@ export class CanvasResources {
             ),
           ]);
 
-          this.assertActive();
+          assertCurrent();
           if (cached) entry = this.create(cached);
           else if (draft) {
             entry = this.create({
@@ -346,7 +374,7 @@ export class CanvasResources {
         }
       }
 
-      this.assertActive();
+      assertCurrent();
       if (entry) {
         entry.resource.pauseAutosave();
         entry.status = "checking";
@@ -380,7 +408,7 @@ export class CanvasResources {
           controller.signal,
         ));
 
-      this.assertActive();
+      assertCurrent();
       // Explicit retry/logout saves remain allowed while checking. Never roll an accepted
       // local revision back to a GET that started before that write completed.
       if (entry) {
@@ -402,7 +430,7 @@ export class CanvasResources {
             break;
           metadataGeneration = entry.metadataGeneration;
           remote = await this.readCanvas(id, entry.document, controller.signal);
-          this.assertActive();
+          assertCurrent();
         }
       }
 
@@ -418,7 +446,7 @@ export class CanvasResources {
         await entry.resource.restore();
       }
 
-      this.assertActive();
+      assertCurrent();
       entry.accessDenied = false;
       if (
         entry.resource.dirty &&
@@ -434,17 +462,17 @@ export class CanvasResources {
         });
 
         await session.start(false);
-        this.assertActive();
+        assertCurrent();
         await session.adoptLegacyDraft(
           entry.resource.baseline,
           entry.resource.value,
           remote.migrationEpoch,
         );
-        this.assertActive();
+        assertCurrent();
         // New queue is durable before removing the old snapshot draft. A crash
         // between these steps can replay the delta, but cannot lose it.
         await entry.resource.discardDraft();
-        this.assertActive();
+        assertCurrent();
       }
 
       if (entry.resource.dirty) {
@@ -484,7 +512,7 @@ export class CanvasResources {
 
       return entry;
     } catch (error) {
-      this.assertActive();
+      assertCurrent();
       if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
         if (entry) {
           entry.accessDenied = true;

@@ -54,6 +54,8 @@ function showDialog(request: DialogRequest): Promise<string | boolean | null> {
       resolve(null);
     };
 
+    // Standalone Vue apps otherwise reuse v-0 and mislabel nested modal dialogs.
+    app.config.idPrefix = "workspace-dialog";
     app.mount(host);
   });
 
