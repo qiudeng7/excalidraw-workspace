@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import type { CanvasMeta } from "#shared/contracts";
 import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "~/components/AccountGate.vue";
 import QuietIcon from "~/components/QuietIcon.vue";
@@ -217,6 +218,20 @@ const {
   renameCanvas,
   deleteCanvas,
 } = directory;
+let sidebarSelection = Promise.resolve();
+
+function selectSidebarCanvas(event: MouseEvent, id: string) {
+  // The second click of a double-click must not replace the pending selection.
+  if (event.detail > 1) return;
+  sidebarSelection = selectCanvas(id);
+}
+
+async function renameSidebarCanvas(canvas: CanvasMeta) {
+  // An unopened canvas may still be loading after the first click.
+  await sidebarSelection;
+  await renameCanvas(canvas);
+}
+
 const { navigationNotice, clearNotice } = navigationController;
 const {
   drag,
@@ -539,7 +554,8 @@ async function flushForShare() {
             :title="canvas.name"
             :aria-current="document?.id === canvas.id ? 'page' : undefined"
             :disabled="interactionLocked"
-            @click="selectCanvas(canvas.id)"
+            @click="selectSidebarCanvas($event, canvas.id)"
+            @dblclick="renameSidebarCanvas(canvas)"
           >
             <QuietIcon name="canvas" :size="16" /><span>{{ canvas.name }}</span>
             <small
