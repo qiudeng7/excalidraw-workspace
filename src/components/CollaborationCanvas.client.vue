@@ -46,6 +46,7 @@ import { getTabScope } from "~/lib/persistence";
 import {
   richTextRecoveryStorageKey,
   readRichTextRecovery,
+  writeRichTextRecovery,
   downloadRichTextRecovery,
 } from "~/lib/richTextRecovery";
 import {
@@ -83,20 +84,17 @@ const session = collaborationSession({
 });
 const error = ref("");
 const textRecovery = ref<ExcalidrawElement>();
+const textRecoveryPersisted = ref(false);
 let textRecoveryKey = "";
 
 function preserveText(element: ExcalidrawElement) {
   textRecovery.value = JSON.parse(JSON.stringify(element));
-  try {
-    if (textRecoveryKey)
-      localStorage.setItem(textRecoveryKey, JSON.stringify(element));
-  } catch (cause) {
-    console.warn("富文本恢复副本无法写入本地存储", cause);
-  }
+  textRecoveryPersisted.value = writeRichTextRecovery(textRecoveryKey, element);
 }
 
 function clearTextRecovery() {
   textRecovery.value = undefined;
+  textRecoveryPersisted.value = false;
   try {
     if (textRecoveryKey) localStorage.removeItem(textRecoveryKey);
   } catch (cause) {
@@ -693,6 +691,7 @@ onMounted(async () => {
     );
     if (!alive) return;
     textRecovery.value = readRichTextRecovery(textRecoveryKey);
+    textRecoveryPersisted.value = !!textRecovery.value;
   } catch (cause) {
     console.warn("读取富文本恢复副本失败", cause);
   }
@@ -748,8 +747,17 @@ onBeforeUnmount(() => {
         重新读取
       </button>
     </div>
-    <div v-if="textRecovery" class="text-recovery" role="status">
-      <span>文字编辑已结束，本地富文本副本已保留。</span>
+    <div
+      v-if="textRecovery"
+      class="text-recovery"
+      :role="textRecoveryPersisted ? 'status' : 'alert'"
+    >
+      <span v-if="textRecoveryPersisted"
+        >文字编辑已结束，本地富文本副本已保留。</span
+      >
+      <span v-else
+        >文字编辑已结束，副本仅保留在当前页面；尚未写入浏览器，请刷新前下载。</span
+      >
       <button v-if="!readOnly" type="button" @click="recoverText">
         恢复为新文字
       </button>

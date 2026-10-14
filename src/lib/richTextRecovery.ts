@@ -28,11 +28,31 @@ export async function richTextRecoveryStorageKey(
   ]);
 }
 
+export function writeRichTextRecovery(
+  key: string,
+  source: ExcalidrawElement,
+  storage?: Pick<Storage, "setItem">,
+): boolean {
+  if (!key) return false;
+  try {
+    (storage ?? localStorage).setItem(key, JSON.stringify(source));
+
+    return true;
+  } catch (cause) {
+    console.warn("富文本恢复副本尚未写入浏览器，请刷新前下载", cause);
+
+    return false;
+  }
+}
+
 export function readRichTextRecovery(
   key: string,
+  storage?: Pick<Storage, "getItem">,
 ): ExcalidrawElement | undefined {
-  const raw = localStorage.getItem(key);
-  const saved = raw && raw.length < 2000000 ? JSON.parse(raw) : undefined;
+  // The browser quota decides what can be stored. Do not hide successfully
+  // persisted documents behind a smaller, unrelated serialized-length limit.
+  const raw = (storage ?? localStorage).getItem(key);
+  const saved = raw ? JSON.parse(raw) : undefined;
 
   return saved?.type === "text" && isRichTextV1(saved.richText)
     ? saved
