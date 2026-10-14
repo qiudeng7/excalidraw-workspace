@@ -1,6 +1,8 @@
 import clsx from "clsx";
 import React from "react";
 
+import { KEYS } from "@excalidraw/common";
+
 import { getShortcutFromShortcutName } from "../actions/shortcuts";
 import { t } from "../i18n";
 
@@ -113,6 +115,13 @@ export const ContextMenu = React.memo(
               >
                 <button
                   type="button"
+                  onKeyDown={(event) => {
+                    // Let the native button activate without starting text
+                    // editing or canvas panning behind the menu.
+                    if (event.key === KEYS.ENTER || event.key === KEYS.SPACE) {
+                      event.stopPropagation();
+                    }
+                  }}
                   className={clsx("context-menu-item", {
                     dangerous: actionName === "deleteSelectedElements",
                     checkmark: item.checked?.(appState),
