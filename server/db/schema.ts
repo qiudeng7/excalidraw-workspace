@@ -80,6 +80,7 @@ export const canvases = sqliteTable(
       .notNull()
       .default("legacy"),
     roomEpoch: text("room_epoch"),
+    migrationEpoch: text("migration_epoch"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     position: integer().notNull().default(0),
@@ -181,3 +182,19 @@ export const collaborationDirectory = sqliteTable("collaboration_directory", {
   canvasId: text("canvas_id").primaryKey(),
   revision: integer().notNull().default(-1),
 });
+
+// Short-lived opens only; no scene, permissions, operation log or Durable Object.
+export const canvasSessions = sqliteTable(
+  "canvas_sessions",
+  {
+    canvasId: text("canvas_id")
+      .notNull()
+      .references(() => canvases.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.canvasId, table.clientId] }),
+    index("canvas_session_expiry").on(table.expiresAt),
+  ],
+);

@@ -33,12 +33,14 @@ export interface CanvasDocumentDependencies {
   >;
   ownerId(): string;
   onLoaded(): void;
+  prepareHandoff?(id: string): Promise<void>;
 }
 
 export function useCanvasDocument({
   api,
   ownerId,
   onLoaded,
+  prepareHandoff,
 }: CanvasDocumentDependencies): CanvasDocumentController {
   const document = shallowRef<CanvasDocument>();
   const library = shallowRef<LibraryDocument>();
@@ -84,7 +86,13 @@ export function useCanvasDocument({
     if (resources.value?.owner !== owner) {
       resources.value?.dispose();
       current.value = undefined;
-      resources.value = new CanvasResources(owner, api, publish);
+      resources.value = new CanvasResources(
+        owner,
+        api,
+        publish,
+        undefined,
+        prepareHandoff,
+      );
     }
 
     return resources.value!;
@@ -94,6 +102,10 @@ export function useCanvasDocument({
     const generation = ++selection;
 
     selectedId = id;
+    // Keep the original editor mounted until native text/IME has committed.
+    if (current.value?.document.id === id && prepareHandoff)
+      await prepareHandoff(id);
+    if (generation !== selection) return;
 
     loadingCanvas.value = true;
     const store = manager();

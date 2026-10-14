@@ -60,11 +60,8 @@ export const workspaceApi: WorkspaceApi = {
   readCatalog: (id) =>
     api<CanvasCatalog>(`/api/workspaces/${segment(id)}/canvases`),
   readCanvas: async (id) =>
-    (
-      await api<{ canvas: CanvasDocument }>(`/api/canvases/${segment(id)}`, {
-        headers: { "X-Collaboration-Protocol": "1" },
-      })
-    ).canvas,
+    (await api<{ canvas: CanvasDocument }>(`/api/canvases/${segment(id)}`))
+      .canvas,
   readLibrary: (ownerId) =>
     api<LibraryDocument>("/api/library", {
       headers: { "X-Resource-Owner": ownerId },
@@ -76,7 +73,6 @@ export const workspaceApi: WorkspaceApi = {
         signal,
         headers: {
           "X-Resource-Owner": ownerId,
-          "X-Collaboration-Protocol": "1",
           ...(known
             ? {
                 "If-None-Match": canvasValidator(known),

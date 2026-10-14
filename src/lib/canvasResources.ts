@@ -6,6 +6,7 @@ import type {
   SaveResult,
 } from "#shared/contracts";
 import type { WorkspaceApi } from "~/lib/workspaceApi";
+import { collaborationSession } from "~/lib/collaboration/session";
 import { ApiError } from "~/lib/api";
 import { canvasRevisionScope } from "#shared/snapshotValidator";
 import {
@@ -58,6 +59,7 @@ export class CanvasResources {
     private api: ReadApi,
     private changed: () => void,
     readonly cache = new ConfirmedCache(undefined, 0),
+    private prepareHandoff?: (id: string) => Promise<void>,
   ) {}
 
   private async runRequest(task: () => Promise<SaveResult>) {
@@ -144,6 +146,14 @@ export class CanvasResources {
         if (entry.resource.conflict) entry.status = "conflict";
         this.notify();
       },
+      onCollaborationRequired: async () => {
+        await this.prepareHandoff?.(document.id);
+        // The old final-publish CAS was fenced by a concurrent room upgrade.
+        queueMicrotask(() => {
+          if (!this.disposed && !this.flights.has(document.id))
+            void this.open(document.id, () => {}).catch(() => {});
+        });
+      },
       confirmed: (scene, saved) => {
         entry.confirmed = true;
         entry.document = {
@@ -211,6 +221,9 @@ export class CanvasResources {
     const existing = this.canvases.get(id);
 
     if (existing) {
+      if (existing.document.syncMode !== "collaborative" && this.prepareHandoff)
+        await this.prepareHandoff(id);
+      this.assertActive();
       existing.resource.pauseAutosave();
       existing.touched = Date.now();
       existing.status = "checking";
@@ -318,7 +331,14 @@ export class CanvasResources {
         }
       }
 
-      if (entry?.resource.hasUnconfirmedSave) await entry.resource.flush();
+      if (entry?.resource.hasUnconfirmedSave) {
+        try {
+          await entry.resource.flush();
+        } catch (error) {
+          if (!entry.resource.conflict) throw error;
+        }
+      }
+
       let metadataGeneration = entry?.metadataGeneration ?? 0;
       let remote = await (remoteTask ??
         this.readCanvas(
@@ -332,8 +352,13 @@ export class CanvasResources {
       // local revision back to a GET that started before that write completed.
       if (entry) {
         for (;;) {
-          await entry.resource.settle();
-          if (entry.resource.hasUnconfirmedSave) await entry.resource.flush();
+          try {
+            await entry.resource.settle();
+            if (entry.resource.hasUnconfirmedSave) await entry.resource.flush();
+          } catch (error) {
+            if (!entry.resource.conflict) throw error;
+          }
+
           if (
             (!entry.confirmed ||
               canvasRevisionScope(remote) !==
@@ -362,6 +387,33 @@ export class CanvasResources {
 
       this.assertActive();
       entry.accessDenied = false;
+      if (
+        entry.resource.dirty &&
+        remote.syncMode === "collaborative" &&
+        remote.migrationEpoch &&
+        remote.migrationEpoch === remote.roomEpoch &&
+        entry.resource.baseline
+      ) {
+        const session = collaborationSession({
+          canvasId: id,
+          userId: this.owner,
+          scope: "account",
+        });
+
+        await session.start(false);
+        this.assertActive();
+        await session.adoptLegacyDraft(
+          entry.resource.baseline,
+          entry.resource.value,
+          remote.migrationEpoch,
+        );
+        this.assertActive();
+        // New queue is durable before removing the old snapshot draft. A crash
+        // between these steps can replay the delta, but cannot lose it.
+        await entry.resource.discardDraft();
+        this.assertActive();
+      }
+
       if (entry.resource.dirty) {
         const changedScope =
           canvasRevisionScope(entry.document) !== canvasRevisionScope(remote);
@@ -386,6 +438,7 @@ export class CanvasResources {
 
         entry.document = immutableSnapshot(remote);
         entry.resource.value = immutableSnapshot(remote.scene);
+        entry.resource.baseline = immutableSnapshot(remote.scene);
         entry.resource.revision = remote.revision;
         entry.status = "ready";
         entry.resource.resumeAutosave();

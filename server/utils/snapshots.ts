@@ -1,3 +1,4 @@
+import { canvas } from "#server/db/canvases";
 import { publishSnapshot } from "#server/db/snapshots";
 import type { H3Event } from "h3";
 import type { User } from "#shared/contracts";
@@ -82,6 +83,11 @@ export async function saveSnapshot(
 
   if (!changes) {
     runBackground(event, deleteSnapshots([key]));
+    const currentMode =
+      type === "canvas" ? (await canvas(id, user.id))?.syncMode : undefined;
+
+    if (currentMode && currentMode !== "legacy")
+      fail(409, "COLLAB_PROTOCOL_REQUIRED", "此画布已启用协作，请接续协作编辑");
     fail(409, "REVISION_CONFLICT", "其他页面已经修改或删除了内容，请重新加载");
   }
 

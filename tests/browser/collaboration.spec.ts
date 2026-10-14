@@ -170,6 +170,8 @@ test("旧画布的已保存浏览器缓存迁入协作后正常解锁，并在�
       },
       { ownerId: owner.user.id, canvas: legacy },
     );
+    // Explicit activation now replaces the former implicit GET migration.
+    await call(owner.context, baseURL!, owner.id, "access");
     await open(page, "/", true);
     await expect
       .poll(() =>
@@ -250,7 +252,7 @@ test("主画布的分享面板发布固定版本，并向已有账号提供共�
     const memberPage = await invited.context.newPage();
 
     await open(memberPage, "/", true);
-    await memberPage.getByRole("button", { name: "与我共享 · 刷新" }).click();
+    // Login loads invitations even while the recipient's own canvas is still solo.
     await expect(memberPage.locator(`a[href='/c/${owner.id}']`)).toBeVisible();
     await memberPage.locator(`a[href='/c/${owner.id}']`).click();
     await expect
@@ -587,6 +589,157 @@ test("同一元素被另一会话更新后，撤销不会回滚对方修改", as
     expect((await editorState(first)).elements[0].x).toBe(saved.x);
   } finally {
     await other.close();
+    await owner.context.close();
+  }
+});
+
+test("单人编辑不建房，第二个浏览器加入时接续首位在途保存并保留双方修改", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const first = await owner.context.newPage();
+  let release!: () => void;
+  let intercepted!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const entered = new Promise<void>((resolve) => {
+    intercepted = resolve;
+  });
+  let secondContext: BrowserContext | undefined;
+
+  try {
+    await open(first, "/", true);
+    const read = async () =>
+      (
+        await (
+          await owner.context.request.get(`/api/canvases/${owner.id}`)
+        ).json()
+      ).canvas;
+
+    expect((await read()).syncMode).toBe("legacy");
+    await Promise.all([
+      first.waitForResponse(
+        (response) =>
+          response.url().endsWith(`/canvases/${owner.id}/presence`) &&
+          response.request().method() === "POST",
+      ),
+      first.reload(),
+    ]);
+    await expect
+      .poll(() => editorState(first).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    expect((await read()).syncMode).toBe("legacy");
+    await first.route(`**/api/canvases/${owner.id}`, async (route) => {
+      if (route.request().method() !== "PUT") return route.continue();
+      intercepted();
+      await waiting;
+      await route.continue();
+    });
+    await draw(first, 650);
+    await expect
+      .poll(() => editorState(first).then((state) => state.elements.length))
+      .toBe(1);
+    await entered;
+    secondContext = await browser.newContext({
+      baseURL,
+      viewport: { width: 1440, height: 900 },
+      storageState: await owner.context.storageState(),
+    });
+    const second = await secondContext.newPage();
+
+    await open(second, "/", true);
+    await expect
+      .poll(async () => (await read()).syncMode)
+      .toBe("collaborative");
+    release();
+    await expect(first.locator(".collaboration-editor")).toBeVisible();
+    await expect(second.locator(".collaboration-editor")).toBeVisible();
+    await expect
+      .poll(() => editorState(first).then((state) => state.elements.length))
+      .toBe(1);
+    await expect
+      .poll(() => editorState(second).then((state) => state.elements.length))
+      .toBe(1);
+    await draw(second, 950);
+    await expect
+      .poll(() => editorState(first).then((state) => state.elements.length))
+      .toBe(2);
+    await expect
+      .poll(
+        async () =>
+          (await read()).scene.elements.filter(
+            (element: { isDeleted?: boolean }) => !element.isDeleted,
+          ).length,
+      )
+      .toBe(2);
+    await first.reload();
+    await expect(first.locator(".collaboration-editor")).toBeVisible();
+    await expect
+      .poll(() => editorState(first).then((state) => state.elements.length))
+      .toBe(2);
+  } finally {
+    release?.();
+    await secondContext?.close();
+    await owner.context.close();
+  }
+});
+
+test("单人文字的输入法组合与未失焦内容在协作升级前完整提交", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const first = await owner.context.newPage();
+  let secondContext: BrowserContext | undefined;
+
+  try {
+    await open(first, "/", true);
+    await first.getByTestId("toolbar-text").first().click();
+    await first.mouse.click(700, 360);
+    const textarea = first.locator("textarea.excalidraw-wysiwyg");
+
+    await expect(textarea).toBeVisible();
+    await textarea.evaluate((element) =>
+      element.dispatchEvent(
+        new CompositionEvent("compositionstart", { bubbles: true }),
+      ),
+    );
+    await textarea.fill("升级时仍在输入的完整文字");
+    secondContext = await browser.newContext({
+      baseURL,
+      viewport: { width: 1440, height: 900 },
+      storageState: await owner.context.storageState(),
+    });
+    const second = await secondContext.newPage();
+
+    await open(second, "/", true);
+    await expect(second.locator(".collaboration-editor")).toBeVisible();
+    await first.evaluate(() =>
+      document.dispatchEvent(new Event("visibilitychange")),
+    );
+    await expect(textarea).toBeVisible();
+    await textarea.evaluate((element) =>
+      element.dispatchEvent(
+        new CompositionEvent("compositionend", {
+          bubbles: true,
+          data: "完整文字",
+        }),
+      ),
+    );
+    await expect(first.locator(".collaboration-editor")).toBeVisible();
+    await expect
+      .poll(() =>
+        editorState(second).then((state) =>
+          state.elements
+            .map((element: { text?: string }) => element.text)
+            .filter(Boolean),
+        ),
+      )
+      .toEqual(["升级时仍在输入的完整文字"]);
+  } finally {
+    await secondContext?.close();
     await owner.context.close();
   }
 });

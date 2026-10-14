@@ -20,6 +20,7 @@ import {
   useAccountSession,
   type AccountSessionController,
 } from "~/composables/useAccountSession";
+import { useCanvasPresence } from "~/composables/useCanvasPresence";
 import { useCanvasDocument } from "~/composables/useCanvasDocument";
 import { useWorkspaceNavigation } from "~/composables/useWorkspaceNavigation";
 import {
@@ -64,15 +65,25 @@ const displayedSaveState = computed(() =>
   isCollaborative.value ? collaborationStatus.value : saveState.value,
 );
 
+let sharedGeneration = 0;
+
 async function loadShared() {
+  const owner = user.value?.id;
+  const generation = ++sharedGeneration;
+
+  if (!owner) return;
   try {
-    shared.value = (
-      await api<{ canvases: typeof shared.value }>("/api/shared-canvases")
-    ).canvases;
-  } catch (cause) {
-    operation.reportError(
-      cause instanceof Error ? cause.message : "共享画布加载失败",
+    const result = await api<{ canvases: typeof shared.value }>(
+      "/api/shared-canvases",
     );
+
+    if (owner === user.value?.id && generation === sharedGeneration)
+      shared.value = result.canvases;
+  } catch (cause) {
+    if (owner === user.value?.id && generation === sharedGeneration)
+      operation.reportError(
+        cause instanceof Error ? cause.message : "共享画布加载失败",
+      );
   }
 }
 
@@ -94,6 +105,10 @@ const canvasDocument = useCanvasDocument({
     if (!account.user.value) throw new Error("请先登录");
 
     return account.user.value.id;
+  },
+  prepareHandoff: async (id) => {
+    if (canvasDocument.document.value?.id === id)
+      await editor.value?.prepareHandoff?.();
   },
   onLoaded: () => {
     if (window.matchMedia("(max-width: 760px)").matches)
@@ -166,6 +181,22 @@ const {
 } = account;
 const { document, current, resources, saveState, loadingCanvas } =
   canvasDocument;
+
+useCanvasPresence(
+  () =>
+    user.value && document.value
+      ? {
+          id: document.value.id,
+          owner: user.value.id,
+          mode: document.value.syncMode,
+        }
+      : undefined,
+  async (id) => {
+    editor.value?.capture();
+    await canvasDocument.loadCanvas(id);
+  },
+  operation.reportError,
+);
 const editorKey = computed(() =>
   user.value && document.value && current.value
     ? `${user.value.id}:${document.value.id}:${current.value.version}`
@@ -195,10 +226,13 @@ watch(
   () => user.value?.id,
   (id, previous) => {
     if (previous) closeCollaboration(previous);
+    sharedGeneration++;
     shared.value = [];
     shareOpen.value = false;
     settingsOpen.value = false;
+    if (id) void loadShared();
   },
+  { immediate: true },
 );
 const {
   workspaces,
@@ -306,10 +340,6 @@ function protectDrafts(event: BeforeUnloadEvent) {
   }
 }
 
-watch(isCollaborative, (value) => {
-  if (value) void loadShared();
-});
-
 watch(
   () => document.value?.id,
   () => {
@@ -325,6 +355,19 @@ onBeforeUnmount(() => {
   closeCollaboration();
   canvasDocument.reset();
 });
+
+async function openShare() {
+  if (!document.value || !user.value) return;
+  await run(async () => {
+    await saveBarrier.flush();
+    // Sharing creates durable permissions, so this is an explicit activation.
+    await api(
+      `/api/canvases/${encodeURIComponent(document.value!.id)}/collaboration/access`,
+    );
+    await canvasDocument.loadCanvas(document.value!.id);
+    shareOpen.value = true;
+  });
+}
 
 async function flushForShare() {
   await editor.value?.flush();
@@ -687,11 +730,7 @@ async function flushForShare() {
                 ? "处理中…"
                 : displayedSaveState
             }}</span
-          ><button
-            v-if="isCollaborative"
-            class="save-button"
-            @click="shareOpen = true"
-          >
+          ><button v-if="document" class="save-button" @click="openShare">
             分享</button
           ><button
             class="save-button"

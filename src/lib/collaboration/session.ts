@@ -150,16 +150,16 @@ export class CollaborationSession {
     );
   }
 
-  async start() {
+  async start(connect = true) {
     if (this.connecting || this.disposed) return this.connecting;
-    this.connecting = this.initialize().finally(() => {
+    this.connecting = this.initialize(connect).finally(() => {
       this.connecting = undefined;
     });
 
     return this.connecting;
   }
 
-  private async initialize() {
+  private async initialize(connect: boolean) {
     try {
       const access = await this.request<Access>("access");
 
@@ -216,7 +216,7 @@ export class CollaborationSession {
       await this.refresh();
       if (this.disposed) return;
       this.authorizedOnce = true;
-      if (access.viewMode === "live") await this.connect();
+      if (access.viewMode === "live" && connect) await this.connect();
       else {
         this.status = "ready";
         this.changed();
@@ -377,6 +377,79 @@ export class CollaborationSession {
     }, 150);
 
     return true;
+  }
+
+  /** Migrate only locally changed elements, keeping remote additions and tombstones. */
+  async adoptLegacyDraft(
+    baseline: CanvasScene,
+    local: CanvasScene,
+    expectedEpoch: string,
+  ) {
+    if (!this.editable || !this.view)
+      throw new Error("协作尚未就绪，原草稿已保留");
+    if (this.view.epoch !== expectedEpoch)
+      throw new ApiError(
+        409,
+        "DRAFT_RECOVERY_REQUIRED",
+        "画布已恢复，原草稿已保留，请下载后手动恢复",
+      );
+    const before = new Map(
+      (baseline.elements as Element[]).map((element) => [element.id, element]),
+    );
+    const remoteIds = new Set(
+      (this.value.elements as Element[]).map((element) => element.id),
+    );
+    const changed = (local.elements as Element[]).filter((element) => {
+      const original = before.get(element.id);
+
+      // A locally created-and-deleted element was never shared. In particular,
+      // its image data may already be pruned by the native serializer.
+      if (element.isDeleted && !original && !remoteIds.has(element.id))
+        return false;
+
+      return (
+        !original ||
+        original.version !== element.version ||
+        original.versionNonce !== element.versionNonce
+      );
+    });
+    // Excalidraw snapshots omit deleted elements. Encode only deletions relative
+    // to the old confirmed baseline, never deletions of new remote elements.
+    const present = new Set(
+      (local.elements as Element[]).map((element) => element.id),
+    );
+
+    for (const element of before.values())
+      if (!element.isDeleted && !present.has(element.id))
+        changed.push({
+          ...element,
+          isDeleted: true,
+          version: element.version + 1,
+          versionNonce: 0,
+        });
+    const merged = new Map(
+      (this.value.elements as Element[]).map((element) => [
+        element.id,
+        element,
+      ]),
+    );
+
+    for (const element of changed) merged.set(element.id, element);
+    const appState = { ...this.value.appState };
+    const baseBackground = baseline.appState.viewBackgroundColor ?? "#ffffff";
+    const localBackground = local.appState.viewBackgroundColor ?? "#ffffff";
+
+    if (
+      localBackground !== baseBackground &&
+      (appState.viewBackgroundColor ?? "#ffffff") === baseBackground
+    )
+      appState.viewBackgroundColor = localBackground;
+    this.update({
+      elements: [...merged.values()],
+      appState,
+      files: { ...this.value.files, ...local.files },
+    });
+    await this.checkpoint();
   }
 
   checkpoint() {

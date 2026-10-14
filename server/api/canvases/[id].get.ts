@@ -6,12 +6,7 @@ import { apiRequest } from "#server/utils/request";
 import { canvasValidator } from "#shared/snapshotValidator";
 import { ApiError, json, assertOwner } from "#server/utils/http";
 
-import {
-  canvasCommand,
-  hydrateView,
-  ensureRoom,
-  principal,
-} from "#server/collaboration/service";
+import { canvasCommand, hydrateView } from "#server/collaboration/service";
 import type { CanvasView } from "#shared/collaboration/types";
 
 const EMPTY_SCENE = { elements: [], appState: {}, files: {} };
@@ -23,26 +18,28 @@ export default defineApiHandler(async (event) => {
   const req = apiRequest(event);
 
   assertOwner(req, user.id, "x-resource-owner");
-  let row = await requireCanvas(id, user);
-
-  if (
-    req.headers.get("x-collaboration-protocol") === "1" &&
-    row.syncMode !== "collaborative"
-  ) {
-    await ensureRoom(event, id, await principal(event));
-    row = await requireCanvas(id, user);
-  }
+  const row = await requireCanvas(id, user);
 
   if (row.syncMode !== "legacy") {
     const view = await canvasCommand<CanvasView>(event, id, { type: "view" });
-    const ETag = `"collaboration:${view.epoch}:${view.seq}:${encodeURIComponent(row.name)}"`;
+    const active = await requireCanvas(id, user);
+    const ETag = `"collaboration:${view.epoch}:${view.seq}:${encodeURIComponent(view.name)}"`;
 
     if (req.headers.get("if-none-match") === ETag)
       return new Response(null, { status: 304, headers: { ETag } });
     const hydrated = await hydrateView(view);
 
     return json(
-      { canvas: { ...meta(row), revision: view.seq, scene: hydrated.scene } },
+      {
+        canvas: {
+          ...meta(active),
+          syncMode: "collaborative",
+          name: view.name,
+          roomEpoch: view.epoch,
+          revision: view.seq,
+          scene: hydrated.scene,
+        },
+      },
       200,
       { ETag },
     );

@@ -72,9 +72,11 @@ export async function ensureRoom(
   if (actor.userId !== row.ownerId || actor.capabilityHash)
     return fail(404, "NOT_FOUND", "画布不存在");
   if (row.canvas.syncMode === "legacy") {
+    const epoch = crypto.randomUUID();
+
     await db
       .update(canvases)
-      .set({ syncMode: "preparing", roomEpoch: crypto.randomUUID() })
+      .set({ syncMode: "preparing", roomEpoch: epoch, migrationEpoch: epoch })
       .where(and(eq(canvases.id, id), eq(canvases.syncMode, "legacy")));
     row = (await canvasRow(id))!;
   }
