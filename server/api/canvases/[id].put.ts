@@ -2,7 +2,8 @@ import { defineApiHandler, resourceId } from "#server/utils/api";
 import { apiRequest } from "#server/utils/request";
 import { requireUser } from "#server/utils/auth";
 import { requireCanvas } from "#server/utils/access";
-import { saveSnapshot } from "#server/utils/snapshots";
+import { assertRichTextWrite } from "#server/utils/richText";
+import { readSnapshot, saveSnapshot } from "#server/utils/snapshots";
 import { fail, json, body, isObject, assertOwner } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
@@ -31,6 +32,16 @@ export default defineApiHandler(async (event) => {
     !isObject(scene.files)
   )
     return fail(400, "INVALID_SCENE", "画布数据格式无效");
+
+  const current = await readSnapshot(row.objectKey, { elements: [] });
+
+  assertRichTextWrite(
+    scene.elements,
+    isObject(current) && Array.isArray(current.elements)
+      ? current.elements
+      : [],
+    data.textFormatVersion,
+  );
 
   return json(
     await saveSnapshot(event, user, "canvas", id, row, data.revision, scene),

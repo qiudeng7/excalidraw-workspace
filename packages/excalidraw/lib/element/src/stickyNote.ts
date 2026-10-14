@@ -1,3 +1,4 @@
+import { layoutRichText } from "./richTextLayout";
 import {
   DEFAULT_ELEMENT_PROPS,
   DEFAULT_STICKY_NOTE_BG,
@@ -732,6 +733,15 @@ export const getStickyNoteLayout = (
 
   const fit = (fontSize: number): FontFit => {
     const font = getFontString({ fontFamily, fontSize });
+    const richLayout = layoutRichText({ ...textElement, fontSize }, maxWidth);
+
+    if (richLayout)
+      return {
+        text: richLayout.text,
+        fontSize,
+        width: richLayout.width,
+        height: richLayout.height,
+      };
     const text = wrapText(originalText, font, maxWidth);
 
     return { text, fontSize, ...measureText(text, font, lineHeight) };

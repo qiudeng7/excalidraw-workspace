@@ -34,6 +34,10 @@
     "./reconcile": {
       "types": "./dist/types/data/reconcileCore.d.ts",
       "default": "./data/reconcileCore.ts"
+    },
+    "./rich-text": {
+      "types": "./dist/types/lib/element/src/richTextDocument.d.ts",
+      "default": "./lib/element/src/richTextDocument.ts"
     }
   },
   "files": [
@@ -77,13 +81,14 @@
     "@codemirror/language": "^6.0.0",
     "@codemirror/state": "^6.0.0",
     "@codemirror/view": "^6.0.0",
-    "@lezer/highlight": "^1.0.0",
     "@excalidraw/common": "workspace:*",
     "@excalidraw/element": "workspace:*",
     "@excalidraw/laser-pointer": "1.3.1",
     "@excalidraw/math": "workspace:*",
     "@excalidraw/mermaid-to-excalidraw": "2.2.2",
     "@excalidraw/random-username": "1.1.0",
+    "@excalidraw/utils": "workspace:*",
+    "@lezer/highlight": "^1.0.0",
     "browser-fs-access": "0.38.0",
     "canvas-roundrect-polyfill": "0.0.1",
     "clsx": "1.1.1",
@@ -103,28 +108,34 @@
     "png-chunks-encode": "1.0.0",
     "png-chunks-extract": "1.0.0",
     "points-on-curve": "1.0.1",
+    "prosemirror-commands": "^1.7.2",
+    "prosemirror-history": "^1.5.1",
+    "prosemirror-inputrules": "^1.5.1",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-model": "^1.25.12",
+    "prosemirror-state": "^1.4.4",
+    "prosemirror-view": "^1.42.6",
     "pwacompat": "2.0.17",
     "radix-ui": "1.4.3",
     "roughjs": "4.6.4",
     "sass": "1.51.0",
-    "tunnel-rat": "0.1.2",
-    "@excalidraw/utils": "workspace:*",
-    "tinycolor2": "1.6.0"
+    "tinycolor2": "1.6.0",
+    "tunnel-rat": "0.1.2"
   },
   "devDependencies": {
     "@types/lodash.debounce": "4.0.8",
+    "@types/lodash.throttle": "^4.1.9",
+    "@types/node": "^18.19.0",
     "@types/pako": "2.0.3",
     "@types/pica": "5.1.3",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "@types/resize-observer-browser": "0.1.7",
+    "csstype": "^3.2.3",
     "esbuild": "0.19.10",
     "esbuild-sass-plugin": "2.16.0",
     "typescript": "5.9.3",
-    "@types/react": "^18.3.31",
-    "@types/react-dom": "^18.3.7",
-    "@types/lodash.throttle": "^4.1.9",
-    "@types/node": "^18.19.0",
-    "vite": "^5.0.12",
-    "csstype": "^3.2.3"
+    "vite": "^5.0.12"
   },
   "repository": "https://github.com/excalidraw/excalidraw",
   "bugs": "https://github.com/excalidraw/excalidraw/issues",

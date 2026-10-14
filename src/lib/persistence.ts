@@ -437,7 +437,11 @@ export class PersistentResource<T> implements SaveResource<T> {
             controller.signal,
             AbortSignal.timeout(20_000),
           ]),
-          body: JSON.stringify({ revision, [this.field]: value }),
+          body: JSON.stringify({
+            revision,
+            [this.field]: value,
+            textFormatVersion: 1,
+          }),
         });
       const saved = await (this.runRequest ? this.runRequest(send) : send());
 

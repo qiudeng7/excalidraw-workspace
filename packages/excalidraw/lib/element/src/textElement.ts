@@ -1,3 +1,4 @@
+import { layoutRichText } from "./richTextLayout";
 import {
   ARROW_LABEL_FONT_SIZE_TO_MIN_WIDTH_RATIO,
   ARROW_LABEL_WIDTH_FRACTION,
@@ -99,11 +100,16 @@ export const redrawTextBoundingBox = (
     );
   }
 
-  const metrics = measureText(
-    boundTextUpdates.text,
-    getFontString(textElement),
-    textElement.lineHeight,
-  );
+  const richLayout = layoutRichText(textElement, maxWidth);
+
+  if (richLayout) boundTextUpdates.text = richLayout.text;
+  const metrics =
+    richLayout ??
+    measureText(
+      boundTextUpdates.text,
+      getFontString(textElement),
+      textElement.lineHeight,
+    );
 
   // Note: only update width for unwrapped text and bound texts (which always have autoResize set to true)
   if (textElement.autoResize) {
@@ -206,11 +212,12 @@ export const handleBindTextResize = (
         );
       }
 
-      const metrics = measureText(
-        text,
-        getFontString(textElement),
-        textElement.lineHeight,
-      );
+      const richLayout = layoutRichText(textElement, maxWidth);
+
+      if (richLayout) text = richLayout.text;
+      const metrics =
+        richLayout ??
+        measureText(text, getFontString(textElement), textElement.lineHeight);
 
       nextHeight = metrics.height;
       nextWidth = metrics.width;

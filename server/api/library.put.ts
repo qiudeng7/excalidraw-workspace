@@ -2,7 +2,8 @@ import { library } from "#server/db/snapshots";
 import { defineApiHandler } from "#server/utils/api";
 import { apiRequest } from "#server/utils/request";
 import { requireUser } from "#server/utils/auth";
-import { saveSnapshot } from "#server/utils/snapshots";
+import { assertRichTextWrite, libraryElements } from "#server/utils/richText";
+import { readSnapshot, saveSnapshot } from "#server/utils/snapshots";
 import { fail, json, body, assertOwner } from "#server/utils/http";
 
 export default defineApiHandler(async (event) => {
@@ -18,6 +19,12 @@ export default defineApiHandler(async (event) => {
 
   if (!Array.isArray(data.items))
     return fail(400, "INVALID_LIBRARY", "素材库数据格式无效");
+
+  assertRichTextWrite(
+    libraryElements(data.items),
+    libraryElements(await readSnapshot(row.objectKey, [])),
+    data.textFormatVersion,
+  );
 
   return json(
     await saveSnapshot(

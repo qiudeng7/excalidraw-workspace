@@ -111,14 +111,14 @@ test("opening settings naturally commits Chinese text on blur and drawing resume
 
   await page.getByTestId("toolbar-text").first().click();
   await page.mouse.click(box.x + 350, box.y + 250);
-  await page.locator("textarea.excalidraw-wysiwyg").fill("正在编辑的中文文本");
+  await page.locator(".excalidraw-wysiwyg").fill("正在编辑的中文文本");
   expect((await editorState(page)).editingTextElement).toBeTruthy();
   await f.open();
   await expect
     .poll(() => editorState(page).then((state) => state.editingTextElement))
     .toBeNull();
   await f.close();
-  await expect(page.locator("textarea.excalidraw-wysiwyg")).toHaveCount(0);
+  await expect(page.locator(".excalidraw-wysiwyg")).toHaveCount(0);
   expect(
     (await editorState(page)).elements.find(
       (element: any) => element.type === "text",

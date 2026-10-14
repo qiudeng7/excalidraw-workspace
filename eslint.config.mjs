@@ -82,6 +82,8 @@ export default [
       "**/dist-ssr/**",
       "**/.cache/**",
       "**/coverage/**",
+      "test-results/**",
+      "playwright-report/**",
     ],
   },
   {

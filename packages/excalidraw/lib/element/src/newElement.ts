@@ -1,3 +1,4 @@
+import { layoutRichText } from "./richTextLayout";
 import {
   DEFAULT_ELEMENT_PROPS,
   DEFAULT_FONT_FAMILY,
@@ -549,6 +550,47 @@ export const refreshTextDimensions = (
 ) => {
   if (textElement.isDeleted) {
     return;
+  }
+
+  const naturalRichLayout = layoutRichText(textElement);
+
+  if (naturalRichLayout) {
+    let fixedWidth = container
+      ? getBoundTextMaxWidth(container, textElement)
+      : !textElement.autoResize
+        ? textElement.width
+        : undefined;
+    let autoResize = textElement.autoResize;
+
+    if (
+      fixedWidth === undefined &&
+      maxWidth !== undefined &&
+      textElement.width <= maxWidth &&
+      naturalRichLayout.width > maxWidth
+    ) {
+      fixedWidth = maxWidth;
+      autoResize = false;
+    }
+
+    const layout =
+      fixedWidth === undefined
+        ? naturalRichLayout
+        : layoutRichText(textElement, fixedWidth)!;
+    const nextWidth =
+      fixedWidth !== undefined && !container ? fixedWidth : layout.width;
+    const offsets = getTextElementPositionOffsets(textElement, {
+      width: nextWidth - textElement.width,
+      height: layout.height - textElement.height,
+    });
+
+    return {
+      text: layout.text,
+      width: nextWidth,
+      height: layout.height,
+      x: textElement.x - offsets.x,
+      y: textElement.y - offsets.y,
+      autoResize,
+    };
   }
 
   if (
