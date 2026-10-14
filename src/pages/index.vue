@@ -55,6 +55,10 @@ const shareOpen = ref(false);
 const onlineCount = ref(0),
   onlineLabel = ref("");
 const collaborationStatus = ref("正在连接协作…");
+const sharedOpen = ref(false);
+const sharedLoading = ref(false);
+const sharedLoaded = ref(false);
+let sharedRequest = 0;
 const shared = ref<
   { id: string; name: string; role: string; viewMode: string }[]
 >([]);
@@ -68,26 +72,32 @@ const displayedSaveState = computed(() =>
   isCollaborative.value ? collaborationStatus.value : saveState.value,
 );
 
-let sharedGeneration = 0;
-
 async function loadShared() {
-  const owner = user.value?.id;
-  const generation = ++sharedGeneration;
+  if (sharedLoading.value || !user.value?.id) return;
+  const requestId = ++sharedRequest;
 
-  if (!owner) return;
+  sharedLoading.value = true;
   try {
     const result = await api<{ canvases: typeof shared.value }>(
       "/api/shared-canvases",
     );
 
-    if (owner === user.value?.id && generation === sharedGeneration)
-      shared.value = result.canvases;
+    if (requestId !== sharedRequest) return;
+    shared.value = result.canvases;
+    sharedLoaded.value = true;
   } catch (cause) {
-    if (owner === user.value?.id && generation === sharedGeneration)
-      operation.reportError(
-        cause instanceof Error ? cause.message : "共享画布加载失败",
-      );
+    if (requestId !== sharedRequest) return;
+    operation.reportError(
+      cause instanceof Error ? cause.message : "共享画布加载失败",
+    );
+  } finally {
+    if (requestId === sharedRequest) sharedLoading.value = false;
   }
+}
+
+function toggleShared() {
+  sharedOpen.value = !sharedOpen.value;
+  if (sharedOpen.value && !sharedLoaded.value) void loadShared();
 }
 
 const readyEditorKey = ref("");
@@ -229,8 +239,13 @@ watch(
   () => user.value?.id,
   (id, previous) => {
     if (previous) closeCollaboration(previous);
-    sharedGeneration++;
+
+    sharedRequest++;
+    sharedLoading.value = false;
+
     shared.value = [];
+    sharedOpen.value = false;
+    sharedLoaded.value = false;
     shareOpen.value = false;
     settingsOpen.value = false;
     if (id) void loadShared();
@@ -551,13 +566,60 @@ async function flushForShare() {
         </div>
       </div>
       <div class="shared-canvases">
-        <button type="button" @click="loadShared">与我共享 · 刷新</button
-        ><NuxtLink
-          v-for="item in shared"
-          :key="item.id"
-          :to="`/c/${item.id}`"
-          >{{ item.name }}</NuxtLink
+        <div class="shared-heading">
+          <button
+            class="shared-toggle"
+            type="button"
+            aria-label="与我共享"
+            :aria-expanded="sharedOpen"
+            aria-controls="shared-canvas-list"
+            @click="toggleShared"
+          >
+            <QuietIcon name="users" :size="16" /><span>与我共享</span
+            ><span v-if="shared.length" class="count">{{ shared.length }}</span
+            ><QuietIcon
+              class="shared-chevron"
+              :class="{ expanded: sharedOpen }"
+              name="chevron"
+              :size="13"
+            />
+          </button>
+          <button
+            v-if="sharedOpen"
+            class="icon-button"
+            type="button"
+            aria-label="刷新共享画布"
+            title="刷新共享画布"
+            :disabled="sharedLoading"
+            @click="loadShared"
+          >
+            <QuietIcon name="refresh" :size="14" />
+          </button>
+        </div>
+        <div
+          v-if="sharedOpen"
+          id="shared-canvas-list"
+          class="shared-list"
+          :aria-busy="sharedLoading"
         >
+          <NuxtLink
+            v-for="item in shared"
+            :key="item.id"
+            :to="`/c/${item.id}`"
+            :title="item.name"
+            ><QuietIcon name="canvas" :size="15" /><span>{{ item.name }}</span
+            ><QuietIcon v-if="item.role === 'editor'" name="edit" :size="12"
+          /></NuxtLink>
+          <p v-if="!shared.length" class="sidebar-empty">
+            {{
+              sharedLoading
+                ? "正在加载…"
+                : sharedLoaded
+                  ? "他人邀请的画布会显示在这里"
+                  : "暂时无法加载，请重试"
+            }}
+          </p>
+        </div>
       </div>
       <div class="canvas-heading">
         <span
@@ -747,9 +809,9 @@ async function flushForShare() {
         <div class="header-right">
           <span
             v-if="isCollaborative && onlineCount"
-            class="save-state"
+            class="save-state presence-state"
             :title="onlineLabel"
-            >{{ onlineCount }} 人在线</span
+            ><QuietIcon name="users" :size="13" />{{ onlineCount }} 人在线</span
           >
           <span
             class="save-state"
@@ -766,7 +828,7 @@ async function flushForShare() {
                 : displayedSaveState
             }}</span
           ><button v-if="document" class="save-button" @click="openShare">
-            分享</button
+            <QuietIcon name="link" :size="14" />分享</button
           ><button
             class="save-button"
             :disabled="interactionLocked || !document"
@@ -1005,6 +1067,67 @@ async function flushForShare() {
 }
 .canvas-name {
   padding-left: 5px !important;
+}
+.shared-canvases {
+  margin: 16px 0 8px;
+}
+.shared-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.shared-toggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  font-size: 12px;
+  color: var(--app-muted);
+  text-align: left;
+}
+.shared-toggle:hover,
+.shared-list a:hover {
+  background: var(--app-hover);
+  border-radius: 6px;
+}
+.shared-chevron {
+  margin-left: auto;
+  transition: transform 0.15s;
+}
+.shared-chevron.expanded {
+  transform: rotate(90deg);
+}
+.shared-list {
+  display: grid;
+  gap: 3px;
+  padding: 4px 0 0 12px;
+}
+.shared-list a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  color: var(--app-muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+.shared-list a > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shared-list svg {
+  flex-shrink: 0;
+}
+.shared-toggle:focus-visible,
+.shared-list a:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
 }
 .sidebar-empty {
   padding: 0 8px;

@@ -402,6 +402,9 @@ test("主画布的分享面板发布固定版本，并向已有账号提供共�
 
     await open(memberPage, "/", true);
     // Login loads invitations even while the recipient's own canvas is still solo.
+    await memberPage
+      .getByRole("button", { name: "与我共享", exact: true })
+      .click();
     await expect(memberPage.locator(`a[href='/c/${owner.id}']`)).toBeVisible();
     await memberPage.locator(`a[href='/c/${owner.id}']`).click();
     await expect
@@ -1141,6 +1144,304 @@ test("协作编辑器即时应用 Ctrl 多选开关，独立选择不写入共�
     );
   } finally {
     await guestContext.close();
+    await owner.context.close();
+  }
+});
+
+test("分享面板引导发布固定版本，复制被拒绝时保留手动复制入口", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const page = await owner.context.newPage();
+
+  try {
+    await open(page, "/", true);
+    await page.getByRole("button", { name: "分享", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "分享画布" });
+
+    await dialog.getByLabel("查看方式").selectOption("fixed");
+    await expect(
+      dialog.getByRole("button", { name: "邀请 / 更新权限" }),
+    ).toBeDisabled();
+    await dialog.getByRole("button", { name: "先发布一个固定版本" }).click();
+    await expect(
+      dialog.getByRole("button", { name: "固定版本", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await dialog.getByLabel("固定版本名称").fill("供评审的固定版本");
+    await dialog
+      .getByRole("button", { name: "发布固定版本", exact: true })
+      .click();
+    await expect(
+      dialog.getByText("供评审的固定版本", { exact: true }),
+    ).toBeVisible();
+    const linksSection = dialog.getByRole("button", {
+      name: "分享链接",
+      exact: true,
+    });
+
+    await linksSection.focus();
+    await page.keyboard.press("Enter");
+    await expect(dialog.getByLabel("固定版本")).not.toHaveValue("");
+    await dialog.getByRole("button", { name: "生成链接" }).click();
+    const link = dialog.getByLabel("新分享链接");
+
+    await expect(link).toHaveValue(/\/share\/.*#/);
+    await page.evaluate(() => {
+      Object.defineProperty(navigator.clipboard, "writeText", {
+        configurable: true,
+        value: () =>
+          Promise.reject(
+            new DOMException("Clipboard denied", "NotAllowedError"),
+          ),
+      });
+    });
+    await dialog.getByRole("button", { name: "复制链接" }).click();
+    await expect(dialog.getByRole("status")).toContainText(
+      "请复制已选中的链接",
+    );
+    await expect(link).toBeFocused();
+    expect(
+      await link.evaluate(
+        (node: HTMLInputElement) => node.selectionEnd! - node.selectionStart!,
+      ),
+    ).toBe((await link.inputValue()).length);
+    await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "分享", exact: true }),
+    ).toBeFocused();
+  } finally {
+    await owner.context.close();
+  }
+});
+
+test("富文本会话在远端胜出/删除及撤权时结束，恢复副本生成新元素且旧历史不再提交", async ({
+  browser,
+  baseURL,
+}) => {
+  test.setTimeout(60000);
+  const owner = await account(browser, baseURL!);
+  const first = await owner.context.newPage();
+
+  try {
+    await open(first, `/c/${owner.id}`, true);
+    await first.getByTestId("toolbar-text").first().click();
+    await first.mouse.click(700, 350);
+    const input = first.locator(".excalidraw-wysiwyg");
+
+    await input.pressSequentially("**original**", { delay: 10 });
+    await input.press("Escape");
+    const fonts = await first.evaluate(async () => {
+      await document.fonts.load("16px Nunito", "original");
+
+      return {
+        loaded: document.fonts.check("16px Nunito", "original"),
+        urls: performance
+          .getEntriesByType("resource")
+          .map((entry) => entry.name)
+          .filter((url) =>
+            url.startsWith(`${location.origin}/editor-assets/fonts/Nunito/`),
+          ),
+      };
+    });
+
+    expect(fonts.loaded).toBe(true);
+    expect(fonts.urls.length).toBeGreaterThan(0);
+    expect((await first.request.get(fonts.urls[0]!)).status()).toBe(200);
+    await expect
+      .poll(async () =>
+        (
+          await call(owner.context, baseURL!, owner.id, "view")
+        ).scene.elements.some((element: any) => element.richText),
+      )
+      .toBe(true);
+    const link = await call(owner.context, baseURL!, owner.id, "links", {
+      role: "editor",
+      requireLogin: false,
+    });
+    const guest = await browser.newContext({
+      baseURL,
+      viewport: { width: 1440, height: 900 },
+    });
+
+    try {
+      const second = await guest.newPage();
+
+      await open(second, link.path, true);
+      await first.mouse.dblclick(705, 355);
+      await expect(input).toBeVisible();
+      await input.press("End");
+      await input.pressSequentially(" local");
+      // Ensure a deterministic remote winner while the first editor's DOM/history stays active.
+      const view = await call(owner.context, baseURL!, owner.id, "view");
+      const original = view.scene.elements.find(
+        (element: any) => element.type === "text",
+      );
+
+      await second.locator(".excalidraw").evaluate((node, original) => {
+        const host = node as any;
+        let fiber =
+          host[
+            Object.keys(host).find((key) => key.startsWith("__reactFiber$"))!
+          ];
+
+        while (fiber && !fiber.stateNode?.api?.getSceneElements)
+          fiber = fiber.return;
+        const app = fiber.stateNode;
+        const richText = {
+          version: 1,
+          doc: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [
+                  { type: "text", text: "remote", marks: [{ type: "italic" }] },
+                ],
+              },
+            ],
+          },
+        };
+
+        app.api.updateScene({
+          elements: [
+            {
+              ...original,
+              text: "remote",
+              originalText: "remote",
+              richText,
+              version: original.version + 100,
+              versionNonce: 0,
+            },
+          ],
+          captureUpdate: "IMMEDIATELY",
+        });
+      }, original);
+      await expect(input).toHaveCount(0);
+      await expect(
+        first.getByRole("button", { name: "恢复为新文字" }),
+      ).toBeVisible();
+      await expect
+        .poll(() =>
+          editorState(first).then(
+            (state) => (state.elements[0] as any).originalText,
+          ),
+        )
+        .toBe("remote");
+      await first.getByRole("button", { name: "恢复为新文字" }).click();
+      await expect
+        .poll(() => editorState(second).then((state) => state.elements.length))
+        .toBe(2);
+      const recovered = (await editorState(first)).elements.find(
+        (element: any) => element.id !== original.id,
+      ) as any;
+
+      expect(recovered.originalText).toContain("local");
+      expect(recovered.richText.doc.content[0].content[0].marks).toEqual([
+        { type: "bold" },
+      ]);
+      // A remote deletion also tears down the active instance; no late blur can resurrect it.
+      await first.mouse.dblclick(705, 355);
+      await expect(input).toBeVisible();
+      const latest = (
+        await call(owner.context, baseURL!, owner.id, "view")
+      ).scene.elements.find((element: any) => element.id === original.id);
+
+      await call(owner.context, baseURL!, owner.id, "update", {
+        protocolVersion: 1,
+        textFormatVersion: 1,
+        epoch: view.epoch,
+        clientId: "rich-test-deletion",
+        clientSeq: 1,
+        opId: crypto.randomUUID(),
+        baseSeq: view.seq,
+        elements: [
+          {
+            ...latest,
+            isDeleted: true,
+            version: latest.version + 100,
+            versionNonce: 0,
+          },
+        ],
+      });
+      await expect(input).toHaveCount(0);
+      await expect
+        .poll(() =>
+          editorState(first).then((state) =>
+            state.elements.some((element: any) => element.id === original.id),
+          ),
+        )
+        .toBe(false);
+      await first.getByRole("button", { name: "忽略", exact: true }).click();
+      // Guest permission loss preserves its rich draft and closes the editor.
+      await second.getByTestId("toolbar-text").first().click();
+      await second.mouse.click(950, 450);
+      const guestInput = second.locator(".excalidraw-wysiwyg");
+
+      await guestInput.pressSequentially("**guest draft**", { delay: 10 });
+      await call(
+        owner.context,
+        baseURL!,
+        owner.id,
+        "links",
+        { id: link.id },
+        "DELETE",
+      );
+      await expect(guestInput).toHaveCount(0);
+      await expect(
+        second.getByText("文字编辑已结束，本地富文本副本已保留。"),
+      ).toBeVisible();
+      await expect(
+        second.getByRole("button", { name: "恢复为新文字" }),
+      ).toHaveCount(0);
+      const beforeDownload = await call(
+        owner.context,
+        baseURL!,
+        owner.id,
+        "view",
+      );
+      const writes: string[] = [];
+
+      second.on("request", (request) => {
+        if (
+          request.method() === "POST" &&
+          new URL(request.url()).pathname.endsWith("/collaboration/update")
+        )
+          writes.push(request.url());
+      });
+      const pendingDownload = second.waitForEvent("download");
+
+      await second
+        .getByRole("button", { name: "下载文字副本", exact: true })
+        .click();
+      const downloaded = await pendingDownload;
+
+      expect(downloaded.suggestedFilename()).toMatch(
+        /文字恢复副本\.excalidraw$/,
+      );
+      const data = JSON.parse(
+        await readFile((await downloaded.path())!, "utf8"),
+      );
+
+      expect(data.type).toBe("excalidraw");
+      expect(data.elements).toHaveLength(1);
+      expect(data.elements[0].originalText).toBe("guest draft");
+      expect(data.elements[0].richText.doc.content[0].content[0]).toEqual({
+        type: "text",
+        text: "guest draft",
+        marks: [{ type: "bold" }],
+      });
+      expect(data.elements[0].containerId).toBeNull();
+      expect(data.files).toEqual({});
+      expect(writes).toEqual([]);
+      expect((await call(owner.context, baseURL!, owner.id, "view")).seq).toBe(
+        beforeDownload.seq,
+      );
+    } finally {
+      await guest.close();
+    }
+  } finally {
     await owner.context.close();
   }
 });
