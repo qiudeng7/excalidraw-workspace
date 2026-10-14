@@ -1,6 +1,6 @@
 # 工作空间
 
-[返回开发者指南](readme.md)
+[返回目录](../../README.md#目录)
 
 工作空间属于当前账户，每个空间包含独立的画布目录。用例由 [useWorkspaceDirectory.ts](../../src/composables/useWorkspaceDirectory.ts) 编排，[workspaceApi.ts](../../src/lib/workspaceApi.ts) 封装 HTTP 调用。工作空间下拉菜单的焦点和键盘交互在 [useWorkspacePicker.ts](../../src/composables/useWorkspacePicker.ts)。
 
@@ -14,9 +14,9 @@
 
 ## 切换工作空间
 
-`selectWorkspace()` 等待当前画布和素材库保存 → 刷新最近位置 → 读取目标空间目录 → 打开该空间最近使用的画布，无有效记录时选第一张。空空间显示新建入口。
+`selectWorkspace()` 先确认当前画布的本地草稿落盘，旧画布在后台同步，再读取目标空间目录。优先恢复该空间当前标签，其次使用账户记录的最近画布，无有效记录时选第一张；空空间显示新建入口。用户已关闭该空间全部标签时保持空白，不自动重开画布。
 
-相关 API 为 [GET /api/navigation](../../server/api/navigation.get.ts)、[GET /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.get.ts)，以及[切换画布](canvases.md#切换画布)中的读取和导航写入接口。画布与素材库都读取成功后，才替换当前文档和目录；保存或目标内容读取失败时保留原编辑器。
+相关 API 为 [GET /api/navigation](../../server/api/navigation.get.ts)、[GET /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.get.ts)，以及[切换画布](canvases.md#切换画布)中的读取和导航写入接口。画布读取独立于账户级素材库的按需加载，不等待素材库读取或云端保存。本地草稿保护或目标内容读取失败时保留原编辑器；快速切换时只应用最后一次选择。
 
 ## 创建工作空间
 

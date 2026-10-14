@@ -1,15 +1,17 @@
 # 部署
 
-命令在仓库根目录执行。源码安装与本地 Worker 调试见 [README](../README.md#本地启动)，运行验证见[开发验证](development/testing.md)。首次部署后打开页面创建管理员。
+命令在仓库根目录执行。源码安装与本地 Worker 调试见 [本地启动](development/local-development.md)，运行验证见[开发验证](development/testing.md)。首次部署后打开页面创建管理员。
 
 ## Docker
+
+安装 Docker 与 Compose，在仓库根目录执行：
 
 ```sh
 docker compose up --build -d
 docker compose logs migrations app
 ```
 
-打开 http://localhost:8080。数据库和快照保存在命名卷 `workspace-data`，挂载到 `/app/.data`；迁移成功后应用才启动。迁移失败时修复错误后重新执行启动命令。
+打开 http://localhost:8080。容器以普通用户运行，不需要 Cloudflare 账户；Docker 使用单实例，数据与在线应用独立。数据库和快照保存在命名卷 `workspace-data`，挂载到 `/app/.data`；迁移成功后应用才启动。迁移失败时修复错误后重新执行启动命令。
 
 对外提供服务时，由反向代理提供 HTTPS，并在 `.env` 设置：
 
@@ -22,13 +24,27 @@ PUBLIC_ORIGIN=https://draw.example.com
 
 ## Cloudflare Workers
 
-首次部署到自己的账户，按 [README](../README.md#部署到-cloudflare) 创建 D1 和 R2，并在 [wrangler.jsonc](../wrangler.jsonc) 设置数据库 ID、资源名和 `PUBLIC_ORIGIN`。仓库中的绑定指向现有线上资源，须替换为自己的资源。
+一个 Cloudflare Worker 同时提供 Nuxt 页面、API 和静态资源。D1 保存账户、会话、工作空间及画布目录，SQLite Durable Objects 保存协作房间权威状态，私有 R2 bucket 保存图片、固定版本及旧画布和素材库快照。部署需要有 Workers、D1 和 R2 操作权限的 Cloudflare 账户。
+
+首次部署到自己的账户，在仓库根目录运行：
+
+```sh
+pnpm exec wrangler login --config wrangler.jsonc
+pnpm exec wrangler d1 create excalidraw-demo --config wrangler.jsonc
+pnpm exec wrangler r2 bucket create excalidraw-demo-data --config wrangler.jsonc
+```
+
+将创建结果中的数据库 ID 填入 [wrangler.jsonc](../wrangler.jsonc) 的 `d1_databases[0].database_id`，同时核对 Worker、数据库和 bucket 名称，并将 `vars.PUBLIC_ORIGIN` 改为自己的实际访问 origin（例如 `https://draw.example.com`）；它用于写请求的来源校验。**仓库中的数据库 ID 指向当前在线应用；部署到自己的账户时必须替换成自己的数据库 ID。** 资源名称可以自行修改，但必须与实际创建的资源和配置一致。
+
+当前在线应用使用 `excalidraw-workspace` Worker，地址为 `https://excalidraw-workspace.qiudeng.workers.dev`。D1 仍为 `excalidraw-demo`，R2 bucket 仍为 `excalidraw-demo-data`，继续使用已有账户和画布数据。更换访问域名后需要重新登录。
 
 ```sh
 pnpm run deploy
 ```
 
-该命令依次构建、迁移远程 D1、部署 Worker。D1、R2、SQLite Durable Objects 的 binding 分别为 `DB`、`BLOB`、`CANVAS_ROOMS`；`canvas-room-v1` 迁移创建 `CanvasRoom` 类，不要删除或改写已发布的 DO migration。所有 Wrangler 命令显式使用 `--config wrangler.jsonc`，否则 NuxtHub 自动生成的配置可能绕过自定义 Worker 入口。已有数据库沿用 `d1_migrations`，不要更换迁移记录重跑旧 SQL。
+部署后打开根地址，及时完成首个管理员注册。后续更新时应用新增迁移并重新部署，保留原有数据库及 bucket 绑定。Workers HTTP 应用和静态资源由 Nuxt/Nitro 生成，[server/worker.mjs](../server/worker.mjs) 包装入口并导出协作 Durable Object。关于页由服务端渲染，画布页仅在浏览器渲染。GitHub push 不会自动更新线上服务。
+
+`pnpm run deploy` 依次构建、迁移远程 D1、部署 Worker。D1、R2、SQLite Durable Objects 的 binding 分别为 `DB`、`BLOB`、`CANVAS_ROOMS`；`canvas-room-v1` 迁移创建 `CanvasRoom` 类，不要删除或改写已发布的 DO migration。所有 Wrangler 命令显式使用 `--config wrangler.jsonc`，否则 NuxtHub 自动生成的配置可能绕过自定义 Worker 入口。已有数据库沿用 `d1_migrations`，不要更换迁移记录重跑旧 SQL。
 
 ## 单独运行 Node
 

@@ -1,6 +1,6 @@
 # 个人素材库
 
-[返回开发者指南](readme.md)
+[返回目录](../../README.md#目录)
 
 素材库属于账户，在该账户的所有画布间共享，有独立于画布的内容版本和快照。编辑器接入与冲突操作在 [ExcalidrawCanvas.client.vue](../../src/components/ExcalidrawCanvas.client.vue)。
 
@@ -17,6 +17,8 @@
 ## 保存素材库
 
 编辑器的 `onLibraryChange` 将新条目交给 [PersistentResource](../../src/lib/persistence.ts)。该资源通过 [PUT /api/library](../../server/api/library.put.ts) 提交 `{ revision, items }`，并携带捕获的账户 ID；后端校验 `items` 为数组，再走与画布共用的 [saveSnapshot()](../../server/utils/snapshots.ts)。成功返回新版本与更新时间。
+
+单次素材库 JSON 保存上限为 20 MB，超出时提示错误并保留本地草稿。
 
 素材库与画布分别保存，没有跨两份内容的事务。关闭侧边栏或切换画布不会取消已有的素材库保存；退出登录与站内离开等待所有未同步资源，任一失败都会阻止离开。发生版本冲突时停止覆盖，可下载本地备份或确认舍弃冲突草稿后重新加载，交互见[处理保存冲突](canvases.md#处理保存冲突)。
 
