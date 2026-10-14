@@ -440,7 +440,7 @@ export class PersistentResource<T> implements SaveResource<T> {
           body: JSON.stringify({
             revision,
             [this.field]: value,
-            textFormatVersion: 1,
+            textFormatVersion: 2,
           }),
         });
       const saved = await (this.runRequest ? this.runRequest(send) : send());

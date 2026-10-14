@@ -1,5 +1,5 @@
 import {
-  isRichTextV1,
+  isSupportedRichText,
   richTextPlainText,
 } from "../lib/element/src/richTextDocument";
 import {
@@ -579,7 +579,7 @@ export const restoreElement = (
         textAlign: element.textAlign || DEFAULT_TEXT_ALIGN,
         verticalAlign: element.verticalAlign || DEFAULT_VERTICAL_ALIGN,
         containerId: element.containerId ?? null,
-        originalText: isRichTextV1(element.richText)
+        originalText: isSupportedRichText(element.richText)
           ? richTextPlainText(element.richText)
           : element.originalText || text,
         ...(element.richText ? { richText: element.richText } : {}),

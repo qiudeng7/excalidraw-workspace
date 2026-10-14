@@ -1,4 +1,4 @@
-import { isRichTextV1 } from "../lib/element/src/richTextDocument";
+import { isSupportedRichText } from "../lib/element/src/richTextDocument";
 import clsx from "clsx";
 import throttle from "lodash.throttle";
 import React, { useContext } from "react";
@@ -6915,7 +6915,7 @@ class App extends React.Component<AppProps, AppState> {
       initialCaretSceneCoords?: { x: number; y: number } | null;
     },
   ) {
-    if (element.richText && !isRichTextV1(element.richText)) {
+    if (element.richText && !isSupportedRichText(element.richText)) {
       this.setState({ editingTextElement: null, newElement: null });
       this.setToast({
         message: "此文字使用了暂不支持的富文本格式，请更新后编辑",

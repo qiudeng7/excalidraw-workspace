@@ -1,3 +1,4 @@
+import { supportsRichTextWrite } from "@excalidraw/excalidraw/rich-text";
 import {
   canonical,
   mergeElements,
@@ -345,11 +346,13 @@ export function execute(
       if (op.protocolVersion !== PROTOCOL_VERSION)
         reject("PROTOCOL_REQUIRED", "请刷新页面更新协作协议", 409);
       if (
-        (room.scene.elements.some(
-          (element) => element.richText !== undefined,
-        ) ||
-          op.elements?.some?.((element) => element.richText !== undefined)) &&
-        op.textFormatVersion !== 1
+        !supportsRichTextWrite(
+          [
+            ...room.scene.elements,
+            ...(Array.isArray(op.elements) ? op.elements : []),
+          ],
+          op.textFormatVersion,
+        )
       )
         reject(
           "TEXT_FORMAT_REQUIRED",

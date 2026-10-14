@@ -209,6 +209,7 @@ export const test = base.extend<{
           data = { canvas };
           break;
         case "PUT /api/canvases/test-canvas":
+          canvas.scene = request.postDataJSON().scene;
           data = { revision: ++canvas.revision, updatedAt: canvas.updatedAt };
           break;
         case "GET /api/library":

@@ -12,6 +12,25 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-10-14-markdown-layout",
+    sequence: 6,
+    version: "0.5.0",
+    date: "2026-10-14",
+    title: "文字编辑更准确，Markdown 格式更丰富",
+    summary:
+      "修复文字编辑时的位置偏移和选区问题，支持更多 Markdown 格式，编辑、画布显示与导出保持一致。",
+    changes: [
+      "修复自由文字、形状内文字、箭头标签和便签的编辑位置与段落间距，支持点击定位光标、拖动选区和中文输入。",
+      "在粗体、斜体和行内代码之外，新增标题、有序与无序列表、引用、代码块、链接和删除线；再次编辑时仍显示格式化内容。",
+      "普通粘贴可识别 Markdown，纯文本粘贴（Ctrl/Cmd+Shift+V）保留原始符号；在代码块中粘贴时保留字面内容。已有普通文字不会自动转换为 Markdown。",
+      "Enter 新建段落、继续列表或在代码块内换行，Shift+Enter 插入软换行，Esc 或 Ctrl/Cmd+Enter 完成编辑；在代码块末尾按向下方向键可退出到后续段落。",
+      "文字格式、换行和装饰在编辑、画布显示及 SVG、PNG 导出中使用一致的排版。",
+    ],
+    actions: [
+      "已打开的页面请刷新后使用新版文字编辑；多人协作时，请所有参与者刷新页面。",
+    ],
+  },
+  {
     id: "workspace-2026-10-14-collaboration-recovery",
     sequence: 5,
     version: "0.4.1",
