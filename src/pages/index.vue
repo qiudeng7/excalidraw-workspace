@@ -4,11 +4,13 @@ import type { CanvasMeta } from "#shared/contracts";
 import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "~/components/AccountGate.vue";
 import QuietIcon from "~/components/QuietIcon.vue";
+import CanvasTabs from "~/components/CanvasTabs.vue";
 import ReleaseAnnouncement from "~/components/ReleaseAnnouncement.vue";
 import { useReleaseAnnouncement } from "~/composables/useReleaseAnnouncement";
 import {
   flushCollaboration,
   closeCollaboration,
+  hasUnsyncedCollaboration,
 } from "~/lib/collaboration/session";
 import { api } from "~/lib/api";
 import { accountApi } from "~/lib/accountApi";
@@ -242,6 +244,8 @@ const {
   currentWorkspace,
   directoryStale,
   directoryLocked,
+  canvasTabs,
+  closeCanvasTab,
   refreshDirectory,
   loadWorkspaces,
   selectCanvas,
@@ -303,6 +307,15 @@ async function selectWorkspace(id: string) {
   await directory.selectWorkspace(id);
 }
 
+async function openResourceCanvas(entry: CanvasResource) {
+  const targetWorkspace = entry.document.workspaceId;
+
+  if (workspaceId.value !== targetWorkspace)
+    await selectWorkspace(targetWorkspace);
+  if (workspaceId.value === targetWorkspace)
+    await selectCanvas(entry.document.id);
+}
+
 function closeActionMenu(event: MouseEvent) {
   const button = (event.target as HTMLElement).closest("button");
 
@@ -349,7 +362,10 @@ function downloadResourceBackup(entry: CanvasResource) {
 }
 
 function protectDrafts(event: BeforeUnloadEvent) {
-  if (resources.value?.hasDirty()) {
+  if (
+    resources.value?.hasDirty() ||
+    (user.value && hasUnsyncedCollaboration(user.value.id))
+  ) {
     event.preventDefault();
     event.returnValue = "";
   }
@@ -700,7 +716,7 @@ async function flushForShare() {
         role="alert"
       >
         <span>{{ entry.document.name }}：{{ entry.message }}</span>
-        <button @click="selectCanvas(entry.document.id)">查看画布</button>
+        <button @click="openResourceCanvas(entry)">查看画布</button>
         <button @click="downloadResourceBackup(entry)">下载本地备份</button>
         <button
           v-if="!entry.resource.conflict"
@@ -720,11 +736,14 @@ async function flushForShare() {
         >
           <QuietIcon name="panel" :size="18" />
         </button>
-        <div class="breadcrumb">
-          <span class="workspace-crumb">{{ currentWorkspace?.name }}</span
-          ><span class="crumb-divider">/</span
-          ><span class="document-name">{{ document?.name ?? "我的画布" }}</span>
-        </div>
+        <CanvasTabs
+          :tabs="canvasTabs"
+          :active-id="document?.id"
+          :locked="interactionLocked"
+          :closing-locked="directoryLocked"
+          @select="selectCanvas"
+          @close="closeCanvasTab"
+        />
         <div class="header-right">
           <span
             v-if="isCollaborative && onlineCount"
@@ -821,73 +840,96 @@ async function flushForShare() {
         <button type="button" @click="retryAnnouncement">重试公告</button>
         <button type="button" @click="announcementNotice = ''">关闭提示</button>
       </div>
-      <div
-        v-if="document && current && resources && settingsResource"
-        class="draw-editor"
-        :inert="busy"
+      <section
+        id="canvas-tab-panel"
+        role="tabpanel"
+        :aria-labelledby="document ? `canvas-tab-${document.id}` : undefined"
+        class="canvas-panel"
       >
-        <CollaborationCanvas
-          v-if="isCollaborative"
-          :key="`collaboration:${user.id}:${document.id}`"
-          ref="editor"
-          :canvas-id="document.id"
-          :user-id="user.id"
-          scope="account"
-          :initial-document="document"
-          :resources="resources"
-          :user-settings="settingsResource.state.settings"
-          :settings-open="settingsOpen || announcementOpen || shareOpen"
-          @status="collaborationStatus = $event"
-          @participants="
-            (count, label) => {
-              onlineCount = count;
-              onlineLabel = label;
-            }
-          "
-          @ready="readyEditorKey = editorKey"
-        />
-        <ExcalidrawCanvas
-          v-else
-          :key="editorKey"
-          ref="editor"
-          :document="document"
-          :entry="current"
-          :resources="resources"
-          :user-id="user.id"
-          :user-settings="settingsResource.state.settings"
-          :settings-status="settingsResource.state.status"
-          :settings-open="settingsOpen || announcementOpen"
-          @ready="readyEditorKey = $event"
-          @retry-load="retryCurrentCanvas"
-        />
-      </div>
-      <div v-else class="loading">
-        <template v-if="busy">正在加载画布…</template
-        ><template v-else-if="!workspaces.length"
-          ><p>创建工作空间，开始整理你的画布。</p>
-          <button
-            class="empty-create"
-            :disabled="interactionLocked"
-            @click="createWorkspace"
-          >
-            新建工作空间
-          </button></template
-        ><template v-else-if="!canvases.length"
-          ><p>这个工作空间还没有画布。</p>
-          <button
-            class="empty-create"
-            :disabled="directoryLocked"
-            @click="createCanvas"
-          >
-            新建画布
-          </button></template
-        ><template v-else
-          ><p>暂时无法加载画布，请重试。</p>
-          <button :disabled="directoryLocked" @click="run(loadWorkspaces)">
-            重新加载
-          </button></template
+        <div
+          v-if="document && current && resources && settingsResource"
+          class="draw-editor"
+          :inert="busy"
         >
-      </div>
+          <CollaborationCanvas
+            v-if="isCollaborative"
+            :key="`collaboration:${user.id}:${document.id}`"
+            ref="editor"
+            :canvas-id="document.id"
+            :user-id="user.id"
+            scope="account"
+            :initial-document="document"
+            :resources="resources"
+            :user-settings="settingsResource.state.settings"
+            :settings-open="settingsOpen || announcementOpen || shareOpen"
+            @status="collaborationStatus = $event"
+            @participants="
+              (count, label) => {
+                onlineCount = count;
+                onlineLabel = label;
+              }
+            "
+            @ready="readyEditorKey = editorKey"
+          />
+          <ExcalidrawCanvas
+            v-else
+            :key="editorKey"
+            ref="editor"
+            :document="document"
+            :entry="current"
+            :resources="resources"
+            :user-id="user.id"
+            :user-settings="settingsResource.state.settings"
+            :settings-status="settingsResource.state.status"
+            :settings-open="settingsOpen || announcementOpen"
+            @ready="readyEditorKey = $event"
+            @retry-load="retryCurrentCanvas"
+          />
+        </div>
+        <div v-else class="loading">
+          <template v-if="busy">正在加载画布…</template
+          ><template v-else-if="!workspaces.length"
+            ><p>创建工作空间，开始整理你的画布。</p>
+            <button
+              class="empty-create"
+              :disabled="interactionLocked"
+              @click="createWorkspace"
+            >
+              新建工作空间
+            </button></template
+          ><template v-else-if="!canvases.length"
+            ><p>这个工作空间还没有画布。</p>
+            <button
+              class="empty-create"
+              :disabled="directoryLocked"
+              @click="createCanvas"
+            >
+              新建画布
+            </button></template
+          ><template v-else-if="!canvasTabs.length"
+            ><p>从侧边栏打开画布，或新建一张画布。</p>
+            <button
+              id="open-canvas-sidebar"
+              class="empty-create"
+              @click="sidebarOpen = true"
+            >
+              打开侧边栏
+            </button>
+            <button
+              class="empty-create"
+              :disabled="directoryLocked"
+              @click="createCanvas"
+            >
+              新建画布
+            </button> </template
+          ><template v-else
+            ><p>暂时无法加载画布，请重试。</p>
+            <button :disabled="directoryLocked" @click="run(loadWorkspaces)">
+              重新加载
+            </button></template
+          >
+        </div>
+      </section>
     </div>
     <SettingsPanel
       v-if="settingsOpen && settingsResource"
@@ -1380,6 +1422,12 @@ async function flushForShare() {
   font-size: 10px;
   color: var(--app-muted);
 }
+.canvas-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
 .canvas-header {
   display: flex;
   align-items: center;
@@ -1390,31 +1438,6 @@ async function flushForShare() {
   padding: 0 20px 0 13px;
   border-bottom: 1px solid var(--line);
   color: var(--app-muted);
-}
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  min-width: 0;
-  flex: 1;
-}
-.workspace-crumb {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  max-width: 200px;
-  color: var(--app-muted);
-}
-.crumb-divider {
-  color: var(--app-subtle);
-}
-.document-name {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: var(--app-text);
-  font-weight: 500;
 }
 .header-right {
   display: flex;
@@ -1505,9 +1528,6 @@ button:focus-visible {
   .save-button kbd {
     display: none;
   }
-  .workspace-crumb {
-    max-width: 120px;
-  }
 }
 @media (max-width: 760px) {
   .workspace-sidebar {
@@ -1530,10 +1550,6 @@ button:focus-visible {
     padding-inline: 10px;
     height: 47px;
     gap: 8px;
-  }
-  .workspace-crumb,
-  .crumb-divider {
-    display: none;
   }
   .header-right {
     gap: 6px;

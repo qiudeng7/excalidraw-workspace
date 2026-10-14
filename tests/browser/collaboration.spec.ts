@@ -93,6 +93,154 @@ async function draw(page: Page, x = 400) {
   await page.mouse.up();
 }
 
+test("标签页保留协作画布的撤销历史，后台远端更新后清空旧历史", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const other = await browser.newContext({
+    baseURL,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  try {
+    const original = (
+      await (
+        await owner.context.request.get(`/api/canvases/${owner.id}`)
+      ).json()
+    ).canvas;
+    const catalog = await (
+      await owner.context.request.get(
+        `/api/workspaces/${original.workspaceId}/canvases`,
+      )
+    ).json();
+    const created = await owner.context.request.post(
+      `/api/workspaces/${original.workspaceId}/canvases`,
+      {
+        headers: { Origin: baseURL!, "X-Requested-With": "excalidraw-demo" },
+        data: { name: "第二张画布", catalogRevision: catalog.catalogRevision },
+      },
+    );
+
+    expect(created.status(), await created.text()).toBe(200);
+    const second = (await created.json()).canvas;
+
+    await call(owner.context, baseURL!, owner.id, "access");
+    await call(owner.context, baseURL!, second.id, "access");
+    const page = await owner.context.newPage();
+
+    await open(page, "/", true);
+    await page.locator(`[data-canvas-id="${owner.id}"] .canvas-name`).click();
+    await expect(page.locator(`#canvas-tab-${owner.id}`)).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    // Main workspace has a sidebar and a properties panel to its right.
+    await draw(page, 700);
+    await expect
+      .poll(() =>
+        editorState(page).then(
+          (state) =>
+            state.elements.filter((element: any) => !element.isDeleted).length,
+        ),
+      )
+      .toBe(1);
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    await page.getByTestId("toolbar-ellipse").click();
+    await expect
+      .poll(() => editorState(page).then((state) => state.activeTool.type))
+      .toBe("ellipse");
+    await page.locator(`[data-canvas-id="${second.id}"] .canvas-name`).click();
+    await expect(
+      page.getByRole("tab", { name: "第二张画布", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "撤销", exact: true }),
+    ).toBeDisabled();
+    await page.locator(`#canvas-tab-${owner.id}`).click();
+    await expect
+      .poll(() => editorState(page).then((state) => state.activeTool.type))
+      .toBe("ellipse");
+    await expect(
+      page.getByRole("button", { name: "撤销", exact: true }),
+    ).toBeEnabled();
+    await page.getByRole("button", { name: "撤销", exact: true }).click();
+    await expect
+      .poll(() =>
+        editorState(page).then(
+          (state) =>
+            state.elements.filter((element: any) => !element.isDeleted).length,
+        ),
+      )
+      .toBe(0);
+    await page.getByRole("button", { name: "重做", exact: true }).click();
+    await expect
+      .poll(() =>
+        editorState(page).then(
+          (state) =>
+            state.elements.filter((element: any) => !element.isDeleted).length,
+        ),
+      )
+      .toBe(1);
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    await page.getByRole("tab", { name: "第二张画布", exact: true }).click();
+    const login = await other.request.post("/api/login", {
+      headers: { Origin: baseURL!, "X-Requested-With": "excalidraw-demo" },
+      data: { email: owner.email, password: "CollaborationBrowser123!" },
+    });
+
+    expect(login.status(), await login.text()).toBe(200);
+    const remote = await other.newPage();
+
+    await open(remote, `/c/${owner.id}`, true);
+    await draw(remote, 650);
+    await expect(
+      remote.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        editorState(remote).then(
+          (state) =>
+            state.elements.filter((element: any) => !element.isDeleted).length,
+        ),
+      )
+      .toBe(2);
+    await expect
+      .poll(() =>
+        editorState(page).then(
+          (state) =>
+            state.elements.filter((element: any) => !element.isDeleted).length,
+        ),
+      )
+      .toBe(0);
+    await page.locator(`#canvas-tab-${owner.id}`).click();
+    await expect
+      .poll(() =>
+        editorState(page).then(
+          (state) =>
+            state.elements.filter((element: any) => !element.isDeleted).length,
+        ),
+      )
+      .toBe(2);
+    await expect(
+      page.getByRole("button", { name: "撤销", exact: true }),
+    ).toBeDisabled();
+  } finally {
+    await other.close();
+    await owner.context.close();
+  }
+});
+
 test("旧画布的已保存浏览器缓存迁入协作后正常解锁，并在重开时复用新版本", async ({
   browser,
   baseURL,
@@ -750,6 +898,7 @@ test("移动端协作画布解锁使用抓手，手动选择工具后远端更�
   baseURL,
 }) => {
   const owner = await account(browser, baseURL!);
+
   // These regressions target the collaboration wrapper, not lazy activation.
   await call(owner.context, baseURL!, owner.id, "access");
   const other = await browser.newContext({ baseURL });
@@ -866,6 +1015,7 @@ test("协作编辑器即时应用 Ctrl 多选开关，独立选择不写入共�
   baseURL,
 }) => {
   const owner = await account(browser, baseURL!);
+
   // These regressions target the collaboration wrapper, not lazy activation.
   await call(owner.context, baseURL!, owner.id, "access");
   const guestContext = await browser.newContext({

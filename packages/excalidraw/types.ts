@@ -1,4 +1,5 @@
 import type { CanvasRenderingOptions } from "./renderer/renderingOptions";
+import type { History } from "./history";
 import type {
   IMAGE_MIME_TYPES,
   UserIdleState,
@@ -1383,6 +1384,8 @@ export interface ExcalidrawImperativeAPI {
   >["getSceneElementsMapIncludingDeleted"];
   history: {
     clear: InstanceType<typeof App>["resetHistory"];
+    getSnapshot: History["getSnapshot"];
+    restoreSnapshot: History["restoreSnapshot"];
   };
   getSceneElements: InstanceType<typeof App>["getSceneElements"];
   getAppState: () => InstanceType<typeof App>["state"];

@@ -7,6 +7,8 @@ import type {
 } from "#shared/contracts";
 import type { WorkspaceApi } from "~/lib/workspaceApi";
 import { collaborationSession } from "~/lib/collaboration/session";
+import type { AppState } from "@excalidraw/excalidraw/types";
+import type { EditorHistory } from "~/lib/editorHistory";
 import { ApiError } from "~/lib/api";
 import { canvasRevisionScope } from "#shared/snapshotValidator";
 import {
@@ -26,7 +28,13 @@ export interface CanvasResource {
   version: number;
   confirmed: boolean;
   metadataGeneration: number;
-  editorContext?: { viewModeEnabled: boolean; activeTool: unknown };
+  historyGeneration: number;
+  editorContext?: {
+    viewModeEnabled: boolean;
+    activeTool: unknown;
+    viewport?: Pick<AppState, "scrollX" | "scrollY" | "zoom">;
+    history?: EditorHistory;
+  };
   accessDenied: boolean;
 }
 
@@ -51,6 +59,10 @@ export class CanvasResources {
   private reads = new Set<AbortController>();
   private disposed = false;
   private activeId = "";
+  private editorContexts = new Map<
+    string,
+    NonNullable<CanvasResource["editorContext"]>
+  >();
   private pendingWrites = 0;
   private writeWaiters: (() => void)[] = [];
 
@@ -89,6 +101,7 @@ export class CanvasResources {
     this.deleted.add(id);
     this.canvases.get(id)?.resource.dispose();
     this.canvases.delete(id);
+    this.editorContexts.delete(id);
     await this.cache.remove(cacheKey(this.owner, "canvas", id));
     this.notify();
   }
@@ -96,6 +109,20 @@ export class CanvasResources {
   setActive(id: string) {
     this.activeId = id;
     this.evict();
+  }
+
+  releaseEditorHistory(id: string) {
+    const entry = this.canvases.get(id);
+
+    if (entry) {
+      // A closing wrapper must not put its just-discarded history back on unmount.
+      entry.historyGeneration++;
+      if (entry.editorContext) delete entry.editorContext.history;
+    }
+
+    const context = this.editorContexts.get(id);
+
+    if (context) delete context.history;
   }
 
   private evict() {
@@ -116,6 +143,8 @@ export class CanvasResources {
 
       bytes += snapshotBytes(entry.document);
       if (index >= 4 || bytes > 64 * 1024 * 1024) {
+        if (entry.editorContext)
+          this.editorContexts.set(entry.document.id, entry.editorContext);
         entry.resource.dispose();
         this.canvases.delete(entry.document.id);
       }
@@ -131,8 +160,12 @@ export class CanvasResources {
       version: 0,
       confirmed: true,
       metadataGeneration: 0,
+      historyGeneration: 0,
       accessDenied: false,
+      editorContext: this.editorContexts.get(document.id),
     } as CanvasResource;
+
+    this.editorContexts.delete(document.id);
 
     entry.resource = new PersistentResource({
       key: `${this.owner}:canvas:${document.id}`,
@@ -629,6 +662,7 @@ export class CanvasResources {
     this.library?.dispose();
     this.writeWaiters.splice(0).forEach((resolve) => resolve());
     this.canvases.clear();
+    this.editorContexts.clear();
     this.cache.clearMemory();
   }
 }

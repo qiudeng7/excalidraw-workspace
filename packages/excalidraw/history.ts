@@ -19,7 +19,7 @@ export class HistoryDelta extends StoreDelta {
   public applyTo(
     elements: SceneElementsMap,
     appState: AppState,
-    snapshot: StoreSnapshot,
+    snapshot: Pick<StoreSnapshot, "elements">,
   ): [SceneElementsMap, AppState, boolean] {
     const [nextElements, elementsContainVisibleChange] = this.elements.applyTo(
       elements,
@@ -87,6 +87,13 @@ export class HistoryChangedEvent {
   ) {}
 }
 
+/** In-memory only. Deltas retain their prototypes and are never serialized. */
+export interface HistorySnapshot {
+  undoStack: readonly HistoryDelta[];
+  redoStack: readonly HistoryDelta[];
+  elements: SceneElementsMap;
+}
+
 export class History {
   public readonly onHistoryChangedEmitter = new Emitter<
     [HistoryChangedEvent]
@@ -94,6 +101,7 @@ export class History {
 
   public readonly undoStack: HistoryDelta[] = [];
   public readonly redoStack: HistoryDelta[] = [];
+  private restoredElements?: SceneElementsMap;
 
   public get isUndoStackEmpty() {
     return this.undoStack.length === 0;
@@ -108,6 +116,30 @@ export class History {
   public clear() {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
+    this.restoredElements = undefined;
+    this.onHistoryChangedEmitter.trigger(new HistoryChangedEvent());
+  }
+
+  public getSnapshot(): HistorySnapshot {
+    return {
+      undoStack: [...this.undoStack],
+      redoStack: [...this.redoStack],
+      elements: new Map([
+        ...(this.restoredElements ?? []),
+        ...this.store.snapshot.elements,
+      ]) as SceneElementsMap,
+    };
+  }
+
+  public restoreSnapshot(snapshot: HistorySnapshot) {
+    this.undoStack.length = 0;
+    for (const delta of snapshot.undoStack) this.undoStack.push(delta);
+    this.redoStack.length = 0;
+    for (const delta of snapshot.redoStack) this.redoStack.push(delta);
+    this.restoredElements = new Map(snapshot.elements) as SceneElementsMap;
+    this.onHistoryChangedEmitter.trigger(
+      new HistoryChangedEvent(this.isUndoStackEmpty, this.isRedoStackEmpty),
+    );
   }
 
   /**
@@ -179,9 +211,21 @@ export class History {
       while (historyDelta) {
         try {
           [nextElements, nextAppState, containsVisibleChange] =
-            historyDelta.applyTo(nextElements, nextAppState, prevSnapshot);
+            historyDelta.applyTo(nextElements, nextAppState, {
+              elements: this.restoredElements
+                ? (new Map([
+                    ...this.restoredElements,
+                    ...prevSnapshot.elements,
+                  ]) as SceneElementsMap)
+                : prevSnapshot.elements,
+            });
 
-          const prevElements = prevSnapshot.elements;
+          const prevElements = this.restoredElements
+            ? (new Map([
+                ...this.restoredElements,
+                ...prevSnapshot.elements,
+              ]) as SceneElementsMap)
+            : prevSnapshot.elements;
           const nextSnapshot = prevSnapshot.maybeClone(
             action,
             nextElements,

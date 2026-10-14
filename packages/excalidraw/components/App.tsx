@@ -964,6 +964,8 @@ class App extends React.Component<AppProps, AppState> {
         this.getSceneElementsMapIncludingDeleted,
       history: {
         clear: this.resetHistory,
+        getSnapshot: () => this.history.getSnapshot(),
+        restoreSnapshot: (snapshot) => this.history.restoreSnapshot(snapshot),
       },
       setViewport: this.viewport.setViewport,
       getViewportOffsets: this.viewport.getOffsets,

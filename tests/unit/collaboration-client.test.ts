@@ -3,13 +3,19 @@ import assert from "node:assert/strict";
 import { setImmediate } from "node:timers/promises";
 import "fake-indexeddb/auto";
 import { indexedDB } from "fake-indexeddb";
-import { CollaborationSession } from "../../src/lib/collaboration/session";
+import {
+  CollaborationSession,
+  collaborationSession,
+  closeCollaboration,
+  hasUnsyncedCollaboration,
+} from "../../src/lib/collaboration/session";
 import {
   createRoom,
   execute,
   type Command,
 } from "../../shared/collaboration/room";
 import { canonical } from "../../shared/collaboration/merge";
+import { ConfirmedCache } from "../../src/lib/confirmedCache";
 import type { Operation, Element } from "../../shared/collaboration/types";
 
 async function until(predicate: () => boolean) {
@@ -63,6 +69,136 @@ class Socket extends EventTarget {
     );
   }
 }
+
+test("a refresh superseded by an ACK still publishes its confirmed view generation", async () => {
+  const originals = Object.fromEntries(
+    ["fetch", "navigator", "sessionStorage"].map((key) => [
+      key,
+      Object.getOwnPropertyDescriptor(globalThis, key),
+    ]),
+  );
+  const room = createRoom("view-generation", "owner", "Canvas", "epoch", {
+    elements: [],
+    appState: {},
+    files: {},
+  });
+  let delayView = false;
+  let release!: () => void;
+  let requested!: () => void;
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const define = (key: string, value: unknown) =>
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+
+  define("navigator", {});
+  define("sessionStorage", {
+    getItem: () => "generation-test",
+    setItem: () => {},
+  });
+  define("fetch", async (url: string, init: RequestInit) => {
+    const path = url.split("/").at(-1);
+    let command: Command;
+
+    if (path === "access") command = { type: "access" };
+    else if (path === "view") command = { type: "view" };
+    else if (path === "update") {
+      const operation = JSON.parse(String(init.body)) as Operation;
+
+      command = { type: "update", operation, digest: canonical(operation) };
+    } else throw new Error(`Unexpected API ${path}`);
+    const result = structuredClone(
+      execute(room, { userId: "owner", name: "Owner" }, command, Date.now()),
+    );
+
+    if (path === "view" && delayView) {
+      requested();
+      await waiting;
+    }
+
+    return Response.json(result);
+  });
+  const session = new CollaborationSession({
+    canvasId: room.id,
+    userId: "owner",
+    scope: "generation",
+  });
+  const observed: number[] = [];
+  const originalPut = ConfirmedCache.prototype.put;
+  let releaseCache = () => {};
+  const unsubscribe = session.subscribe(() =>
+    observed.push(session.viewGeneration),
+  );
+
+  try {
+    await session.start(false);
+    assert.equal(session.viewGeneration, 1);
+    delayView = true;
+    const refreshing = session.refresh();
+
+    await started;
+    session.update({ elements: [element("a")], appState: {}, files: {} });
+    await session.flush();
+    assert.equal(session.view?.seq, 1);
+    assert.equal(session.viewGeneration, 1);
+    release();
+    await refreshing;
+    assert.equal(
+      session.view?.seq,
+      1,
+      "a delayed GET must not roll back the accepted ACK",
+    );
+    assert.equal(session.viewGeneration, 2);
+    assert.equal(
+      observed.at(-1),
+      2,
+      "the reopening wrapper receives fresh proof even when the GET is ignored",
+    );
+    delayView = false;
+    let cacheEntered!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      cacheEntered = resolve;
+    });
+    const pendingCache = new Promise<void>((resolve) => {
+      releaseCache = resolve;
+    });
+
+    ConfirmedCache.prototype.put = async function (key, value, revisionScope) {
+      cacheEntered();
+      await pendingCache;
+
+      return originalPut.call(this, key, value, revisionScope);
+    };
+
+    const startingAgain = session.start(false);
+
+    await entered;
+    const mountGeneration = session.viewGeneration;
+    const joinedStart = session.start(false);
+
+    releaseCache();
+    await Promise.all([startingAgain, joinedStart]);
+    assert.equal(
+      session.viewGeneration,
+      mountGeneration + 1,
+      "a wrapper mounting during cache.put observes new proof when the shared start completes",
+    );
+    assert.equal(observed.at(-1), session.viewGeneration);
+  } finally {
+    release();
+    releaseCache();
+    ConfirmedCache.prototype.put = originalPut;
+    unsubscribe();
+    session.dispose();
+    for (const [key, descriptor] of Object.entries(originals)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});
 
 const element = (id: string, version = 1, x = 0): Element => ({
   id,
@@ -153,7 +289,7 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
     return Response.json(result);
   });
   const options = { canvasId: room.id, userId: "owner", scope: "test" };
-  let session = new CollaborationSession(options);
+  let session = collaborationSession(options);
   let unsubscribe = session.subscribe(() => {});
 
   try {
@@ -172,6 +308,14 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
     const saving = session.flush();
 
     await until(() => !!release);
+    unsubscribe();
+    assert.equal(
+      hasUnsyncedCollaboration("owner"),
+      true,
+      "a closed view's pending queue must still protect page unload",
+    );
+    assert.equal(hasUnsyncedCollaboration("another-owner"), false);
+    unsubscribe = session.subscribe(() => {});
     session.update({
       elements: [element("a", 2, 100)],
       files: {},
@@ -181,6 +325,7 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
     release!();
     await saving;
     assert.equal(session.dirty, false);
+    assert.equal(hasUnsyncedCollaboration("owner"), false);
     assert.equal(room.scene.elements[0]?.x, 100);
     assert.equal(posts, 2);
     session.update({
@@ -246,6 +391,7 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
   } finally {
     unsubscribe();
     session.dispose();
+    closeCollaboration("owner", "test");
     for (const [key, descriptor] of Object.entries(originals)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
       else Reflect.deleteProperty(globalThis, key);
