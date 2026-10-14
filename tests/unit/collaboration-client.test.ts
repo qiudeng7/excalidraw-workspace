@@ -197,7 +197,7 @@ test("a refresh superseded by an ACK still publishes its confirmed view generati
     releaseCache();
     ConfirmedCache.prototype.put = originalPut;
     unsubscribe();
-    session.dispose();
+    await session.dispose();
     for (const [key, descriptor] of Object.entries(originals)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
       else Reflect.deleteProperty(globalThis, key);
@@ -264,6 +264,12 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
     const path = url.split("/").at(-1);
     let command: Command;
 
+    if (path === "presence")
+      return Response.json({
+        participants: 2,
+        realtime: true,
+        leaseExpiresAt: Date.now() + 150000,
+      });
     if (path === "ticket")
       return Response.json({ ticket: `ticket-${++tickets}` });
     if (path === "access") command = { type: "access" };
@@ -299,7 +305,10 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
 
   try {
     await session.start();
-    await until(() => session.status === "ready");
+    await until(
+      () =>
+        Socket.authenticated.includes("ticket-1") && session.status === "ready",
+    );
     assert.equal(tickets, 1);
     Socket.instances.at(-1)!.close();
     await until(() => tickets === 2 && session.status === "ready");
@@ -356,7 +365,7 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
 
     await session.checkpoint();
     unsubscribe();
-    session.dispose();
+    await session.dispose();
     session = new CollaborationSession(options);
     unsubscribe = session.subscribe(() => {});
     await session.start();
@@ -377,7 +386,7 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
     await assert.rejects(session.flush(), /ACK lost/);
     await session.checkpoint();
     unsubscribe();
-    session.dispose();
+    await session.dispose();
     room.epoch = "restored-epoch";
     room.seq = 0;
     room.operations = {};
@@ -395,7 +404,7 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
     assert.equal(room.seq, 0, "an old epoch must never be silently replayed");
   } finally {
     unsubscribe();
-    session.dispose();
+    await session.dispose();
     closeCollaboration("owner", "test");
     for (const [key, descriptor] of Object.entries(originals)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
@@ -489,7 +498,7 @@ test("legacy adoption preserves remote additions and changes, persists before re
       99,
     );
     assert.equal(session.value.appState.viewBackgroundColor, "#abcdef");
-    session.dispose();
+    await session.dispose();
     session = new CollaborationSession(options);
     await session.start(false);
     assert.equal(session.dirty, true);
@@ -505,7 +514,7 @@ test("legacy adoption preserves remote additions and changes, persists before re
       99,
     );
   } finally {
-    session.dispose();
+    await session.dispose();
     for (const [key, descriptor] of Object.entries(originals)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor);
       else Reflect.deleteProperty(globalThis, key);
@@ -572,7 +581,7 @@ test("editing after a lost ACK keeps the attempted payload immutable, including 
       assert.equal(room.seq, 1);
       if (reload) {
         await session.checkpoint();
-        session.dispose();
+        await session.dispose();
         session = new CollaborationSession(options);
         await session.start(false);
       }
@@ -592,10 +601,10 @@ test("editing after a lost ACK keeps the attempted payload immutable, including 
         "retry must use exactly the originally attempted operation",
       );
       assert.notEqual(operations[2]?.opId, operations[0]?.opId);
-      session.dispose();
+      await session.dispose();
     }
   } finally {
-    session?.dispose();
+    await session?.dispose();
     globalThis.fetch = originalFetch;
   }
 });
@@ -679,7 +688,7 @@ test("permission changes keep the previous editor draft discoverable without rep
     });
     await assert.rejects(session.flush(), /offline/);
     await session.checkpoint();
-    session.dispose();
+    await session.dispose();
     for (const role of ["viewer", "editor"] as const) {
       member(role);
       session = new CollaborationSession(options);
@@ -705,7 +714,7 @@ test("permission changes keep the previous editor draft discoverable without rep
         true,
         "cancelling must preserve the old queue",
       );
-      session.dispose();
+      await session.dispose();
     }
 
     // Reopen once more to prove cancelling did not remove the persisted backup.
@@ -778,7 +787,7 @@ test("permission changes keep the previous editor draft discoverable without rep
       ["new"],
     );
   } finally {
-    session?.dispose();
+    await session?.dispose();
     globalThis.fetch = originalFetch;
   }
 });
@@ -818,4 +827,312 @@ test("draft recovery discovery stays within the current account, canvas and tab"
   assert.equal((await findRecoveryDraft(current))?.key, previous);
   await draftStorage(previous, "put", { ...draft, operations: [] });
   assert.equal(await findRecoveryDraft(current), undefined);
+});
+
+test("an existing room unlocks on HTTP confirmation while presence is delayed, and saving needs no WS READY", async () => {
+  const names = [
+    "navigator",
+    "sessionStorage",
+    "location",
+    "WebSocket",
+    "fetch",
+    "window",
+    "document",
+  ];
+  const originals = new Map(
+    names.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
+  );
+  const room = createRoom("solo-http-test", "owner", "Solo", "epoch", {
+    elements: [],
+    appState: {},
+    files: {},
+  });
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let presenceEntered = false;
+  let tickets = 0;
+  let failAccess = false;
+  let slowSave = false;
+  let saveEntered = false;
+  let releaseSave!: () => void;
+  const saveWaiting = new Promise<void>((resolve) => {
+    releaseSave = resolve;
+  });
+  const define = (key: string, value: unknown) =>
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+
+  class NoReadySocket extends Socket {
+    send() {}
+  }
+
+  define("navigator", {});
+  define("sessionStorage", {
+    getItem: () => "solo-presence-test",
+    setItem() {},
+  });
+  define("location", { origin: "https://solo.test" });
+  define("WebSocket", NoReadySocket);
+  const page = new EventTarget();
+
+  define("window", page);
+  define(
+    "document",
+    Object.assign(new EventTarget(), { visibilityState: "visible" }),
+  );
+  define("fetch", async (url: string, init: RequestInit) => {
+    const path = url.split("/").at(-1);
+
+    if (path === "access" && failAccess) {
+      failAccess = false;
+      throw new Error("temporary resume network failure");
+    }
+
+    if (path === "presence") {
+      if (!JSON.parse(String(init.body)).leave) {
+        presenceEntered = true;
+        await waiting;
+      }
+
+      return Response.json({
+        participants: 2,
+        realtime: true,
+        leaseExpiresAt: 123456,
+      });
+    }
+
+    if (path === "ticket") {
+      tickets++;
+
+      return Response.json({ ticket: "no-ready" });
+    }
+
+    const command: Command =
+      path === "update"
+        ? {
+            type: "update",
+            operation: JSON.parse(String(init.body)),
+            digest: canonical(JSON.parse(String(init.body))),
+          }
+        : { type: path as "access" | "view" };
+
+    const result = execute(
+      room,
+      { userId: "owner", name: "Owner" },
+      command,
+      Date.now(),
+    );
+
+    if (path === "update" && slowSave) {
+      slowSave = false;
+      saveEntered = true;
+      await saveWaiting;
+    }
+
+    return Response.json(result);
+  });
+  const session = new CollaborationSession({
+    canvasId: room.id,
+    userId: "owner",
+    scope: "solo-presence",
+  });
+  const unsubscribe = session.subscribe(() => {});
+
+  try {
+    await session.start();
+    await until(() => presenceEntered);
+    assert.equal(session.editable, true);
+    assert.equal(
+      tickets,
+      0,
+      "slow presence does not block editing or create an eager WS",
+    );
+    session.update({ elements: [element("a")], appState: {}, files: {} });
+    await session.flush();
+    assert.equal(session.statusText, "已保存");
+    assert.equal(room.scene.elements.length, 1);
+    slowSave = true;
+    session.update({
+      elements: [element("a", 2, 25)],
+      appState: {},
+      files: {},
+    });
+    const savingAcrossSuspend = session.flush();
+
+    await until(() => saveEntered);
+    // bfcache may suspend while both the first lease and an ACK are pending.
+    page.dispatchEvent(new Event("pagehide"));
+    failAccess = true;
+    page.dispatchEvent(new Event("pageshow"));
+    await until(() => session.status === "offline");
+    page.dispatchEvent(new Event("online"));
+    await until(() => session.editable && session.status === "ready");
+    assert.equal(session.value.elements.length, 1);
+    assert.equal(
+      session.dirty,
+      true,
+      "resume must preserve the in-flight queue until its ACK",
+    );
+    assert.equal((session.value.elements[0] as Element).x, 25);
+    releaseSave();
+    await savingAcrossSuspend;
+    release();
+    await until(() => tickets === 1);
+    assert.equal(
+      session.editable,
+      true,
+      "a missing AUTH READY cannot freeze a confirmed HTTP editor",
+    );
+    session.update({
+      elements: [element("a", 3, 50)],
+      appState: {},
+      files: {},
+    });
+    await session.flush();
+    assert.equal(session.statusText, "已保存");
+    assert.equal(room.scene.elements[0]!.x, 50);
+    Socket.instances.at(-1)!.dispatchEvent(
+      new MessageEvent("message", {
+        data: JSON.stringify({ type: "ERROR", message: "连接凭证已过期" }),
+      }),
+    );
+    await until(
+      () =>
+        session.realtimeStatus === "unavailable" && session.status === "ready",
+    );
+    assert.equal(
+      session.editable,
+      true,
+      "a WS authentication error must verify HTTP authority instead of permanently denying edits",
+    );
+    session.update({
+      elements: [element("a", 4, 75)],
+      appState: {},
+      files: {},
+    });
+    await session.flush();
+    assert.equal(room.scene.elements[0]!.x, 75);
+    assert.match(session.statusText, /^已保存/);
+  } finally {
+    releaseSave();
+    release();
+    unsubscribe();
+    await session.dispose();
+    await setImmediate();
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});
+
+test("owner/share remounts serialize a delayed old touch before the new lease and never delete its participation", async () => {
+  const names = ["navigator", "sessionStorage", "fetch"];
+  const originals = new Map(
+    names.map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
+  );
+  const room = createRoom("scope-lease-test", "owner", "Scope", "epoch", {
+    elements: [],
+    appState: {},
+    files: {},
+  });
+  let lease: number | undefined;
+  let touches = 0;
+  let entered = false;
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const define = (key: string, value: unknown) =>
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+
+  define("navigator", {});
+  define("sessionStorage", { getItem: () => "scope-lease-test", setItem() {} });
+  define("fetch", async (url: string, init: RequestInit) => {
+    const path = url.split("/").at(-1);
+
+    if (path === "presence") {
+      const data = JSON.parse(String(init.body));
+
+      if (data.leave) {
+        if (data.leaseExpiresAt !== undefined && data.leaseExpiresAt === lease)
+          lease = undefined;
+      } else {
+        touches++;
+        if (touches === 1) {
+          entered = true;
+          await waiting;
+        }
+
+        lease = Math.max(Date.now() + 150000, (lease ?? 0) + 1);
+      }
+
+      return Response.json({
+        participants: lease ? 1 : 0,
+        realtime: false,
+        leaseExpiresAt: lease,
+      });
+    }
+
+    return Response.json(
+      execute(
+        room,
+        { userId: "owner", name: "Owner" },
+        { type: path as "access" | "view" },
+        Date.now(),
+      ),
+    );
+  });
+  const old = new CollaborationSession({
+    canvasId: room.id,
+    userId: "owner",
+    scope: "account",
+  });
+  const next = new CollaborationSession({
+    canvasId: room.id,
+    userId: "owner",
+    scope: "public:new-scope",
+  });
+  const unsubscribeOld = old.subscribe(() => {});
+  let unsubscribeNext = () => {};
+
+  try {
+    await old.start();
+    await until(() => entered);
+    unsubscribeOld();
+    unsubscribeNext = next.subscribe(() => {});
+    await next.start();
+    assert.equal(
+      next.editable,
+      true,
+      "a prior scope lease never blocks the new HTTP editor",
+    );
+    assert.equal(
+      touches,
+      1,
+      "the second scope waits behind the old touch at the transport boundary",
+    );
+    release();
+    await until(
+      () => touches === 2 && next.participants === 1 && lease !== undefined,
+    );
+    await setImmediate();
+    assert.notEqual(
+      lease,
+      undefined,
+      "late old touch/leave cannot erase the current scope lease",
+    );
+    assert.equal(next.editable, true);
+  } finally {
+    release();
+    unsubscribeOld();
+    unsubscribeNext();
+    await old.dispose();
+    await next.dispose();
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
 });

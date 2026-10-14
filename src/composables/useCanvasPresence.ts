@@ -1,5 +1,6 @@
 import { onBeforeUnmount, watch } from "vue";
 import { api } from "~/lib/api";
+import { enqueueCanvasPresence } from "~/lib/canvasPresence";
 import { getTabScope } from "~/lib/persistence";
 
 /** Track an open editor separately from the account's durable background saves. */
@@ -13,17 +14,27 @@ export function useCanvasPresence(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let current: ReturnType<typeof selection>;
   let pending = false;
+  let leaseExpiresAt: number | undefined;
   let departures = Promise.resolve();
 
-  async function leave(value: NonNullable<typeof current>) {
+  async function leave(
+    value: NonNullable<typeof current>,
+    lease = leaseExpiresAt,
+  ) {
     try {
-      await api(`/api/canvases/${encodeURIComponent(value.id)}/presence`, {
-        method: "POST",
-        keepalive: true,
-        signal: AbortSignal.timeout(3_000),
-        headers: { "X-Resource-Owner": value.owner },
-        body: JSON.stringify({ clientId: await client, leave: true }),
-      });
+      await enqueueCanvasPresence(value.id, async () =>
+        api(`/api/canvases/${encodeURIComponent(value.id)}/presence`, {
+          method: "POST",
+          keepalive: true,
+          signal: AbortSignal.timeout(3_000),
+          headers: { "X-Resource-Owner": value.owner },
+          body: JSON.stringify({
+            clientId: await client,
+            leave: true,
+            leaseExpiresAt: lease,
+          }),
+        }),
+      );
     } catch (error) {
       // The lease expires when a keepalive request cannot finish.
       console.debug("画布离开通知未送达，将等待会话到期", error);
@@ -42,18 +53,22 @@ export function useCanvasPresence(
       // canvas, so a delayed A → B departure cannot delete a fresh B → A open.
       await departures;
       if (ownGeneration !== generation) return;
-      const result = await api<{ syncMode: string }>(
-        `/api/canvases/${encodeURIComponent(value.id)}/presence`,
-        {
-          method: "POST",
-          signal: AbortSignal.timeout(10_000),
-          headers: { "X-Resource-Owner": value.owner },
-          body: JSON.stringify({ clientId: await client }),
-        },
+      const result = await enqueueCanvasPresence(value.id, async () =>
+        api<{ syncMode: string; leaseExpiresAt: number }>(
+          `/api/canvases/${encodeURIComponent(value.id)}/presence`,
+          {
+            method: "POST",
+            signal: AbortSignal.timeout(10_000),
+            headers: { "X-Resource-Owner": value.owner },
+            body: JSON.stringify({ clientId: await client }),
+          },
+        ),
       );
 
+      leaseExpiresAt = result.leaseExpiresAt;
       if (ownGeneration !== generation) {
-        await leave(value);
+        if (current?.id !== value.id || current?.owner !== value.owner)
+          await leave(value);
 
         return;
       }
@@ -88,9 +103,14 @@ export function useCanvasPresence(
       current = selection();
       if (
         previous &&
+        previous.mode !== "collaborative" &&
         (previous.id !== current?.id || previous.owner !== current?.owner)
-      )
-        departures = departures.then(() => leave(previous));
+      ) {
+        const lease = leaseExpiresAt;
+
+        departures = departures.then(() => leave(previous, lease));
+      }
+
       void touch();
     },
     { immediate: true },
@@ -115,7 +135,7 @@ export function useCanvasPresence(
       });
   };
   const close = () => {
-    if (current) void leave(current);
+    if (current && current.mode !== "collaborative") void leave(current);
   };
 
   window.addEventListener("pagehide", close);

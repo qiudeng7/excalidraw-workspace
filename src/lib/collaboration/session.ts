@@ -9,6 +9,7 @@ import type {
 import { orderElements, wins } from "#shared/collaboration/merge";
 import { api, ApiError } from "~/lib/api";
 import { ConfirmedCache } from "~/lib/confirmedCache";
+import { enqueueCanvasPresence } from "~/lib/canvasPresence";
 import { getTabScope } from "~/lib/persistence";
 import {
   draftStorage,
@@ -68,6 +69,30 @@ export class CollaborationSession {
   private authorizedOnce = false;
   private failures = 0;
   private confirmedViews = 0;
+  participants = 1;
+  realtimeStatus: "idle" | "connecting" | "connected" | "unavailable" = "idle";
+  private presenceGeneration = 0;
+  private presenceQueue = Promise.resolve();
+  private presenceClient = "";
+  private presenceActive = false;
+  private presenceLease?: number;
+  private resume = () => {
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState !== "visible"
+    )
+      return;
+    if (this.listeners.size) {
+      if (this.presenceActive) void this.pollPresence();
+      else void this.resumeAfterSuspension();
+    }
+  };
+  private suspend = () => {
+    this.disconnect();
+    window.addEventListener("pageshow", this.resume);
+    window.addEventListener("online", this.resume);
+    document.addEventListener("visibilitychange", this.resume);
+  };
 
   constructor(readonly options: SessionOptions) {}
 
@@ -107,6 +132,10 @@ export class CollaborationSession {
       return `固定版本 · ${this.view.snapshot?.label ?? ""}`;
     if (this.view?.access.viewMode === "latest")
       return `最新版 · ${new Date(this.view.readAt).toLocaleTimeString()}`;
+    if (this.realtimeStatus === "unavailable")
+      return this.view?.access.role === "viewer"
+        ? "实时查看 · 实时连接中断"
+        : "已保存 · 实时连接中断";
     if (this.view?.access.role === "viewer") return "实时查看";
 
     return "已保存";
@@ -117,11 +146,42 @@ export class CollaborationSession {
 
     return () => {
       this.listeners.delete(listener);
-      if (!this.listeners.size && !this.dirty) this.disconnect();
+      if (!this.listeners.size) this.disconnect();
     };
   }
 
   private disconnect() {
+    this.presenceGeneration++;
+    this.presenceActive = false;
+    if (typeof window !== "undefined") {
+      window.removeEventListener("online", this.resume);
+      window.removeEventListener("pageshow", this.resume);
+      window.removeEventListener("pagehide", this.suspend);
+      document.removeEventListener("visibilitychange", this.resume);
+    }
+
+    if (this.presenceClient) {
+      const clientId = this.presenceClient;
+
+      this.presenceQueue = enqueueCanvasPresence(
+        this.options.canvasId,
+        async () => {
+          try {
+            await this.request(
+              "presence",
+              { clientId, leave: true, leaseExpiresAt: this.presenceLease },
+              "POST",
+              true,
+            );
+          } catch (error) {
+            // A failed departure expires with its server-side lease.
+            console.debug("画布离开通知未送达，将等待会话到期", error);
+          }
+        },
+      );
+    }
+
+    this.realtimeStatus = "idle";
     const socket = this.socket;
 
     this.socket = undefined;
@@ -129,7 +189,7 @@ export class CollaborationSession {
     this.peers.clear();
     clearInterval(this.pollTimer);
     this.pollTimer = undefined;
-    clearTimeout(this.retryTimer);
+    if (!this.dirty) clearTimeout(this.retryTimer);
     socket?.close();
   }
 
@@ -150,11 +210,14 @@ export class CollaborationSession {
     path: string,
     payload?: unknown,
     method = payload === undefined ? "GET" : "POST",
+    keepalive = false,
   ) {
     return api<T>(
       `/api/canvases/${encodeURIComponent(this.options.canvasId)}/collaboration/${path}`,
       {
         method,
+        keepalive,
+        ...(path === "presence" ? { signal: AbortSignal.timeout(10_000) } : {}),
         headers: this.headers(),
         ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
       },
@@ -245,15 +308,35 @@ export class CollaborationSession {
       await this.refresh();
       if (this.disposed) return;
       this.authorizedOnce = true;
-      if (access.viewMode === "live" && connect) await this.connect();
-      else {
-        this.status = "ready";
-        this.changed();
+      // HTTP access + the authoritative view unlock editing and ACK-based saving.
+      // A persisted room is not evidence of another currently open editor.
+      this.status = "ready";
+      this.message = "";
+      this.changed();
+      if (connect && this.listeners.size) {
+        this.presenceActive = access.viewMode === "live";
+        if (this.presenceActive) {
+          const generation = this.presenceGeneration;
+
+          this.presenceClient = await getTabScope();
+          if (!this.listeners.size || generation !== this.presenceGeneration)
+            return;
+          if (typeof window !== "undefined") {
+            window.addEventListener("online", this.resume);
+            window.addEventListener("pageshow", this.resume);
+            window.addEventListener("pagehide", this.suspend);
+            document.addEventListener("visibilitychange", this.resume);
+          }
+
+          void this.syncPresence().catch((error: unknown) =>
+            this.realtimeUnavailable(error),
+          );
+        }
+
+        this.pollTimer ??= setInterval(() => void this.pollPresence(), 15_000);
       }
 
-      this.pollTimer ??= setInterval(() => {
-        void this.recheckAccess();
-      }, 50000);
+      if (connect && this.dirty && this.editable) await this.flush();
     } catch (error) {
       this.failed(error);
     }
@@ -642,10 +725,7 @@ export class CollaborationSession {
     }
 
     this.failures = 0;
-    this.status =
-      this.subscribed || this.view?.access.viewMode !== "live"
-        ? "ready"
-        : "offline";
+    this.status = "ready";
     this.rebase();
     this.changed();
     if (!this.listeners.size) this.disconnect();
@@ -715,10 +795,121 @@ export class CollaborationSession {
     this.changed();
   }
 
+  private realtimeUnavailable(error?: unknown) {
+    if (
+      error instanceof ApiError &&
+      [401, 403, 404, 410].includes(error.status)
+    ) {
+      this.failed(error);
+
+      return;
+    }
+
+    this.realtimeStatus = "unavailable";
+    this.changed();
+  }
+
+  private async syncPresence() {
+    const generation = this.presenceGeneration;
+    const task = enqueueCanvasPresence(this.options.canvasId, async () => {
+      if (!this.presenceActive || generation !== this.presenceGeneration)
+        return;
+      const result = await this.request<{
+        participants: number;
+        realtime: boolean;
+        leaseExpiresAt: number;
+      }>("presence", { clientId: this.presenceClient });
+
+      if (!this.presenceActive || generation !== this.presenceGeneration)
+        return;
+      this.presenceLease = result.leaseExpiresAt;
+      this.participants = result.participants;
+      if (result.realtime) await this.connect();
+      else {
+        const socket = this.socket;
+
+        this.socket = undefined;
+        this.subscribed = false;
+        this.peers.clear();
+        this.realtimeStatus = "idle";
+        socket?.close();
+      }
+
+      this.changed();
+    });
+
+    this.presenceQueue = task.catch(() => {});
+
+    return task;
+  }
+
+  private async resumeAfterSuspension() {
+    if (this.disposed || !this.listeners.size || this.presenceActive) return;
+    const generation = this.presenceGeneration;
+
+    try {
+      this.status = "checking";
+      this.changed();
+      await this.recheckAccess();
+      if (!this.listeners.size || generation !== this.presenceGeneration)
+        return;
+      if (["denied", "recovery", "error", "offline"].includes(this.status))
+        return;
+      await this.refresh();
+      if (!this.listeners.size || generation !== this.presenceGeneration)
+        return;
+      // Refresh rebases the current in-memory queue, rather than reloading a
+      // checkpoint while an older HTTP save may still be in flight.
+      this.status = "ready";
+      this.presenceActive = this.view?.access.viewMode === "live";
+      this.changed();
+      if (this.presenceActive) {
+        window.addEventListener("online", this.resume);
+        window.addEventListener("pageshow", this.resume);
+        window.addEventListener("pagehide", this.suspend);
+        document.addEventListener("visibilitychange", this.resume);
+        await this.syncPresence().catch((error: unknown) =>
+          this.realtimeUnavailable(error),
+        );
+      }
+
+      this.pollTimer ??= setInterval(() => void this.pollPresence(), 15_000);
+      this.changed();
+      await this.flush();
+    } catch (error) {
+      this.failed(error);
+    }
+  }
+
+  private async pollPresence() {
+    if (this.disposed || !this.listeners.size) return;
+    try {
+      await this.recheckAccess();
+      if (["denied", "recovery", "error"].includes(this.status)) return;
+      if (this.presenceActive) {
+        await this.syncPresence().catch((error: unknown) =>
+          this.realtimeUnavailable(error),
+        );
+        if (["denied", "recovery"].includes(this.status)) return;
+        // HTTP remains a convergence path while another session cannot reach WS.
+        if (!this.subscribed) await this.refresh();
+      }
+
+      if (this.dirty) await this.flush();
+      else if (this.status === "offline") {
+        this.status = "ready";
+        this.message = "";
+        this.changed();
+      }
+    } catch (error) {
+      this.failed(error);
+    }
+  }
+
   private async connect() {
     if (this.disposed || this.socket || this.view?.access.viewMode !== "live")
       return;
-    this.status = "connecting";
+    this.realtimeStatus = "connecting";
     this.changed();
     const url = new URL(
       `/api/canvases/${encodeURIComponent(this.options.canvasId)}/realtime`,
@@ -738,7 +929,8 @@ export class CollaborationSession {
 
           return url.href;
         } catch (error) {
-          if (!["denied", "recovery"].includes(this.status)) this.failed(error);
+          if (!["denied", "recovery"].includes(this.status))
+            this.realtimeUnavailable(error);
           throw error;
         }
       },
@@ -763,6 +955,7 @@ export class CollaborationSession {
 
         if (message.type === "READY") {
           this.subscribed = true;
+          this.realtimeStatus = "connected";
           await this.refresh();
           this.status = "ready";
           this.changed();
@@ -782,10 +975,23 @@ export class CollaborationSession {
           message.type === "ACCESS_CHANGED" ||
           message.type === "ERROR"
         ) {
-          this.status = "denied";
-          this.message = message.message;
-          this.socket?.close();
-          this.changed();
+          // A transport AUTH/ERROR can expire independently of HTTP authority.
+          // Verify permissions instead of permanently locking a healthy editor.
+          this.socket = undefined;
+          this.subscribed = false;
+          this.peers.clear();
+          socket.close();
+          this.realtimeUnavailable();
+          await this.recheckAccess();
+          if (
+            !["denied", "recovery", "error", "offline"].includes(this.status)
+          ) {
+            await this.refresh();
+            this.status = "ready";
+            this.message = "";
+            this.changed();
+            await this.flush();
+          }
         }
       })().catch((error: unknown) => this.failed(error));
     };
@@ -795,16 +1001,14 @@ export class CollaborationSession {
       this.subscribed = false;
       this.peers.clear();
       if (["denied", "recovery"].includes(this.status)) return;
-      this.status = "offline";
+      this.realtimeStatus = "unavailable";
       this.changed();
     };
 
     socket.onerror = () => {
       if (this.disposed || ["denied", "recovery"].includes(this.status)) return;
       this.subscribed = false;
-      this.status = this.authorizedOnce ? "offline" : "error";
-      this.message = "连接中断，正在重连；修改会保留在本地";
-      this.changed();
+      this.realtimeUnavailable();
     };
   }
 
@@ -873,9 +1077,19 @@ export class CollaborationSession {
       () => {
         void (async () => {
           if (this.authorizedOnce) {
+            if (
+              this.listeners.size &&
+              !this.presenceActive &&
+              this.view?.access.viewMode === "live"
+            ) {
+              await this.resumeAfterSuspension();
+
+              return;
+            }
+
             await this.recheckAccess();
             if (["denied", "recovery"].includes(this.status)) return;
-            await this.connect();
+            if (this.presenceActive) await this.syncPresence();
             await this.flush();
           } else await this.start();
         })().catch((error: unknown) => this.failed(error));
@@ -885,12 +1099,15 @@ export class CollaborationSession {
   }
 
   dispose() {
+    if (this.disposed) return this.presenceQueue;
     this.disposed = true;
     clearTimeout(this.retryTimer);
     clearTimeout(this.saveTimer);
     clearInterval(this.pollTimer);
-    this.socket?.close();
+    this.disconnect();
     this.listeners.clear();
+
+    return this.presenceQueue;
   }
 }
 
