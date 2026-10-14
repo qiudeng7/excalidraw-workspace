@@ -10,6 +10,7 @@ import {
 import { editorState } from "./fixtures";
 import { currentRelease } from "../../src/data/releases";
 import { announcementKey } from "../../src/lib/releaseProgress";
+import { readFile } from "node:fs/promises";
 
 test.skip(
   !process.env.COLLABORATION_LIVE_TEST,
@@ -93,6 +94,105 @@ async function draw(page: Page, x = 400) {
   await page.mouse.move(x + 110, 380, { steps: 5 });
   await page.mouse.up();
 }
+
+test("权限降级后的旧草稿可下载，取消保留，确认放弃后按当前权限重读", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const invited = await account(browser, baseURL!);
+  const page = await invited.context.newPage();
+
+  try {
+    await call(owner.context, baseURL!, owner.id, "members", {
+      email: invited.email,
+      role: "editor",
+      viewMode: "live",
+    });
+    await open(page, `/c/${owner.id}`, true);
+    await page.route("**/collaboration/update", (route) => route.abort());
+    await draw(page);
+    await expect(
+      page.getByRole("status").filter({ hasText: "离线" }),
+    ).toBeVisible();
+    await call(owner.context, baseURL!, owner.id, "members", {
+      email: invited.email,
+      role: "viewer",
+      viewMode: "live",
+    });
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.reload();
+    const discard = page.getByRole("button", { name: "放弃草稿并重新读取" });
+
+    await expect(discard).toBeVisible();
+    await expect(
+      page.getByText("发现权限变更前尚未同步的草稿", { exact: false }),
+    ).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(discard).toBeInViewport();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    const backup = async () => {
+      const waiting = page.waitForEvent("download");
+
+      await page.getByRole("button", { name: "下载本地备份" }).click();
+      const download = await waiting;
+
+      return JSON.parse(await readFile((await download.path())!, "utf8"));
+    };
+    const first = await backup();
+
+    expect(
+      first.elements.filter((element: any) => !element.isDeleted),
+    ).toHaveLength(1);
+    await discard.click();
+    const confirmation = page.getByRole("dialog", { name: "放弃未同步草稿" });
+
+    await expect(confirmation).toBeVisible();
+    await expect(confirmation).toContainText("无法撤销");
+    await confirmation
+      .getByRole("button", { name: "取消", exact: true })
+      .click();
+    await expect(discard).toBeVisible();
+    expect((await backup()).elements).toEqual(first.elements);
+    await discard.click();
+    await confirmation
+      .getByRole("button", { name: "放弃并重新读取", exact: true })
+      .click();
+    await expect(discard).toBeHidden();
+    await expect(
+      page.getByRole("status").filter({ hasText: /^实时查看$/ }),
+    ).toBeVisible();
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(true);
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements.length))
+      .toBe(0);
+    expect((await call(owner.context, baseURL!, owner.id, "view")).seq).toBe(0);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.unroute("**/collaboration/update");
+    await call(owner.context, baseURL!, owner.id, "members", {
+      email: invited.email,
+      role: "editor",
+      viewMode: "live",
+    });
+    await open(page, `/c/${owner.id}`, true);
+    await draw(page);
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    expect(
+      (await call(owner.context, baseURL!, owner.id, "view")).scene.elements,
+    ).toHaveLength(1);
+  } finally {
+    await invited.context.close();
+    await owner.context.close();
+  }
+});
 
 test("标签页保留协作画布的撤销历史，后台远端更新后清空旧历史", async ({
   browser,
@@ -436,8 +536,17 @@ test("真实房间：双会话合并、远程更新不回传、撤销隔离及�
   const owner = await account(browser, baseURL!);
   const first = await owner.context.newPage();
   const errors: string[] = [];
+  let firstUpdates = 0;
+  let secondUpdates = 0;
 
   first.on("pageerror", (error) => errors.push(error.message));
+  first.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      request.url().endsWith("/collaboration/update")
+    )
+      firstUpdates++;
+  });
   try {
     await open(first, `/c/${owner.id}`, true);
     const link = await call(owner.context, baseURL!, owner.id, "links", {
@@ -451,22 +560,52 @@ test("真实房间：双会话合并、远程更新不回传、撤销隔离及�
     const second = await guestContext.newPage();
 
     second.on("pageerror", (error) => errors.push(error.message));
+    second.on("request", (request) => {
+      if (
+        request.method() === "POST" &&
+        request.url().endsWith("/collaboration/update")
+      )
+        secondUpdates++;
+    });
     try {
       await open(second, link.path, true);
       await draw(first, 350);
       await expect
         .poll(() => editorState(second).then((state) => state.elements.length))
         .toBe(1);
+      await expect(
+        first.getByRole("status").filter({ hasText: /^已保存$/ }),
+      ).toBeVisible();
+      await first.waitForLoadState("networkidle");
+      await expect(
+        second.getByRole("status").filter({ hasText: /^已保存$/ }),
+      ).toBeVisible();
+      expect(
+        secondUpdates,
+        "receiving another editor's drawing must not write",
+      ).toBe(0);
+      const beforeRemote = firstUpdates;
+
       await draw(second, 600);
       await expect
         .poll(() => editorState(first).then((state) => state.elements.length))
         .toBe(2);
-      await expect
-        .poll(
-          async () =>
-            (await call(owner.context, baseURL!, owner.id, "view")).seq,
-        )
-        .toBe(2);
+      await expect(
+        second.getByRole("status").filter({ hasText: /^已保存$/ }),
+      ).toBeVisible();
+      // Let the real update request and resulting render/debounce work settle
+      // before measuring absence of echo writes. Dragging can commit several times.
+      await second.waitForLoadState("networkidle");
+      await expect(
+        first.getByRole("status").filter({ hasText: /^已保存$/ }),
+      ).toBeVisible();
+      expect(
+        firstUpdates,
+        "remote changes must not echo through the first editor",
+      ).toBe(beforeRemote);
+      expect(
+        (await call(owner.context, baseURL!, owner.id, "view")).seq,
+      ).toBeGreaterThanOrEqual(2);
       await first.keyboard.press("Control+z");
       await expect
         .poll(() => editorState(second).then((state) => state.elements.length))
