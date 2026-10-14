@@ -42,7 +42,13 @@ export async function recycleEntries(
         ),
       ),
     db
-      .select({ canvas: canvases, workspace: workspaces })
+      .select({
+        id: canvases.id,
+        name: canvases.name,
+        workspaceId: canvases.workspaceId,
+        deletedAt: canvases.deletedAt,
+        workspaceName: sql<string>`${workspaces.name}`.as("workspaceName"),
+      })
       .from(canvases)
       .innerJoin(workspaces, eq(canvases.workspaceId, workspaces.id))
       .where(
@@ -65,14 +71,14 @@ export async function recycleEntries(
       deletedAt: row.deletedAt!,
       expiresAt: recycleExpiry(row.deletedAt!),
     })),
-    ...files.map(({ canvas, workspace }): RecycleEntry => ({
+    ...files.map((row): RecycleEntry => ({
       kind: "canvas",
-      id: canvas.id,
-      name: canvas.name,
-      workspaceId: workspace.id,
-      workspaceName: workspace.name,
-      deletedAt: canvas.deletedAt!,
-      expiresAt: recycleExpiry(canvas.deletedAt!),
+      id: row.id,
+      name: row.name,
+      workspaceId: row.workspaceId,
+      workspaceName: row.workspaceName,
+      deletedAt: row.deletedAt!,
+      expiresAt: recycleExpiry(row.deletedAt!),
     })),
   ].sort(
     (a, b) =>
