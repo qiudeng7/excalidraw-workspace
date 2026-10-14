@@ -28,6 +28,7 @@ import type { CanvasResource, CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
 import type { UserSettingsStatus } from "~/lib/userSettings";
 import { confirmDialog, isAppDialogOpen } from "~/lib/dialogs";
+import { defaultEditorTool } from "~/lib/editorTools";
 
 const props = defineProps<{
   document: CanvasDocument;
@@ -182,6 +183,9 @@ let userViewMode =
   props.entry.editorContext?.viewModeEnabled ??
   !!props.document.scene.appState.viewModeEnabled;
 let restoringContext = false;
+const initialTool =
+  (props.entry.editorContext?.activeTool as
+    AppState["activeTool"] | undefined) ?? defaultEditorTool(navigator);
 let injectedLibrary = false;
 
 let injectingLibrary: Promise<void> | undefined;
@@ -536,9 +540,7 @@ function CanvasEditor() {
         ...sceneResource.value.appState,
         ...toolDefaults(),
         viewModeEnabled: userViewMode,
-        ...(props.entry.editorContext
-          ? { activeTool: props.entry.editorContext.activeTool }
-          : {}),
+        activeTool: initialTool,
       },
     } as ExcalidrawInitialDataState,
     onInitialize: (editor) => {

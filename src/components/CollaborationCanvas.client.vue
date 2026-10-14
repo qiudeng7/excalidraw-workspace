@@ -23,6 +23,7 @@ import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import "@excalidraw/excalidraw/index.css";
 import "~/assets/editor-layout.css";
 import type {
+  AppState,
   ExcalidrawImperativeAPI,
   ExcalidrawProps,
   ExcalidrawInitialDataState,
@@ -37,6 +38,7 @@ import {
 import { collaborationSession } from "~/lib/collaboration/session";
 import type { CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
+import { defaultEditorTool } from "~/lib/editorTools";
 
 const props = defineProps<{
   canvasId: string;
@@ -84,6 +86,10 @@ let lastPeers = "";
 let renderState = "";
 let historyPreconditions: Operation["preconditions"];
 let displayedElements: readonly ExcalidrawElement[] = [];
+const entry = props.resources?.canvases.get(props.canvasId);
+const initialTool =
+  (entry?.editorContext?.activeTool as AppState["activeTool"] | undefined) ??
+  defaultEditorTool(navigator);
 
 function applySession() {
   if (!alive) return;
@@ -236,6 +242,11 @@ const onChange: NonNullable<ExcalidrawProps["onChange"]> = (
   )
     void ensureLibrary();
   if (session.editable) {
+    if (entry)
+      entry.editorContext = {
+        viewModeEnabled: appState.viewModeEnabled,
+        activeTool: { ...appState.activeTool },
+      };
     const serialized = JSON.parse(
       serializeAsJSON(elements, appState, files, "local"),
     ) as CanvasScene;
@@ -395,6 +406,7 @@ function CanvasEditor() {
     initialData: {
       ...(props.initialDocument?.scene ?? session.value),
       appState: {
+        activeTool: initialTool,
         viewBackgroundColor: String(
           props.initialDocument?.scene.appState.viewBackgroundColor ??
             "#ffffff",

@@ -903,3 +903,124 @@ test("unloaded and loading library refuse imperative update/reset without PUT", 
   );
   expect(mock.errors).toEqual([]);
 });
+
+test.describe("mobile canvas tools", () => {
+  test.use({
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
+    hasTouch: true,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  test("mobile starts with hand, touch pans and manual selection survives cached validation", async ({
+    page,
+    context,
+  }) => {
+    const mock = await fixture(page);
+
+    await mock.ready("a");
+    await expect
+      .poll(() => editorState(page).then((state) => state.activeTool.type))
+      .toBe("hand");
+    expect((await editorState(page)).viewModeEnabled).toBe(false);
+    const before = await editorState(page);
+    const box = (await page.locator(".excalidraw").boundingBox())!;
+    const touch = await context.newCDPSession(page);
+
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [{ x: box.x + 500, y: box.y + 350 }],
+    });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchMove",
+      touchPoints: [{ x: box.x + 600, y: box.y + 400 }],
+    });
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await expect
+      .poll(() => editorState(page).then((state) => state.scrollX))
+      .not.toBe(before.scrollX);
+    expect((await editorState(page)).elements).toEqual(before.elements);
+    await page.getByTestId("toolbar-selection").first().click();
+    await expect
+      .poll(() => editorState(page).then((state) => state.activeTool.type))
+      .toBe("selection");
+    await mock.select("b");
+    await mock.ready("b");
+    expect((await editorState(page)).activeTool.type).toBe("hand");
+    const gate = deferred();
+
+    mock.readGates.set("a", gate);
+    await mock.select("a");
+    await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements[0]?.id))
+      .toBe("a");
+    expect((await editorState(page)).viewModeEnabled).toBe(true);
+    gate.resolve();
+    await mock.ready("a");
+    await expect
+      .poll(() => editorState(page).then((state) => state.activeTool.type))
+      .toBe("selection");
+    // The hand default never enables view mode: a user can select a drawing tool.
+    await page.getByTestId("toolbar-rectangle").first().click();
+    await page.mouse.move(box.x + 500, box.y + 350);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 600, box.y + 420, { steps: 5 });
+    await page.mouse.up();
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements.length))
+      .toBe(2);
+    expect(mock.errors).toEqual([]);
+  });
+
+  test("mobile hand survives disk-cache startup and remote content replacement", async ({
+    page,
+  }) => {
+    const mock = await fixture(page);
+
+    await mock.ready("a");
+    const gate = deferred();
+
+    mock.readGates.set("a", gate);
+    mock.canvases.a!.revision = 1;
+    mock.canvases.a!.scene.elements = [rectangle("a-new", 240)];
+    await page.reload();
+    await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements[0]?.id))
+      .toBe("a");
+    expect((await editorState(page)).viewModeEnabled).toBe(true);
+    gate.resolve();
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements[0]?.id))
+      .toBe("a-new");
+    await expect(page.locator(".save-state")).toHaveText("已保存");
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    expect((await editorState(page)).activeTool.type).toBe("hand");
+    expect(mock.counts.get("PUT /api/canvases/a") ?? 0).toBe(0);
+    expect(mock.errors).toEqual([]);
+  });
+});
+
+test("desktop tool initialization does not depend on a narrow window or touch support", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 600, height: 900 });
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, "maxTouchPoints", { get: () => 10 }),
+  );
+  const mock = await fixture(page);
+
+  await mock.ready("a");
+  // The editor may use its lasso variant on a compact desktop; neither is hand.
+  expect(["selection", "lasso"]).toContain(
+    (await editorState(page)).activeTool.type,
+  );
+  expect((await editorState(page)).viewModeEnabled).toBe(false);
+  expect(mock.errors).toEqual([]);
+});
