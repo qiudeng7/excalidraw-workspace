@@ -1,8 +1,27 @@
-# Excalidraw Workspace
+<div align="center">
 
-[在线使用](https://excalidraw-workspace.qiudeng.workers.dev/) · [GitHub 仓库](https://github.com/qiudeng7/excalidraw-workspace) · [Changelog](https://github.com/qiudeng7/excalidraw-workspace/releases)
+<h1>Excalidraw Workspace</h1>
 
-Excalidraw Workspace 是一个可以管理多个无限画布、云同步、画布内编辑markdown、协作、分享的应用，支持自动保存，同时支持 Cloudflare worker 和 docker 部署(因为基于nuxt开发)
+<p>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-7c3aed" alt="MIT License" /></a>
+  <a href="https://github.com/qiudeng7/excalidraw-workspace/releases"><img src="https://img.shields.io/github/v/release/qiudeng7/excalidraw-workspace?include_prereleases&amp;color=7c3aed" alt="GitHub Release" /></a>
+  <a href="docs/deployment.md#cloudflare-workers"><img src="https://img.shields.io/badge/Cloudflare-Workers-f38020?logo=cloudflare&amp;logoColor=white" alt="Deploy on Cloudflare Workers" /></a>
+  <a href="docs/deployment.md#docker"><img src="https://img.shields.io/badge/Docker-Self--hosted-2496ed?logo=docker&amp;logoColor=white" alt="Self-host with Docker" /></a>
+</p>
+
+<p>Excalidraw Workspace 是一个可以管理多个画布的在线应用，支持自动保存、云同步、画布内编辑markdown、多人协作、画布分享，支持 Cloudflare Worker 和 docker 部署，本项目基于 nuxt 和 excalidraw。</p>
+
+<p>
+  <a href="https://excalidraw-workspace.qiudeng.workers.dev/"><strong>在线使用</strong></a> ·
+  <a href="docs/deployment.md#docker">Docker 部署</a> ·
+  <a href="docs/deployment.md#cloudflare-workers">Cloudflare 部署</a> ·
+  <a href="#目录">开发文档</a> ·
+  <a href="https://github.com/qiudeng7/excalidraw-workspace/releases">更新日志</a>
+</p>
+
+</div>
+
+[![Excalidraw Workspace 产品预览：工作空间目录、多画布标签、流程图与 Markdown 笔记](docs/assets/workspace-preview.png)](docs/assets/workspace-preview.png)
 
 ## 目录
 
@@ -18,3 +37,7 @@ Excalidraw Workspace 是一个可以管理多个无限画布、云同步、画�
 | [编辑器](docs/development/editor.md)            | [调整绘图交互](docs/development/editor.md#调整绘图交互)、[编辑富文本](docs/development/editor.md#编辑富文本)、[收藏与复用颜色](docs/development/editor.md#收藏与复用颜色)、[导入导出与复制](docs/development/editor.md#导入导出与复制)                                                                                                                                                                                                             |
 | [更新公告与日志](docs/development/releases.md)  | [自动展示公告](docs/development/releases.md#自动展示公告)、[回看历史更新](docs/development/releases.md#回看历史更新)、[维护发布内容](docs/development/releases.md#发布新公告)                                                                                                                                                                                                                                                                      |
 | [协作与分享](docs/development/collaboration.md) | [并发编辑](docs/development/collaboration.md#并发编辑)、[成员邀请与链接](docs/development/collaboration.md#成员邀请与链接)、[三种查看模式](docs/development/collaboration.md#三种查看模式)、[离线队列](docs/development/collaboration.md#离线队列)、[权限撤销](docs/development/collaboration.md#权限撤销)、[房间迁移和恢复](docs/development/collaboration.md#迁移删除图片与备份)                                                                 |
+
+## License
+
+本项目自己的代码采用 [MIT](LICENSE) 许可证，纳入仓库的 Excalidraw 代码保留[上游 MIT 版权与许可声明](packages/excalidraw/LICENSE)。发布产物随附这两份许可原文，可在“设置 → 通用 → 开源许可”查看；详情见[许可证文档](docs/license.md)。

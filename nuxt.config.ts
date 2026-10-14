@@ -1,6 +1,20 @@
 import { fileURLToPath } from "node:url";
+import { writeLicenseNotices } from "./scripts/licenses.mjs";
+
+const projectRoot = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineNuxtConfig({
+  hooks: {
+    async "nitro:config"(config) {
+      const directory = fileURLToPath(
+        new URL("./.nuxt/licenses", import.meta.url),
+      );
+
+      await writeLicenseNotices(projectRoot, directory);
+      config.publicAssets ||= [];
+      config.publicAssets.push({ dir: directory, baseURL: "/", maxAge: 0 });
+    },
+  },
   compatibilityDate: "2026-09-27",
   srcDir: "src/",
   serverDir: "server/",
