@@ -31,6 +31,7 @@ import {
 } from "../../hooks/useTextEditorFocus";
 
 import { ColorInput } from "./ColorInput";
+import { SavedColorPalette } from "./SavedColorPalette";
 import { Picker } from "./Picker";
 import PickerHeading from "./PickerHeading";
 import { TopPicks } from "./TopPicks";
@@ -258,7 +259,14 @@ const ColorPickerPopupContent = ({
           {colorInputJSX}
         </Picker>
       ) : (
-        colorInputJSX
+        <div className="color-picker-content color-picker-content--saved-palette">
+          {colorInputJSX}
+          <SavedColorPalette
+            color={color}
+            onChange={onChange}
+            dark={appState.theme === THEME.DARK}
+          />
+        </div>
       )}
     </PropertiesPopover>
   );

@@ -1025,6 +1025,8 @@ export interface ExcalidrawProps {
   theme?: Theme;
   // @TODO come with better API before v0.18.0
   name?: string;
+  /** Opt-in browser-local personal color palette; the host scopes the key per account. */
+  customColorPaletteStorageKey?: string;
   renderCustomStats?: (
     elements: readonly NonDeletedExcalidrawElement[],
     appState: UIAppState,

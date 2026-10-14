@@ -99,7 +99,7 @@ export const getMostUsedCustomColors = (
 };
 
 export type ActiveColorPickerSectionAtomType =
-  "custom" | "baseColors" | "shades" | "hex" | null;
+  "custom" | "baseColors" | "shades" | "hex" | "saved" | null;
 
 export const activeColorPickerSectionAtom =
   atom<ActiveColorPickerSectionAtomType>(null);

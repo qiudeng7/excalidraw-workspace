@@ -16,6 +16,7 @@ import { useAtom } from "../../editor-jotai";
 import { t } from "../../i18n";
 import { TopPicksTip } from "../TopPicksDnD/TopPicksTip";
 
+import { SavedColorPalette, useSavedColorPalette } from "./SavedColorPalette";
 import { CustomColorList } from "./CustomColorList";
 import PickerColorList from "./PickerColorList";
 import PickerHeading from "./PickerHeading";
@@ -89,6 +90,7 @@ export const Picker = React.forwardRef(
       activeColorPickerSectionAtom,
     );
     const dnd = useColorPickerDnD();
+    const savedPalette = useSavedColorPalette();
 
     const colorObj = getColorNameAndShadeFromColor({
       color,
@@ -169,6 +171,7 @@ export const Picker = React.forwardRef(
               activeShade,
               onEscape,
               excludedColors,
+              savedPaletteEnabled: !!savedPalette,
             });
 
             if (handled) {
@@ -176,7 +179,7 @@ export const Picker = React.forwardRef(
               event.stopPropagation();
             }
           }}
-          className="color-picker-content properties-content"
+          className={`color-picker-content properties-content${savedPalette ? " color-picker-content--saved-palette" : ""}`}
           // to allow focusing by clicking but not by tabbing
           tabIndex={-1}
         >
@@ -221,6 +224,11 @@ export const Picker = React.forwardRef(
             />
           </div>
           {children}
+          <SavedColorPalette
+            color={color}
+            onChange={onChange}
+            dark={theme === "dark"}
+          />
           {/* dnd context is only provided when top picks are customizable */}
           {dnd && (
             <TopPicksTip

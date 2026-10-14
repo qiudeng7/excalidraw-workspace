@@ -409,6 +409,9 @@ function CanvasEditor() {
   const flags = settings.value;
 
   return createElement(Excalidraw, {
+    customColorPaletteStorageKey: props.userId
+      ? `workspace:color-palette:v1:${encodeURIComponent(props.userId)}`
+      : undefined,
     handleKeyboardGlobally: false,
     syncReadOnly: !canEdit(),
     viewModeEnabled: canEdit() ? undefined : true,
