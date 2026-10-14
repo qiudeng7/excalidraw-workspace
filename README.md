@@ -2,7 +2,7 @@
 
 [在线使用](https://excalidraw-workspace.qiudeng.workers.dev/) · [GitHub 仓库](https://github.com/qiudeng7/excalidraw-workspace) · [Changelog](https://github.com/qiudeng7/excalidraw-workspace/releases)
 
-Excalidraw Workspace 是一个开发中的在线绘图应用。使用自己的账户管理工作空间，在每个工作空间中创建多个画布，自动保存图形、文字、图片和个人素材库。它基于 Excalidraw 编辑器，默认使用更规整的线条、Nunito 字体和较短的箭头头部。
+Excalidraw Workspace 是一个可以管理多个无限画布、云同步、画布内编辑markdown、协作、分享的应用，支持自动保存，同时支持 Cloudflare worker 和 docker 部署(因为基于nuxt开发)
 
 ## 目录
 
