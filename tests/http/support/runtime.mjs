@@ -13,12 +13,12 @@ let stopping = false;
 
 function launch(args, options = {}) {
   if (stopping) throw new Error("Test run is stopping");
-  const { executable = "pnpm", ...spawnOptions } = options;
+  const { executable = "pnpm", stdio = "inherit", ...spawnOptions } = options;
   const child = spawn(executable, args, {
     cwd: project,
     ...spawnOptions,
     detached: true,
-    stdio: "inherit",
+    stdio,
     env: { ...process.env, WRANGLER_SEND_METRICS: "false", ...options.env },
   });
   const exited = new Promise((resolve) => {

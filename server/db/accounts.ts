@@ -53,6 +53,7 @@ export async function createAccount(
   workspace: string,
   canvas: string,
   now: string,
+  registrationRequired = true,
 ) {
   const result = await db.batch([
     db
@@ -71,7 +72,7 @@ export async function createAccount(
           .where(
             and(
               eq(tables.settings.id, 1),
-              user.role === "admin"
+              user.role === "admin" || !registrationRequired
                 ? undefined
                 : and(
                     eq(tables.settings.registrationEnabled, 1),

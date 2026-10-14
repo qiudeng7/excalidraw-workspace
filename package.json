@@ -4,8 +4,7 @@
   "version": "0.3.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm build:editor && pnpm db:migrate && nuxt dev --host 0.0.0.0",
-    "dev:worker": "wrangler dev --config wrangler.jsonc --port 8787 --var PUBLIC_ORIGIN:http://localhost:8787",
+    "dev": "node scripts/dev.mjs",
     "build": "pnpm build:editor && NITRO_PRESET=cloudflare-module nuxt build",
     "build:node": "pnpm build:editor && NITRO_PRESET=node-server nuxt build",
     "build:editor": "pnpm --filter @excalidraw/excalidraw build",

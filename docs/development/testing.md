@@ -112,6 +112,17 @@ BROWSER_BASE_URL=http://127.0.0.1:3000 CHROMIUM_PATH=/usr/bin/chromium pnpm test
 
 失败截图与 trace 保存在忽略的 `test-results/browser/`，成功用例不保存截图。用 `pnpm exec playwright show-trace <trace.zip路径>` 查看 trace。浏览器测试验证前端行为，API 为模拟响应，测试服务关闭协作目录投影和对象清理后台任务；真实会话 SQL 和 D1 的结果由下面两套测试验证。
 
+## 开发启动器回归
+
+```sh
+CHROMIUM_PATH=/usr/bin/chromium node tests/http/run-development.mjs node
+CHROMIUM_PATH=/usr/bin/chromium node tests/http/run-development.mjs worker
+```
+
+两条命令串行执行。runner 用临时数据目录和空闲端口调用与 `pnpm dev` 相同的启动器，验证前后端预设一致、管理员和普通用户正常登录、注册页不预填、重复启动保留画布及会话、配置改密后旧密码和会话失效。Worker 场景还检查普通运行时的 bootstrap 不返回开发凭证，开发准备接口不可访问。测试结束关闭自己启动的服务并删除临时数据，只操作本地临时存储，不改默认开发目录，也不迁移远端。构建会更新当前 checkout 的 `.nuxt` / `.output` 和编辑器产物，请与其他构建串行运行。
+
+`tests/lint/development-config.test.mjs` 验证开发配置的文件读取、环境变量优先级和校验；`tests/integration/development-accounts.test.ts` 验证账号初始化、密码哈希、关闭注册时准备预设及已有账号冲突保护，随 `pnpm check` 执行。
+
 ## 认证并发回归
 
 ```sh

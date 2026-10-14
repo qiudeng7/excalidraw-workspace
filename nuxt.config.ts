@@ -9,10 +9,19 @@ export default defineNuxtConfig({
     // The filesystem SDK needs a relative path for portable Node artifacts.
     blob: process.env.NITRO_PRESET?.startsWith("cloudflare")
       ? true
-      : { driver: "fs", dir: ".data/blob" },
+      : {
+          driver: "fs",
+          dir: process.env.WORKSPACE_DEV_DATA_DIR
+            ? `${process.env.WORKSPACE_DEV_DATA_DIR}/blob`
+            : ".data/blob",
+        },
     db: {
       dialect: "sqlite",
-      connection: { url: "file:.data/db/sqlite.db" },
+      connection: {
+        url: process.env.WORKSPACE_DEV_DATA_DIR
+          ? `file:${process.env.WORKSPACE_DEV_DATA_DIR}/db/sqlite.db`
+          : "file:.data/db/sqlite.db",
+      },
       applyMigrationsDuringBuild: false,
       applyMigrationsDuringDev: false,
     },

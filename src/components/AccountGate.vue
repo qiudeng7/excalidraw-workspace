@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import QuietIcon from "~/components/QuietIcon.vue";
 import type { Bootstrap, User } from "#shared/contracts";
 import { ApiError } from "~/lib/api";
@@ -22,6 +22,28 @@ const title = computed(() =>
     : registering.value
       ? "创建账户"
       : "登录画布",
+);
+
+function fillDevelopmentAccount(role: "admin" | "user" = "admin") {
+  if (creating.value) return;
+  const account = props.bootstrap.developmentAccounts?.find(
+    (entry) => entry.role === role,
+  );
+
+  if (account) {
+    email.value = account.email;
+    password.value = account.password;
+  }
+}
+
+watch(
+  creating,
+  (value) => {
+    email.value = "";
+    password.value = "";
+    if (!value) fillDevelopmentAccount();
+  },
+  { immediate: true },
 );
 
 async function submit() {
@@ -140,6 +162,28 @@ async function submit() {
               : "登录后，继续你的创作。"
           }}
         </p>
+        <div
+          v-if="bootstrap.developmentAccounts && !creating"
+          class="development-accounts"
+        >
+          <span>开发账号</span>
+          <button
+            type="button"
+            class="switch"
+            :disabled="busy"
+            @click="fillDevelopmentAccount('admin')"
+          >
+            管理员
+          </button>
+          <button
+            type="button"
+            class="switch"
+            :disabled="busy"
+            @click="fillDevelopmentAccount('user')"
+          >
+            普通用户
+          </button>
+        </div>
         <div class="fields">
           <label v-if="creating"
             >昵称<input
@@ -338,6 +382,14 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+.development-accounts {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  color: var(--app-subtle);
+  font-size: 12px;
 }
 label {
   display: flex;

@@ -1,3 +1,5 @@
+import type { DevelopmentAccount } from "#shared/development";
+
 export interface User {
   id: string;
   email: string;
@@ -6,6 +8,7 @@ export interface User {
 }
 
 export interface Bootstrap {
+  developmentAccounts?: DevelopmentAccount[];
   needsSetup: boolean;
   registrationEnabled: boolean;
   emailVerification: false;
