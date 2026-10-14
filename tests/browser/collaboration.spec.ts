@@ -998,7 +998,7 @@ test("单人文字的输入法组合与未失焦内容在协作升级前完整�
     await open(first, "/", true);
     await first.getByTestId("toolbar-text").first().click();
     await first.mouse.click(700, 360);
-    const textarea = first.locator("textarea.excalidraw-wysiwyg");
+    const textarea = first.locator(".excalidraw-wysiwyg");
 
     await expect(textarea).toBeVisible();
     await textarea.evaluate((element) =>
