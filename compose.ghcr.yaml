@@ -1,0 +1,23 @@
+# Keep the same Compose project name when switching from compose.yaml.
+services:
+  migrations:
+    image: ${WORKSPACE_IMAGE:-ghcr.io/qiudeng7/excalidraw-workspace}:${WORKSPACE_VERSION:?Set WORKSPACE_VERSION to a published version or sha tag}-migrations
+    volumes:
+      - workspace-data:/app/.data
+
+  app:
+    image: ${WORKSPACE_IMAGE:-ghcr.io/qiudeng7/excalidraw-workspace}:${WORKSPACE_VERSION:?Set WORKSPACE_VERSION to a published version or sha tag}
+    depends_on:
+      migrations:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${PORT:-8080}:3000"
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:8080}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+    volumes:
+      - workspace-data:/app/.data
+    restart: unless-stopped
+
+volumes:
+  workspace-data:

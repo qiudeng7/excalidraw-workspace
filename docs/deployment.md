@@ -4,14 +4,54 @@
 
 ## Docker
 
-安装 Docker 与 Compose，在仓库根目录执行：
+安装 Docker 与 Compose。提供从 GHCR 拉取镜像和从源码构建两种方式，均使用单实例 Node 服务。
+
+### GHCR 镜像
+
+镜像由 [Container images 工作流](../.github/workflows/containers.yml) 构建。**首次发布需先将工作流合入 `main` 并等待成功，再将 GitHub 仓库 Packages 中的 `excalidraw-workspace` 设为 Public**，公开仓库不会自动使包公开；已存在的包还需允许本仓库 Actions 写入。当前配置不代表镜像已经发布，可在[包页面](https://github.com/qiudeng7/excalidraw-workspace/pkgs/container/excalidraw-workspace)核对可用标签。目前发布 `linux/amd64` 镜像。
+
+下载同一提交的 [compose.ghcr.yaml](../compose.ghcr.yaml)，放入部署目录并创建 `.env`：
+
+```dotenv
+# 从包页面选择实际存在的版本，例如 0.5.1 或 sha-<完整提交号>。
+WORKSPACE_VERSION=sha-<完整提交号>
+PORT=8080
+PUBLIC_ORIGIN=http://localhost:8080
+```
+
+运行：
+
+```sh
+docker compose -f compose.ghcr.yaml pull
+docker compose -f compose.ghcr.yaml up -d
+docker compose -f compose.ghcr.yaml logs migrations app
+```
+
+`WORKSPACE_VERSION` 同时选择应用和迁移镜像，迁移镜像自动追加 `-migrations`，不要单独改用其他版本。每次 `main` 推送生成 `main`、`latest` 和 `sha-<完整提交号>`；推送与 `package.json` 版本一致的 `v<版本>` tag 生成不带 `v` 的版本标签及 SHA 标签，预发行版也保留完整版本号。`latest` 始终跟随 `main`，工作流成功后再使用新标签；两张镜像不是原子发布，正式部署优先选固定版本或 SHA，避免拉取过程中浮动标签变化。自建 fork 的镜像可通过 `WORKSPACE_IMAGE=ghcr.io/你的账号/仓库名` 指定。
+
+更新前[备份数据](#备份和恢复)，将 `.env` 的 `WORKSPACE_VERSION` 换为新标签，随后执行：
+
+```sh
+docker compose -f compose.ghcr.yaml pull
+docker compose -f compose.ghcr.yaml stop app
+docker compose -f compose.ghcr.yaml up -d --force-recreate
+docker compose -f compose.ghcr.yaml logs migrations app
+```
+
+先拉齐两张镜像再停止应用；停止旧应用后才执行新迁移，避免旧进程继续写入。`--force-recreate` 保证迁移容器重新运行，成功后才启动新应用。失败时先检查迁移日志，不要跳过迁移直接启动应用。迁移可能不向后兼容，回退应用版本前确认兼容性或恢复备份。从已有源码部署切换时，也按以上更新流程先备份并停止旧应用，再执行新迁移；保持原部署目录和 Compose 项目名（使用过 `-p` 时沿用相同值），才能继续使用原命名卷。
+
+### 源码构建
+
+在仓库根目录执行：
 
 ```sh
 docker compose up --build -d
 docker compose logs migrations app
 ```
 
-打开 http://localhost:8080。容器以普通用户运行，不需要 Cloudflare 账户；Docker 使用单实例，数据与在线应用独立。数据库和快照保存在命名卷 `workspace-data`，挂载到 `/app/.data`；迁移成功后应用才启动。迁移失败时修复错误后重新执行启动命令。
+### 访问与配置
+
+两种方式均打开 http://localhost:8080。容器以普通用户运行，不需要 Cloudflare 账户；Docker 使用单实例，数据与在线应用独立。数据库和快照保存在命名卷 `workspace-data`，挂载到 `/app/.data`；迁移成功后应用才启动。迁移失败时修复错误后重新执行启动命令。
 
 对外提供服务时，由反向代理提供 HTTPS，并在 `.env` 设置：
 
@@ -20,7 +60,7 @@ PORT=8080
 PUBLIC_ORIGIN=https://draw.example.com
 ```
 
-端口只绑定回环地址。`PUBLIC_ORIGIN` 填浏览器实际访问的完整 origin，不含路径；仅修改本地端口时，也须同步修改该值。代理须保留 Cookie、Origin 和请求头，不缓存 `/api/*`，并支持 WebSocket Upgrade 和持续连接。按客户端 IP 限流时，将代理连接 IP 填入 `TRUSTED_PROXY_IPS`。修改环境变量后执行 `docker compose up -d`。
+端口只绑定回环地址。`PUBLIC_ORIGIN` 填浏览器实际访问的完整 origin，不含路径；仅修改本地端口时，也须同步修改该值。代理须保留 Cookie、Origin 和请求头，不缓存 `/api/*`，并支持 WebSocket Upgrade 和持续连接。按客户端 IP 限流时，将代理连接 IP 填入 `TRUSTED_PROXY_IPS`。修改环境变量后，源码方式执行 `docker compose up -d`，GHCR 方式执行 `docker compose -f compose.ghcr.yaml up -d`。
 
 ## Cloudflare Workers
 
@@ -59,7 +99,7 @@ Node 协作广播仅支持一个应用进程，不支持多副本或 cluster；�
 
 ## 备份和恢复
 
-Node / Docker 停止写入后备份整个 `.data` 目录或卷，包含数据库、WAL 与快照；恢复时使用兼容版本，并确保运行用户可读写。`docker compose down` 保留命名卷，`down -v` 会删除命名卷。
+Node / Docker 停止写入后备份整个 `.data` 目录或卷，包含数据库、WAL 与快照；恢复时使用兼容版本，并确保运行用户可读写。源码方式的 `docker compose down`、GHCR 方式的 `docker compose -f compose.ghcr.yaml down` 均保留命名卷；添加 `-v` 会删除命名卷。
 
 Cloudflare 必须同时备份 D1、R2 和协作房间状态。**D1 + R2 不再是完整备份**：DO SQLite 与 D1 是不同的数据库。备份时暂停写入；逐张协作画布导出房间状态及全部引用对象，再备份目录和账户数据库。恢复房间必须使用新的 epoch，避免旧设备继续提交恢复前的队列。Node 的整目录恢复也须对协作房间执行下面的恢复步骤来更新 epoch。
 
