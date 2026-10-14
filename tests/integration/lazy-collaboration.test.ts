@@ -8,6 +8,8 @@ import { nodeStorage } from "./support/storage";
 import { handleApi } from "./support/api";
 import { withDatabase } from "../lib/database";
 import {
+  canvasSessionKey,
+  countCanvasSessions,
   touchCanvasSession,
   leaveCanvasSession,
   CANVAS_SESSION_TTL,
@@ -64,8 +66,19 @@ async function fixture() {
     await request(`/workspaces/${spaces[0].id}/canvases`)
   ).json();
   const id = catalog.canvases[0].id;
-  const presence = (clientId: string, leave = false) =>
-    request(`/canvases/${id}/presence`, "POST", { clientId, leave });
+  const leases = new Map<string, number>();
+  const presence = async (clientId: string, leave = false) => {
+    const response = await request(`/canvases/${id}/presence`, "POST", {
+      clientId,
+      leave,
+      ...(leave ? { leaseExpiresAt: leases.get(clientId) } : {}),
+    });
+    const value = await response.clone().json();
+
+    if (value.leaseExpiresAt) leases.set(clientId, value.leaseExpiresAt);
+
+    return response;
+  };
 
   return {
     ...storage,
@@ -73,6 +86,7 @@ async function fixture() {
     presence,
     id,
     owner,
+    cookie,
     interceptBlob(value: typeof blob) {
       blob = value;
     },
@@ -91,14 +105,25 @@ const scene = {
 };
 const a = "client-aaaaaaaaaaaa";
 const b = "client-bbbbbbbbbbbb";
+const touchCount = async (...args: Parameters<typeof touchCanvasSession>) =>
+  (await touchCanvasSession(...args)).participants;
+
+async function presenceState(response: Response) {
+  const { leaseExpiresAt, ...value } = await response.json();
+
+  if (leaseExpiresAt !== undefined)
+    assert.ok(Number.isSafeInteger(leaseExpiresAt));
+
+  return value;
+}
 
 test("single editor reads, refreshes and saves without persisting a room; simultaneous second session promotes once", async () => {
   const f = await fixture();
 
   try {
     assert.equal((await f.request(`/canvases/${f.id}`)).status, 200);
-    assert.equal((await (await f.presence(a)).json()).syncMode, "legacy");
-    assert.equal((await (await f.presence(a)).json()).syncMode, "legacy");
+    assert.equal((await presenceState(await f.presence(a))).syncMode, "legacy");
+    assert.equal((await presenceState(await f.presence(a))).syncMode, "legacy");
     const saved = await f.request(`/canvases/${f.id}`, "PUT", {
       revision: 0,
       scene,
@@ -122,14 +147,14 @@ test("single editor reads, refreshes and saves without persisting a room; simult
     await f.presence(a, true);
     await f.presence(b, true);
     assert.equal(
-      (await (await f.presence(a)).json()).syncMode,
+      (await presenceState(await f.presence(a))).syncMode,
       "collaborative",
     );
     assert.equal(
       (await f.database.select().from(collaborationRooms)).length,
       1,
     );
-    assert.deepEqual(await f.database.select().from(canvasSessions), []);
+    assert.equal((await f.database.select().from(canvasSessions)).length, 1);
   } finally {
     await f.close();
   }
@@ -140,17 +165,29 @@ test("leaving, refresh identity and expiration do not mistake historical opens f
 
   try {
     await withDatabase(f.database, async () => {
-      assert.equal(await touchCanvasSession(f.id, a, 1_000), false);
-      assert.equal(await touchCanvasSession(f.id, a, 1_500), false);
-      await leaveCanvasSession(f.id, a);
-      assert.equal(await touchCanvasSession(f.id, b, 2_000), false);
+      const actor = { principalId: `user:${f.owner.id}`, grantId: "owner" };
+      const first = await canvasSessionKey(actor, a);
+      const second = await canvasSessionKey(actor, b);
+
+      assert.equal(await touchCount(f.id, first, 1_000), 1);
+      assert.equal(await touchCount(f.id, first, 1_500), 1);
+      await leaveCanvasSession(f.id, first);
+      assert.equal(await touchCount(f.id, second, 2_000), 1);
       assert.equal(
-        await touchCanvasSession(f.id, a, 2_001 + CANVAS_SESSION_TTL),
-        false,
+        await touchCount(f.id, first, 2_001 + CANVAS_SESSION_TTL),
+        1,
       );
       assert.equal(
-        await touchCanvasSession(f.id, b, 2_002 + CANVAS_SESSION_TTL),
-        true,
+        await touchCount(f.id, second, 2_002 + CANVAS_SESSION_TTL),
+        2,
+      );
+      assert.equal(
+        await touchCount(
+          f.id,
+          await canvasSessionKey(actor, "client-cccccccccccc"),
+          2_003 + CANVAS_SESSION_TTL,
+        ),
+        3,
       );
     });
     assert.deepEqual(await f.database.select().from(collaborationRooms), []);
@@ -308,6 +345,291 @@ test("preparing reads expose authoritative collaborative metadata and conditiona
 
     assert.equal(restored.migrationEpoch, value.migrationEpoch);
     assert.notEqual(restored.roomEpoch, restored.migrationEpoch);
+  } finally {
+    await f.close();
+  }
+});
+
+test("an existing room remains a single participant until a second tab arrives, with consistent owner identity across endpoints", async () => {
+  const f = await fixture();
+
+  try {
+    assert.deepEqual(await presenceState(await f.presence(a)), {
+      syncMode: "legacy",
+      participants: 1,
+      realtime: false,
+    });
+    await f.request(`/canvases/${f.id}/collaboration/manage`);
+    const row = (
+      await f.database.select().from(canvases).where(eq(canvases.id, f.id))
+    )[0]!;
+
+    // Old deployments stored a raw tab ID. It must not double-count after upgrade.
+    await f.database.insert(canvasSessions).values({
+      canvasId: f.id,
+      clientId: a,
+      expiresAt: Date.now() + CANVAS_SESSION_TTL,
+    });
+    const leases = new Map<string, number>();
+    const presence = async (clientId: string, leave = false) => {
+      const response = await f.request(
+        `/canvases/${f.id}/collaboration/presence`,
+        "POST",
+        {
+          clientId,
+          leave,
+          leaseExpiresAt: leases.get(clientId),
+        },
+      );
+      const value = await response.clone().json();
+
+      if (value.leaseExpiresAt) leases.set(clientId, value.leaseExpiresAt);
+
+      return response;
+    };
+
+    assert.deepEqual(await presenceState(await presence(a)), {
+      participants: 1,
+      realtime: false,
+    });
+    assert.deepEqual(await presenceState(await presence(b)), {
+      participants: 2,
+      realtime: true,
+    });
+    assert.deepEqual(
+      await presenceState(await presence("client-cccccccccccc")),
+      {
+        participants: 3,
+        realtime: true,
+      },
+    );
+    assert.equal((await presenceState(await f.presence(a))).participants, 3);
+    assert.deepEqual(await presenceState(await presence(b, true)), {
+      participants: 2,
+      realtime: true,
+    });
+    await presence("client-cccccccccccc", true);
+    assert.deepEqual(await presenceState(await presence(a)), {
+      participants: 1,
+      realtime: false,
+    });
+    const after = (
+      await f.database.select().from(canvases).where(eq(canvases.id, f.id))
+    )[0]!;
+
+    assert.equal(after.syncMode, "collaborative");
+    assert.equal(after.roomEpoch, row.roomEpoch);
+  } finally {
+    await f.close();
+  }
+});
+
+test("presence isolates identical tab IDs by authorized account and cannot leave another participant", async () => {
+  const f = await fixture();
+
+  try {
+    const registration = await f.request("/register", "POST", {
+      email: "presence-other@example.test",
+      password: "OtherLazyPassword123!",
+    });
+    const otherCookie = registration.headers.get("set-cookie")!.split(";")[0]!;
+    const leases = new Map<string, number>();
+    const presence = async (cookie: string, leave = false) => {
+      const response = await f.request(
+        `/canvases/${f.id}/collaboration/presence`,
+        "POST",
+        { clientId: a, leave, leaseExpiresAt: leases.get(cookie) },
+        cookie,
+      );
+      const value = await response.clone().json();
+
+      if (value.leaseExpiresAt) leases.set(cookie, value.leaseExpiresAt);
+
+      return response;
+    };
+
+    // A delayed leave cannot initialize a legacy room.
+    assert.equal((await presence(f.cookie, true)).status, 404);
+    assert.deepEqual(await f.database.select().from(collaborationRooms), []);
+    await f.request(`/canvases/${f.id}/collaboration/manage`);
+    assert.deepEqual(await presenceState(await presence(f.cookie)), {
+      participants: 1,
+      realtime: false,
+    });
+    assert.equal((await presence(otherCookie, true)).status, 403);
+    assert.equal((await f.database.select().from(canvasSessions)).length, 1);
+    assert.equal(
+      (
+        await f.request(`/canvases/${f.id}/collaboration/members`, "POST", {
+          email: "presence-other@example.test",
+          role: "editor",
+          viewMode: "live",
+        })
+      ).status,
+      200,
+    );
+    assert.deepEqual(await presenceState(await presence(otherCookie)), {
+      participants: 2,
+      realtime: true,
+    });
+    assert.deepEqual(await presenceState(await presence(otherCookie, true)), {
+      participants: 1,
+      realtime: false,
+    });
+    assert.deepEqual(await presenceState(await presence(f.cookie)), {
+      participants: 1,
+      realtime: false,
+    });
+    const snapshot = await f.database.select().from(canvasSessions);
+
+    assert.equal((await presence("", true)).status, 401);
+    assert.deepEqual(await f.database.select().from(canvasSessions), snapshot);
+  } finally {
+    await f.close();
+  }
+});
+
+test("live share viewers count, fixed/latest viewers do not, and revoked links cannot mutate leases", async () => {
+  const f = await fixture();
+
+  try {
+    assert.equal(
+      (
+        await f.request(`/canvases/${f.id}/collaboration/versions`, "POST", {
+          id: "presence-snapshot",
+          label: "Presence snapshot",
+        })
+      ).status,
+      200,
+    );
+    await f.presence(a);
+    const links: Record<string, { id: string; token: string }> = {};
+
+    for (const viewMode of ["live", "latest", "fixed"]) {
+      const link = await (
+        await f.request(`/canvases/${f.id}/collaboration/links`, "POST", {
+          role: "viewer",
+          viewMode,
+          requireLogin: false,
+          ...(viewMode === "fixed" ? { snapshotId: "presence-snapshot" } : {}),
+        })
+      ).json();
+      const exchange = await f.request(
+        `/canvases/${f.id}/collaboration/exchange`,
+        "POST",
+        { secret: link.path.split("#")[1] },
+        "",
+      );
+
+      links[viewMode] = { id: link.id, token: (await exchange.json()).token };
+    }
+
+    const presence = (viewMode: string, leave = false) =>
+      f.request(
+        `/canvases/${f.id}/collaboration/presence`,
+        "POST",
+        { clientId: a, leave },
+        "",
+        { "x-canvas-access": links[viewMode]!.token },
+      );
+
+    for (const viewMode of ["latest", "fixed"])
+      assert.deepEqual(await presenceState(await presence(viewMode)), {
+        participants: 1,
+        realtime: false,
+      });
+    assert.deepEqual(await presenceState(await presence("live")), {
+      participants: 2,
+      realtime: true,
+    });
+    assert.deepEqual(await presenceState(await presence("latest")), {
+      participants: 2,
+      realtime: false,
+    });
+    const snapshot = await f.database.select().from(canvasSessions);
+
+    await f.request(`/canvases/${f.id}/collaboration/links`, "DELETE", {
+      id: links.live!.id,
+    });
+    assert.equal((await presence("live", true)).status, 403);
+    assert.deepEqual(await f.database.select().from(canvasSessions), snapshot);
+    await withDatabase(f.database, async () => {
+      assert.equal(
+        await countCanvasSessions(f.id, Date.now() + CANVAS_SESSION_TTL + 1),
+        0,
+      );
+    });
+  } finally {
+    await f.close();
+  }
+});
+
+test("renewed leases reject delayed leaves and account link context does not duplicate a tab", async () => {
+  const f = await fixture();
+
+  try {
+    const first = await (await f.presence(a)).json();
+    const link = await (
+      await f.request(`/canvases/${f.id}/collaboration/links`, "POST", {
+        role: "editor",
+        requireLogin: true,
+      })
+    ).json();
+    const exchanged = await (
+      await f.request(`/canvases/${f.id}/collaboration/exchange`, "POST", {
+        secret: link.path.split("#")[1],
+      })
+    ).json();
+    const renewed = await (
+      await f.request(
+        `/canvases/${f.id}/collaboration/presence`,
+        "POST",
+        {
+          clientId: a,
+        },
+        f.cookie,
+        { "x-canvas-access": exchanged.token },
+      )
+    ).json();
+
+    assert.equal(renewed.participants, 1);
+    assert.equal(renewed.realtime, false);
+    assert.ok(renewed.leaseExpiresAt > first.leaseExpiresAt);
+    for (const leaseExpiresAt of [undefined, first.leaseExpiresAt]) {
+      const response = await f.request(`/canvases/${f.id}/presence`, "POST", {
+        clientId: a,
+        leave: true,
+        leaseExpiresAt,
+      });
+
+      assert.equal((await response.json()).participants, 1);
+    }
+
+    const left = await f.request(
+      `/canvases/${f.id}/collaboration/presence`,
+      "POST",
+      {
+        clientId: a,
+        leave: true,
+        leaseExpiresAt: renewed.leaseExpiresAt,
+      },
+    );
+
+    assert.deepEqual(await left.json(), { participants: 0, realtime: false });
+    await withDatabase(f.database, async () => {
+      const key = await canvasSessionKey(
+        { principalId: `user:${f.owner.id}` },
+        a,
+      );
+      const first = await touchCanvasSession(f.id, key, 1_000);
+      const second = await touchCanvasSession(f.id, key, 1_000);
+
+      assert.equal(second.leaseExpiresAt, first.leaseExpiresAt + 1);
+      await leaveCanvasSession(f.id, key, first.leaseExpiresAt);
+      assert.equal(await countCanvasSessions(f.id, 1_000), 1);
+      await leaveCanvasSession(f.id, key, second.leaseExpiresAt);
+      assert.equal(await countCanvasSessions(f.id, 1_000), 0);
+    });
   } finally {
     await f.close();
   }

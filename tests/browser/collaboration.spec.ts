@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import {
   test,
-  expect,
+  expect as browserExpect,
   type Browser,
   type BrowserContext,
   type Page,
@@ -10,6 +10,10 @@ import {
 import { editorState } from "./fixtures";
 import { currentRelease } from "../../src/data/releases";
 import { announcementKey } from "../../src/lib/releaseProgress";
+
+const expect = browserExpect.configure({ timeout: 25_000 });
+
+test.describe.configure({ timeout: 60_000 });
 
 test.skip(
   !process.env.COLLABORATION_LIVE_TEST,
@@ -1934,6 +1938,158 @@ test("回收工作空间保留曾单独回收的画布，并可同页恢复父�
     await expect(page.locator(".canvas-name")).toHaveCount(1);
     await expect(page.locator(".canvas-name")).toHaveText("保留画布");
     await expect(page.locator(".excalidraw")).toBeVisible();
+  } finally {
+    await owner.context.close();
+  }
+});
+
+test("存量房间单人无需WS，独立同账号浏览器计两方且WS不可用仍HTTP保存收敛", async ({
+  browser,
+  baseURL,
+}) => {
+  test.setTimeout(120000);
+  const owner = await account(browser, baseURL!);
+  const first = await owner.context.newPage();
+  let secondContext: BrowserContext | undefined;
+  let sockets = 0;
+
+  try {
+    await call(owner.context, baseURL!, owner.id, "manage");
+    await first.routeWebSocket("**/realtime", (socket) => {
+      sockets++;
+      socket.close();
+    });
+    await open(first, "/", true);
+    await expect(first.locator(".presence-state")).toHaveText(/1 个会话在线/);
+    expect(sockets).toBe(0);
+    await draw(first, 650);
+    await expect(
+      first.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    expect(
+      (await call(owner.context, baseURL!, owner.id, "view")).scene.elements,
+    ).toHaveLength(1);
+    secondContext = await browser.newContext({
+      baseURL,
+      viewport: { width: 1440, height: 900 },
+      storageState: await owner.context.storageState(),
+    });
+    const second = await secondContext.newPage();
+
+    await second.routeWebSocket("**/realtime", (socket) => socket.close());
+    await second.goto("/");
+    await expect
+      .poll(() => editorState(second).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    await expect(first.locator(".presence-state")).toHaveText(/2 个会话在线/);
+    await expect(second.locator(".presence-state")).toHaveText(/2 个会话在线/);
+    await draw(second, 950);
+    await expect(
+      second.getByRole("status").filter({ hasText: /^已保存/ }),
+    ).toBeVisible();
+    await expect
+      .poll(() => editorState(first).then((state) => state.elements.length))
+      .toBe(2);
+    await expect
+      .poll(() => editorState(first).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    expect(sockets).toBeGreaterThan(0);
+    await second.close();
+    await expect(first.locator(".presence-state")).toHaveText(/1 个会话在线/);
+    await draw(first, 1100);
+    await expect(
+      first.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    expect(
+      (await call(owner.context, baseURL!, owner.id, "view")).scene.elements,
+    ).toHaveLength(3);
+  } finally {
+    await secondContext?.close();
+    await owner.context.close();
+  }
+});
+
+test("同浏览器克隆标签页独立计数，刷新保留同一参与身份", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const first = await owner.context.newPage();
+
+  try {
+    await call(owner.context, baseURL!, owner.id, "manage");
+    await open(first, "/", true);
+    const popup = first.waitForEvent("popup");
+
+    await first.evaluate(() => window.open("/", "_blank"));
+    const second = await popup;
+
+    await expect(second.locator(".presence-state")).toHaveText(/2 个会话在线/);
+    await expect(first.locator(".presence-state")).toHaveText(/2 个会话在线/);
+    await second.reload();
+    await expect(second.locator(".presence-state")).toHaveText(/2 个会话在线/);
+    await draw(second, 850);
+    await expect
+      .poll(() => editorState(first).then((state) => state.elements.length))
+      .toBe(1);
+    await second.close();
+    await expect(first.locator(".presence-state")).toHaveText(/1 个会话在线/);
+  } finally {
+    await owner.context.close();
+  }
+});
+
+test("WebSocket传输凭证ERROR后HTTP权限仍有效，编辑和保存继续可用", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const page = await owner.context.newPage();
+  let injected = false;
+
+  try {
+    await call(owner.context, baseURL!, owner.id, "manage");
+    // A second authorized tab lease creates demand without needing another UI.
+    await call(owner.context, baseURL!, owner.id, "presence", {
+      clientId: "transport-error-peer",
+    });
+    await page.routeWebSocket("**/realtime", (socket) => {
+      const server = socket.connectToServer();
+
+      socket.onMessage((message) => {
+        if (
+          !injected &&
+          typeof message === "string" &&
+          JSON.parse(message).type === "AUTH"
+        ) {
+          injected = true;
+          socket.send(
+            JSON.stringify({ type: "ERROR", message: "连接凭证已过期" }),
+          );
+        } else server.send(message);
+      });
+      server.onMessage((message) => socket.send(message));
+    });
+    await page.goto("/");
+    await expect.poll(() => injected).toBe(true);
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存/ }),
+    ).toBeVisible();
+    await draw(page, 750);
+    await expect
+      .poll(
+        async () =>
+          (await call(owner.context, baseURL!, owner.id, "view")).scene.elements
+            .length,
+      )
+      .toBe(1);
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存/ }),
+    ).toBeVisible();
+    await expect(page.getByText("访问已失效", { exact: true })).toHaveCount(0);
   } finally {
     await owner.context.close();
   }

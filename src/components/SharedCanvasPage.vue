@@ -172,7 +172,10 @@ async function flushForShare() {
         </div>
         <div class="shared-actions">
           <span v-if="mode === 'live'" class="presence" :title="onlineLabel"
-            ><QuietIcon name="users" :size="14" />{{ onlineCount }} 人在线</span
+            ><QuietIcon name="users" :size="14" />{{
+              onlineCount
+            }}
+            个会话在线</span
           ><span class="sync-state" role="status">{{ status }}</span>
           <button v-if="mode === 'latest'" type="button" @click="refresh">
             <QuietIcon name="refresh" :size="14" />刷新最新版
