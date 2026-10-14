@@ -4,6 +4,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
+  type WebSocketRoute,
 } from "@playwright/test";
 import { editorState } from "./fixtures";
 import { currentRelease } from "../../src/data/releases";
@@ -588,5 +589,119 @@ test("同一元素被另一会话更新后，撤销不会回滚对方修改", as
   } finally {
     await other.close();
     await owner.context.close();
+  }
+});
+
+test("移动端协作画布解锁使用抓手，手动选择工具后远端更新和重连保持选择", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const other = await browser.newContext({ baseURL });
+  let releaseView!: () => void;
+  const viewGate = new Promise<void>((resolve) => {
+    releaseView = resolve;
+  });
+
+  await owner.context.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", {
+      get: () =>
+        "Mozilla/5.0 (Linux; Android 15; Tablet) Chrome/130 Safari/537.36",
+    });
+    Object.defineProperty(navigator, "maxTouchPoints", { get: () => 5 });
+  });
+  const page = await owner.context.newPage();
+  const errors: string[] = [];
+  let liveSocket: WebSocketRoute | undefined;
+  let socketConnections = 0;
+
+  page.on("pageerror", (error) => errors.push(error.message));
+  try {
+    await page.routeWebSocket(
+      `**/api/canvases/${owner.id}/realtime`,
+      (socket) => {
+        liveSocket = socket;
+        socketConnections++;
+        socket.connectToServer();
+      },
+    );
+    await page.route(
+      `**/api/canvases/${owner.id}/collaboration/view`,
+      async (route) => {
+        await viewGate;
+        await route.continue();
+      },
+    );
+    await page.goto("/");
+    await expect(page.locator(".excalidraw")).toBeVisible();
+    await expect
+      .poll(() => editorState(page).then((state) => state.activeTool.type))
+      .toBe("hand");
+    expect((await editorState(page)).viewModeEnabled).toBe(true);
+    releaseView();
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    expect((await editorState(page)).activeTool.type).toBe("hand");
+    await page.getByTestId("toolbar-selection").first().click();
+    const link = await call(owner.context, baseURL!, owner.id, "links", {
+      role: "editor",
+      requireLogin: false,
+    });
+    const remote = await other.newPage();
+
+    await open(remote, link.path, true);
+    // Desktop retains its normal pointer default.
+    expect((await editorState(remote)).activeTool.type).toBe("selection");
+    await draw(remote);
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements.length))
+      .toBe(1);
+    expect((await editorState(page)).activeTool.type).toBe("selection");
+    await page.getByRole("button", { name: "新建画布", exact: true }).click();
+    const create = page.getByRole("dialog", { name: "新建画布", exact: true });
+
+    await create.getByLabel("画布名称").fill("工具切换测试");
+    await create.getByRole("button", { name: "创建", exact: true }).click();
+    await expect(page.locator(".canvas-name[aria-current=page]")).toHaveText(
+      "工具切换测试",
+    );
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    expect((await editorState(page)).activeTool.type).toBe("hand");
+    await page.locator(`[data-canvas-id="${owner.id}"] .canvas-name`).click();
+    await expect
+      .poll(() => editorState(page).then((state) => state.elements.length))
+      .toBe(1);
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    expect((await editorState(page)).activeTool.type).toBe("selection");
+    // Browser offline emulation need not close an existing WebSocket. Close
+    // the forwarded real connection explicitly and observe a fresh handshake.
+    const connectionsBefore = socketConnections;
+
+    expect(liveSocket).toBeDefined();
+    await liveSocket!.close({
+      code: 1012,
+      reason: "tool reconnect regression",
+    });
+    await expect
+      .poll(() => socketConnections)
+      .toBeGreaterThan(connectionsBefore);
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
+    expect((await editorState(page)).activeTool.type).toBe("selection");
+    await draw(page, 650);
+    await expect
+      .poll(() => editorState(remote).then((state) => state.elements.length))
+      .toBe(2);
+    expect(errors).toEqual([]);
+  } finally {
+    releaseView();
+    await owner.context.close();
+    await other.close();
   }
 });
