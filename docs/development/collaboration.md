@@ -1,10 +1,12 @@
 # 协作与分享
 
-[返回开发者指南](readme.md) · [Issue #12](https://github.com/qiudeng7/excalidraw-workspace/issues/12)
+[返回目录](../../README.md#目录) · [Issue #12](https://github.com/qiudeng7/excalidraw-workspace/issues/12)
 
 ## 从使用流程进入代码
 
 所有者在画布顶部打开 [CanvasSharePanel.vue](../../src/components/CanvasSharePanel.vue)，按邮箱邀请已有账号或生成可撤销的链接。账号邀请出现在“与我共享”，打开 `/c/:id`；分享链接使用 `/share/:id#secret`，前端把 fragment secret 交换为短期、不透明的访问 capability 后移除 fragment，按账号保存在当前标签页的 sessionStorage。请求携带 `X-Canvas-Access`，链接上下文始终按该链接授权，即使打开者本身是所有者也不能升级权限。
+
+画布默认私有。所有者管理权限，编辑者可以绘图，查看者保持只读。分享链接默认要求登录、有效期 7 天，也可允许匿名访问、调整有效期或撤销；删除固定版本后，对应访问失效。分享不包含所有者的个人素材库、设置或其他画布。协作同步和连接状态统一显示在顶部的保存状态处。
 
 | 身份 / 查看方式 | 内容加载与后续行为                         | 实时连接           |
 | --------------- | ------------------------------------------ | ------------------ |

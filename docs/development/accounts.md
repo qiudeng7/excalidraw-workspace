@@ -1,6 +1,6 @@
 # 账户与访问
 
-[返回开发者指南](readme.md)
+[返回目录](../../README.md#目录)
 
 用户通过邮箱和密码建立会话；管理员额外控制注册开放状态。账户表单在 [AccountGate.vue](../../src/components/AccountGate.vue)，登录后的生命周期由 [useAccountSession.ts](../../src/composables/useAccountSession.ts) 编排，HTTP 适配在 [accountApi.ts](../../src/lib/accountApi.ts)。
 
@@ -13,6 +13,8 @@
 成功后走与登录相同的账户加载流程。初始化与普通注册共用凭证校验，邮箱规范化为小写，密码为 12–256 个字符。
 
 ## 注册与登录
+
+打开[在线应用](https://excalidraw-workspace.qiudeng.workers.dev/)后注册或登录即可使用。邮箱只作为登录名，无需邮件验证。
 
 普通用户通过 [POST /api/register](../../server/api/register.post.ts) 注册，通过 [POST /api/login](../../server/api/login.post.ts) 登录。注册创建与初始化相同的一组个人资源；管理员尚未创建或已关闭注册时拒绝普通注册。登录校验密码并创建会话，不重新创建工作空间。
 

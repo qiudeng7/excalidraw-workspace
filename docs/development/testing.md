@@ -1,6 +1,6 @@
 # 开发验证
 
-[返回开发者指南](readme.md)
+[返回目录](../../README.md#目录)
 
 在仓库根目录按变更范围运行。测试使用 Node.js 24+ 和仓库锁定的 pnpm 版本；先执行 `pnpm install --frozen-lockfile`。
 
@@ -20,6 +20,20 @@
 手动执行 `pnpm check`，依次运行 `lint`、`format:check`、`test:lint`、`test:unit`、`test:integration` 和 `typecheck`。提交和推送不会自动触发项目检查。快速定位问题可先运行相关 unit；integration 不启动应用 HTTP 服务，但迁移回归会执行独立 Nuxt CLI。
 
 Nuxt 准备、类型检查和生产构建共用 `.nuxt` / `.output`，编辑器构建共用包内 `dist`，请在同一 checkout 串行执行。默认浏览器启动器独占临时 Nuxt 生成目录和 Vite 缓存，但仍先构建编辑器，不能与编辑器构建并行。各功能模块末尾还列有相关检查项。
+
+## 代码检查
+
+在仓库根目录手动运行：
+
+```sh
+pnpm check:staged    # 只检查 Git 暂存区中的新增、修改和重命名文件
+pnpm lint            # ESLint：代码规则与异常处理
+pnpm lint --fix      # 手动修复 ESLint 可修复的问题
+pnpm format:check    # Prettier：检查排版
+pnpm format          # 手动格式化，执行前先确认工作区改动
+```
+
+`pnpm check:staged` 对独立的暂存区快照运行 ESLint、Prettier 和 Git 空白检查，不修改工作区或暂存区。它适合部分暂存后的提交检查；修改 ESLint 配置时会检查完整代码范围。Prettier 范围见 [.prettierignore](../../.prettierignore)。项目不安装 Git hooks；检查脚本放在 `scripts/`，其回归用例与 ESLint 规则测试放在 `tests/lint/`。
 
 ## 测试目录和辅助代码
 

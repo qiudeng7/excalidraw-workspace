@@ -1,10 +1,14 @@
 # 账户设置
 
-[返回开发者指南](readme.md)
+[返回目录](../../README.md#目录)
 
 工作空间侧边栏底部的“设置”打开 [SettingsPanel.vue](../../src/components/SettingsPanel.vue)，左侧上方包含“通用”“编辑器”“账号”“调试”；管理员专属的“系统设置”位于左侧下方。绘图功能、采样倍率与渲染开关按账户保存，独立于画布场景和撤销历史；控件定义与旧配置读取在 [settingsControls.ts](../../src/lib/settingsControls.ts)。保存与冲突状态在 [userSettings.ts](../../src/lib/userSettings.ts)，完整类型与默认值在 [shared/contracts.ts](../../shared/contracts.ts)。
 
 “通用”中的外观主题按浏览器保存；管理员在“系统设置”中可切换注册开放状态；“账号”提供[修改密码](accounts.md#修改密码)。通用、系统与账号设置不走绘图设置的版本与保存队列。
+
+编辑器开关默认全部开启：关闭 Excalidraw 默认右侧栏、工具栏置底、Ctrl 点击多选、边缘连线、Nunito 字体、规整线条、纯色填充和短箭头头部；关闭“关闭excalidraw默认侧边栏”开关可恢复素材库与查找入口。调试提供 `1×`、`1.5×`、`2×` 采样倍率及六个 Canvas 渲染开关，默认 `1×`、全部关闭。提高倍率会增加内存和渲染开销，“恢复调试默认”只重置调试项。各项作用和限制见[源码维护说明](../../packages/excalidraw/README.md#渲染实验开关)。
+
+字体、线条和填充开关影响新建元素的工具默认值，导入或已有图形保留自己的样式。关闭填充开关会恢复上游默认纯色填充，因此可能没有视觉区别。短箭头头部和渲染设置的显示、导出边界见[源码维护说明](../../packages/excalidraw/README.md)。
 
 ## 加载设置
 

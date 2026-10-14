@@ -28,7 +28,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-`pnpm dev` 先构建本地编辑器，再启动 Nuxt 开发服务。账户与保存使用本地 SQLite 和文件目录；Workers 模拟方式见[根目录 README](../../README.md#本地启动)。其余命令：
+`pnpm dev` 先构建本地编辑器，再启动本地 Workers，使用 Wrangler 模拟 D1、R2 和 Durable Objects；`pnpm dev --runtime node` 启动 Nuxt 热更新服务，使用本地 SQLite 和私有文件目录。具体配置见[本地启动](../../docs/development/local-development.md)。其余命令：
 
 ```sh
 pnpm build:editor # 只构建六个源码包所需的编辑器 JS、CSS、字体和类型声明
@@ -106,13 +106,13 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 
 上游包原本由 Yarn monorepo 构建。本仓库改用 pnpm，并在 [build.mjs](build.mjs) 中保留 esbuild 双产物构建方式，不依赖上游根目录脚本和环境文件。构建中关闭上游统计追踪，保留素材库相关地址。字体通过宿主的 `/editor-assets/fonts/` 提供，来自本地编辑器构建产物；上游 CDN 仅保留为加载失败时的回退。
 
-为减小源码接入时的兼容变更，编辑器暂时保留上游 TypeScript 5.9.3、esbuild 0.19.10、esbuild-sass-plugin 2.16.0 和 Sass 1.51.0；Vite 5 与 Node 18 类型仅供编辑器旧工具链的类型检查。宿主应用使用 Nuxt 4、Vite 8、TypeScript 6 和 Node 类型。运行环境以[根目录 README](../../README.md#本地启动)为准；Node 类型版本不决定运行时版本。
+为减小源码接入时的兼容变更，编辑器暂时保留上游 TypeScript 5.9.3、esbuild 0.19.10、esbuild-sass-plugin 2.16.0 和 Sass 1.51.0；Vite 5 与 Node 18 类型仅供编辑器旧工具链的类型检查。宿主应用使用 Nuxt 4、Vite 8、TypeScript 6 和 Node 类型。运行环境以[本地启动](../../docs/development/local-development.md)为准；Node 类型版本不决定运行时版本。
 
 严格的 pnpm 依赖隔离还要求显式声明 `csstype`、`@types/lodash.throttle` 和 utils 使用的 `points-on-curve`，这些声明已补齐。React 运行时共享宿主的 18.3.1；不新增另一份 React。
 
 ## 验证与更新上游
 
-构建通过后，分别在 Nuxt 开发页面和本地 Worker 提供的生产页面检查（启动方式见[根目录 README](../../README.md#本地启动)）：新图形为规整线条、文字为 Nunito、箭头头部缩短；`Ctrl+C` 复制元素而 `Ctrl+Shift+C` 复制 PNG；外链菜单组隐藏，工具栏在底部且弹层向上展开。切换采样倍率后检查已有图形、新绘制图形及选择框位置，重登录或同账户换浏览器检查设置从服务端恢复；比较各倍率下复制 PNG 的尺寸，确认导出设置独立生效。修改渲染逻辑时还应比较 SVG/PNG 导出与画布外观。
+构建通过后，分别在 Nuxt 开发页面和本地 Worker 提供的生产页面检查（启动方式见[本地启动](../../docs/development/local-development.md)）：新图形为规整线条、文字为 Nunito、箭头头部缩短；`Ctrl+C` 复制元素而 `Ctrl+Shift+C` 复制 PNG；外链菜单组隐藏，工具栏在底部且弹层向上展开。切换采样倍率后检查已有图形、新绘制图形及选择框位置，重登录或同账户换浏览器检查设置从服务端恢复；比较各倍率下复制 PNG 的尺寸，确认导出设置独立生效。修改渲染逻辑时还应比较 SVG/PNG 导出与画布外观。
 
 新增功能可以运行 [arrowFlags.browser.mjs](tests/arrowFlags.browser.mjs) 做独立 Chromium 检查。先执行 `pnpm build:editor`；测试会在临时目录构建页面、启动回环服务，不使用账户或后端，并阻止外部请求。Playwright 是可选测试工具，未加入产品依赖，可在独立目录安装：
 

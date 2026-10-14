@@ -1,8 +1,8 @@
 # 架构与开发约束
 
-[返回开发者指南](readme.md)
+[返回目录](../../README.md#目录)
 
-应用由 Nuxt 页面、Vue 控制器、React 编辑器和 Nuxt 文件路由组成。Node 使用 SQLite 与私有文件目录，Workers 使用 D1 与私有 R2；协作房间分别由 DO SQLite 和本地 SQLite 保存权威状态，两端共用纯 TypeScript 合并与权限核心。功能流程从[模块与用例](readme.md#功能模块与用例)进入，本页说明跨功能的开发约束。
+应用使用 Nuxt 4、Vue、TypeScript 和 Pinia，通过浏览器端 React 组件挂载 Excalidraw，依赖由 pnpm workspace 管理。数据库通过 NuxtHub 与 Drizzle 接入，快照通过 NuxtHub Blob 保存。Node 使用 SQLite 与私有文件目录，Workers 使用 D1 与私有 R2；协作房间分别由 DO SQLite 和本地 SQLite 保存权威状态，两端共用纯 TypeScript 合并与权限核心。功能流程从[模块与用例](../../README.md#目录)进入，本页说明跨功能的开发约束。
 
 ## 页面与状态边界
 
