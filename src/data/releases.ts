@@ -12,6 +12,21 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-10-14-collaboration-recovery",
+    sequence: 5,
+    version: "0.4.1",
+    date: "2026-10-14",
+    title: "单人编辑更顺畅，协作连接可恢复",
+    summary:
+      "单人打开画布无需等待实时协作连接；多个会话加入后再启用实时同步，连接超时会自动重试。",
+    changes: [
+      "单人编辑通过普通请求加载和保存，确认画布版本后即可开始绘图，已开启过协作的画布也适用。",
+      "同一账号的不同设备、浏览器和标签页分别计为独立会话，第二个活跃会话加入时启用实时协作。",
+      "协作连接的凭据请求和握手增加超时与重试，避免无限等待；连接暂时不可用时保留本地草稿，并在权限和版本有效时继续通过普通请求保存。",
+    ],
+    actions: ["已打开的页面请刷新后使用新版。"],
+  },
+  {
     id: "workspace-2026-10-14-editor",
     sequence: 4,
     version: "0.4.0",
