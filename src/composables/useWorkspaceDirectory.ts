@@ -381,10 +381,11 @@ export function useWorkspaceDirectory({
 
   async function createCanvas() {
     if (directoryLocked.value || !workspaceId.value) return;
+    const now = new Date();
     const name = await dialogs.prompt({
       title: "新建画布",
       label: "画布名称",
-      initialValue: "未命名画布",
+      initialValue: `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`,
       confirmLabel: "创建",
     });
 
