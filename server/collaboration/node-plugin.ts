@@ -7,7 +7,14 @@ export default defineNitroPlugin((nitro) => {
   const timer = setInterval(() => {
     if (running) return;
     running = true;
-    void Promise.all([collectRecycleBin(), repairNodeProjections()])
+    void Promise.allSettled([collectRecycleBin(), repairNodeProjections()])
+      .then((results) => {
+        const errors = results.flatMap((result) =>
+          result.status === "rejected" ? [result.reason] : [],
+        );
+
+        if (errors.length) throw new AggregateError(errors, "部分后台维护失败");
+      })
       .catch((error) =>
         console.error(
           "回收站与共享目录维护失败",

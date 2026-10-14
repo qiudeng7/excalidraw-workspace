@@ -22,7 +22,10 @@ import {
   recycleWorkspace,
   restoreRecycleEntry,
 } from "../../server/db/recycle-bin";
-import { collectOrphans } from "../../server/utils/cleanup";
+import {
+  collectStorageGarbage,
+  collectOrphans,
+} from "../../server/utils/cleanup";
 import { collectNodeRoomOrphans } from "../../server/collaboration/node-cleanup";
 import { eq } from "drizzle-orm";
 import { nodeCommand } from "../../server/collaboration/node";
@@ -906,6 +909,79 @@ test("expiry cleanup paginates past a full page of persistently failing rooms", 
         .length,
       100,
     );
+  } finally {
+    await f.close();
+  }
+});
+
+test("a failed room maintenance cannot suppress independent legacy orphan collection", async () => {
+  const f = await fixture();
+
+  try {
+    await f.request(`/canvases/${f.id}/collaboration/view`);
+    await f.context(() => recycleCanvas(f.id, f.owner.id, f.workspaceId, 0));
+    await f.blob.put("abandoned.json", "{}");
+    const namespace = {
+      idFromName: (id: string) => id,
+      get: () => ({
+        fetch: async () => {
+          throw new Error("permanent room outage");
+        },
+      }),
+    };
+
+    await assert.rejects(
+      f.context(() =>
+        collectStorageGarbage(namespace, Date.now() + 2 * 86400000),
+      ),
+      AggregateError,
+    );
+    assert.equal(await f.blob.get("abandoned.json"), null);
+    assert.equal(
+      (await f.database.select().from(canvases))[0]!.recyclePending,
+      1,
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("a failing blob listing cannot suppress expired recycle cleanup", async () => {
+  const f = await fixture();
+
+  try {
+    await f.request(`/canvases/${f.id}`, "PUT", { revision: 0, scene });
+    const original = (await f.database.select().from(canvases))[0]!;
+
+    await f.context(() =>
+      recycleCanvas(
+        f.id,
+        f.owner.id,
+        f.workspaceId,
+        0,
+        new Date(Date.now() - RECYCLE_RETENTION).toISOString(),
+      ),
+    );
+    f.interceptBlob(
+      new Proxy(f.blob, {
+        get(target, key) {
+          if (key === "list")
+            return async () => {
+              throw new Error("blob listing unavailable");
+            };
+
+          const value = Reflect.get(target, key);
+
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      }),
+    );
+    await assert.rejects(
+      f.context(() => collectStorageGarbage()),
+      AggregateError,
+    );
+    assert.deepEqual(await f.database.select().from(canvases), []);
+    assert.equal(await f.blob.get(original.objectKey!), null);
   } finally {
     await f.close();
   }
