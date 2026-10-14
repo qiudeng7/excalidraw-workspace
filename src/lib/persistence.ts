@@ -4,6 +4,7 @@ import type { SaveResult } from "#shared/contracts";
 interface Draft<T> {
   revision: number;
   value: T;
+  baseline?: T;
   updatedAt?: string;
 }
 
@@ -153,6 +154,7 @@ export interface PersistentResourceOptions<T> {
   value: T;
   revision: number;
   changed: (message?: string) => void;
+  onCollaborationRequired?: () => Promise<void>;
   scopeId?: string;
   ownerId?: string;
   confirmed?: (value: T, result: SaveResult) => void;
@@ -191,6 +193,7 @@ export class PersistentResource<T> implements SaveResource<T> {
   revision: number;
   dirty = false;
   conflict = false;
+  baseline: T | undefined;
   private generation = 0;
   private saving?: Promise<void>;
   private timer?: ReturnType<typeof setTimeout>;
@@ -199,6 +202,7 @@ export class PersistentResource<T> implements SaveResource<T> {
   private autosavePaused = false;
   private activeRequest?: AbortController;
   private ownerId?: string;
+  private onCollaborationRequired?: () => void;
   private storageError = false;
   private key: Promise<string>;
   private prefix: string;
@@ -254,11 +258,13 @@ export class PersistentResource<T> implements SaveResource<T> {
     changed,
     scopeId,
     ownerId,
+    onCollaborationRequired,
     confirmed,
     readRemote,
     runRequest,
   }: PersistentResourceOptions<T>) {
     this.ownerId = ownerId;
+    this.onCollaborationRequired = onCollaborationRequired;
     this.confirmed = confirmed;
     this.readRemote = readRemote;
     this.runRequest = runRequest;
@@ -270,6 +276,7 @@ export class PersistentResource<T> implements SaveResource<T> {
     this.field = field;
     this.changed = changed;
     this.value = value;
+    this.baseline = JSON.parse(JSON.stringify(value)) as T;
     this.revision = revision;
   }
 
@@ -280,6 +287,7 @@ export class PersistentResource<T> implements SaveResource<T> {
       if (this.disposed) return;
       if (draft) {
         this.value = draft.value;
+        this.baseline = draft.baseline;
         this.dirty = true;
         this.conflict = draft.revision !== this.revision;
         this.revision = draft.revision;
@@ -302,6 +310,7 @@ export class PersistentResource<T> implements SaveResource<T> {
       ? {
           revision: this.revision,
           value: this.value,
+          baseline: this.baseline,
           updatedAt: new Date().toISOString(),
         }
       : undefined;
@@ -394,6 +403,7 @@ export class PersistentResource<T> implements SaveResource<T> {
           this.revision = remote.revision;
           if (uncertain.generation === this.generation) this.dirty = false;
           this.uncertain = undefined;
+          this.baseline = uncertain.value;
           this.confirmed?.(uncertain.value, {
             revision: remote.revision,
             updatedAt: remote.updatedAt ?? "",
@@ -434,6 +444,7 @@ export class PersistentResource<T> implements SaveResource<T> {
       if (this.disposed)
         throw new DOMException("Resource disposed", "AbortError");
       this.revision = saved.revision;
+      this.baseline = value;
       this.confirmed?.(value, saved);
       if (generation === this.generation) this.dirty = false;
       this.persist();
@@ -446,6 +457,12 @@ export class PersistentResource<T> implements SaveResource<T> {
       );
     } catch (error) {
       if (this.disposed) throw error;
+      if (
+        error instanceof ApiError &&
+        error.code === "COLLAB_PROTOCOL_REQUIRED"
+      )
+        // Submit text/IME while the old editor still permits local capture.
+        await this.onCollaborationRequired?.();
       this.conflict = error instanceof ApiError && error.status === 409;
       // A transport failure can occur after commit. Re-read before the next write.
       if (

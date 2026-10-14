@@ -111,6 +111,7 @@ export async function createAccount(
           objectKey: sql<string | null>`NULL`.as("objectKey"),
           syncMode: sql<"legacy">`'legacy'`.as("syncMode"),
           roomEpoch: sql<string | null>`NULL`.as("roomEpoch"),
+          migrationEpoch: sql<string | null>`NULL`.as("migrationEpoch"),
           createdAt: sql<string>`${now}`.as("createdAt"),
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           position: sql<number>`0`.as("position"),

@@ -25,6 +25,7 @@ export interface Workspace {
 export interface CanvasMeta {
   syncMode?: "legacy" | "preparing" | "collaborative";
   roomEpoch?: string | null;
+  migrationEpoch?: string | null;
   position: number;
   id: string;
   workspaceId: string;

@@ -252,3 +252,112 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
     }
   }
 });
+
+test("legacy adoption preserves remote additions and changes, persists before reload, and carries only the local delta", async () => {
+  const originals = Object.fromEntries(
+    ["navigator", "sessionStorage", "fetch"].map((key) => [
+      key,
+      Object.getOwnPropertyDescriptor(globalThis, key),
+    ]),
+  );
+  const baseline = {
+    elements: [element("a"), element("unchanged")],
+    appState: { viewBackgroundColor: "#ffffff" },
+    files: {},
+  };
+  const room = createRoom("legacy-adoption", "owner", "Canvas", "epoch", {
+    elements: [element("a"), element("unchanged", 3, 99), element("remote")],
+    appState: { viewBackgroundColor: "#abcdef" },
+    files: {},
+  });
+  let posted: Operation | undefined;
+  const define = (key: string, value: unknown) =>
+    Object.defineProperty(globalThis, key, { configurable: true, value });
+
+  define("navigator", {});
+  define("sessionStorage", {
+    getItem: () => "legacy-adoption-tab",
+    setItem: () => {},
+  });
+  define("fetch", async (url: string, init: RequestInit) => {
+    const path = url.split("/").at(-1);
+    let command: Command;
+
+    if (path === "access" || path === "view") command = { type: path };
+    else if (path === "update") {
+      posted = JSON.parse(String(init.body)) as Operation;
+      command = {
+        type: "update",
+        operation: posted,
+        digest: canonical(posted),
+      };
+    } else throw new Error(`Unexpected ${path}`);
+
+    return Response.json(
+      execute(room, { userId: "owner", name: "Owner" }, command, Date.now()),
+    );
+  });
+  const options = {
+    canvasId: room.id,
+    userId: "owner",
+    scope: "legacy-adoption",
+  };
+  let session = new CollaborationSession(options);
+
+  try {
+    await session.start(false);
+    await assert.rejects(
+      session.adoptLegacyDraft(baseline, baseline, "previous-epoch"),
+      /已恢复/,
+    );
+    await session.adoptLegacyDraft(
+      baseline,
+      {
+        ...baseline,
+        elements: [
+          element("a", 2, 50),
+          element("unchanged"),
+          element("local"),
+          {
+            ...element("never-shared-image"),
+            type: "image",
+            fileId: "pruned-local-file",
+            isDeleted: true,
+          },
+        ],
+        appState: { viewBackgroundColor: "#eeeeee" },
+      },
+      room.epoch,
+    );
+    assert.equal(session.dirty, true);
+    assert.equal(session.value.elements.length, 4);
+    assert.equal(
+      (session.value.elements as Element[]).find(
+        (item) => item.id === "unchanged",
+      )?.x,
+      99,
+    );
+    assert.equal(session.value.appState.viewBackgroundColor, "#abcdef");
+    session.dispose();
+    session = new CollaborationSession(options);
+    await session.start(false);
+    assert.equal(session.dirty, true);
+    await session.flush();
+    assert.deepEqual(posted?.elements.map((item) => item.id).sort(), [
+      "a",
+      "local",
+    ]);
+    assert.equal(posted?.background, undefined);
+    assert.equal(room.scene.elements.length, 4);
+    assert.equal(
+      room.scene.elements.find((item) => item.id === "unchanged")?.x,
+      99,
+    );
+  } finally {
+    session.dispose();
+    for (const [key, descriptor] of Object.entries(originals)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+});

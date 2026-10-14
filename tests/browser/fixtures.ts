@@ -148,6 +148,12 @@ export const test = base.extend<{
       if (!(path === "/api" || path.startsWith("/api/")))
         return route.continue();
       const key = `${request.method()} ${path}`;
+
+      if (
+        request.method() === "POST" &&
+        /^\/api\/canvases\/[^/]+\/presence$/.test(path)
+      )
+        return route.fulfill({ json: { syncMode: "legacy" } });
       let data: unknown;
       const fail = (status: number, code: string, message: string) =>
         route.fulfill({ status, json: { error: { code, message } } });

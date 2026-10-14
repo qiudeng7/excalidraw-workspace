@@ -363,7 +363,46 @@ function capture() {
   );
 }
 
-defineExpose<EditorHandle>({ capture, flush, saveManually });
+let composing = false;
+const compositionWaiters = new Set<() => void>();
+const compositionStart = () => {
+  composing = true;
+};
+const compositionEnd = () => {
+  composing = false;
+  for (const resolve of compositionWaiters) resolve();
+  compositionWaiters.clear();
+};
+
+async function prepareHandoff() {
+  while (composing && active)
+    await new Promise<void>((resolve) => compositionWaiters.add(resolve));
+  if (!active || !editorApi) return;
+  const focused = container.value?.ownerDocument.activeElement;
+
+  // Native text submission runs on blur. Capture afterward even if the old
+  // PUT was already fenced and its wrapper has entered conflict/read-only.
+  if (focused instanceof HTMLElement && container.value?.contains(focused))
+    focused.blur();
+  await Promise.resolve();
+  if (!active || !editorApi) return;
+  const serialized = serializeAsJSON(
+    editorApi.getSceneElementsIncludingDeleted(),
+    editorApi.getAppState(),
+    editorApi.getFiles(),
+    "local",
+  );
+
+  if (serialized !== sceneFingerprint) {
+    sceneFingerprint = serialized;
+    sceneResource.update(JSON.parse(serialized) as CanvasScene);
+  }
+
+  sceneResource.pauseAutosave();
+  await sceneResource.checkpoint();
+}
+
+defineExpose<EditorHandle>({ capture, flush, saveManually, prepareHandoff });
 
 const container = useTemplateRef<HTMLDivElement>("container");
 const router = useRouter();
@@ -625,6 +664,8 @@ onMounted(async () => {
   }
 
   if (!container.value) return;
+  container.value.addEventListener("compositionstart", compositionStart);
+  container.value.addEventListener("compositionend", compositionEnd);
   loading.value = false;
   root = createRoot(container.value);
   root.render(createElement(CanvasEditor));
@@ -632,6 +673,9 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   active = false;
+  compositionEnd();
+  container.value?.removeEventListener("compositionstart", compositionStart);
+  container.value?.removeEventListener("compositionend", compositionEnd);
   window.removeEventListener("beforeunload", beforeUnload);
   window.removeEventListener("keydown", saveShortcut, true);
   clearTimeout(feedbackTimer);
