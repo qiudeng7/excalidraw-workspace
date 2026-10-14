@@ -92,9 +92,23 @@ flowchart TD
 
 ## 删除画布
 
-`deleteCanvas()` 确认后等待保存，通过 [DELETE /api/canvases/:id](../../server/api/canvases/[id].delete.ts) 携带 `{ catalogRevision }`。后端校验归属和目录版本，删除画布、递增目录版本，并后台删除快照。
+`deleteCanvas()` 确认后等待保存，通过 [DELETE /api/canvases/:id](../../server/api/canvases/[id].delete.ts) 携带 `{ catalogRevision }`。后端校验归属和目录版本，记录服务端 UTC 回收时间、递增目录和快照版本，保留快照与图片，并暂停已有协作房间。此处的删除是移入回收站。
 
 前端无论请求是否报错都会重新读取目录，确认画布是否仍存在；这也处理“服务端已删除但响应丢失”的情况。删除后移除对应标签与资源；若删除的是当前画布，刷新导航，再打开相邻的已打开标签，没有标签则保留空状态。其他文件仍可从侧边栏打开。
+
+## 回收站与彻底删除
+
+侧边栏底部的[回收站](../../src/components/RecycleBinPanel.vue)列出当前账号回收的画布和工作空间，显示删除日期与剩余天数。工作空间整体回收时保留子画布，只列父空间；恢复父空间不会恢复此前单独回收的画布。恢复保留原 ID、名称、位置、场景、协作成员、分享链接、固定版本与图片，目录中的同位置画布按原有 ID 排序。
+
+[GET /api/recycle-bin](../../server/api/recycle-bin/index.get.ts) 列出未满 30 天的项目；[POST /api/recycle-bin/:kind/:id](../../server/api/recycle-bin/[kind]/[id].post.ts) 恢复；[DELETE 同一路径](../../server/api/recycle-bin/[kind]/[id].delete.ts) 需要 `{ confirm: true }` 彻底删除。所有接口只允许所有者操作自己的数据，管理员也不能读取其他人的回收站。满 30 天后即使定时任务尚未执行，也不能恢复。
+
+回收前继续等待全部画布保存；回收后正常目录、导航、共享、固定版本和实时连接均不可访问。服务端快照发布 CAS 同时检查画布与父空间是否在回收站，避免迟到请求把旧内容写回。恢复时提高快照版本并轮换协作 epoch，旧浏览器草稿会触发现有冲突/下载恢复流程，不自动覆盖恢复内容；本地富文本恢复副本不随服务端回收删除。
+
+[db/recycle-bin.ts](../../server/db/recycle-bin.ts) 原子提交元数据与导航。房间暂停使用持久 `recycleRevision` / `recyclePending` 世代，等待房间同步完成再恢复协作访问，目录投影失败继续重试；重试不会重复换代，迟到的旧暂停不能覆盖新恢复。已中断的 `preparing` 迁移使用原冻结快照补齐房间。暂停期间场景、固定版本和图片仍是有效对象引用，不参与孤儿清理。
+
+清理复用每小时的 [snapshots:cleanup](../../server/tasks/snapshots/cleanup.ts)，Node 另在现有每分钟维护中重试。先锁定不可恢复的清理意图，再永久 tombstone 房间并清空内容/权限，最后删除目录与快照。中途失败保留意图重试；协作图片由既有房间 GC 按 24 小时对象保护窗口回收，避免误删正在上传的对象。
+
+[recycle-bin.test.ts](../../tests/integration/recycle-bin.test.ts) 覆盖到期边界、权限、选择性恢复、迟到保存、迁移中断、失序重试和回收期间 GC；[recycle-bin.spec.ts](../../tests/browser/recycle-bin.spec.ts) 检查面板操作、确认、错误恢复和移动端布局。真实 Node / Worker 的回收与在线撤权用例位于 [collaboration.spec.ts](../../tests/browser/collaboration.spec.ts)。
 
 ## 调整画布顺序
 

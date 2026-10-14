@@ -99,6 +99,21 @@ export class CanvasRoom extends Server<Environment> {
     });
   }
 
+  private async requireActiveCatalog() {
+    const id = this.load()?.id;
+
+    if (!id) return;
+    const row = await this.env.DB.prepare(
+      "SELECT c.id, c.recycle_pending FROM canvases c JOIN workspaces w ON w.id=c.workspace_id WHERE c.id=? AND c.deleted_at IS NULL AND c.purging=0 AND w.deleted_at IS NULL AND w.deleting=0",
+    )
+      .bind(id)
+      .first<{ recycle_pending: number }>();
+
+    if (!row) reject("CANVAS_DELETED", "画布已移入回收站或彻底删除", 410);
+    if (row.recycle_pending)
+      reject("RECYCLE_SYNC_PENDING", "正在恢复画布，请稍后重试", 503);
+  }
+
   private async validSession(principal: Principal) {
     if (!principal.userId) return true;
     if (!principal.sessionHash) return false;
@@ -156,14 +171,26 @@ export class CanvasRoom extends Server<Environment> {
         command: Command;
         seed?: RoomState;
       };
+
+      if (
+        !["recycle", "delete", "projection", "projectionAck"].includes(
+          command.type,
+        )
+      )
+        await this.requireActiveCatalog();
       const result = this.transaction(principal, command, seed);
 
       // Persistence has completed. Reauthorize each recipient immediately before sending.
       await this.broadcastAuthorized(command, result);
       if (
-        ["member", "removeMember", "delete", "restore", "rename"].includes(
-          command.type,
-        )
+        [
+          "member",
+          "removeMember",
+          "delete",
+          "recycle",
+          "restore",
+          "rename",
+        ].includes(command.type)
       )
         await this.projectDirectory();
       if (
@@ -208,6 +235,7 @@ export class CanvasRoom extends Server<Environment> {
 
     if (!attachment?.principal) return;
     try {
+      await this.requireActiveCatalog();
       if (!(await this.validSession(attachment.principal)))
         reject("SESSION_CHANGED", "登录已失效，请刷新页面", 401);
       const access = this.transaction(attachment.principal, {
@@ -285,6 +313,8 @@ export class CanvasRoom extends Server<Environment> {
         if (message.type !== "AUTH" || typeof message.ticket !== "string")
           reject("AUTH_REQUIRED", "请先验证连接", 401);
         const hash = await hashSecret(message.ticket);
+
+        await this.requireActiveCatalog();
         const authenticated = this.transaction(
           { name: "" },
           { type: "authenticate", hash },

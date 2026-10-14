@@ -133,3 +133,13 @@ export function createDefaultUserSettings(): UserSettings {
     },
   };
 }
+
+export interface RecycleEntry {
+  id: string;
+  kind: "workspace" | "canvas";
+  name: string;
+  workspaceId?: string;
+  workspaceName?: string;
+  deletedAt: string;
+  expiresAt: string;
+}

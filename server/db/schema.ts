@@ -60,8 +60,12 @@ export const workspaces = sqliteTable(
     updatedAt: text("updated_at").notNull(),
     catalogRevision: integer("catalog_revision").notNull().default(0),
     deleting: integer().notNull().default(0),
+    deletedAt: text("deleted_at"),
   },
-  (table) => [index("workspace_owner").on(table.userId)],
+  (table) => [
+    index("workspace_owner").on(table.userId),
+    index("workspace_deleted_at").on(table.deletedAt),
+  ],
 );
 
 export const canvases = sqliteTable(
@@ -84,11 +88,17 @@ export const canvases = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     position: integer().notNull().default(0),
+    deletedAt: text("deleted_at"),
+    recycleRevision: integer("recycle_revision").notNull().default(0),
+    recyclePending: integer("recycle_pending").notNull().default(0),
+    purging: integer().notNull().default(0),
   },
   (table) => [
     index("canvas_workspace").on(table.workspaceId),
     index("canvas_position").on(table.workspaceId, table.position, table.id),
     index("canvas_object_key").on(table.objectKey),
+    index("canvas_deleted_at").on(table.deletedAt),
+    index("canvas_recycle_pending").on(table.recyclePending),
   ],
 );
 

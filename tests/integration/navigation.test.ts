@@ -348,7 +348,7 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
         .lastCanvasId,
       null,
     );
-    assert.equal(afterDelete.revision, 2);
+    assert.equal(afterDelete.revision, 3);
     assert.equal(
       (
         await request(

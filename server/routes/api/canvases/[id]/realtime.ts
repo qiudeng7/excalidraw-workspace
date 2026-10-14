@@ -110,6 +110,7 @@ export default defineWebSocketHandler({
           "restore",
           "rename",
           "delete",
+          "recycle",
         ].includes(command.type)
       )
         return;

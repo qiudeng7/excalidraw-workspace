@@ -1775,3 +1775,166 @@ for (const failure of ["QuotaExceededError", "SecurityError"]) {
     }
   });
 }
+
+test("回收站同页删除恢复重新打开，实时成员立即失去访问，旧epoch操作不能重放", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const member = await account(browser, baseURL!);
+  const page = await owner.context.newPage();
+  const memberPage = await member.context.newPage();
+  const headers = { Origin: baseURL!, "X-Requested-With": "excalidraw-demo" };
+
+  try {
+    await call(owner.context, baseURL!, owner.id, "members", {
+      email: member.email,
+      role: "editor",
+      viewMode: "live",
+    });
+    await open(page, "/", true);
+    await open(memberPage, `/c/${owner.id}`, true);
+    await draw(page);
+    await expect
+      .poll(
+        async () =>
+          (await call(owner.context, baseURL!, owner.id, "view")).scene.elements
+            .length,
+      )
+      .toBe(1);
+    const before = await call(owner.context, baseURL!, owner.id, "view");
+
+    await page.getByLabel("画布 未命名画布 的操作", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "删除画布 未命名画布", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "移入回收站", exact: true })
+      .getByRole("button", { name: "移入回收站", exact: true })
+      .click();
+    await expect(page.locator(".canvas-name")).toHaveCount(0);
+    await expect
+      .poll(() =>
+        editorState(memberPage).then((state) => state.viewModeEnabled),
+      )
+      .toBe(true);
+    const denied = await member.context.request.get(
+      `/api/canvases/${owner.id}/collaboration/view`,
+    );
+
+    expect(denied.status()).toBe(410);
+    await page.getByRole("button", { name: "回收站", exact: true }).click();
+    const panel = page.getByRole("dialog", { name: "回收站", exact: true });
+
+    await panel
+      .getByRole("button", { name: "恢复 未命名画布", exact: true })
+      .click();
+    await expect(panel.getByText("回收站是空的")).toBeVisible();
+    await panel
+      .getByRole("button", { name: "关闭回收站", exact: true })
+      .click();
+    await page.locator(".canvas-name").click();
+    await expect(page.locator(".excalidraw")).toBeVisible();
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    const after = await call(owner.context, baseURL!, owner.id, "view");
+
+    expect(after.epoch).not.toBe(before.epoch);
+    expect(after.scene.elements.map((element: any) => element.id)).toEqual(
+      before.scene.elements.map((element: any) => element.id),
+    );
+    const stale = await member.context.request.post(
+      `/api/canvases/${owner.id}/collaboration/update`,
+      {
+        headers,
+        data: {
+          protocolVersion: 1,
+          epoch: before.epoch,
+          baseSeq: before.seq,
+          clientId: "recycle-stale-client",
+          clientSeq: 1,
+          opId: "recycle-stale-operation",
+          elements: [],
+        },
+      },
+    );
+
+    expect(stale.status()).toBe(409);
+    await memberPage.reload();
+    await expect
+      .poll(() =>
+        editorState(memberPage).then((state) => state.viewModeEnabled),
+      )
+      .toBe(false);
+    await draw(memberPage, 600);
+    await expect
+      .poll(
+        async () =>
+          (await call(owner.context, baseURL!, owner.id, "view")).scene.elements
+            .length,
+      )
+      .toBe(2);
+  } finally {
+    await owner.context.close();
+    await member.context.close();
+  }
+});
+
+test("回收工作空间保留曾单独回收的画布，并可同页恢复父空间", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const page = await owner.context.newPage();
+  const headers = { Origin: baseURL!, "X-Requested-With": "excalidraw-demo" };
+
+  try {
+    const spaces = (
+      await (await owner.context.request.get("/api/workspaces")).json()
+    ).workspaces;
+    const workspace = spaces[0];
+    const second = await owner.context.request.post(
+      `/api/workspaces/${workspace.id}/canvases`,
+      { headers, data: { name: "保留画布", catalogRevision: 0 } },
+    );
+
+    expect(second.status()).toBe(200);
+    await open(page, "/", true);
+    await page.getByLabel("画布 未命名画布 的操作", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "删除画布 未命名画布", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "移入回收站", exact: true })
+      .getByRole("button", { name: "移入回收站", exact: true })
+      .click();
+    await expect(page.locator(".canvas-name")).toHaveCount(1);
+    await page.getByLabel("工作空间操作", { exact: true }).click();
+    await page
+      .getByRole("button", { name: "删除工作空间", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "移入回收站", exact: true })
+      .getByRole("button", { name: "移入回收站", exact: true })
+      .click();
+    await expect(page.locator(".canvas-name")).toHaveCount(0);
+    await page.getByRole("button", { name: "回收站", exact: true }).click();
+    const panel = page.getByRole("dialog", { name: "回收站", exact: true });
+
+    await panel
+      .getByRole("button", { name: `恢复 ${workspace.name}`, exact: true })
+      .click();
+    await expect(
+      panel.getByRole("button", { name: "恢复 未命名画布", exact: true }),
+    ).toBeVisible();
+    await panel
+      .getByRole("button", { name: "关闭回收站", exact: true })
+      .click();
+    await expect(page.locator(".canvas-name")).toHaveCount(1);
+    await expect(page.locator(".canvas-name")).toHaveText("保留画布");
+    await expect(page.locator(".excalidraw")).toBeVisible();
+  } finally {
+    await owner.context.close();
+  }
+});

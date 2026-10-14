@@ -64,6 +64,13 @@
       "when": 1791940559316,
       "tag": "0009_canvas_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791949644209,
+      "tag": "0010_recycle_bin",
+      "breakpoints": true
     }
   ]
 }

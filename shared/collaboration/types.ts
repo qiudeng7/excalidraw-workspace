@@ -116,6 +116,8 @@ export interface RoomState {
   minMergeSeq: number;
   accessRevision: number;
   deleted: boolean;
+  recycledAt?: string | null;
+  recycleRevision?: number;
   directoryPending: boolean;
   scene: SharedScene;
   members: Member[];

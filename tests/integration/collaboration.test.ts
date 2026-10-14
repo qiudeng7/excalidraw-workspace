@@ -495,13 +495,25 @@ test("an in-flight legacy PUT cannot publish after room migration freezes the so
   }
 });
 
-test("deleting a workspace leaves durable room tombstones and prevents old clients from recreating its canvases", async () => {
+test("purging a workspace retries durable room tombstones and prevents old clients from recreating its canvases", async () => {
   const f = await fixture();
 
   try {
     const spaces = (
       await (await f.request("/workspaces", "GET", undefined, f.cookie)).json()
     ).workspaces;
+
+    assert.equal(
+      (
+        await f.request(
+          `/workspaces/${spaces[0].id}`,
+          "DELETE",
+          undefined,
+          f.cookie,
+        )
+      ).status,
+      200,
+    );
 
     // Simulate an interruption after room deletion but before catalog deletion.
     await withDatabase(f.storage.database, () =>
@@ -512,9 +524,9 @@ test("deleting a workspace leaves durable room tombstones and prevents old clien
       ),
     );
     const response = await f.request(
-      `/workspaces/${spaces[0].id}`,
+      `/recycle-bin/workspace/${spaces[0].id}`,
       "DELETE",
-      undefined,
+      { confirm: true },
       f.cookie,
     );
 

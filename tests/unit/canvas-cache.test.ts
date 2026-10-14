@@ -1312,3 +1312,55 @@ test("legacy drafts with baselines remain recoverable instead of being replayed 
     manager.dispose();
   }
 });
+
+test("authoritative restore revives the same id while an old deleted read cannot replace it or unrelated drafts", async () => {
+  const oldRead = deferred<CanvasDocument>();
+  let reads = 0;
+  const manager = new CanvasResources(
+    "recycle-revive",
+    {
+      readCanvas: async (id) =>
+        id === "a" && ++reads === 1
+          ? oldRead.promise
+          : canvas(id, 2, "restored"),
+      readLibrary: library,
+    },
+    () => {},
+    cache().cache,
+  );
+
+  try {
+    const unrelated = await manager.open("b", () => {});
+
+    unrelated.resource.update(scene("unrelated-draft"));
+    const previews: string[] = [];
+    const loading = manager.open("a", (entry) =>
+      previews.push(entry.document.scene.elements[0] as string),
+    );
+    const rejected = assert.rejects(
+      loading,
+      (error: unknown) =>
+        error instanceof DOMException && error.name === "AbortError",
+    );
+
+    await manager.invalidate("a");
+    await assert.rejects(
+      manager.open("a", () => {}),
+      /画布已删除/,
+    );
+    await manager.revive("a");
+    const restored = await manager.open("a", () => {});
+
+    oldRead.resolve(canvas("a", 0, "stale"));
+    await rejected;
+    assert.equal(restored.resource.revision, 2);
+    assert.equal(manager.canvases.get("a"), restored);
+    assert.ok(!previews.length);
+    assert.equal(manager.canvases.get("b"), unrelated);
+    assert.equal(unrelated.resource.dirty, true);
+    assert.deepEqual(unrelated.resource.value, scene("unrelated-draft"));
+  } finally {
+    oldRead.resolve(canvas("a"));
+    manager.dispose();
+  }
+});

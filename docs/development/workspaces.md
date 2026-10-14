@@ -30,9 +30,9 @@
 
 ## 删除工作空间
 
-`deleteWorkspace()` 先确认删除并等待编辑器保存，再调用 [DELETE /api/workspaces/:id](../../server/api/workspaces/[id].delete.ts)。后端验证归属，删除空间及关联画布，并将关联快照交给后台删除。
+`deleteWorkspace()` 先确认删除并等待编辑器保存，再调用 [DELETE /api/workspaces/:id](../../server/api/workspaces/[id].delete.ts)。后端验证归属，记录服务端回收时间，隐藏空间及关联画布并暂停协作访问，保留场景和图片供 30 天内恢复。
 
-成功后前端清空当前文档，重新加载工作空间和最近位置。删除的范围包含空间下所有画布；底层实现见 [db/workspaces.ts](../../server/db/workspaces.ts) 和 [schema.ts](../../server/db/schema.ts)。后台快照删除失败后的残留由[孤立快照回收](architecture.md#孤立快照回收)处理。
+成功后前端清空当前文档，重新加载工作空间和最近位置。删除的范围包含空间下所有画布；恢复空间不会恢复此前单独回收的画布。底层实现见 [db/recycle-bin.ts](../../server/db/recycle-bin.ts) 和 [schema.ts](../../server/db/schema.ts)，恢复、确认彻底删除及到期清理见[回收站与彻底删除](canvases.md#回收站与彻底删除)。
 
 ## 验证入口
 

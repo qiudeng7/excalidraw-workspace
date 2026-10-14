@@ -32,7 +32,8 @@ export function authorize(
   principal: Principal,
   now: number,
 ): Access {
-  if (room.deleted) reject("CANVAS_DELETED", "画布已删除", 410);
+  if (room.deleted || room.recycledAt)
+    reject("CANVAS_DELETED", "画布已删除", 410);
   let grant: Grant | undefined;
   let principalId = principal.userId ? `user:${principal.userId}` : "";
   let name = principal.name;
@@ -185,6 +186,12 @@ export type Command =
       guestId: string;
     }
   | { type: "delete" }
+  | {
+      type: "recycle";
+      deletedAt: string | null;
+      revision: number;
+      epoch: string;
+    }
   | { type: "rename"; name: string }
   | { type: "backup" }
   | {
@@ -208,7 +215,10 @@ export function execute(
   if (command.type === "projection")
     return {
       revision: room.accessRevision,
-      userIds: room.deleted ? [] : room.members.map((member) => member.userId),
+      userIds:
+        room.deleted || room.recycledAt
+          ? []
+          : room.members.map((member) => member.userId),
       pending: room.directoryPending,
       name: room.name,
       epoch: room.epoch,
@@ -219,8 +229,44 @@ export function execute(
     return { ok: true };
   }
 
+  // Catalog-owned reversible suspension. Keep grants and assets until final deletion.
+  if (command.type === "recycle" || command.type === "delete") {
+    if (principal.userId !== room.ownerId || principal.capabilityHash)
+      reject("FORBIDDEN", "只有所有者可以操作回收站", 403);
+    if (command.type === "recycle") {
+      if (room.deleted) reject("CANVAS_DELETED", "画布已彻底删除", 410);
+      if (command.revision <= (room.recycleRevision ?? 0)) return { ok: true };
+      if (!command.deletedAt) {
+        room.epoch = command.epoch;
+        room.seq = 0;
+        room.minMergeSeq = 0;
+        room.operations = {};
+        room.clients = {};
+      }
+
+      room.recycledAt = command.deletedAt;
+      room.recycleRevision = command.revision;
+    } else {
+      room.deleted = true;
+      room.members = [];
+      room.links = [];
+      room.capabilities = {};
+      room.scene = { elements: [], appState: {}, files: {} };
+      room.versions = [];
+      room.operations = {};
+      room.clients = {};
+    }
+
+    room.tickets = {};
+    room.directoryPending = true;
+    room.accessRevision++;
+
+    return { ok: true };
+  }
+
   if (command.type === "exchange") {
-    if (room.deleted) reject("CANVAS_DELETED", "画布已删除", 410);
+    if (room.deleted || room.recycledAt)
+      reject("CANVAS_DELETED", "画布已删除", 410);
     const link = room.links.find(
       (link) =>
         link.secretHash === command.secretHash &&
@@ -618,16 +664,6 @@ export function execute(
     case "rename":
       room.name = command.name;
       room.directoryPending = true;
-      room.accessRevision++;
-
-      return { ok: true };
-    case "delete":
-      room.directoryPending = true;
-      room.deleted = true;
-      room.members = [];
-      room.links = [];
-      room.capabilities = {};
-      room.tickets = {};
       room.accessRevision++;
 
       return { ok: true };
