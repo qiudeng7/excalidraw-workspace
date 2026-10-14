@@ -52,6 +52,7 @@ const saveBarrier = {
 };
 const settingsOpen = ref(false);
 const shareOpen = ref(false);
+const shareButton = ref<HTMLButtonElement>();
 const onlineCount = ref(0),
   onlineLabel = ref("");
 const collaborationStatus = ref("正在连接协作…");
@@ -827,7 +828,12 @@ async function flushForShare() {
                 ? "处理中…"
                 : displayedSaveState
             }}</span
-          ><button v-if="document" class="save-button" @click="openShare">
+          ><button
+            v-if="document"
+            ref="shareButton"
+            class="save-button"
+            @click="openShare"
+          >
             <QuietIcon name="link" :size="14" />分享</button
           ><button
             class="save-button"
@@ -1017,6 +1023,7 @@ async function flushForShare() {
       :canvas-id="document.id"
       :user-id="user.id"
       :before-publish="flushForShare"
+      :return-focus="shareButton"
       @close="shareOpen = false"
     />
   </section>

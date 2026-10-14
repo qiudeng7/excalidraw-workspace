@@ -23,6 +23,7 @@ const login = ref(false);
 const bootstrap = ref<Bootstrap>();
 const editor = ref<EditorHandle>();
 const shareOpen = ref(false);
+const shareButton = ref<HTMLButtonElement>();
 const personalSettings = shallowRef<UserSettingsResource>();
 const onlineCount = ref(0),
   onlineLabel = ref("");
@@ -136,6 +137,7 @@ async function flushForShare() {
           <button
             v-if="role === 'owner' && user"
             type="button"
+            ref="shareButton"
             @click="shareOpen = true"
           >
             <QuietIcon name="link" :size="14" />分享
@@ -177,6 +179,7 @@ async function flushForShare() {
         :canvas-id="canvasId"
         :user-id="user.id"
         :before-publish="flushForShare"
+        :return-focus="shareButton"
         @close="shareOpen = false"
       />
     </template>

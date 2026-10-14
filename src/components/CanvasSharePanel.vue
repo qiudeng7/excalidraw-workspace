@@ -12,6 +12,7 @@ const props = defineProps<{
   canvasId: string;
   userId: string;
   beforePublish: () => Promise<void>;
+  returnFocus?: HTMLElement;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = ref<HTMLDialogElement>();
@@ -169,11 +170,19 @@ function close() {
   }
 }
 
+let previousFocus: HTMLElement | null = null;
+
 onMounted(() => {
+  previousFocus = document.activeElement as HTMLElement | null;
   dialog.value?.showModal();
   void run(load, false);
 });
-onBeforeUnmount(() => dialog.value?.close());
+onBeforeUnmount(() => {
+  dialog.value?.close();
+  const target = props.returnFocus ?? previousFocus;
+
+  if (target?.isConnected) target.focus();
+});
 </script>
 
 <template>

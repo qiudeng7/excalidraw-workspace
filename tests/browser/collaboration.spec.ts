@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import {
   test,
   expect,
@@ -374,12 +375,17 @@ test("主画布的分享面板发布固定版本，并向已有账号提供共�
 
     await expect(dialog).toBeVisible();
     await expect(dialog.getByLabel("查看方式")).toHaveValue("latest");
+    await dialog.getByRole("button", { name: "分享链接", exact: true }).click();
     await expect(dialog.getByLabel("要求登录")).toBeChecked();
+    await dialog.getByRole("button", { name: "固定版本", exact: true }).click();
     await dialog.getByLabel("固定版本名称").fill("面板发布测试");
-    await dialog.getByRole("button", { name: "发布当前已保存内容" }).click();
+    await dialog
+      .getByRole("button", { name: "发布固定版本", exact: true })
+      .click();
     await expect(
-      dialog.getByText("面板发布测试 ·", { exact: false }).last(),
+      dialog.getByText("面板发布测试", { exact: true }),
     ).toBeVisible();
+    await dialog.getByRole("button", { name: "分享链接", exact: true }).click();
     await dialog.getByLabel("查看方式").selectOption("fixed");
     await dialog.getByLabel("要求登录").uncheck();
     await dialog.getByRole("button", { name: "生成链接" }).click();
@@ -392,11 +398,15 @@ test("主画布的分享面板发布固定版本，并向已有账号提供共�
     await expect
       .poll(() => editorState(guest).then((state) => state.elements.length))
       .toBe(1);
+    await dialog.getByRole("button", { name: "邀请成员", exact: true }).click();
     await dialog.getByLabel("权限", { exact: true }).selectOption("editor");
     await dialog.getByLabel("邀请账号邮箱").fill(invited.email);
     await dialog.getByRole("button", { name: "邀请 / 更新权限" }).click();
     await expect(
-      dialog.getByText("协作测试 · 编辑者", { exact: false }),
+      dialog
+        .getByRole("listitem")
+        .filter({ hasText: "协作测试" })
+        .getByText("可编辑"),
     ).toBeVisible();
     const memberPage = await invited.context.newPage();
 
