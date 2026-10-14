@@ -56,3 +56,28 @@ export async function draftStorage(
 
   return undefined;
 }
+
+/** Find a previous authorization's draft without crossing accounts or tabs. */
+export async function findRecoveryDraft(currentKey: string) {
+  const separator = currentKey.lastIndexOf(":tab:");
+  const scope = JSON.parse(currentKey.slice(0, separator)) as unknown[];
+  const tab = currentKey.slice(separator);
+  const prefix = `${JSON.stringify(scope.slice(0, 3)).slice(0, -1)},`;
+  const database = await db();
+  const transaction = database.transaction("drafts", "readonly");
+  const keys = await transaction.store.getAllKeys(
+    IDBKeyRange.bound(prefix, `${prefix}\uffff`),
+  );
+  const candidates = await Promise.all(
+    keys
+      .filter((key) => key !== currentKey && key.endsWith(tab))
+      .map(async (key) => ({ key, draft: await transaction.store.get(key) })),
+  );
+
+  return candidates
+    .filter(
+      (entry): entry is { key: string; draft: Draft } =>
+        !!entry.draft?.operations.length,
+    )
+    .sort((a, b) => b.draft.updatedAt.localeCompare(a.draft.updatedAt))[0];
+}

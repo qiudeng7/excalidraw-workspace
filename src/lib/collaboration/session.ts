@@ -10,7 +10,11 @@ import { orderElements, wins } from "#shared/collaboration/merge";
 import { api, ApiError } from "~/lib/api";
 import { ConfirmedCache } from "~/lib/confirmedCache";
 import { getTabScope } from "~/lib/persistence";
-import { draftStorage, type Draft } from "~/lib/collaboration/storage";
+import {
+  draftStorage,
+  findRecoveryDraft,
+  type Draft,
+} from "~/lib/collaboration/storage";
 import ReconnectingWebSocket from "partysocket/ws";
 
 export type HydratedView = Omit<CanvasView, "scene"> & { scene: CanvasScene };
@@ -51,7 +55,8 @@ export class CollaborationSession {
   private socket?: ReconnectingWebSocket;
   private connecting?: Promise<void>;
   private sending?: Promise<void>;
-  private sendingOpId = "";
+  private submittedOperations = new Set<string>();
+  private discarding = false;
   private loading?: Promise<void>;
   private writes?: Promise<void>;
   private checkpointPending = false;
@@ -80,6 +85,7 @@ export class CollaborationSession {
 
   get editable() {
     return (
+      !this.discarding &&
       this.authorizedOnce &&
       this.view?.access.role !== "viewer" &&
       !["checking", "connecting", "recovery", "denied", "error"].includes(
@@ -156,7 +162,8 @@ export class CollaborationSession {
   }
 
   async start(connect = true) {
-    if (this.connecting || this.disposed) return this.connecting;
+    if (this.connecting || this.disposed || this.discarding)
+      return this.connecting;
     this.connecting = this.initialize(connect).finally(() => {
       this.connecting = undefined;
     });
@@ -205,13 +212,30 @@ export class CollaborationSession {
         this.changed();
       }
 
-      const draft = await draftStorage(this.draftKey, "get");
+      let draft = await draftStorage(this.draftKey, "get");
+      const recovery = !draft?.operations.length
+        ? await findRecoveryDraft(this.draftKey)
+        : undefined;
+
+      if (recovery) {
+        this.draftKey = recovery.key;
+        draft = recovery.draft;
+      }
 
       this.clientId = draft?.clientId ?? crypto.randomUUID();
       this.clientSeq = draft?.clientSeq ?? 0;
       this.operations = draft?.operations ?? [];
+      // A restored operation may already have reached the server before its ACK
+      // was lost. Its identity must never be reused with a changed payload.
+      this.submittedOperations = new Set(this.operations.map((op) => op.opId));
       this.files = draft?.files ?? {};
       if (this.dirty && draft?.scene) this.value = draft.scene;
+      if (recovery)
+        throw new ApiError(
+          409,
+          "DRAFT_RECOVERY_REQUIRED",
+          "发现权限变更前尚未同步的草稿，请下载本地备份后手动恢复",
+        );
       if (access.role === "viewer" && this.dirty)
         throw new ApiError(
           409,
@@ -355,7 +379,7 @@ export class CollaborationSession {
 
     if (
       tail &&
-      tail.opId !== this.sendingOpId &&
+      !this.submittedOperations.has(tail.opId) &&
       !preconditions &&
       !tail.preconditions
     ) {
@@ -467,6 +491,7 @@ export class CollaborationSession {
   }
 
   checkpoint() {
+    if (this.discarding) return this.writes ?? Promise.resolve();
     if (!this.draftKey) return Promise.resolve();
     this.checkpointPending = true;
     this.writes ??= (async () => {
@@ -492,9 +517,61 @@ export class CollaborationSession {
     return this.writes;
   }
 
+  /** Only an explicit confirmation may discard this selected local queue. */
+  async discardDraft(confirmed: boolean) {
+    if (
+      !confirmed ||
+      !this.dirty ||
+      this.status !== "recovery" ||
+      this.discarding
+    )
+      return false;
+    const selectedKey = this.draftKey;
+
+    this.discarding = true;
+    this.changed();
+    try {
+      await this.connecting;
+      // Confirm there is still a readable destination before deleting the backup.
+      await this.request<Access>("access");
+      await this.sending?.catch(() => {
+        // flush() already reported this error. Wait for settlement before the
+        // explicitly confirmed discard so no late ACK can rewrite its draft.
+      });
+      await this.writes;
+      if (this.draftKey !== selectedKey)
+        throw new Error("当前草稿已切换，请重新确认要放弃的草稿");
+      await draftStorage(selectedKey, "delete");
+      this.disconnect();
+      clearTimeout(this.saveTimer);
+      this.operations = [];
+      this.submittedOperations.clear();
+      this.files = {};
+      this.draftKey = "";
+      this.view = undefined;
+      this.value = { elements: [], appState: {}, files: {} };
+      this.authorizedOnce = false;
+      this.status = "checking";
+      this.message = "";
+      this.changed();
+      this.discarding = false;
+      await this.start(this.listeners.size > 0);
+
+      return true;
+    } catch (error) {
+      this.failed(error);
+
+      return false;
+    } finally {
+      this.discarding = false;
+      this.changed();
+    }
+  }
+
   async flush(): Promise<void> {
+    if (this.discarding) return;
     await this.checkpoint();
-    if (!this.dirty) return;
+    if (this.discarding || !this.dirty) return;
     if (this.sending) {
       await this.sending;
       if (this.dirty && this.editable) return this.flush();
@@ -514,17 +591,17 @@ export class CollaborationSession {
       })
       .finally(() => {
         this.sending = undefined;
-        this.sendingOpId = "";
       });
 
     return this.sending;
   }
 
   private async sendPending() {
-    while (this.operations.length && !this.disposed) {
+    while (this.operations.length && !this.disposed && !this.discarding) {
       const op = this.operations[0]!;
 
-      this.sendingOpId = op.opId;
+      // Keep attempted operations immutable until ACK, including network errors.
+      this.submittedOperations.add(op.opId);
 
       this.status = "saving";
       this.changed();
@@ -547,6 +624,7 @@ export class CollaborationSession {
       this.operations = this.operations.filter(
         (pending) => pending.opId !== op.opId,
       );
+      this.submittedOperations.delete(op.opId);
       await this.accept(commit);
       const referenced = new Set(
         this.operations.flatMap((pending) =>

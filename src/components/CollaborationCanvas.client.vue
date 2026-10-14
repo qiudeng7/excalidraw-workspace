@@ -39,6 +39,7 @@ import { collaborationSession } from "~/lib/collaboration/session";
 import type { CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
 import { defaultEditorTool } from "~/lib/editorTools";
+import { confirmDialog } from "~/lib/dialogs";
 import {
   captureEditorHistory,
   restoreEditorHistory,
@@ -75,6 +76,8 @@ const session = collaborationSession({
 const error = ref("");
 const dirty = ref(false);
 const readOnly = ref(true);
+const recovery = ref(false);
+const discarding = ref(false);
 const initialized = ref(false);
 let root: Root | undefined;
 let editor: ExcalidrawImperativeAPI | undefined;
@@ -107,6 +110,7 @@ function applySession() {
   error.value = session.message;
   dirty.value = session.dirty;
   readOnly.value = !canEdit();
+  recovery.value = session.status === "recovery";
   emit(
     "status",
     confirmedThisMount || session.message
@@ -382,6 +386,28 @@ function download() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+async function discardDraft() {
+  const confirmed = await confirmDialog({
+    title: "放弃未同步草稿",
+    message:
+      "请先下载本地备份。继续将放弃当前未同步草稿，重新读取云端内容，无法撤销。当前账号若只有查看权限，重新读取后仍为只读。",
+    confirmLabel: "放弃并重新读取",
+    danger: true,
+  });
+
+  if (!confirmed || discarding.value) return;
+  discarding.value = true;
+  try {
+    if (await session.discardDraft(confirmed)) {
+      editor?.history.clear();
+      historyRestorePending = false;
+      props.resources?.releaseEditorHistory(props.canvasId);
+    }
+  } finally {
+    discarding.value = false;
+  }
+}
+
 function beforeUnload(event: BeforeUnloadEvent) {
   if (session.dirty) {
     event.preventDefault();
@@ -584,6 +610,14 @@ onBeforeUnmount(() => {
       <span>{{ error }}</span
       ><button type="button" @click="download">下载本地备份</button>
       <button type="button" @click="session.start()">重新连接</button>
+      <button
+        v-if="recovery && dirty"
+        type="button"
+        :disabled="discarding"
+        @click="discardDraft"
+      >
+        放弃草稿并重新读取
+      </button>
       <button v-if="!dirty" type="button" @click="session.refresh()">
         重新读取
       </button>
@@ -611,6 +645,7 @@ onBeforeUnmount(() => {
 }
 .save-notice {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   padding: 8px 16px;
@@ -618,6 +653,10 @@ onBeforeUnmount(() => {
   font-size: 13px;
 }
 .save-notice span {
-  flex: 1;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.save-notice button {
+  white-space: nowrap;
 }
 </style>
