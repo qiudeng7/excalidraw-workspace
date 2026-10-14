@@ -38,6 +38,8 @@ sequenceDiagram
 
 更新通过 HTTP 提交，保证大量元素导入是一个原子操作；WebSocket 只传提交广播、重同步信号与在线状态。超过 60,000 字符的广播发送 `RESYNC`，客户端回读权威场景，避免大 WebSocket 帧。浏览器用 PartySocket 管理连接超时与退避重连，每次连接重新鉴权并申请 ticket，不缓存离线 WebSocket 消息；持久化操作仍使用独立的 ACK 队列。加入连接先消费一分钟有效的一次性 ticket；READY 后再次读取场景，覆盖“读快照到加入连接”之间的窗口。
 
+客户端为 `access`、`ticket`、`presence` 请求和 WebSocket Upgrade 各设置 10 秒超时，OPEN 后另用 10 秒等待 AUTH 的 `READY`；场景 `view` 读取允许 120 秒，READY 后也须成功读回权威场景才标记实时连接成功。编辑提交 `update` 和图片上传 `assets` 不套用这些短超时。连接或读取超时不清除本地草稿；READY 等待超时会关闭本次连接，通过既有退避和参与会话轮询重新申请票据，HTTP 仍有权限时可继续编辑、保存。实际权限或 epoch 变更仍执行原有锁定与恢复流程。`CollaborationSession.connectionDiagnostic` 和浏览器控制台的“协作连接阶段失败”区分 `access`、`ticket`、Upgrade、等待 READY 和 READY 后读取场景等阶段；诊断只记录阶段、状态、原因和时间，不包含 ticket、capability、Cookie、请求 URL 或场景内容。阶段记录用于定位等待位置，具体原因需结合 HTTP 状态、WebSocket 帧与服务端日志判断。
+
 Cloudflare 由 [CanvasRoom](../../server/collaboration/durable-object.ts) 使用 SQLite 同步事务保存状态与去重回执，通过 PartyServer 管理 hibernation WebSocket。Node 由 [node.ts](../../server/collaboration/node.ts) 在 SQLite 中 CAS 更新房间状态，提交后在同进程广播；仅支持单进程部署。网络响应或广播失败不回滚已经提交的状态，客户端用相同 opId 重试。
 
 房间状态以 JSON 保存，DO 按 32,000 字符分行以避开单个 SQLite 值的限制。每次事务读取、写入当前房间，是本版的实现边界；大量持续编辑的成本与目标负载的延迟需要单独测量。成员目录用带权限版本的 outbox 投影到 D1 / SQLite，失败按分钟重试；较旧投影不能覆盖新权限。

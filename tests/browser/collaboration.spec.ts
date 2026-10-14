@@ -2094,3 +2094,74 @@ test("WebSocket传输凭证ERROR后HTTP权限仍有效，编辑和保存继续�
     await owner.context.close();
   }
 });
+
+test("WebSocket保持OPEN但无READY时重试，HTTP编辑仍保存", async ({
+  browser,
+  baseURL,
+}) => {
+  test.setTimeout(60000);
+  const owner = await account(browser, baseURL!);
+  const page = await owner.context.newPage();
+  let attempts = 0;
+  let auths = 0;
+  const diagnostics: unknown[] = [];
+
+  page.on("console", (message) => {
+    if (
+      message.type() === "warning" &&
+      message.text().includes("协作连接阶段失败")
+    )
+      void message
+        .args()[1]
+        ?.jsonValue()
+        .then((value) => diagnostics.push(value));
+  });
+  try {
+    await call(owner.context, baseURL!, owner.id, "manage");
+    await call(owner.context, baseURL!, owner.id, "presence", {
+      clientId: "silent-realtime-peer",
+    });
+    await page.routeWebSocket("**/realtime", (socket) => {
+      attempts++;
+      // Upgrade succeeds; AUTH is received but no READY or close is returned.
+      socket.onMessage((message) => {
+        if (typeof message === "string" && JSON.parse(message).type === "AUTH")
+          auths++;
+      });
+    });
+    await page.goto("/");
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(false);
+    await expect.poll(() => auths).toBe(1);
+    await draw(page, 750);
+    await expect
+      .poll(
+        async () =>
+          (await call(owner.context, baseURL!, owner.id, "view")).scene.elements
+            .length,
+      )
+      .toBe(1);
+    await expect.poll(() => attempts, { timeout: 25000 }).toBeGreaterThan(1);
+    await expect.poll(() => auths).toBeGreaterThan(1);
+    await expect
+      .poll(() => diagnostics)
+      .toContainEqual({ stage: "ready", reason: "timeout" });
+    await draw(page, 950);
+    await expect
+      .poll(
+        async () =>
+          (await call(owner.context, baseURL!, owner.id, "view")).scene.elements
+            .length,
+      )
+      .toBe(2);
+    await expect(
+      page.getByRole("status").filter({ hasText: /^已保存/ }),
+    ).toBeVisible();
+    await expect
+      .poll(() => editorState(page).then((state) => state.viewModeEnabled))
+      .toBe(false);
+  } finally {
+    await owner.context.close();
+  }
+});
