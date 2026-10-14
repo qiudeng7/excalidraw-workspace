@@ -1,8 +1,27 @@
-# Excalidraw Workspace
+<div align="center">
 
-[在线使用](https://excalidraw-workspace.qiudeng.workers.dev/) · [GitHub 仓库](https://github.com/qiudeng7/excalidraw-workspace) · [Changelog](https://github.com/qiudeng7/excalidraw-workspace/releases)
+<h1>Excalidraw Workspace</h1>
 
-Excalidraw Workspace 是一个可以管理多个画布的在线应用，支持自动保存、云同步、画布内编辑markdown、多人协作、画布分享，支持 Cloudflare Worker 和 docker 部署，本项目基于 nuxt 和 excalidraw。
+<p>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-7c3aed" alt="MIT License" /></a>
+  <a href="https://github.com/qiudeng7/excalidraw-workspace/releases"><img src="https://img.shields.io/github/v/release/qiudeng7/excalidraw-workspace?include_prereleases&amp;color=7c3aed" alt="GitHub Release" /></a>
+  <a href="docs/deployment.md#cloudflare-workers"><img src="https://img.shields.io/badge/Cloudflare-Workers-f38020?logo=cloudflare&amp;logoColor=white" alt="Deploy on Cloudflare Workers" /></a>
+  <a href="docs/deployment.md#docker"><img src="https://img.shields.io/badge/Docker-Self--hosted-2496ed?logo=docker&amp;logoColor=white" alt="Self-host with Docker" /></a>
+</p>
+
+<p>Excalidraw Workspace 是一个可以管理多个画布的在线应用，支持自动保存、云同步、画布内编辑markdown、多人协作、画布分享，支持 Cloudflare Worker 和 docker 部署，本项目基于 nuxt 和 excalidraw。</p>
+
+<p>
+  <a href="https://excalidraw-workspace.qiudeng.workers.dev/"><strong>在线使用</strong></a> ·
+  <a href="docs/deployment.md#docker">Docker 部署</a> ·
+  <a href="docs/deployment.md#cloudflare-workers">Cloudflare 部署</a> ·
+  <a href="#目录">开发文档</a> ·
+  <a href="https://github.com/qiudeng7/excalidraw-workspace/releases">更新日志</a>
+</p>
+
+</div>
+
+[![Excalidraw Workspace 产品预览：工作空间目录、多画布标签、流程图与 Markdown 笔记](docs/assets/workspace-preview.png)](docs/assets/workspace-preview.png)
 
 ## 目录
 
