@@ -9,6 +9,7 @@ import type {
 import { orderElements, wins } from "#shared/collaboration/merge";
 import { api, ApiError } from "~/lib/api";
 import { ConfirmedCache } from "~/lib/confirmedCache";
+import { enqueueCanvasPresence } from "~/lib/canvasPresence";
 import { getTabScope } from "~/lib/persistence";
 import {
   draftStorage,
@@ -38,6 +39,18 @@ export interface SessionOptions {
 }
 
 const cache = new ConfirmedCache();
+const CONTROL_TIMEOUT = 10_000;
+const VIEW_TIMEOUT = 120_000;
+
+type ConnectionStage =
+  "access" | "ticket" | "upgrade" | "ready" | "view" | "ready-view";
+
+interface ConnectionDiagnostic {
+  stage: ConnectionStage;
+  state: "waiting" | "failed" | "complete";
+  reason?: "timeout" | "transport" | "protocol";
+  at: number;
+}
 
 /** Confirmed baseline + durable local queue. Only the acknowledged operation leaves the queue. */
 export class CollaborationSession {
@@ -53,6 +66,10 @@ export class CollaborationSession {
   private clientSeq = 0;
   private draftKey = "";
   private socket?: ReconnectingWebSocket;
+  private handshakeTimer?: ReturnType<typeof setTimeout>;
+  private diagnostic?: ConnectionDiagnostic;
+  private socketGeneration = 0;
+
   private connecting?: Promise<void>;
   private sending?: Promise<void>;
   private submittedOperations = new Set<string>();
@@ -68,8 +85,56 @@ export class CollaborationSession {
   private authorizedOnce = false;
   private failures = 0;
   private confirmedViews = 0;
+  participants = 1;
+  realtimeStatus: "idle" | "connecting" | "connected" | "unavailable" = "idle";
+  private presenceGeneration = 0;
+  private presenceQueue = Promise.resolve();
+  private presenceClient = "";
+  private presenceActive = false;
+  private presenceLease?: number;
+  private resume = () => {
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState !== "visible"
+    )
+      return;
+    if (this.listeners.size) {
+      if (this.presenceActive) void this.pollPresence();
+      else void this.resumeAfterSuspension();
+    }
+  };
+  private suspend = () => {
+    this.disconnect();
+    window.addEventListener("pageshow", this.resume);
+    window.addEventListener("online", this.resume);
+    document.addEventListener("visibilitychange", this.resume);
+  };
 
   constructor(readonly options: SessionOptions) {}
+
+  get connectionDiagnostic() {
+    return this.diagnostic ? { ...this.diagnostic } : undefined;
+  }
+
+  private diagnose(
+    stage: ConnectionStage,
+    reason?: ConnectionDiagnostic["reason"],
+  ) {
+    if (this.disposed) return;
+    this.diagnostic = {
+      stage,
+      state: reason ? "failed" : "waiting",
+      ...(reason ? { reason } : {}),
+      at: Date.now(),
+    };
+    // Deliberately omit request URLs, credentials, error objects and scene data.
+    if (reason) console.warn("协作连接阶段失败", { stage, reason });
+  }
+
+  private clearHandshake() {
+    clearTimeout(this.handshakeTimer);
+    this.handshakeTimer = undefined;
+  }
 
   get dirty() {
     return this.operations.length > 0;
@@ -107,6 +172,10 @@ export class CollaborationSession {
       return `固定版本 · ${this.view.snapshot?.label ?? ""}`;
     if (this.view?.access.viewMode === "latest")
       return `最新版 · ${new Date(this.view.readAt).toLocaleTimeString()}`;
+    if (this.realtimeStatus === "unavailable")
+      return this.view?.access.role === "viewer"
+        ? "实时查看 · 实时连接中断"
+        : "已保存 · 实时连接中断";
     if (this.view?.access.role === "viewer") return "实时查看";
 
     return "已保存";
@@ -117,11 +186,44 @@ export class CollaborationSession {
 
     return () => {
       this.listeners.delete(listener);
-      if (!this.listeners.size && !this.dirty) this.disconnect();
+      if (!this.listeners.size) this.disconnect();
     };
   }
 
   private disconnect() {
+    this.socketGeneration++;
+    this.clearHandshake();
+    this.presenceGeneration++;
+    this.presenceActive = false;
+    if (typeof window !== "undefined") {
+      window.removeEventListener("online", this.resume);
+      window.removeEventListener("pageshow", this.resume);
+      window.removeEventListener("pagehide", this.suspend);
+      document.removeEventListener("visibilitychange", this.resume);
+    }
+
+    if (this.presenceClient) {
+      const clientId = this.presenceClient;
+
+      this.presenceQueue = enqueueCanvasPresence(
+        this.options.canvasId,
+        async () => {
+          try {
+            await this.request(
+              "presence",
+              { clientId, leave: true, leaseExpiresAt: this.presenceLease },
+              "POST",
+              true,
+            );
+          } catch (error) {
+            // A failed departure expires with its server-side lease.
+            console.debug("画布离开通知未送达，将等待会话到期", error);
+          }
+        },
+      );
+    }
+
+    this.realtimeStatus = "idle";
     const socket = this.socket;
 
     this.socket = undefined;
@@ -129,7 +231,7 @@ export class CollaborationSession {
     this.peers.clear();
     clearInterval(this.pollTimer);
     this.pollTimer = undefined;
-    clearTimeout(this.retryTimer);
+    if (!this.dirty) clearTimeout(this.retryTimer);
     socket?.close();
   }
 
@@ -146,19 +248,46 @@ export class CollaborationSession {
     };
   }
 
-  request<T>(
+  async request<T>(
     path: string,
     payload?: unknown,
     method = payload === undefined ? "GET" : "POST",
+    keepalive = false,
+    current = () => !this.disposed,
   ) {
-    return api<T>(
-      `/api/canvases/${encodeURIComponent(this.options.canvasId)}/collaboration/${path}`,
-      {
-        method,
-        headers: this.headers(),
-        ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
-      },
-    );
+    const timeout =
+      path === "view"
+        ? VIEW_TIMEOUT
+        : ["access", "ticket", "presence"].includes(path)
+          ? CONTROL_TIMEOUT
+          : undefined;
+    const signal = timeout ? AbortSignal.timeout(timeout) : undefined;
+
+    try {
+      return await api<T>(
+        `/api/canvases/${encodeURIComponent(this.options.canvasId)}/collaboration/${path}`,
+        {
+          method,
+          keepalive,
+          ...(signal ? { signal } : {}),
+          headers: this.headers(),
+          ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
+        },
+      );
+    } catch (error) {
+      // A received HTTP denial stays authoritative even if its body times out.
+      if (error instanceof ApiError && error.status >= 400) throw error;
+      if (signal?.aborted) {
+        if (current() && ["access", "ticket", "view"].includes(path))
+          this.diagnose(path as ConnectionStage, "timeout");
+        const timeoutError = new Error(`协作 ${path} 请求超时，请稍后重试`);
+
+        timeoutError.name = "TimeoutError";
+        throw timeoutError;
+      }
+
+      throw error;
+    }
   }
 
   async start(connect = true) {
@@ -245,15 +374,35 @@ export class CollaborationSession {
       await this.refresh();
       if (this.disposed) return;
       this.authorizedOnce = true;
-      if (access.viewMode === "live" && connect) await this.connect();
-      else {
-        this.status = "ready";
-        this.changed();
+      // HTTP access + the authoritative view unlock editing and ACK-based saving.
+      // A persisted room is not evidence of another currently open editor.
+      this.status = "ready";
+      this.message = "";
+      this.changed();
+      if (connect && this.listeners.size) {
+        this.presenceActive = access.viewMode === "live";
+        if (this.presenceActive) {
+          const generation = this.presenceGeneration;
+
+          this.presenceClient = await getTabScope();
+          if (!this.listeners.size || generation !== this.presenceGeneration)
+            return;
+          if (typeof window !== "undefined") {
+            window.addEventListener("online", this.resume);
+            window.addEventListener("pageshow", this.resume);
+            window.addEventListener("pagehide", this.suspend);
+            document.addEventListener("visibilitychange", this.resume);
+          }
+
+          void this.syncPresence().catch((error: unknown) =>
+            this.realtimeUnavailable(error),
+          );
+        }
+
+        this.pollTimer ??= setInterval(() => void this.pollPresence(), 15_000);
       }
 
-      this.pollTimer ??= setInterval(() => {
-        void this.recheckAccess();
-      }, 50000);
+      if (connect && this.dirty && this.editable) await this.flush();
     } catch (error) {
       this.failed(error);
     }
@@ -642,10 +791,7 @@ export class CollaborationSession {
     }
 
     this.failures = 0;
-    this.status =
-      this.subscribed || this.view?.access.viewMode !== "live"
-        ? "ready"
-        : "offline";
+    this.status = "ready";
     this.rebase();
     this.changed();
     if (!this.listeners.size) this.disconnect();
@@ -715,10 +861,123 @@ export class CollaborationSession {
     this.changed();
   }
 
+  private realtimeUnavailable(error?: unknown) {
+    if (
+      error instanceof ApiError &&
+      [401, 403, 404, 410].includes(error.status)
+    ) {
+      this.failed(error);
+
+      return;
+    }
+
+    this.realtimeStatus = "unavailable";
+    this.changed();
+  }
+
+  private async syncPresence() {
+    const generation = this.presenceGeneration;
+    const task = enqueueCanvasPresence(this.options.canvasId, async () => {
+      if (!this.presenceActive || generation !== this.presenceGeneration)
+        return;
+      const result = await this.request<{
+        participants: number;
+        realtime: boolean;
+        leaseExpiresAt: number;
+      }>("presence", { clientId: this.presenceClient });
+
+      if (!this.presenceActive || generation !== this.presenceGeneration)
+        return;
+      this.presenceLease = result.leaseExpiresAt;
+      this.participants = result.participants;
+      if (result.realtime) await this.connect();
+      else {
+        this.socketGeneration++;
+        this.clearHandshake();
+        const socket = this.socket;
+
+        this.socket = undefined;
+        this.subscribed = false;
+        this.peers.clear();
+        this.realtimeStatus = "idle";
+        socket?.close();
+      }
+
+      this.changed();
+    });
+
+    this.presenceQueue = task.catch(() => {});
+
+    return task;
+  }
+
+  private async resumeAfterSuspension() {
+    if (this.disposed || !this.listeners.size || this.presenceActive) return;
+    const generation = this.presenceGeneration;
+
+    try {
+      this.status = "checking";
+      this.changed();
+      await this.recheckAccess();
+      if (!this.listeners.size || generation !== this.presenceGeneration)
+        return;
+      if (["denied", "recovery", "error", "offline"].includes(this.status))
+        return;
+      await this.refresh();
+      if (!this.listeners.size || generation !== this.presenceGeneration)
+        return;
+      // Refresh rebases the current in-memory queue, rather than reloading a
+      // checkpoint while an older HTTP save may still be in flight.
+      this.status = "ready";
+      this.presenceActive = this.view?.access.viewMode === "live";
+      this.changed();
+      if (this.presenceActive) {
+        window.addEventListener("online", this.resume);
+        window.addEventListener("pageshow", this.resume);
+        window.addEventListener("pagehide", this.suspend);
+        document.addEventListener("visibilitychange", this.resume);
+        await this.syncPresence().catch((error: unknown) =>
+          this.realtimeUnavailable(error),
+        );
+      }
+
+      this.pollTimer ??= setInterval(() => void this.pollPresence(), 15_000);
+      this.changed();
+      await this.flush();
+    } catch (error) {
+      this.failed(error);
+    }
+  }
+
+  private async pollPresence() {
+    if (this.disposed || !this.listeners.size) return;
+    try {
+      await this.recheckAccess();
+      if (["denied", "recovery", "error"].includes(this.status)) return;
+      if (this.presenceActive) {
+        await this.syncPresence().catch((error: unknown) =>
+          this.realtimeUnavailable(error),
+        );
+        if (["denied", "recovery"].includes(this.status)) return;
+        // HTTP remains a convergence path while another session cannot reach WS.
+        if (!this.subscribed) await this.refresh();
+      }
+
+      if (this.dirty) await this.flush();
+      else if (this.status === "offline") {
+        this.status = "ready";
+        this.message = "";
+        this.changed();
+      }
+    } catch (error) {
+      this.failed(error);
+    }
+  }
+
   private async connect() {
     if (this.disposed || this.socket || this.view?.access.viewMode !== "live")
       return;
-    this.status = "connecting";
+    this.realtimeStatus = "connecting";
     this.changed();
     const url = new URL(
       `/api/canvases/${encodeURIComponent(this.options.canvasId)}/realtime`,
@@ -727,18 +986,63 @@ export class CollaborationSession {
 
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     let ticket = "";
+    let attempt = 0;
+    const socketGeneration = ++this.socketGeneration;
+    const valid = () =>
+      !this.disposed && socketGeneration === this.socketGeneration;
+    const current = () => !this.disposed && socket === this.socket;
+    const unavailable = (
+      stage: ConnectionStage,
+      reason: ConnectionDiagnostic["reason"],
+    ) => {
+      if (!current()) return;
+      this.clearHandshake();
+      this.diagnose(stage, reason);
+      this.socket = undefined;
+      this.subscribed = false;
+      this.peers.clear();
+      socket.close();
+      this.realtimeUnavailable();
+      if (this.listeners.size && this.presenceActive) this.retry();
+    };
     const socket = new ReconnectingWebSocket(
       async () => {
+        if (!current()) throw new Error("协作连接已停止");
+        const generation = ++attempt;
+        const active = () => current() && generation === attempt;
+        let preparationStage: "access" | "ticket" = "access";
+
         try {
-          // A one-use ticket belongs to this attempt, never to the reconnecting socket.
-          await this.recheckAccess();
-          if (this.disposed || ["denied", "recovery"].includes(this.status))
+          this.diagnose("access");
+          if (!(await this.recheckAccess(active)))
+            throw new Error("协作连接权限检查未完成");
+          if (!active() || ["denied", "recovery"].includes(this.status))
             throw new Error("协作连接已停止");
-          ({ ticket } = await this.request<{ ticket: string }>("ticket", {}));
+          preparationStage = "ticket";
+          this.diagnose("ticket");
+          const result = await this.request<{ ticket: string }>(
+            "ticket",
+            {},
+            "POST",
+            false,
+            active,
+          );
+
+          if (!active()) throw new Error("协作连接已停止");
+          ticket = result.ticket;
+          this.diagnose("upgrade");
 
           return url.href;
         } catch (error) {
-          if (!["denied", "recovery"].includes(this.status)) this.failed(error);
+          if (active() && !["denied", "recovery"].includes(this.status)) {
+            if (this.diagnostic?.state !== "failed")
+              this.diagnose(
+                preparationStage,
+                error instanceof ApiError ? "protocol" : "transport",
+              );
+            this.realtimeUnavailable(error);
+          }
+
           throw error;
         }
       },
@@ -748,22 +1052,53 @@ export class CollaborationSession {
         minReconnectionDelay: 1000,
         maxReconnectionDelay: 15000,
         reconnectionDelayGrowFactor: 2,
-        connectionTimeout: 10000,
+        connectionTimeout: CONTROL_TIMEOUT,
         // Durable edits use the acknowledged HTTP queue. Presence can be dropped.
         maxEnqueuedMessages: 0,
       },
     );
 
     this.socket = socket;
-    socket.onopen = () => socket.send(JSON.stringify({ type: "AUTH", ticket }));
+    socket.onopen = () => {
+      if (!current()) return;
+      this.clearHandshake();
+      this.diagnose("ready");
+      this.handshakeTimer = setTimeout(
+        () => unavailable("ready", "timeout"),
+        CONTROL_TIMEOUT,
+      );
+      socket.send(JSON.stringify({ type: "AUTH", ticket }));
+    };
+
     socket.onmessage = (event) => {
+      const generation = attempt;
+      const active = () => current() && generation === attempt;
+      let readyView = false;
+      let authorityRecovery = false;
+
       void (async () => {
-        if (this.disposed || socket !== this.socket) return;
+        if (!active()) return;
         const message = JSON.parse(event.data);
 
         if (message.type === "READY") {
-          this.subscribed = true;
+          this.clearHandshake();
+          readyView = true;
+          this.diagnose("ready-view");
           await this.refresh();
+          readyView = false;
+          if (
+            !active() ||
+            socket.readyState !== WebSocket.OPEN ||
+            ["denied", "recovery"].includes(this.status)
+          )
+            return;
+          this.subscribed = true;
+          this.realtimeStatus = "connected";
+          this.diagnostic = {
+            stage: "ready-view",
+            state: "complete",
+            at: Date.now(),
+          };
           this.status = "ready";
           this.changed();
           await this.flush();
@@ -782,37 +1117,70 @@ export class CollaborationSession {
           message.type === "ACCESS_CHANGED" ||
           message.type === "ERROR"
         ) {
-          this.status = "denied";
-          this.message = message.message;
-          this.socket?.close();
-          this.changed();
+          authorityRecovery = true;
+          unavailable("ready", "protocol");
+          await this.recheckAccess(valid);
+          if (
+            valid() &&
+            !["denied", "recovery", "error", "offline"].includes(this.status)
+          ) {
+            await this.refresh();
+            if (!valid() || ["denied", "recovery"].includes(this.status))
+              return;
+            this.status = "ready";
+            this.message = "";
+            this.changed();
+            await this.flush();
+          }
         }
-      })().catch((error: unknown) => this.failed(error));
+      })().catch((error: unknown) => {
+        if (!(authorityRecovery ? valid() : active())) return;
+        if (
+          readyView &&
+          error instanceof Error &&
+          error.name === "TimeoutError"
+        )
+          unavailable("ready-view", "timeout");
+        this.failed(error);
+      });
     };
 
     socket.onclose = () => {
-      if (socket !== this.socket || this.disposed) return;
+      if (!current()) return;
+      attempt++;
+      this.clearHandshake();
       this.subscribed = false;
       this.peers.clear();
       if (["denied", "recovery"].includes(this.status)) return;
-      this.status = "offline";
+      if (this.diagnostic?.state !== "failed")
+        this.diagnose("upgrade", "transport");
+      this.realtimeStatus = "unavailable";
       this.changed();
     };
 
     socket.onerror = () => {
-      if (this.disposed || ["denied", "recovery"].includes(this.status)) return;
+      if (!current() || ["denied", "recovery"].includes(this.status)) return;
+      attempt++;
+      this.clearHandshake();
       this.subscribed = false;
-      this.status = this.authorizedOnce ? "offline" : "error";
-      this.message = "连接中断，正在重连；修改会保留在本地";
-      this.changed();
+      if (this.diagnostic?.state !== "failed")
+        this.diagnose("upgrade", "transport");
+      this.realtimeUnavailable();
     };
   }
 
-  private async recheckAccess() {
-    if (this.disposed) return;
+  private async recheckAccess(current = () => !this.disposed) {
+    if (!current()) return false;
     try {
-      const access = await this.request<Access>("access");
+      const access = await this.request<Access>(
+        "access",
+        undefined,
+        "GET",
+        false,
+        current,
+      );
 
+      if (!current()) return false;
       if (this.view?.access.viewMode !== "live" && this.status === "offline") {
         this.status = "ready";
         this.changed();
@@ -827,12 +1195,19 @@ export class CollaborationSession {
           access.snapshotId !== this.view.access.snapshotId)
       ) {
         this.status = "denied";
+        this.clearHandshake();
         this.message = "分享权限已变更，请重新加载画布";
         this.socket?.close();
         this.changed();
+
+        return false;
       }
+
+      return true;
     } catch (error) {
-      this.failed(error);
+      if (current()) this.failed(error);
+
+      return false;
     }
   }
 
@@ -851,12 +1226,14 @@ export class CollaborationSession {
       [401, 403, 404, 410].includes(error.status)
     ) {
       this.status = "denied";
+      this.clearHandshake();
       this.socket?.close();
     } else if (
       error instanceof ApiError &&
       [400, 409, 413, 415].includes(error.status)
     ) {
       this.status = "recovery";
+      this.clearHandshake();
       this.socket?.close();
     } else {
       this.status = this.authorizedOnce ? "offline" : "error";
@@ -873,9 +1250,19 @@ export class CollaborationSession {
       () => {
         void (async () => {
           if (this.authorizedOnce) {
+            if (
+              this.listeners.size &&
+              !this.presenceActive &&
+              this.view?.access.viewMode === "live"
+            ) {
+              await this.resumeAfterSuspension();
+
+              return;
+            }
+
             await this.recheckAccess();
             if (["denied", "recovery"].includes(this.status)) return;
-            await this.connect();
+            if (this.presenceActive) await this.syncPresence();
             await this.flush();
           } else await this.start();
         })().catch((error: unknown) => this.failed(error));
@@ -885,12 +1272,15 @@ export class CollaborationSession {
   }
 
   dispose() {
+    if (this.disposed) return this.presenceQueue;
     this.disposed = true;
     clearTimeout(this.retryTimer);
     clearTimeout(this.saveTimer);
     clearInterval(this.pollTimer);
-    this.socket?.close();
+    this.disconnect();
     this.listeners.clear();
+
+    return this.presenceQueue;
   }
 }
 

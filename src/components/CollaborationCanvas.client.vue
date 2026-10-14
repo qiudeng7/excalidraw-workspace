@@ -202,7 +202,7 @@ function applySession() {
 
   emit(
     "participants",
-    groups.size,
+    session.view?.access.viewMode === "live" ? session.participants : 0,
     [...groups.values()]
       .map(
         (group) =>

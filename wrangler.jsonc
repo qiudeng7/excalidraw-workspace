@@ -2,6 +2,7 @@
   "name": "excalidraw-workspace",
   "compatibility_date": "2026-09-27",
   "workers_dev": true,
+  "observability": { "enabled": true },
   "triggers": { "crons": ["0 * * * *"] },
   "assets": {
     "directory": ".output/public",

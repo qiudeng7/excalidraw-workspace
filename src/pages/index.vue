@@ -826,7 +826,10 @@ async function flushForShare() {
             v-if="isCollaborative && onlineCount"
             class="save-state presence-state"
             :title="onlineLabel"
-            ><QuietIcon name="users" :size="13" />{{ onlineCount }} 人在线</span
+            ><QuietIcon name="users" :size="13" />{{
+              onlineCount
+            }}
+            个会话在线</span
           >
           <span
             class="save-state"
