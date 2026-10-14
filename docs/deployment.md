@@ -8,7 +8,7 @@
 
 ### GHCR 镜像
 
-镜像由 [Container images 工作流](../.github/workflows/containers.yml) 构建。**首次发布需先将工作流合入 `main` 并等待成功，再将 GitHub 仓库 Packages 中的 `excalidraw-workspace` 设为 Public**，公开仓库不会自动使包公开；已存在的包还需允许本仓库 Actions 写入。当前配置不代表镜像已经发布，可在[包页面](https://github.com/qiudeng7/excalidraw-workspace/pkgs/container/excalidraw-workspace)核对可用标签。目前发布 `linux/amd64` 镜像。
+镜像由 [Container images 工作流](../.github/workflows/containers.yml) 构建。**首次发布需先将工作流合入 `main` 并等待成功，再将 GitHub 仓库 Packages 中的 `excalidraw-workspace` 设为 Public**，公开仓库不会自动使包公开；已存在的包还需允许本仓库 Actions 写入。需要重试主分支发布时，可在 Actions → Container images → Run workflow 选择 `main` 手动运行；手动运行其他分支会跳过构建与发布。可在[包页面](https://github.com/qiudeng7/excalidraw-workspace/pkgs/container/excalidraw-workspace)核对已发布版本及可用标签。目前发布 `linux/amd64` 镜像。
 
 下载同一提交的 [compose.ghcr.yaml](../compose.ghcr.yaml)，放入部署目录并创建 `.env`：
 
