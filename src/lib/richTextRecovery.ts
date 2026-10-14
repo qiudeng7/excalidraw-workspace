@@ -1,4 +1,4 @@
-import { isRichTextV1 } from "@excalidraw/excalidraw/rich-text";
+import { isSupportedRichText } from "@excalidraw/excalidraw/rich-text";
 import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 
 /** Stable across reloads; isolated by account, capability and browser tab. */
@@ -54,7 +54,7 @@ export function readRichTextRecovery(
   const raw = (storage ?? localStorage).getItem(key);
   const saved = raw ? JSON.parse(raw) : undefined;
 
-  return saved?.type === "text" && isRichTextV1(saved.richText)
+  return saved?.type === "text" && isSupportedRichText(saved.richText)
     ? saved
     : undefined;
 }

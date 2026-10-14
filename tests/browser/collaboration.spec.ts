@@ -1502,7 +1502,7 @@ test("富文本会话在远端胜出/删除及撤权时结束，恢复副本生�
 
       await call(owner.context, baseURL!, owner.id, "update", {
         protocolVersion: 1,
-        textFormatVersion: 1,
+        textFormatVersion: 2,
         epoch: view.epoch,
         clientId: "rich-test-deletion",
         clientSeq: 1,
@@ -1712,7 +1712,7 @@ for (const failure of ["QuotaExceededError", "SecurityError"]) {
       await input.pressSequentially(" current local text");
       await call(owner.context, baseURL!, owner.id, "update", {
         protocolVersion: 1,
-        textFormatVersion: 1,
+        textFormatVersion: 2,
         epoch: view.epoch,
         clientId: `storage-failure-${failure}`,
         clientSeq: 1,
@@ -1773,7 +1773,7 @@ for (const failure of ["QuotaExceededError", "SecurityError"]) {
       expect(downloaded.elements[0].originalText).not.toBe(
         "older persistent copy",
       );
-      expect(downloaded.elements[0].richText.version).toBe(1);
+      expect(downloaded.elements[0].richText.version).toBe(2);
     } finally {
       await owner.context.close();
     }
@@ -2162,6 +2162,127 @@ test("WebSocket保持OPEN但无READY时重试，HTTP编辑仍保存", async ({
       .poll(() => editorState(page).then((state) => state.viewModeEnabled))
       .toBe(false);
   } finally {
+    await owner.context.close();
+  }
+});
+
+test("v2 Markdown 块结构同步与重载保留，v1 客户端不能剥离已保存富文本", async ({
+  browser,
+  baseURL,
+}) => {
+  const owner = await account(browser, baseURL!);
+  const guest = await browser.newContext({
+    baseURL,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  try {
+    const first = await owner.context.newPage();
+
+    await open(first, `/c/${owner.id}`, true);
+    const link = await call(owner.context, baseURL!, owner.id, "links", {
+      role: "editor",
+      requireLogin: false,
+    });
+    const second = await guest.newPage();
+
+    await open(second, link.path, true);
+    await owner.context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await first.bringToFront();
+    await first.getByTestId("toolbar-text").first().click();
+    await first.mouse.click(700, 350);
+    const input = first.locator(".excalidraw-wysiwyg");
+
+    await expect(input).toBeVisible();
+    await first.evaluate(() =>
+      navigator.clipboard.writeText(
+        "## Shared heading\n\n3. First item\n4. [Shared link](https://example.test)\n\n> Quoted text",
+      ),
+    );
+    await input.press("Control+v");
+    await expect(input.locator("h2")).toHaveText("Shared heading");
+    await expect(input.locator("ol li")).toHaveCount(2);
+    await expect(input.locator("a")).toHaveAttribute(
+      "href",
+      "https://example.test",
+    );
+    await input.press("Escape");
+    await expect
+      .poll(async () => {
+        const view = await call(owner.context, baseURL!, owner.id, "view");
+
+        return view.scene.elements.find(
+          (element: any) => element.type === "text",
+        )?.richText?.version;
+      })
+      .toBe(2);
+    const saved = await call(owner.context, baseURL!, owner.id, "view");
+    const text = saved.scene.elements.find(
+      (element: any) => element.type === "text",
+    );
+
+    expect(text.richText.doc.content.map((block: any) => block.type)).toEqual([
+      "heading",
+      "orderedList",
+      "blockquote",
+    ]);
+    expect(text.richText.doc.content[1].attrs.order).toBe(3);
+    expect(text.originalText).toBe(
+      "Shared heading\nFirst item\nShared link\nQuoted text",
+    );
+    const remoteRichText = async () =>
+      (await editorState(second)).elements.find(
+        (element: any) => element.id === text.id,
+      ) as any;
+
+    await expect
+      .poll(async () => (await remoteRichText())?.richText)
+      .toEqual(text.richText);
+    await open(second, link.path, true);
+    await expect
+      .poll(async () => (await remoteRichText())?.richText)
+      .toEqual(text.richText);
+    // A v1 client may have read the latest scene but silently dropped unsupported fields.
+    const latest = await call(owner.context, baseURL!, owner.id, "view");
+    const rejected = await owner.context.request.post(
+      `/api/canvases/${owner.id}/collaboration/update`,
+      {
+        headers: { Origin: baseURL!, "X-Requested-With": "excalidraw-demo" },
+        data: {
+          protocolVersion: 1,
+          textFormatVersion: 1,
+          epoch: latest.epoch,
+          clientId: "v1-rich-text-browser",
+          clientSeq: 1,
+          opId: crypto.randomUUID(),
+          baseSeq: latest.seq,
+          elements: [
+            {
+              ...text,
+              richText: undefined,
+              version: text.version + 100,
+              versionNonce: 0,
+            },
+          ],
+        },
+      },
+    );
+
+    expect(rejected.status()).toBe(409);
+    expect((await rejected.json()).error.code).toBe("TEXT_FORMAT_REQUIRED");
+    const protectedView = await call(owner.context, baseURL!, owner.id, "view");
+
+    expect(protectedView.seq).toBe(latest.seq);
+    expect(
+      protectedView.scene.elements.find(
+        (element: any) => element.id === text.id,
+      ).richText,
+    ).toEqual(text.richText);
+    await expect
+      .poll(async () => (await remoteRichText())?.richText)
+      .toEqual(text.richText);
+  } finally {
+    await guest.close();
     await owner.context.close();
   }
 });

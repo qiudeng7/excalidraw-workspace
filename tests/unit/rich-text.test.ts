@@ -258,3 +258,196 @@ test("failed rich-text writes report failure without deleting the previous persi
 
   assert.equal(writeRichTextRecovery("", next), false);
 });
+
+test("v2 validates block structure and projects nested lists, headings, quotes and code literally", async () => {
+  const { isRichTextV2, isSupportedRichText } =
+    await import("../../packages/excalidraw/lib/element/src/richTextDocument");
+  const value = {
+    version: 2 as const,
+    doc: {
+      type: "doc" as const,
+      content: [
+        {
+          type: "heading" as const,
+          attrs: { level: 2 },
+          content: [{ type: "text" as const, text: "Title" }],
+        },
+        {
+          type: "orderedList" as const,
+          attrs: { order: 3 },
+          content: [
+            {
+              type: "listItem" as const,
+              content: [
+                {
+                  type: "paragraph" as const,
+                  content: [
+                    {
+                      type: "text" as const,
+                      text: "Item",
+                      marks: [{ type: "strike" as const }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "blockquote" as const,
+          content: [
+            {
+              type: "paragraph" as const,
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Link",
+                  marks: [
+                    {
+                      type: "link" as const,
+                      attrs: { href: "https://example.test", title: null },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "codeBlock" as const,
+          attrs: { params: "js" },
+          content: [{ type: "text" as const, text: "a\n\tb" }],
+        },
+      ],
+    },
+  };
+
+  assert.ok(isRichTextV2(value));
+  assert.ok(isSupportedRichText(value));
+  assert.equal(richTextPlainText(value), "Title\nItem\nLink\na\n\tb");
+  assert.deepEqual(normalizeRichText(value), value);
+  assert.ok(isSupportedRichText(richTextFromPlainText("**unchanged**")));
+  for (const block of [
+    { type: "heading", attrs: { level: 7 } },
+    {
+      type: "orderedList",
+      attrs: { order: 0 },
+      content: value.doc.content[1].content,
+    },
+    { type: "bulletList", content: [{ type: "paragraph" }] },
+    { type: "listItem", content: [{ type: "paragraph" }] },
+    { type: "blockquote", content: [] },
+    { type: "codeBlock", content: [{ type: "hardBreak" }] },
+    {
+      type: "codeBlock",
+      content: [{ type: "text", text: "x", marks: [{ type: "bold" }] }],
+    },
+    {
+      type: "paragraph",
+      content: [
+        {
+          type: "text",
+          text: "x",
+          marks: [{ type: "link", attrs: { href: "javascript:alert(1)" } }],
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      content: [{ type: "text", text: "x", marks: [{ type: ["bold"] }] }],
+    },
+    { type: "table" },
+  ])
+    assert.equal(
+      isRichTextV2({ version: 2, doc: { type: "doc", content: [block] } }),
+      false,
+    );
+  let deep: any = { type: "paragraph" };
+
+  for (let i = 0; i < 34; i++) deep = { type: "blockquote", content: [deep] };
+  assert.equal(
+    isRichTextV2({ version: 2, doc: { type: "doc", content: [deep] } }),
+    false,
+  );
+});
+
+test("v1 capability cannot overwrite v2 room content even after stripping richText", async () => {
+  const { createRoom, execute } =
+    await import("../../shared/collaboration/room");
+  const { canonical } = await import("../../shared/collaboration/merge");
+  const owner = { userId: "owner", name: "Owner" };
+  const richText = { ...richTextFromPlainText("safe"), version: 2 as const };
+  const value = {
+    id: "v2",
+    type: "text",
+    x: 0,
+    y: 0,
+    width: 10,
+    height: 20,
+    angle: 0,
+    version: 1,
+    versionNonce: 1,
+    text: "safe",
+    originalText: "safe",
+    richText,
+  };
+  const state = createRoom("rich", "owner", "Rich", "epoch", {
+    elements: [],
+    appState: {},
+    files: {},
+  });
+  const operation = {
+    protocolVersion: 1 as const,
+    epoch: "epoch",
+    clientId: "client",
+    clientSeq: 1,
+    opId: "v2",
+    baseSeq: 0,
+    elements: [value],
+    textFormatVersion: 2 as const,
+  };
+
+  execute(state, owner, {
+    type: "update",
+    operation,
+    digest: canonical(operation),
+  });
+  for (const elements of [
+    [{ ...value, version: 2, richText: undefined }],
+    [],
+  ]) {
+    const old = {
+      ...operation,
+      clientSeq: 2,
+      opId: "old",
+      baseSeq: state.seq,
+      elements,
+      textFormatVersion: 1 as const,
+    };
+
+    assert.throws(
+      () =>
+        execute(state, owner, {
+          type: "update",
+          operation: old,
+          digest: canonical(old),
+        }),
+      /刷新/,
+    );
+  }
+
+  assert.deepEqual(state.scene.elements[0].richText, richText);
+  const { writeRichTextRecovery, readRichTextRecovery } =
+    await import("../../src/lib/richTextRecovery");
+  let raw = "";
+
+  writeRichTextRecovery("key", value as any, {
+    setItem: (_, next) => {
+      raw = next;
+    },
+  });
+  assert.deepEqual(
+    readRichTextRecovery("key", { getItem: () => raw })?.richText,
+    richText,
+  );
+});

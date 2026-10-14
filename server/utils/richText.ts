@@ -1,5 +1,6 @@
 import {
-  isRichTextV1,
+  isSupportedRichText,
+  supportsRichTextWrite,
   richTextPlainText,
 } from "@excalidraw/excalidraw/rich-text";
 import { fail, isObject } from "#server/utils/http";
@@ -21,10 +22,7 @@ export function assertRichTextWrite(
   const containsRichText = (element: unknown) =>
     isObject(element) && element.richText !== undefined;
 
-  if (
-    (incoming.some(containsRichText) || current.some(containsRichText)) &&
-    formatVersion !== 1
-  )
+  if (!supportsRichTextWrite([...current, ...incoming], formatVersion))
     fail(
       409,
       "TEXT_FORMAT_REQUIRED",
@@ -36,7 +34,7 @@ export function assertRichTextWrite(
 
     if (
       value.type !== "text" ||
-      !isRichTextV1(value.richText) ||
+      !isSupportedRichText(value.richText) ||
       value.originalText !== richTextPlainText(value.richText)
     )
       fail(

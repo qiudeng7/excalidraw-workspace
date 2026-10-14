@@ -1,16 +1,16 @@
 import type { ExcalidrawTextElement } from "@excalidraw/element/types";
 import { richTextWysiwyg } from "./richTextWysiwyg";
-import type { RichTextV1 } from "../lib/element/src/richTextDocument";
+import type { SupportedRichText } from "../lib/element/src/richTextDocument";
 import type App from "../components/App";
 
 export const CARET_FOLLOW_PADDING = 5;
 
 export type TextWysiwygOptions = {
-  onChange?: (nextOriginalText: string, richText?: RichTextV1) => void;
+  onChange?: (nextOriginalText: string, richText?: SupportedRichText) => void;
   onSubmit: (data: {
     viaKeyboard: boolean;
     nextOriginalText: string;
-    richText?: RichTextV1;
+    richText?: SupportedRichText;
     cancelled?: boolean;
   }) => void;
   getViewportCoords: (x: number, y: number) => [number, number];

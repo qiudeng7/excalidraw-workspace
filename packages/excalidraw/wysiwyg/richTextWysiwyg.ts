@@ -1,26 +1,55 @@
-import { richTextSchema, richTextInputRules } from "./richTextEditor";
+import {
+  richTextSchema,
+  richTextInputRules,
+  parseRichTextMarkdown,
+  richTextKeymapCommands,
+} from "./richTextEditor";
 import { Slice, Fragment } from "prosemirror-model";
-import { EditorState, TextSelection, type Command } from "prosemirror-state";
+import {
+  EditorState,
+  TextSelection,
+  AllSelection,
+  type Command,
+} from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { history, undo, redo } from "prosemirror-history";
 import { undoInputRule } from "prosemirror-inputrules";
 import { keymap } from "prosemirror-keymap";
-import { baseKeymap, chainCommands, toggleMark } from "prosemirror-commands";
+import {
+  baseKeymap,
+  chainCommands,
+  toggleMark,
+  newlineInCode,
+} from "prosemirror-commands";
 import { applyDarkModeFilter, THEME } from "@excalidraw/common";
 import {
   getContainerElement,
-  getBoundTextMaxWidth,
+  LinearElementEditor,
+  computeBoundTextPosition,
+  getBoundTextMaxHeight,
+  computeContainerDimensionForBoundText,
+  isArrowElement,
+  isStickyNoteElement,
+  originalContainerCache,
+  updateOriginalContainerCache,
+  updateBoundElements,
   getTextElementAngle,
   getBoundTextElementId,
 } from "@excalidraw/element";
 import {
-  isRichTextV1,
+  isSupportedRichText,
   normalizeRichText,
   richTextFromPlainText,
   richTextPlainText,
 } from "../lib/element/src/richTextDocument";
-import { richTextBlockStyle } from "../lib/element/src/richTextLayout";
-import type { RichTextV1 } from "../lib/element/src/richTextDocument";
+import { applyRichTextDocumentStyle } from "../lib/element/src/richTextLayout";
+import type { SupportedRichText } from "../lib/element/src/richTextDocument";
+import type {
+  ExcalidrawTextElementWithContainer,
+  ExcalidrawTextElement,
+  ExcalidrawTextContainer,
+  NonDeleted,
+} from "@excalidraw/element/types";
 import type { textWysiwyg } from "./textWysiwyg";
 
 export const richTextWysiwyg = (
@@ -51,24 +80,19 @@ export const richTextWysiwyg = (
   let destroyed = false;
   let localUpdate = false;
   let viaKeyboard = false;
-  const initial = isRichTextV1(element.richText)
+  const initial = isSupportedRichText(element.richText)
     ? element.richText
     : richTextFromPlainText(element.originalText);
-  let richActivated = !!element.richText;
-  const persisted = (richText: RichTextV1) => {
-    if (
-      richText.doc.content[0].content?.some(
-        (node) => node.type === "text" && node.marks?.length,
-      )
-    )
-      richActivated = true;
-
-    // Once activated, clearing all marks still publishes an authoritative plain document.
-    // An undefined update alone can otherwise be ignored when font metrics do not change.
-    return richActivated ? richText : undefined;
-  };
-  const documentValue = (): RichTextV1 =>
-    normalizeRichText({ version: 1, doc: view.state.doc.toJSON() });
+  let edited = false;
+  let plainPaste = false;
+  let styling = false;
+  // Opening and closing a legacy element never migrates its persisted document.
+  const persisted = (richText: SupportedRichText) =>
+    edited ? richText : (element.richText as SupportedRichText | undefined);
+  const documentValue = (): SupportedRichText =>
+    edited
+      ? normalizeRichText({ version: 2, doc: view.state.doc.toJSON() })
+      : initial;
   const publish = () => {
     const richText = documentValue();
 
@@ -157,8 +181,8 @@ export const richTextWysiwyg = (
       plugins: [
         richTextInputRules(),
         keymap({
-          Enter: hardBreak,
-          "Shift-Enter": hardBreak,
+          ...richTextKeymapCommands,
+          "Shift-Enter": chainCommands(newlineInCode, hardBreak),
           Escape: finish,
           "Mod-Enter": finish,
           Backspace: undoInputRule,
@@ -169,11 +193,11 @@ export const richTextWysiwyg = (
           "Mod-i": toggleMark(richTextSchema.marks.italic),
           "Mod-e": toggleMark(richTextSchema.marks.code),
           "Mod-\\": clearMarks,
-          Tab: (state, dispatch) => {
+          Tab: chainCommands(richTextKeymapCommands.Tab, (state, dispatch) => {
             if (dispatch) dispatch(state.tr.insertText("    "));
 
             return true;
-          },
+          }),
         }),
         history(),
         keymap(baseKeymap),
@@ -191,29 +215,54 @@ export const richTextWysiwyg = (
     dispatchTransaction(transaction) {
       if (destroyed) return;
       view.updateState(view.state.apply(transaction));
-      if (transaction.docChanged) publish();
+      if (transaction.docChanged) {
+        edited = true;
+        publish();
+      }
+
       updateStyle();
     },
-    // Plain text paste deliberately bypasses Markdown/HTML rules and external resource loading.
+    // Only explicit plain paste and code blocks bypass Markdown parsing.
     handlePaste(_view, event) {
       const text = event.clipboardData?.getData("text/plain");
 
       if (text === undefined) return false;
-      const doc = richTextSchema.nodeFromJSON(richTextFromPlainText(text).doc);
+      const literal =
+        plainPaste || view.state.selection.$from.parent.type.spec.code;
 
-      view.dispatch(
-        view.state.tr
-          .replaceSelection(
-            new Slice(Fragment.from(doc.firstChild!.content), 0, 0),
-          )
-          .scrollIntoView(),
-      );
+      plainPaste = false;
+      if (view.state.selection.$from.parent.type.spec.code) {
+        view.dispatch(view.state.tr.insertText(text).scrollIntoView());
+      } else {
+        const doc = literal
+          ? richTextSchema.nodeFromJSON(richTextFromPlainText(text).doc)
+          : parseRichTextMarkdown(text);
+
+        view.dispatch(
+          view.state.tr
+            .replaceSelection(
+              literal
+                ? new Slice(Fragment.from(doc.firstChild!.content), 0, 0)
+                : Slice.maxOpen(doc.content),
+            )
+            .scrollIntoView(),
+        );
+      }
 
       return true;
     },
     handleDOMEvents: {
       keydown(_view, event) {
-        if (!event.isComposing) event.stopPropagation();
+        plainPaste =
+          event.key.toLowerCase() === "v" &&
+          event.shiftKey &&
+          (event.ctrlKey || event.metaKey);
+        event.stopPropagation();
+
+        return false;
+      },
+      click(_view, event) {
+        if ((event.target as Element).closest("a")) event.preventDefault();
 
         return false;
       },
@@ -238,50 +287,93 @@ export const richTextWysiwyg = (
     },
   });
   const updateStyle = () => {
-    if (destroyed) return;
+    if (destroyed || styling) return;
     const latest = app.scene.getNonDeletedElement(element.id);
 
     if (!latest || latest.type !== "text") return;
-    const container = getContainerElement(
-      latest,
-      app.scene.getNonDeletedElementsMap(),
-    );
+    const container = getContainerElement<
+      NonDeleted<ExcalidrawTextElement>,
+      NonDeleted<ExcalidrawTextContainer>
+    >(latest, app.scene.getNonDeletedElementsMap());
     const { left, right } = app.viewport.getSidebarInsets();
 
     box.style.left = `${left}px`;
     box.style.right = `${right}px`;
-    const [x, y] = getViewportCoords(latest.x, latest.y);
-    const angle = getTextElementAngle(latest, container);
-    const zoom = app.state.zoom.value;
-    const width = container
-      ? getBoundTextMaxWidth(container, latest)
-      : latest.autoResize
-        ? Infinity
-        : latest.width;
+    styling = true;
+    try {
+      const elementsMap = app.scene.getNonDeletedElementsMap();
+      let coordX = latest.x;
+      let coordY = latest.y;
 
-    Object.assign(view.dom.style, richTextBlockStyle(latest, width), {
-      position: "absolute",
-      minWidth: "1px",
-      minHeight: `${latest.fontSize * latest.lineHeight}px`,
-      left: `${x - left}px`,
-      top: `${y}px`,
-      background: "transparent",
-      zIndex: "var(--zIndex-wysiwyg)",
-      color: applyDarkModeFilter(
-        latest.strokeColor,
-        app.state.theme === THEME.DARK,
-      ),
-      opacity: String(latest.opacity / 100),
-      transformOrigin: `${latest.width / 2}px ${latest.height / 2}px`,
-      transform: `translate(${(latest.width * (zoom - 1)) / 2}px, ${(latest.height * (zoom - 1)) / 2}px) scale(${zoom}) rotate(${angle}rad)`,
-    });
-    Object.assign((view.dom.firstChild as HTMLElement).style, {
-      margin: "0",
-      padding: "0",
-      font: "inherit",
-      lineHeight: "inherit",
-      whiteSpace: "inherit",
-    });
+      if (container && latest.containerId) {
+        const boundText = latest as ExcalidrawTextElementWithContainer;
+
+        if (!isArrowElement(container) && !isStickyNoteElement(container)) {
+          const original =
+            originalContainerCache[container.id] ??
+            updateOriginalContainerCache(container.id, container.height);
+          const maxHeight = getBoundTextMaxHeight(container, boundText);
+
+          if (
+            latest.height > maxHeight ||
+            (container.height > original.height && latest.height < maxHeight)
+          ) {
+            const height = Math.max(
+              original.height,
+              computeContainerDimensionForBoundText(
+                latest.height,
+                container.type,
+              ),
+            );
+
+            if (height !== container.height) {
+              app.scene.mutateElement(container, { height });
+              updateBoundElements(container, app.scene);
+            }
+          }
+        }
+
+        const position = isArrowElement(container)
+          ? LinearElementEditor.getBoundTextElementPosition(
+              container,
+              boundText,
+              elementsMap,
+            )
+          : computeBoundTextPosition(container, boundText, elementsMap);
+
+        coordX = position.x;
+        coordY = position.y;
+      }
+
+      const [x, y] = getViewportCoords(coordX, coordY);
+      const angle = getTextElementAngle(latest, container);
+      const zoom = app.state.zoom.value;
+
+      // The canvas aligns text inside its measured element box, not the container's capacity.
+      applyRichTextDocumentStyle(view.dom, latest, latest.width);
+      Object.assign(view.dom.style, {
+        position: "absolute",
+        minWidth: "1px",
+        pointerEvents: "auto",
+        boxSizing: "content-box",
+        minHeight: `${latest.fontSize * latest.lineHeight}px`,
+        left: `${x - left}px`,
+        top: `${y}px`,
+        background: "transparent",
+        zIndex: "var(--zIndex-wysiwyg)",
+        color: applyDarkModeFilter(
+          latest.strokeColor,
+          app.state.theme === THEME.DARK,
+        ),
+        opacity: String(latest.opacity / 100),
+        transformOrigin: `${latest.width / 2}px ${latest.height / 2}px`,
+        transform: `translate(${(latest.width * (zoom - 1)) / 2}px, ${(latest.height * (zoom - 1)) / 2}px) scale(${zoom}) rotate(${angle}rad)`,
+      });
+      if (latest.x !== coordX || latest.y !== coordY)
+        app.scene.mutateElement(latest, { x: coordX, y: coordY });
+    } finally {
+      styling = false;
+    }
   };
   const followCaret = () => {
     const { scrollLeft, scrollTop } = box;
@@ -290,8 +382,9 @@ export const richTextWysiwyg = (
     box.scrollLeft = 0;
     box.scrollTop = 0;
     app.viewport.translate((state) => ({
-      scrollX: state.scrollX - scrollLeft / state.zoom.value,
-      scrollY: state.scrollY - scrollTop / state.zoom.value,
+      scrollX:
+        state.scrollX - (scrollLeft && scrollLeft + 5) / state.zoom.value,
+      scrollY: state.scrollY - (scrollTop && scrollTop + 5) / state.zoom.value,
     }));
   };
   const outside = (event: PointerEvent) => {
@@ -345,13 +438,7 @@ export const richTextWysiwyg = (
       );
     else if (autoSelect)
       view.dispatch(
-        view.state.tr.setSelection(
-          TextSelection.create(
-            view.state.doc,
-            1,
-            view.state.doc.content.size - 1,
-          ),
-        ),
+        view.state.tr.setSelection(new AllSelection(view.state.doc)),
       );
   });
 

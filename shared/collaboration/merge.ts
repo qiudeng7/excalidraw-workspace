@@ -1,5 +1,5 @@
 import {
-  isRichTextV1,
+  isSupportedRichText,
   richTextPlainText,
 } from "@excalidraw/excalidraw/rich-text";
 import type { Element, SharedScene } from "#shared/collaboration/types";
@@ -103,7 +103,7 @@ export function validateElement(value: unknown): asserts value is Element {
   if (
     element.richText !== undefined &&
     (element.type !== "text" ||
-      !isRichTextV1(element.richText) ||
+      !isSupportedRichText(element.richText) ||
       element.originalText !== richTextPlainText(element.richText))
   )
     reject("INVALID_RICH_TEXT", "富文本格式或文本投影无效");

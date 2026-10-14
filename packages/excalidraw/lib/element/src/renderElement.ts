@@ -661,6 +661,18 @@ const drawElementOnCanvas = (
 
         if (richLayout) {
           context.textBaseline = "alphabetic";
+          for (const decoration of richLayout.decorations) {
+            context.save();
+            context.globalAlpha *= decoration.opacity;
+            context.fillRect(
+              decoration.x,
+              decoration.y,
+              decoration.width,
+              decoration.height,
+            );
+            context.restore();
+          }
+
           for (const run of richLayout.runs) {
             context.font = run.font;
             context.direction = run.direction;

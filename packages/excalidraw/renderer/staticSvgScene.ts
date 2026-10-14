@@ -1,7 +1,4 @@
-import {
-  layoutRichText,
-  RICH_TEXT_CODE_FONT,
-} from "../lib/element/src/richTextLayout";
+import { layoutRichText } from "../lib/element/src/richTextLayout";
 import {
   BOUND_TEXT_PADDING,
   FRAME_STYLE,
@@ -887,6 +884,24 @@ const renderElementToSvg = (
         const richLayout = layoutRichText(element, element.width);
 
         if (richLayout) {
+          for (const decoration of richLayout.decorations) {
+            const rect = svgRoot.ownerDocument.createElementNS(SVG_NS, "rect");
+
+            rect.setAttribute("x", String(decoration.x));
+            rect.setAttribute("y", String(decoration.y));
+            rect.setAttribute("width", String(decoration.width));
+            rect.setAttribute("height", String(decoration.height));
+            rect.setAttribute("opacity", String(decoration.opacity));
+            rect.setAttribute(
+              "fill",
+              applyDarkModeFilter(
+                element.strokeColor,
+                renderConfig.theme === THEME.DARK,
+              ),
+            );
+            node.append(rect);
+          }
+
           for (const run of richLayout.runs) {
             const text = svgRoot.ownerDocument.createElementNS(SVG_NS, "text");
 
@@ -895,21 +910,10 @@ const renderElementToSvg = (
               String(run.x + (run.direction === "rtl" ? run.width : 0)),
             );
             text.setAttribute("y", String(run.baseline));
-            text.setAttribute(
-              "font-family",
-              run.marks.includes("code")
-                ? RICH_TEXT_CODE_FONT
-                : getFontFamilyString(element),
-            );
-            text.setAttribute("font-size", `${element.fontSize}px`);
-            text.setAttribute(
-              "font-weight",
-              run.marks.includes("bold") ? "700" : "400",
-            );
-            text.setAttribute(
-              "font-style",
-              run.marks.includes("italic") ? "italic" : "normal",
-            );
+            text.setAttribute("font-family", run.fontFamily);
+            text.setAttribute("font-size", `${run.fontSize}px`);
+            text.setAttribute("font-weight", run.fontWeight);
+            text.setAttribute("font-style", run.fontStyle);
             text.setAttribute("direction", run.direction);
             text.setAttribute(
               "text-anchor",
