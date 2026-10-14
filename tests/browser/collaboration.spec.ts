@@ -10,7 +10,6 @@ import {
 import { editorState } from "./fixtures";
 import { currentRelease } from "../../src/data/releases";
 import { announcementKey } from "../../src/lib/releaseProgress";
-import { readFile } from "node:fs/promises";
 
 test.skip(
   !process.env.COLLABORATION_LIVE_TEST,
@@ -1633,3 +1632,146 @@ test("富文本会话在远端胜出/删除及撤权时结束，恢复副本生�
     await owner.context.close();
   }
 });
+
+for (const failure of ["QuotaExceededError", "SecurityError"]) {
+  test(`富文本恢复写入 ${failure} 时明确提示刷新前下载，并保留最新内存副本与旧持久副本`, async ({
+    browser,
+    baseURL,
+  }) => {
+    const owner = await account(browser, baseURL!);
+    const page = await owner.context.newPage();
+
+    try {
+      await open(page, `/c/${owner.id}`, true);
+      await page.getByTestId("toolbar-text").first().click();
+      await page.mouse.click(700, 350);
+      const input = page.locator(".excalidraw-wysiwyg");
+
+      await input.pressSequentially("**original**", { delay: 10 });
+      await input.press("Escape");
+      await expect
+        .poll(async () =>
+          (
+            await call(owner.context, baseURL!, owner.id, "view")
+          ).scene.elements.some((element: any) => element.richText),
+        )
+        .toBe(true);
+      const view = await call(owner.context, baseURL!, owner.id, "view");
+      const original = view.scene.elements.find(
+        (element: any) => element.type === "text",
+      );
+      const recoveryKey = await page.evaluate(
+        ({ userId, canvasId, original, failure }) => {
+          const key = JSON.stringify([
+            "excalidraw-rich-text-recovery",
+            1,
+            userId,
+            canvasId,
+            "",
+            sessionStorage.getItem("excalidraw-draft-tab"),
+          ]);
+          const older = {
+            ...original,
+            text: "older persistent copy",
+            originalText: "older persistent copy",
+            richText: {
+              version: 1,
+              doc: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "older persistent copy" }],
+                  },
+                ],
+              },
+            },
+          };
+
+          localStorage.setItem(key, JSON.stringify(older));
+          const setItem = Storage.prototype.setItem;
+
+          Storage.prototype.setItem = function (candidate, value) {
+            if (candidate === key)
+              throw new DOMException("storage unavailable", failure);
+
+            return setItem.call(this, candidate, value);
+          };
+
+          return key;
+        },
+        { userId: owner.user.id, canvasId: owner.id, original, failure },
+      );
+
+      await page.mouse.dblclick(705, 355);
+      await input.press("End");
+      await input.pressSequentially(" current local text");
+      await call(owner.context, baseURL!, owner.id, "update", {
+        protocolVersion: 1,
+        textFormatVersion: 1,
+        epoch: view.epoch,
+        clientId: `storage-failure-${failure}`,
+        clientSeq: 1,
+        opId: crypto.randomUUID(),
+        baseSeq: view.seq,
+        elements: [
+          {
+            ...original,
+            version: original.version + 100,
+            versionNonce: 0,
+            text: "remote winner",
+            originalText: "remote winner",
+            richText: {
+              version: 1,
+              doc: {
+                type: "doc",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "remote winner" }],
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      });
+      await expect(input).toHaveCount(0);
+      await expect(
+        page
+          .getByRole("alert")
+          .filter({ hasText: "尚未写入浏览器，请刷新前下载" }),
+      ).toBeVisible();
+      await expect(
+        page.getByText("文字编辑已结束，本地富文本副本已保留。", {
+          exact: true,
+        }),
+      ).toHaveCount(0);
+      expect(
+        await page.evaluate(
+          (key) => JSON.parse(localStorage.getItem(key)!).originalText,
+          recoveryKey,
+        ),
+      ).toBe("older persistent copy");
+      const pending = page.waitForEvent("download");
+
+      await page
+        .getByRole("button", { name: "下载文字副本", exact: true })
+        .click();
+      const file = await pending;
+      const downloaded = JSON.parse(
+        await readFile((await file.path())!, "utf8"),
+      );
+
+      expect(downloaded.elements[0].originalText).toContain(
+        "current local text",
+      );
+      expect(downloaded.elements[0].originalText).not.toBe(
+        "older persistent copy",
+      );
+      expect(downloaded.elements[0].richText.version).toBe(1);
+    } finally {
+      await owner.context.close();
+    }
+  });
+}

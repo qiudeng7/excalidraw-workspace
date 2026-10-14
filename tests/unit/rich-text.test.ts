@@ -210,3 +210,51 @@ test("rich-text recovery stays discoverable after reload and isolates accounts, 
   ] as const)
     assert.notEqual(key, await richTextRecoveryStorageKey(candidate, tab));
 });
+
+test("successfully persisted rich text over two million serialized characters remains readable", async () => {
+  const { readRichTextRecovery, writeRichTextRecovery } =
+    await import("../../src/lib/richTextRecovery");
+  const text = "字".repeat(700000);
+  const source = {
+    type: "text",
+    text,
+    originalText: text,
+    richText: richTextFromPlainText(text),
+  } as any;
+  const data = new Map<string, string>();
+  const storage = {
+    setItem: (key: string, value: string) => {
+      data.set(key, value);
+    },
+    getItem: (key: string) => data.get(key) ?? null,
+  };
+
+  assert.ok(JSON.stringify(source).length > 2000000);
+  assert.equal(writeRichTextRecovery("large", source, storage), true);
+  assert.deepEqual(readRichTextRecovery("large", storage), source);
+});
+
+test("failed rich-text writes report failure without deleting the previous persistent copy", async () => {
+  const { readRichTextRecovery, writeRichTextRecovery } =
+    await import("../../src/lib/richTextRecovery");
+  const previous = {
+    type: "text",
+    richText: richTextFromPlainText("previous"),
+  } as any;
+  const next = { type: "text", richText: richTextFromPlainText("next") } as any;
+  const stored = JSON.stringify(previous);
+
+  for (const name of ["QuotaExceededError", "SecurityError"]) {
+    const storage = {
+      setItem: () => {
+        throw new DOMException("storage unavailable", name);
+      },
+      getItem: () => stored,
+    };
+
+    assert.equal(writeRichTextRecovery("same-key", next, storage), false);
+    assert.deepEqual(readRichTextRecovery("same-key", storage), previous);
+  }
+
+  assert.equal(writeRichTextRecovery("", next), false);
+});
