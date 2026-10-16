@@ -12,6 +12,10 @@
 
 “Ctrl 点击多选”默认开启，通过 `ctrlMultiSelect` 属性控制选择工具下的左键累加与取消选择，普通画布与协作画布均即时生效。关闭后恢复 Ctrl 穿透分组选择；Ctrl+Alt 套索、⌘、线段点编辑及其他工具保留原行为。该实现只调整选择分支，不伪造 Shift 事件，因此不影响绘图角度、缩放和快捷键。独立使用编辑器而未传此属性时保持上游行为。
 
+“箭头沿线选中高亮”默认开启，单选、多选箭头都沿箭身和头部绘制约 1.5px 的规整高亮，保留文字标签留白。单选箭头保留端点、中点编辑，不显示矩形缩放与旋转控制柄；多选仍显示整体操作框和控制柄。普通图形、整体分组选择、锁定与远端选中框沿用原策略。关闭开关恢复原有矩形选择框和控制柄策略（两点或折线箭头原本就可能没有单选矩形框）。普通与协作画布即时生效，设置按账户保存，不改变元素、撤销历史或 SVG/PNG/JSON 导出。
+
+入口为 [interactiveScene.ts](../../packages/excalidraw/renderer/interactiveScene.ts) 与 [arrowSelection.ts](../../packages/excalidraw/renderer/arrowSelection.ts)，`arrowSelectionHighlight` 是实例属性，独立嵌入编辑器未传时默认关闭。几何复用 [shape.ts](../../packages/excalidraw/lib/element/src/shape.ts) 的箭身和头部生成，使用独立版本缓存，不覆盖屏幕静态绘制缓存。回归见 [arrowSelection.browser.mjs](../../packages/excalidraw/tests/arrowSelection.browser.mjs) 与 [arrow-selection.spec.ts](../../tests/browser/arrow-selection.spec.ts)。
+
 修改编辑器菜单与宿主属性从包装组件开始，调整设置内容从 [SettingsPanel.vue](../../src/components/SettingsPanel.vue) 和 [settingsControls.ts](../../src/lib/settingsControls.ts) 开始；修改编辑器内部行为，按[本地定制位置](../../packages/excalidraw/README.md#本仓库的定制)定位手势、几何和渲染代码。修改设置字段时，同时检查共享类型、默认值、后端完整配置校验和设置资源测试。
 
 打开画布时，前端根据浏览器 UA 为移动设备默认选择抓手（平移工具），桌面保留指针默认行为；iPad 的桌面 UA 结合多点触摸识别，不将窄窗口或普通触摸电脑视为移动设备。判断只用于初始化，不控制后续工具选择；版本校验结束、远端更新和重连不重新设置工具。用户手动选择的工具通过当前账号内该画布的内存 `editorContext` 在切换画布时保留；刷新页面或重新登录后恢复设备默认工具，工具不写入服务端画布或共享给其他编辑者。入口见 [editorTools.ts](../../src/lib/editorTools.ts) 和两个画布包装组件。
@@ -20,7 +24,7 @@
 
 双击画布文字后使用 ProseMirror 直接编辑格式化内容，再次进入编辑仍显示格式化结果，不提供格式工具栏。输入支持 `**粗体**`、`__粗体__`、`*斜体*`、`_斜体_`、`` `行内代码` ``、`~~删除线~~` 和 `[链接](https://example.com)`；段落开头输入 `# ` 至 `###### `、`- `、`1. ` 或 `> `，分别转为标题、无序列表、有序列表或引用。输入三个反引号后按 Enter 进入代码块，可在反引号后附语言名称，但不做语法高亮。标题字号按文字元素的基础字号缩放；表格、图片和 HTML 不参与格式转换。
 
-普通粘贴通过官方 `prosemirror-markdown` 模块解析 Markdown，`Ctrl / ⌘ Shift V` 保留字面文本；代码块内粘贴始终保留字面内容。打开已有普通文字不会重新解释其中的 Markdown 标记。
+编辑文字时，来自本项目智能复制或 ProseMirror 字符选区的 HTML 按白名单 schema 保留粗体、斜体、链接等语义格式；其他普通粘贴继续通过官方 `prosemirror-markdown` 模块解析纯文本表示中的 Markdown。`Ctrl / ⌘ Shift V` 保留字面文本，代码块内粘贴也始终保留字面内容。复制字符选区交给 ProseMirror，不复制整段文字元素或画布；打开已有普通文字不会重新解释其中的 Markdown 标记。
 
 Enter 按所在结构拆分段落、继续列表或在代码块内换行；空列表项按 Enter 退出列表，Tab / Shift Tab 调整列表缩进。Shift Enter 插入软换行，代码块末尾按向下方向键进入后续段落。Escape 或 `Ctrl / ⌘ Enter` 完成编辑。`Ctrl / ⌘ B`、`I`、`E` 切换粗体、斜体、行内代码，`Ctrl / ⌘ \` 清除选区行内格式；输入转换后按 Backspace 或撤销可恢复字面标记。
 
@@ -46,7 +50,13 @@ Enter 按所在结构拆分段落、继续列表或在代码块内换行；空�
 
 ## 导入导出与复制
 
-普通 `Ctrl+C` 复制可编辑元素，`Ctrl+Shift+C` 复制 PNG，可粘贴到支持图片的应用；macOS 使用 Cmd 代替 Ctrl。图片剪贴板需要浏览器权限和 HTTPS 或 localhost 安全上下文。编辑器菜单提供文件导入、导出，可保留独立备份。
+`Ctrl+C` 是智能复制，`Ctrl+Shift+C` 仍是复制 PNG；macOS 使用 Cmd 代替 Ctrl。元素右键菜单与命令面板还提供「原始 Excalidraw 兼容复制」，给未修改的 Excalidraw 使用原来的纯文本 JSON 协议；该入口没有新增快捷键。兼容复制不会让聊天框自动得到人类文字，智能复制则不保证旧编辑器能够恢复元素。
+
+智能复制同时提供人类可读的 `text/plain` 和文档流 `text/html`。文字取富文本投影或 `originalText`，不使用画布软折行，不识别图片中的文字。文档先放一张仅包含非文本元素的 PNG 概览，再按场景顺序放可编辑文字；形状内文字、箭头标签只出现一次。有限语义格式包括标题、段落、列表、代码、粗体、斜体、删除线、安全链接及基础字号、颜色和对齐。图片内嵌为 data URL；字体是否可用取决于目标应用，不保留画布的绝对布局、旋转和文字与图形的相对位置。
+
+HTML 属性还包含 UTF-8/base64 编码的版本化原生元素和引用文件，回到本项目时优先恢复为可编辑元素。普通智能复制不额外放入 `image/png` 表示，避免目标优先选择整图；PNG 复制仍是独立入口。`Ctrl / Cmd Shift V` 对智能内容粘贴语义纯文本，旧 JSON 的粘贴与 seed 行为保留。字符选区复制仍由文字编辑器处理，只带选中文字及受支持的格式。
+
+剪贴板写入需要浏览器权限和 HTTPS 或 localhost 安全上下文。超过 16 MiB 原生数据、缺失引用图片或写入失败会提示，降级复制也会提示且不剪切元素；写入完成前更换选区、修改目标或撤销编辑权限时，仅复制、不删除。浏览器是否保留 HTML 属性、目标是否选择 HTML、内嵌图片及字体样式，需要目标应用验收；QQ、微信和 Word 尚无原生客户端实测。编辑器菜单提供文件导入、导出，可保留独立备份。
 
 画布文件导入、SVG/PNG 导出和复制在浏览器内执行，没有单独的导入导出 API；导入导致的画布内容变化随后进入[保存内容](canvases.md#保存内容)流程。个人素材库导入后走[保存素材库](library.md#保存素材库)。
 

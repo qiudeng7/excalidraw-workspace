@@ -2316,7 +2316,11 @@ export class LinearElementEditor {
     elementsMap: ElementsMap,
     includeBoundText: boolean = false,
   ): [number, number, number, number, number, number] => {
-    const shape = ShapeCache.generateElementShape(element, null);
+    // Bounds depend on the shaft, not the current head/theme settings. Keep
+    // the painted drawable (and its bitmap) rather than regenerating defaults.
+    const shape =
+      ShapeCache.get(element, null) ??
+      ShapeCache.generateElementShape(element, null);
 
     // first element is always the curve
     const ops = getCurvePathOps(shape[0]);

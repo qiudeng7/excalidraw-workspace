@@ -41,6 +41,7 @@ export type ActionFilterFn = (action: Action) => void;
 
 export type ActionName =
   | "copy"
+  | "copyCompatible"
   | "cut"
   | "paste"
   | "copyAsPng"

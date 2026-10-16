@@ -231,6 +231,12 @@ export const richTextWysiwyg = (
         plainPaste || view.state.selection.$from.parent.type.spec.code;
 
       plainPaste = false;
+      // Let the schema import supported HTML marks (including character selections).
+      // Our scene marker is inert: only the visible document is pasted into text editing.
+      const html = event.clipboardData?.getData("text/html") || "";
+
+      if (!literal && /\bdata-(?:pm-slice|excalidraw-workspace)\s*=/.test(html))
+        return false;
       if (view.state.selection.$from.parent.type.spec.code) {
         view.dispatch(view.state.tr.insertText(text).scrollIntoView());
       } else {

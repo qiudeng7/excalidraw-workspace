@@ -38,6 +38,7 @@ export async function editorState(page: Page) {
             selectedElementIds: app.state.selectedElementIds,
             selectedGroupIds: app.state.selectedGroupIds,
             viewModeEnabled: app.state.viewModeEnabled,
+            arrowSelectionHighlight: app.state.arrowSelectionHighlight,
             editingTextElement: app.state.editingTextElement?.id ?? null,
             scrollX: app.state.scrollX,
             scrollY: app.state.scrollY,

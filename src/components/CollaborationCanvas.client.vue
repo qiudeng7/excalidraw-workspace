@@ -551,6 +551,7 @@ function CanvasEditor() {
     arrowBindingOptimization: flags.features.edgeBinding,
     shortArrowheads: flags.features.shortArrowheads,
     ctrlMultiSelect: flags.features.ctrlMultiSelect,
+    arrowSelectionHighlight: flags.features.arrowSelectionHighlight,
     UIOptions: {
       defaultSidebar:
         !!props.resources && !flags.features.disableDefaultSidebar,

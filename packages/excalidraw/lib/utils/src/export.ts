@@ -1,4 +1,8 @@
 import { MIME_TYPES } from "@excalidraw/common";
+import {
+  beginClipboardOperation,
+  isCurrentClipboardOperation,
+} from "@excalidraw/excalidraw/smartClipboard";
 import { getDefaultAppState } from "@excalidraw/excalidraw/appState";
 import {
   copyBlobToClipboardAsPng,
@@ -213,8 +217,10 @@ export const exportToClipboard = async (
   },
 ) => {
   if (opts.type === "svg") {
+    const token = beginClipboardOperation();
     const svg = await exportToSvg(opts);
 
+    if (!isCurrentClipboardOperation(token)) return;
     await copyTextToSystemClipboard(svg.outerHTML);
   } else if (opts.type === "png") {
     await copyBlobToClipboardAsPng(exportToBlob(opts));

@@ -6,12 +6,18 @@ import {
 type UserSettingsWrite = Omit<UserSettings, "features"> & {
   features: Omit<
     UserSettings["features"],
-    "disableDefaultSidebar" | "bottomToolbar" | "ctrlMultiSelect"
+    | "disableDefaultSidebar"
+    | "bottomToolbar"
+    | "ctrlMultiSelect"
+    | "arrowSelectionHighlight"
   > &
     Partial<
       Pick<
         UserSettings["features"],
-        "disableDefaultSidebar" | "bottomToolbar" | "ctrlMultiSelect"
+        | "disableDefaultSidebar"
+        | "bottomToolbar"
+        | "ctrlMultiSelect"
+        | "arrowSelectionHighlight"
       >
     >;
 };
@@ -44,6 +50,7 @@ export function validateUserSettings(value: unknown): value is UserSettings {
       "disableDefaultSidebar",
       "bottomToolbar",
       "ctrlMultiSelect",
+      "arrowSelectionHighlight",
     ])
   )
     return false;
@@ -76,6 +83,7 @@ export function readStoredUserSettings(value: unknown): UserSettings | null {
           disableDefaultSidebar: true,
           bottomToolbar: true,
           ctrlMultiSelect: true,
+          arrowSelectionHighlight: true,
           ...features,
         },
       };
@@ -97,7 +105,9 @@ export function validateUserSettingsWrite(
     (!Object.hasOwn(features, "bottomToolbar") ||
       Object.hasOwn(features, "disableDefaultSidebar")) &&
     (!Object.hasOwn(features, "ctrlMultiSelect") ||
-      Object.hasOwn(features, "bottomToolbar"))
+      Object.hasOwn(features, "bottomToolbar")) &&
+    (!Object.hasOwn(features, "arrowSelectionHighlight") ||
+      Object.hasOwn(features, "ctrlMultiSelect"))
   );
 }
 
@@ -112,6 +122,7 @@ export function completeUserSettingsWrite(
       disableDefaultSidebar: previous.features.disableDefaultSidebar,
       bottomToolbar: previous.features.bottomToolbar,
       ctrlMultiSelect: previous.features.ctrlMultiSelect,
+      arrowSelectionHighlight: previous.features.arrowSelectionHighlight,
       ...value.features,
     },
   };

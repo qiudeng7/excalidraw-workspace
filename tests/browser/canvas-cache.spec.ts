@@ -102,6 +102,7 @@ async function fixture(
   const putGates = new Map<string, ReturnType<typeof deferred>>();
   const errors: string[] = [];
   let navigationRevision = 0;
+  let settingsRevision = 0;
   let failRead = "";
   let libraryFailure = 0;
   let libraryData = { items: [] as unknown[], revision: 0 };
@@ -145,7 +146,11 @@ async function fixture(
         body = { user };
         break;
       case "GET /api/user-settings":
-        body = { settings, configured: true, revision: 0 };
+        body = { settings, configured: true, revision: settingsRevision };
+        break;
+      case "PUT /api/user-settings":
+        Object.assign(settings, req.postDataJSON().settings);
+        body = { settings, configured: true, revision: ++settingsRevision };
         break;
       case "GET /api/workspaces":
         body = { workspaces: [workspace] };
@@ -308,6 +313,47 @@ async function fixture(
     },
   };
 }
+
+test("arrow selection preference follows cached canvas switches without changing scene revisions", async ({
+  page,
+}) => {
+  const mock = await fixture(page);
+  const revisions = Object.values(mock.canvases).map(
+    (canvas) => canvas.revision,
+  );
+
+  await expect
+    .poll(() => editorState(page).then((s) => s.arrowSelectionHighlight))
+    .toBe(true);
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "设置", exact: true });
+
+  await dialog.getByRole("tab", { name: "编辑器", exact: true }).click();
+  await dialog
+    .getByRole("checkbox", { name: "箭头沿线选中高亮", exact: true })
+    .locator("..")
+    .click();
+  await expect
+    .poll(() => editorState(page).then((s) => s.arrowSelectionHighlight))
+    .toBe(false);
+  await expect
+    .poll(() => mock.counts.get("PUT /api/user-settings") ?? 0)
+    .toBe(1);
+  await dialog.getByRole("button", { name: "关闭设置" }).click();
+  for (const id of ["b", "a", "c"]) {
+    await mock.select(id);
+    await mock.ready(id);
+    expect((await editorState(page)).arrowSelectionHighlight).toBe(false);
+  }
+
+  await page.reload();
+  await mock.ready("a");
+  expect((await editorState(page)).arrowSelectionHighlight).toBe(false);
+  expect(Object.values(mock.canvases).map((canvas) => canvas.revision)).toEqual(
+    revisions,
+  );
+  expect(mock.errors).toEqual([]);
+});
 
 for (const enabled of [false, true])
   test(`library is lazy when default sidebar ${enabled ? "enabled" : "disabled"}`, async ({

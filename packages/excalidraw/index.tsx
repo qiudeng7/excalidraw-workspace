@@ -221,6 +221,7 @@ const ExcalidrawBase = (props: ExcalidrawProps) => {
             arrowBindingOptimization={props.arrowBindingOptimization}
             shortArrowheads={props.shortArrowheads}
             ctrlMultiSelect={props.ctrlMultiSelect}
+            arrowSelectionHighlight={props.arrowSelectionHighlight}
             canvasSampling={props.canvasSampling}
             canvasRenderingOptions={props.canvasRenderingOptions}
             onExport={onExport}

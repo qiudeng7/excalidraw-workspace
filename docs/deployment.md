@@ -70,6 +70,50 @@ pnpm run deploy
 
 `pnpm run deploy` 依次构建、迁移远程 D1、部署 Worker。D1、R2、SQLite Durable Objects 的 binding 分别为 `DB`、`BLOB`、`CANVAS_ROOMS`；`canvas-room-v1` 迁移创建 `CanvasRoom` 类，不要删除或改写已发布的 DO migration。所有 Wrangler 命令显式使用 `--config wrangler.jsonc`，否则 NuxtHub 自动生成的配置可能绕过自定义 Worker 入口。已有数据库沿用 `d1_migrations`，不要更换迁移记录重跑旧 SQL。
 
+### 持久 preview 验收环境
+
+本项目使用传统 `env.preview` 部署一个独立、持久的 preview Worker，不使用 Workers Previews。`dev` 集成提交部署到固定验收站，`main` 的正式发布提交部署到生产；Git push 不会自动部署任一环境。
+
+| 资源                  | 生产（顶层配置）                                 | preview（`env.preview`）                                 |
+| --------------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| Worker                | `excalidraw-workspace`                           | `excalidraw-workspace-preview`                           |
+| URL / `PUBLIC_ORIGIN` | https://excalidraw-workspace.qiudeng.workers.dev | https://excalidraw-workspace-preview.qiudeng.workers.dev |
+| D1（`DB`）            | `excalidraw-demo`                                | `excalidraw-workspace-preview`                           |
+| 私有 R2（`BLOB`）     | `excalidraw-demo-data`                           | `excalidraw-workspace-preview-data`                      |
+| DO（`CANVAS_ROOMS`）  | 本 Worker 的 `CanvasRoom`                        | preview Worker 自己的 `CanvasRoom`，无 `script_name`     |
+
+preview 使用独立空数据库、独立 bucket 和独立 DO 命名空间，不复制生产账号或数据；之后更新保留 preview 自己的数据。两边都每小时执行一次清理任务（`0 * * * *`），各自仅访问自己的绑定。preview 继承顶层 `canvas-room-v1` DO migration，不重写历史迁移。R2 保持私有，不开启公共桶或 `r2.dev` 访问。
+
+此验收站不配置 Cloudflare Access。首次上线后由用户本人注册首个管理员，并在应用管理设置关闭注册；不得预置管理员或公网默认密码。**关闭注册不是访问隔离**：站点仍可从公网访问，已有账号和分享访问仍按应用权限生效。管理员完成初始化前不要把站点当作已封闭的测试环境。
+
+首次资源创建由获授权的部署者执行，已有资源不要重复创建：
+
+```sh
+pnpm exec wrangler d1 create excalidraw-workspace-preview --env preview --config wrangler.jsonc
+pnpm exec wrangler r2 bucket create excalidraw-workspace-preview-data --env preview --config wrangler.jsonc
+```
+
+将新数据库 UUID 写入 `env.preview.d1_databases[0].database_id`，确认上述资源属于目标账户。不要把生产 UUID 用作临时值。顶层生产配置不变；`env.preview` 必须显式声明 D1、R2、DO 和变量。部署脚本固定本项目 preview 名称与 URL，迁移到其他账户或域名时须同时审阅配置和脚本中的目标校验。
+
+在独立 worktree 安装自己的依赖，避免与正在运行的本地预览共用 `.nuxt`、`.output` 或编辑器构建目录。先验证构建与绑定，不写入云端：
+
+```sh
+pnpm install
+pnpm run deploy:preview --dry-run
+```
+
+`--dry-run` 允许任务分支及未提交修改，只执行 Cloudflare 构建和 `wrangler deploy --dry-run --env preview --config wrangler.jsonc`，不迁移远端数据库，也不发布 Worker。检查输出使用 `server/worker.mjs` wrapper、包含 `CanvasRoom` 导出，且所有绑定都是 preview 资源；本地 bundle 验证不替代线上验收。
+
+合入 `dev` 后，从干净、已提交且 `HEAD` 等于本地 `refs/heads/dev` 的 worktree 执行真实部署；允许独立 worktree detached checkout 到该提交，无须打断主 worktree 的预览服务：
+
+```sh
+pnpm run deploy:preview
+```
+
+脚本检查资源隔离、有效且非生产的 D1 UUID、DO 不跨 Worker，并打印非敏感部署目标；检查失败立即退出。执行顺序为 Cloudflare 构建 → `pnpm db:migrate:preview` → `wrangler deploy --env preview --config wrangler.jsonc`。脚本不接受覆盖 env、config、name 的参数。仅需单独应用 preview 迁移时，可由获授权的部署者执行 `pnpm db:migrate:preview`；该命令直接写入远端 preview D1，不包含完整部署脚本的安全检查。生产仍使用 `pnpm run deploy`，不能用它更新 preview。
+
+部署者随后核对 preview Worker 的在线版本、D1/R2/DO 绑定、首页、登录和主要改动；首次管理员注册留给用户完成。部署失败时先修复并重跑验证，不以成功构建作为上线成功。回滚 Worker 代码**不会还原 D1、R2 或 DO 数据**；回滚前检查迁移与数据协议兼容性，必要时按[备份和恢复](#备份和恢复)恢复对应环境的数据，不得用生产数据覆盖 preview。
+
 ## 单独运行 Node
 
 安装项目依赖后执行：

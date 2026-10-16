@@ -138,6 +138,7 @@ export const getDefaultAppState = (): Omit<
     arrowBindingInside: false,
     arrowBindingOptimizationActive: false,
     shortArrowheads: false,
+    arrowSelectionHighlight: false,
     boxSelectionMode: "contain",
     colorTopPicks: {
       elementStroke: null,
@@ -298,6 +299,7 @@ const APP_STATE_STORAGE_CONF = (<
     server: false,
   },
   shortArrowheads: { browser: false, export: false, server: false },
+  arrowSelectionHighlight: { browser: false, export: false, server: false },
   colorTopPicks: { browser: true, export: false, server: false },
   fontTopPicks: { browser: true, export: false, server: false },
 });

@@ -22,7 +22,7 @@ import {
   getOmitSidesForEditorInterface,
   canResizeFromSides,
 } from "./transformHandles";
-import { isImageElement, isLinearElement } from "./typeChecks";
+import { isArrowElement, isImageElement, isLinearElement } from "./typeChecks";
 
 import type {
   TransformHandleType,
@@ -139,9 +139,16 @@ export const getElementWithTransformHandleType = (
   elementsMap: ElementsMap,
   editorInterface: EditorInterface,
 ) => {
+  // Keep hit regions in sync with the single-arrow path indicator: no invisible
+  // bbox resize/rotate handles. Multi-selection uses its separate common bounds.
   return elements.reduce(
     (result, element) => {
-      if (result) {
+      if (
+        result ||
+        (appState.arrowSelectionHighlight &&
+          isArrowElement(element) &&
+          !element.locked)
+      ) {
         return result;
       }
 

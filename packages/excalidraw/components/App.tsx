@@ -306,6 +306,7 @@ import {
   actionBringForward,
   actionBringToFront,
   actionCopy,
+  actionCopyCompatible,
   actionCopyAsPng,
   actionCopyAsSvg,
   copyText,
@@ -426,6 +427,7 @@ import { LaserTrails } from "../laserTrails";
 import { withBatchedUpdates, withBatchedUpdatesThrottled } from "../reactUtils";
 import { isPointHittingTextAutoResizeHandle } from "../textAutoResizeHandle";
 import { textWysiwyg } from "../wysiwyg/textWysiwyg";
+import { beginClipboardOperation } from "../smartClipboard";
 import { isOverScrollBars } from "../scene/scrollbars";
 import { isMaybeMermaidDefinition } from "../mermaid";
 import { LassoTrail } from "../lasso";
@@ -1049,6 +1051,7 @@ class App extends React.Component<AppProps, AppState> {
       arrowBindingInside: false,
       arrowBindingOptimizationActive: false,
       shortArrowheads: !!props.shortArrowheads,
+      arrowSelectionHighlight: !!props.arrowSelectionHighlight,
       width: this.ownerWindow.innerWidth,
       height: this.ownerWindow.innerHeight,
     };
@@ -3452,6 +3455,7 @@ class App extends React.Component<AppProps, AppState> {
           // 初始化、导入和清空场景不能覆盖实例的用户设置或注入手势状态。
           arrowBindingOptimization: !!this.props.arrowBindingOptimization,
           shortArrowheads: !!this.props.shortArrowheads,
+          arrowSelectionHighlight: !!this.props.arrowSelectionHighlight,
           arrowBindingInside:
             this.optimizedArrowPointerId !== null &&
             prevAppState.arrowBindingInside,
@@ -3842,6 +3846,7 @@ class App extends React.Component<AppProps, AppState> {
         ...getDefaultAppState(),
         arrowBindingOptimization: !!this.props.arrowBindingOptimization,
         shortArrowheads: !!this.props.shortArrowheads,
+        arrowSelectionHighlight: !!this.props.arrowSelectionHighlight,
         isLoading: opts?.resetLoadingState ? false : state.isLoading,
         theme: this.state.theme,
       }));
@@ -4588,12 +4593,15 @@ class App extends React.Component<AppProps, AppState> {
 
     this.scene.arrowBindingOptimization = !!this.props.arrowBindingOptimization;
     if (
+      prevProps.arrowSelectionHighlight !==
+        this.props.arrowSelectionHighlight ||
       prevProps.shortArrowheads !== this.props.shortArrowheads ||
       prevProps.arrowBindingOptimization !== this.props.arrowBindingOptimization
     ) {
       // 只更新实例渲染上下文；不 mutate 元素，不增加场景版本。
       this.setState({
         shortArrowheads: !!this.props.shortArrowheads,
+        arrowSelectionHighlight: !!this.props.arrowSelectionHighlight,
         arrowBindingOptimization: !!this.props.arrowBindingOptimization,
       });
     }
@@ -4854,7 +4862,18 @@ class App extends React.Component<AppProps, AppState> {
       this.ownerDocument.activeElement,
     );
 
-    if (!isExcalidrawActive || isWritableElement(event.target)) {
+    if (!isExcalidrawActive) return;
+    if (
+      event.defaultPrevented ||
+      this.state.editingTextElement ||
+      isWritableElement(event.target) ||
+      (event.target instanceof this.ownerWindow.HTMLElement &&
+        event.target.isContentEditable)
+    ) {
+      // Respect PM's consumed event, including events targeted at nested marks.
+      // Native character copies supersede an in-flight scene copy without changing PM behavior.
+      beginClipboardOperation();
+
       return;
     }
 
@@ -4872,7 +4891,18 @@ class App extends React.Component<AppProps, AppState> {
       this.ownerDocument.activeElement,
     );
 
-    if (!isExcalidrawActive || isWritableElement(event.target)) {
+    if (!isExcalidrawActive) return;
+    if (
+      event.defaultPrevented ||
+      this.state.editingTextElement ||
+      isWritableElement(event.target) ||
+      (event.target instanceof this.ownerWindow.HTMLElement &&
+        event.target.isContentEditable)
+    ) {
+      // Respect PM's consumed event, including events targeted at nested marks.
+      // Native character copies supersede an in-flight scene copy without changing PM behavior.
+      beginClipboardOperation();
+
       return;
     }
 
@@ -5204,7 +5234,12 @@ class App extends React.Component<AppProps, AppState> {
       }
 
       if (this.props.syncReadOnly) return;
-      await this.insertClipboardContent(data, filesList, isPlainPaste);
+      // A native element payload is authoritative; PNG is only another representation.
+      await this.insertClipboardContent(
+        data,
+        data.nativePayload ? [] : filesList,
+        isPlainPaste,
+      );
 
       this.setActiveTool(
         { type: this.state.preferredSelectionTool.type },
@@ -5809,7 +5844,11 @@ class App extends React.Component<AppProps, AppState> {
       }
 
       if (appState) {
-        this.setState(appState as Pick<AppState, K> | null);
+        this.setState({
+          ...appState,
+          // This is an instance preference, never a scene/remote override.
+          arrowSelectionHighlight: !!this.props.arrowSelectionHighlight,
+        } as Pick<AppState, K>);
       }
 
       if (elements) {
@@ -14605,7 +14644,7 @@ class App extends React.Component<AppProps, AppState> {
     options.push(copyText);
 
     if (this.state.viewModeEnabled) {
-      return [actionCopy, ...options];
+      return [actionCopy, actionCopyCompatible, ...options];
     }
 
     const zIndexActions: ContextMenuItems =
@@ -14623,6 +14662,7 @@ class App extends React.Component<AppProps, AppState> {
       CONTEXT_MENU_SEPARATOR,
       actionCut,
       actionCopy,
+      actionCopyCompatible,
       actionPaste,
       CONTEXT_MENU_SEPARATOR,
       actionSelectAllElementsInFrame,

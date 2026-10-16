@@ -67,17 +67,23 @@ const modern = structuredClone(defaults);
 
 modern.features.disableDefaultSidebar = false;
 modern.features.bottomToolbar = false;
+modern.features.ctrlMultiSelect = false;
+modern.features.arrowSelectionHighlight = false;
 expect(await save(modern, 0), 200);
 const legacy = structuredClone(defaults);
 
 delete legacy.features.disableDefaultSidebar;
 delete legacy.features.bottomToolbar;
+delete legacy.features.ctrlMultiSelect;
+delete legacy.features.arrowSelectionHighlight;
 legacy.features.nunitoFont = false;
 let saved = expect(await save(legacy, 1), 200);
 
 assert.equal(saved.revision, 2);
 assert.equal(saved.settings.features.disableDefaultSidebar, false);
 assert.equal(saved.settings.features.bottomToolbar, false);
+assert.equal(saved.settings.features.ctrlMultiSelect, false);
+assert.equal(saved.settings.features.arrowSelectionHighlight, false);
 assert.equal(saved.settings.features.nunitoFont, false);
 assert.deepEqual(expect(await read(), 200), saved);
 const intermediate = structuredClone(legacy);
@@ -87,6 +93,8 @@ saved = expect(await save(intermediate, 2), 200);
 assert.equal(saved.revision, 3);
 assert.equal(saved.settings.features.disableDefaultSidebar, true);
 assert.equal(saved.settings.features.bottomToolbar, false);
+assert.equal(saved.settings.features.ctrlMultiSelect, false);
+assert.equal(saved.settings.features.arrowSelectionHighlight, false);
 expect(await save(legacy, 1), 409);
 assert.deepEqual(expect(await read(), 200), saved);
 report(
@@ -113,4 +121,6 @@ const first = expect(
 
 assert.equal(first.settings.features.disableDefaultSidebar, true);
 assert.equal(first.settings.features.bottomToolbar, true);
+assert.equal(first.settings.features.ctrlMultiSelect, true);
+assert.equal(first.settings.features.arrowSelectionHighlight, true);
 report("新注册账户的原版 v1 首次保存补齐两个默认 flag");

@@ -258,6 +258,9 @@ export type InteractiveCanvasAppState = Readonly<
     shouldCacheIgnoreZoom: AppState["shouldCacheIgnoreZoom"];
     exportScale: AppState["exportScale"];
     currentItemArrowType: AppState["currentItemArrowType"];
+    arrowSelectionHighlight: AppState["arrowSelectionHighlight"];
+    shortArrowheads: AppState["shortArrowheads"];
+    viewBackgroundColor: AppState["viewBackgroundColor"];
   }
 >;
 
@@ -575,6 +578,7 @@ export interface AppState {
   arrowBindingInside: boolean;
   arrowBindingOptimizationActive: boolean;
   shortArrowheads: boolean;
+  arrowSelectionHighlight: boolean;
   /** user-customized color-picker top picks (pinned via drag & drop from the
    * color picker popup). `null` means no customization (defaults, or
    * host-supplied `topPicks`, are used). Kept per picker. */
@@ -851,6 +855,8 @@ export interface ExcalidrawProps {
   /** 屏幕采样倍率，独立于场景缩放及导出分辨率。 */
   arrowBindingOptimization?: boolean;
   shortArrowheads?: boolean;
+  /** Path selection indicators for arrows; opt-in for standalone editors. */
+  arrowSelectionHighlight?: boolean;
   /** Let Ctrl+left click extend selection; opt-in for standalone editor users. */
   ctrlMultiSelect?: boolean;
   canvasSampling?: 1 | 1.5 | 2;

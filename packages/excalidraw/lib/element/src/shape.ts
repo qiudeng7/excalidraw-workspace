@@ -74,6 +74,7 @@ import type {
   ExcalidrawFreeDrawElement,
   ElementsMap,
   ExcalidrawLineElement,
+  ExcalidrawArrowElement,
   Arrowhead,
 } from "./types";
 
@@ -1095,6 +1096,62 @@ const _generateElementShape = (
       return null;
     }
   }
+};
+
+const arrowSelectionShapeCache = new WeakMap<
+  ExcalidrawArrowElement,
+  {
+    version: number;
+    versionNonce: number;
+    shortArrowheads: boolean;
+    theme: AppState["theme"];
+    background: string;
+    shape: ElementShapes["arrow"];
+  }
+>();
+
+/**
+ * The same shaft/heads as painting, without hand-drawn jitter. This separate
+ * cache must never replace ShapeCache's drawable or invalidate static bitmaps.
+ */
+export const getArrowSelectionShape = (
+  element: ExcalidrawArrowElement,
+  config: Pick<AppState, "shortArrowheads" | "theme" | "viewBackgroundColor">,
+): ElementShapes["arrow"] => {
+  const cached = arrowSelectionShapeCache.get(element);
+
+  if (
+    cached?.version === element.version &&
+    cached.versionNonce === element.versionNonce &&
+    cached.shortArrowheads === config.shortArrowheads &&
+    cached.theme === config.theme &&
+    cached.background === config.viewBackgroundColor
+  ) {
+    return cached.shape;
+  }
+
+  const shape = _generateElementShape(
+    { ...element, roughness: 0, strokeStyle: "solid", fillStyle: "solid" },
+    new RoughGenerator(),
+    {
+      isExporting: false,
+      shortArrowheads: config.shortArrowheads,
+      theme: config.theme,
+      canvasBackgroundColor: config.viewBackgroundColor,
+      embedsValidationStatus: null,
+    },
+  ) as ElementShapes["arrow"];
+
+  arrowSelectionShapeCache.set(element, {
+    version: element.version,
+    versionNonce: element.versionNonce,
+    shortArrowheads: config.shortArrowheads,
+    theme: config.theme,
+    background: config.viewBackgroundColor,
+    shape,
+  });
+
+  return shape;
 };
 
 const generateElbowArrowShape = (
