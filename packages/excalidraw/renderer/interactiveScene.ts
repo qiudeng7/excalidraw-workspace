@@ -82,6 +82,7 @@ import type {
 } from "@excalidraw/element/types";
 
 import { renderSnaps } from "../renderer/renderSnaps";
+import { renderArrowSelection } from "./arrowSelection";
 import { roundRect } from "../renderer/roundRect";
 import {
   getScrollBars,
@@ -1708,6 +1709,32 @@ const _renderInteractiveScene = ({
     }
   });
 
+  // Independent of bounding boxes: two-point and elbow arrows have no single
+  // bbox. Paint before all point handles, including in the vertex editor.
+  if (
+    appState.arrowSelectionHighlight &&
+    !appState.multiElement &&
+    !appState.newElement
+  ) {
+    for (const selected of selectedElements) {
+      const arrow = elementsMap.get(selected.id);
+
+      if (
+        isArrowElement(arrow) &&
+        !arrow.locked &&
+        !isSelectedViaGroup(appState, arrow)
+      ) {
+        renderArrowSelection(
+          context,
+          arrow,
+          allElementsMap,
+          appState,
+          renderConfig.selectionColor || getThemedColor("#000", appState.theme),
+        );
+      }
+    }
+  }
+
   if (editingLinearElement) {
     renderLinearPointHandles(
       context,
@@ -1933,7 +1960,12 @@ const _renderInteractiveScene = ({
           // local user
           if (
             locallySelectedIds.has(element.id) &&
-            !isSelectedViaGroup(appState, element)
+            !isSelectedViaGroup(appState, element) &&
+            !(
+              appState.arrowSelectionHighlight &&
+              isArrowElement(element) &&
+              !element.locked
+            )
           ) {
             selectionColors.push(selectionColor);
           }
@@ -2035,6 +2067,11 @@ const _renderInteractiveScene = ({
       if (
         !appState.viewModeEnabled &&
         showBoundingBox &&
+        !(
+          appState.arrowSelectionHighlight &&
+          isArrowElement(selectedElements[0]) &&
+          !selectedElements[0].locked
+        ) &&
         // do not show transform handles when text is being edited
         !isTextElement(appState.editingTextElement) &&
         // do not show transform handles when image is being cropped

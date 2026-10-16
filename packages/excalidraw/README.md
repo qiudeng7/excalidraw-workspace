@@ -51,6 +51,7 @@ pnpm --filter @excalidraw/excalidraw build:watch
 | 定制 | 源码位置 | 行为 |
 | --- | --- | --- |
 | 普通开口箭头头部 | [lib/element/src/bounds.ts](lib/element/src/bounds.ts) 的 `getArrowheadSize`、`getArrowheadAngle` | 由实例 `shortArrowheads` 控制：开启时最大侧翼长度 14、单侧角度 28°，关闭恢复 25、20°；其他头部类型和短箭头限制保留 |
+| 箭头路径选择高亮 | [renderer/arrowSelection.ts](renderer/arrowSelection.ts)、[interactiveScene.ts](renderer/interactiveScene.ts)、[shape.ts](lib/element/src/shape.ts)、[resizeTest.ts](lib/element/src/resizeTest.ts) | `arrowSelectionHighlight` 开启时单选/多选沿箭身与头部高亮，单选仅保留端点/中点控制；多选整体操作框、普通图形和分组/远端/锁定框保留。关闭恢复原策略；不写场景或导出，独立编辑器默认关闭、宿主默认开启 |
 | 复制 PNG 快捷键 | [actions/actionClipboard.tsx](actions/actionClipboard.tsx) 的 `actionCopyAsPng` | Windows/Linux 用 `Ctrl+Shift+C`，macOS 用 `Cmd+Shift+C`，排除 Alt |
 | 命令面板 | [components/LayerUI.tsx](components/LayerUI.tsx) | 挂载上游 CommandPalette 组件，为独立嵌入场景接通菜单入口及快捷键 |
 | 素材库导入与错误提示 | [data/library.ts](data/library.ts)、[ActiveConfirmDialog.tsx](components/ActiveConfirmDialog.tsx)、[LibraryMenuHeaderContent.tsx](components/LibraryMenuHeaderContent.tsx) | 导入确认使用异步编辑器弹窗，发布失败通过现有错误弹窗显示，不再调用浏览器 confirm/alert |
@@ -113,6 +114,8 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 ## 验证与更新上游
 
 构建通过后，分别在 Nuxt 开发页面和本地 Worker 提供的生产页面检查（启动方式见[本地启动](../../docs/development/local-development.md)）：新图形为规整线条、文字为 Nunito、箭头头部缩短；`Ctrl+C` 复制元素而 `Ctrl+Shift+C` 复制 PNG；外链菜单组隐藏，工具栏在底部且弹层向上展开。切换采样倍率后检查已有图形、新绘制图形及选择框位置，重登录或同账户换浏览器检查设置从服务端恢复；比较各倍率下复制 PNG 的尺寸，确认导出设置独立生效。修改渲染逻辑时还应比较 SVG/PNG 导出与画布外观。
+
+箭头选择高亮可运行 `PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node packages/excalidraw/tests/arrowSelection.browser.mjs`（先构建编辑器）。该 [Chromium 回归](tests/arrowSelection.browser.mjs) 检查真实交互层像素、单选/多选和开关恢复、曲线与圆角折线、标签留白、旋转/缩放/采样、静态 drawable/位图缓存身份和导出不变；成功截图留在 `test-results/arrow-selection/`，供视觉审阅。宿主设置、重载与切换画布见 [arrow-selection.spec.ts](../../tests/browser/arrow-selection.spec.ts) 和 [canvas-cache.spec.ts](../../tests/browser/canvas-cache.spec.ts)，协作开关见 [collaboration.spec.ts](../../tests/browser/collaboration.spec.ts)。
 
 新增功能可以运行 [arrowFlags.browser.mjs](tests/arrowFlags.browser.mjs) 做独立 Chromium 检查。先执行 `pnpm build:editor`；测试会在临时目录构建页面、启动回环服务，不使用账户或后端，并阻止外部请求。Playwright 是可选测试工具，未加入产品依赖，可在独立目录安装：
 

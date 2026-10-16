@@ -1049,6 +1049,7 @@ class App extends React.Component<AppProps, AppState> {
       arrowBindingInside: false,
       arrowBindingOptimizationActive: false,
       shortArrowheads: !!props.shortArrowheads,
+      arrowSelectionHighlight: !!props.arrowSelectionHighlight,
       width: this.ownerWindow.innerWidth,
       height: this.ownerWindow.innerHeight,
     };
@@ -3452,6 +3453,7 @@ class App extends React.Component<AppProps, AppState> {
           // 初始化、导入和清空场景不能覆盖实例的用户设置或注入手势状态。
           arrowBindingOptimization: !!this.props.arrowBindingOptimization,
           shortArrowheads: !!this.props.shortArrowheads,
+          arrowSelectionHighlight: !!this.props.arrowSelectionHighlight,
           arrowBindingInside:
             this.optimizedArrowPointerId !== null &&
             prevAppState.arrowBindingInside,
@@ -3842,6 +3844,7 @@ class App extends React.Component<AppProps, AppState> {
         ...getDefaultAppState(),
         arrowBindingOptimization: !!this.props.arrowBindingOptimization,
         shortArrowheads: !!this.props.shortArrowheads,
+        arrowSelectionHighlight: !!this.props.arrowSelectionHighlight,
         isLoading: opts?.resetLoadingState ? false : state.isLoading,
         theme: this.state.theme,
       }));
@@ -4588,12 +4591,15 @@ class App extends React.Component<AppProps, AppState> {
 
     this.scene.arrowBindingOptimization = !!this.props.arrowBindingOptimization;
     if (
+      prevProps.arrowSelectionHighlight !==
+        this.props.arrowSelectionHighlight ||
       prevProps.shortArrowheads !== this.props.shortArrowheads ||
       prevProps.arrowBindingOptimization !== this.props.arrowBindingOptimization
     ) {
       // 只更新实例渲染上下文；不 mutate 元素，不增加场景版本。
       this.setState({
         shortArrowheads: !!this.props.shortArrowheads,
+        arrowSelectionHighlight: !!this.props.arrowSelectionHighlight,
         arrowBindingOptimization: !!this.props.arrowBindingOptimization,
       });
     }

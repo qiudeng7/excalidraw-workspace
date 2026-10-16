@@ -87,6 +87,7 @@ export interface UserSettings {
     disableDefaultSidebar: boolean;
     bottomToolbar: boolean;
     ctrlMultiSelect: boolean;
+    arrowSelectionHighlight: boolean;
   };
   debug: {
     sampling: 1 | 1.5 | 2;
@@ -119,6 +120,7 @@ export function createDefaultUserSettings(): UserSettings {
       disableDefaultSidebar: true,
       bottomToolbar: true,
       ctrlMultiSelect: true,
+      arrowSelectionHighlight: true,
     },
     debug: {
       sampling: 1,

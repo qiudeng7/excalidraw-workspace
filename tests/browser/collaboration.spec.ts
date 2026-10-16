@@ -1165,6 +1165,105 @@ test("移动端协作画布解锁使用抓手，手动选择工具后远端更�
   }
 });
 
+test("协作箭头高亮开关即时生效并持久化，不改变共享元素或其他编辑者设置", async ({
+  browser,
+  baseURL,
+}, testInfo) => {
+  const owner = await account(browser, baseURL!);
+
+  await call(owner.context, baseURL!, owner.id, "access");
+  const guestContext = await browser.newContext({
+    baseURL,
+    viewport: { width: 1440, height: 900 },
+  });
+
+  try {
+    const page = await owner.context.newPage();
+
+    await open(page, "/", true);
+    await expect
+      .poll(() => editorState(page).then((s) => s.arrowSelectionHighlight))
+      .toBe(true);
+    const box = (await page.locator("canvas.interactive").boundingBox())!;
+
+    await page.getByTestId("toolbar-arrow").first().click();
+    await page.mouse.move(box.x + 400, box.y + 220);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 650, box.y + 410);
+    await page.mouse.up();
+    await draw(page, 850);
+    await expect
+      .poll(
+        async () =>
+          (
+            await call(owner.context, baseURL!, owner.id, "view")
+          ).scene.elements.filter((e: any) => !e.isDeleted).length,
+      )
+      .toBe(2);
+    const link = await call(owner.context, baseURL!, owner.id, "links", {
+      role: "editor",
+      requireLogin: false,
+    });
+    const guest = await guestContext.newPage();
+
+    await open(guest, link.path, true);
+    await expect
+      .poll(() => editorState(guest).then((s) => s.elements.length))
+      .toBe(2);
+    await page.getByTestId("toolbar-selection").first().click();
+    await page.mouse.click(box.x + 525, box.y + 315);
+    await page.keyboard.down("Control");
+    await page.mouse.click(box.x + 900, box.y + 300);
+    await page.keyboard.up("Control");
+    await expect
+      .poll(() =>
+        editorState(page).then((s) => Object.keys(s.selectedElementIds).length),
+      )
+      .toBe(2);
+    const before = await call(owner.context, baseURL!, owner.id, "view");
+
+    await page.screenshot({
+      path: testInfo.outputPath("collaboration-on.png"),
+    });
+    await page.getByRole("button", { name: "设置", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "设置", exact: true });
+
+    await dialog.getByRole("tab", { name: "编辑器", exact: true }).click();
+    await dialog
+      .getByRole("checkbox", { name: "箭头沿线选中高亮", exact: true })
+      .locator("..")
+      .click();
+    await expect
+      .poll(() => editorState(page).then((s) => s.arrowSelectionHighlight))
+      .toBe(false);
+    await expect
+      .poll(
+        async () =>
+          (await (await owner.context.request.get("/api/user-settings")).json())
+            .settings.features.arrowSelectionHighlight,
+      )
+      .toBe(false);
+    await dialog.getByRole("button", { name: "关闭设置" }).click();
+    await page.screenshot({
+      path: testInfo.outputPath("collaboration-off.png"),
+    });
+    expect((await editorState(guest)).arrowSelectionHighlight).toBe(true);
+    const after = await call(owner.context, baseURL!, owner.id, "view");
+
+    expect(after.seq).toBe(before.seq);
+    expect(after.scene.elements).toEqual(before.scene.elements);
+    expect(after.scene.appState.arrowSelectionHighlight).toBeUndefined();
+    await page.reload();
+    await open(page, "/", true);
+    await expect
+      .poll(() => editorState(page).then((s) => s.arrowSelectionHighlight))
+      .toBe(false);
+  } finally {
+    await guestContext.close();
+    await owner.context.close();
+  }
+});
+
 test("协作编辑器即时应用 Ctrl 多选开关，独立选择不写入共享场景", async ({
   browser,
   baseURL,

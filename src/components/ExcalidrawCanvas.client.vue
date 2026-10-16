@@ -583,6 +583,8 @@ function CanvasEditor() {
     arrowBindingOptimization: props.userSettings.features.edgeBinding,
     shortArrowheads: props.userSettings.features.shortArrowheads,
     ctrlMultiSelect: props.userSettings.features.ctrlMultiSelect,
+    arrowSelectionHighlight:
+      props.userSettings.features.arrowSelectionHighlight,
     UIOptions: {
       defaultSidebar: !props.userSettings.features.disableDefaultSidebar,
     },

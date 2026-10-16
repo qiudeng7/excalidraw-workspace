@@ -12,6 +12,10 @@
 
 “Ctrl 点击多选”默认开启，通过 `ctrlMultiSelect` 属性控制选择工具下的左键累加与取消选择，普通画布与协作画布均即时生效。关闭后恢复 Ctrl 穿透分组选择；Ctrl+Alt 套索、⌘、线段点编辑及其他工具保留原行为。该实现只调整选择分支，不伪造 Shift 事件，因此不影响绘图角度、缩放和快捷键。独立使用编辑器而未传此属性时保持上游行为。
 
+“箭头沿线选中高亮”默认开启，单选、多选箭头都沿箭身和头部绘制约 1.5px 的规整高亮，保留文字标签留白。单选箭头保留端点、中点编辑，不显示矩形缩放与旋转控制柄；多选仍显示整体操作框和控制柄。普通图形、整体分组选择、锁定与远端选中框沿用原策略。关闭开关恢复原有矩形选择框和控制柄策略（两点或折线箭头原本就可能没有单选矩形框）。普通与协作画布即时生效，设置按账户保存，不改变元素、撤销历史或 SVG/PNG/JSON 导出。
+
+入口为 [interactiveScene.ts](../../packages/excalidraw/renderer/interactiveScene.ts) 与 [arrowSelection.ts](../../packages/excalidraw/renderer/arrowSelection.ts)，`arrowSelectionHighlight` 是实例属性，独立嵌入编辑器未传时默认关闭。几何复用 [shape.ts](../../packages/excalidraw/lib/element/src/shape.ts) 的箭身和头部生成，使用独立版本缓存，不覆盖屏幕静态绘制缓存。回归见 [arrowSelection.browser.mjs](../../packages/excalidraw/tests/arrowSelection.browser.mjs) 与 [arrow-selection.spec.ts](../../tests/browser/arrow-selection.spec.ts)。
+
 修改编辑器菜单与宿主属性从包装组件开始，调整设置内容从 [SettingsPanel.vue](../../src/components/SettingsPanel.vue) 和 [settingsControls.ts](../../src/lib/settingsControls.ts) 开始；修改编辑器内部行为，按[本地定制位置](../../packages/excalidraw/README.md#本仓库的定制)定位手势、几何和渲染代码。修改设置字段时，同时检查共享类型、默认值、后端完整配置校验和设置资源测试。
 
 打开画布时，前端根据浏览器 UA 为移动设备默认选择抓手（平移工具），桌面保留指针默认行为；iPad 的桌面 UA 结合多点触摸识别，不将窄窗口或普通触摸电脑视为移动设备。判断只用于初始化，不控制后续工具选择；版本校验结束、远端更新和重连不重新设置工具。用户手动选择的工具通过当前账号内该画布的内存 `editorContext` 在切换画布时保留；刷新页面或重新登录后恢复设备默认工具，工具不写入服务端画布或共享给其他编辑者。入口见 [editorTools.ts](../../src/lib/editorTools.ts) 和两个画布包装组件。
