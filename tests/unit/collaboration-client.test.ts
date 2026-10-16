@@ -266,6 +266,12 @@ test("a delayed ACK preserves later edits, local queue survives reload, and retr
 
     if (path === "presence")
       return Response.json({
+        ...(execute(
+          room,
+          { userId: "owner", name: "Owner" },
+          { type: "status" },
+          Date.now(),
+        ) as object),
         participants: 2,
         realtime: true,
         leaseExpiresAt: Date.now() + 150000,
@@ -896,6 +902,12 @@ test("an existing room unlocks on HTTP confirmation while presence is delayed, a
       }
 
       return Response.json({
+        ...(execute(
+          room,
+          { userId: "owner", name: "Owner" },
+          { type: "status" },
+          Date.now(),
+        ) as object),
         participants: 2,
         realtime: true,
         leaseExpiresAt: 123456,
@@ -1069,6 +1081,12 @@ test("owner/share remounts serialize a delayed old touch before the new lease an
       }
 
       return Response.json({
+        ...(execute(
+          room,
+          { userId: "owner", name: "Owner" },
+          { type: "status" },
+          Date.now(),
+        ) as object),
         participants: lease ? 1 : 0,
         realtime: false,
         leaseExpiresAt: lease,
@@ -1183,6 +1201,12 @@ async function handshakeFixture(socket: typeof Socket = Socket) {
     if (path === "ticket") return Response.json({ ticket: "secret-ticket" });
     if (path === "presence")
       return Response.json({
+        ...(execute(
+          room,
+          { userId: "owner", name: "Owner" },
+          { type: "status" },
+          Date.now(),
+        ) as object),
         participants: 2,
         realtime: true,
         leaseExpiresAt: Date.now() + 60000,
@@ -1503,7 +1527,7 @@ test("known HTTP denial stays authoritative when its response body times out", a
     await until(() => session.realtimeStatus === "connected");
     t.mock.method(AbortSignal, "timeout", () => actualTimeout(10));
     fixture.intercept((path, init) => {
-      if (path !== "access") return undefined;
+      if (path !== "presence") return undefined;
       const body = new ReadableStream({
         start(controller) {
           init.signal!.addEventListener(
@@ -1565,7 +1589,7 @@ test("a late view after WS ERROR cannot undo a concurrent authoritative HTTP den
     await session.start();
     await until(() => session.realtimeStatus === "connected");
     fixture.intercept((path) => {
-      if (path === "access" && deny)
+      if ((path === "access" || path === "presence") && deny)
         return Promise.resolve(
           Response.json(
             { error: { code: "ACCESS_CHANGED", message: "权限已撤销" } },
@@ -1601,6 +1625,122 @@ test("a late view after WS ERROR cannot undo a concurrent authoritative HTTP den
     assert.equal(session.editable, false);
   } finally {
     release();
+    await fixture.cleanup();
+  }
+});
+
+test("revocation during a delayed HTTP ACK never resumes editing or sends the remaining draft", async () => {
+  const fixture = await handshakeFixture();
+  const { session, room, calls } = fixture;
+  let release!: (value: Response) => void;
+  const pending = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  let commit: unknown;
+  let entered = false;
+  let denied = false;
+
+  try {
+    await session.start();
+    await until(() => session.realtimeStatus === "connected");
+    fixture.intercept((path, init) => {
+      if (path === "presence" && denied)
+        return Promise.resolve(
+          Response.json(
+            { error: { code: "ACCESS_CHANGED", message: "权限已撤销" } },
+            { status: 403 },
+          ),
+        );
+      if (path !== "update") return undefined;
+      const operation = JSON.parse(String(init.body));
+
+      commit = execute(
+        room,
+        { userId: "owner", name: "Owner" },
+        { type: "update", operation, digest: canonical(operation) },
+        Date.now(),
+      );
+      entered = true;
+
+      return pending;
+    });
+    session.update({ elements: [element("first")], appState: {}, files: {} });
+    const saving = session.flush();
+
+    await until(() => entered);
+    session.update({
+      elements: [element("first"), element("later")],
+      appState: {},
+      files: {},
+    });
+    denied = true;
+    await (
+      session as unknown as { pollPresence(): Promise<void> }
+    ).pollPresence();
+    assert.equal(session.status, "denied");
+    release(Response.json(commit));
+    await saving;
+    assert.equal(session.status, "denied");
+    assert.equal(session.editable, false);
+    assert.equal(session.dirty, true);
+    assert.equal(session.value.elements.length, 2);
+    assert.equal(calls.get("update"), 1);
+    assert.equal(session.message, "权限已撤销");
+  } finally {
+    release?.(Response.json(commit ?? {}));
+    await fixture.cleanup();
+  }
+});
+
+test("restore between the initial presence watermark and its view immediately protects the old draft", async () => {
+  const fixture = await handshakeFixture();
+  const { session, room, calls } = fixture;
+  let release!: (value: Response) => void;
+  const pending = new Promise<Response>((resolve) => {
+    release = resolve;
+  });
+  let entered = false;
+
+  fixture.intercept((path, init) => {
+    if (path !== "presence" || JSON.parse(String(init.body)).leave)
+      return undefined;
+    entered = true;
+
+    return pending;
+  });
+  try {
+    await session.start();
+    await until(() => entered);
+    session.update({
+      elements: [element("old-epoch-draft")],
+      appState: {},
+      files: {},
+    });
+    room.seq++;
+    const watermark = execute(
+      room,
+      { userId: "owner", name: "Owner" },
+      { type: "status" },
+      Date.now(),
+    ) as object;
+
+    room.epoch = "restored-between-reads";
+    release(
+      Response.json({
+        ...watermark,
+        participants: 1,
+        realtime: false,
+        leaseExpiresAt: Date.now() + 150000,
+      }),
+    );
+    await until(() => session.status === "recovery");
+    assert.equal(session.editable, false);
+    assert.equal(session.dirty, true);
+    assert.equal(session.value.elements[0]?.id, "old-epoch-draft");
+    assert.equal(calls.get("update") ?? 0, 0);
+    assert.equal(calls.get("ticket") ?? 0, 0);
+  } finally {
+    release?.(Response.json({}));
     await fixture.cleanup();
   }
 });

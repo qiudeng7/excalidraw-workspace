@@ -59,7 +59,7 @@ export async function nodeCommand(
     const result = execute(room, principal, command, Date.now());
 
     if (
-      ["access", "view", "manage", "backup", "projection"].includes(
+      ["access", "status", "view", "manage", "backup", "projection"].includes(
         command.type,
       )
     )

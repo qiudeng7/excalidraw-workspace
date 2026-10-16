@@ -78,6 +78,14 @@ async function call(
   return response.json();
 }
 
+async function activate(context: BrowserContext, baseURL: string, id: string) {
+  await call(context, baseURL, id, "links", {
+    role: "viewer",
+    viewMode: "latest",
+    requireLogin: true,
+  });
+}
+
 async function open(page: Page, path: string, editable: boolean) {
   await page.goto(path);
   await expect(page.locator(".excalidraw")).toBeVisible();
@@ -229,8 +237,8 @@ test("标签页保留协作画布的撤销历史，后台远端更新后清空�
     expect(created.status(), await created.text()).toBe(200);
     const second = (await created.json()).canvas;
 
-    await call(owner.context, baseURL!, owner.id, "access");
-    await call(owner.context, baseURL!, second.id, "access");
+    await activate(owner.context, baseURL!, owner.id);
+    await activate(owner.context, baseURL!, second.id);
     const page = await owner.context.newPage();
 
     await open(page, "/", true);
@@ -424,7 +432,7 @@ test("旧画布的已保存浏览器缓存迁入协作后正常解锁，并在�
       { ownerId: owner.user.id, canvas: legacy },
     );
     // Explicit activation now replaces the former implicit GET migration.
-    await call(owner.context, baseURL!, owner.id, "access");
+    await activate(owner.context, baseURL!, owner.id);
     await open(page, "/", true);
     await expect
       .poll(() =>
@@ -477,6 +485,13 @@ test("主画布的分享面板发布固定版本，并向已有账号提供共�
     const dialog = page.getByRole("dialog", { name: "分享画布" });
 
     await expect(dialog).toBeVisible();
+    expect(
+      (
+        await (
+          await owner.context.request.get(`/api/canvases/${owner.id}`)
+        ).json()
+      ).canvas.syncMode,
+    ).toBe("legacy");
     await expect(dialog.getByLabel("查看方式")).toHaveValue("latest");
     await dialog.getByRole("button", { name: "分享链接", exact: true }).click();
     await expect(dialog.getByLabel("要求登录")).toBeChecked();
@@ -551,6 +566,7 @@ test("真实房间：双会话合并、远程更新不回传、撤销隔离及�
       firstUpdates++;
   });
   try {
+    await activate(owner.context, baseURL!, owner.id);
     await open(first, `/c/${owner.id}`, true);
     const link = await call(owner.context, baseURL!, owner.id, "links", {
       role: "editor",
@@ -651,10 +667,18 @@ test("真实三种查看模式：实时跟随、最新手动刷新、固定版�
 
   try {
     await open(first, `/c/${owner.id}`, true);
-    await draw(first);
+    await draw(first, 650);
+    await expect(
+      first.getByRole("status").filter({ hasText: /^已保存$/ }),
+    ).toBeVisible();
     await expect
       .poll(
-        async () => (await call(owner.context, baseURL!, owner.id, "view")).seq,
+        async () =>
+          (
+            await (
+              await owner.context.request.get(`/api/canvases/${owner.id}`)
+            ).json()
+          ).canvas.scene.elements.length,
       )
       .toBe(1);
     await call(owner.context, baseURL!, owner.id, "versions", {
@@ -749,6 +773,7 @@ test("离线编辑重连后合并；权限撤销后停止读取和编辑", async
   const second = await guestContext.newPage();
 
   try {
+    await activate(owner.context, baseURL!, owner.id);
     await open(first, `/c/${owner.id}`, true);
     const link = await call(owner.context, baseURL!, owner.id, "links", {
       role: "editor",
@@ -816,6 +841,7 @@ test("同账号独立浏览器并发编辑共享一张画布；只移动视角�
     second = await other.newPage();
 
   try {
+    await activate(owner.context, baseURL!, owner.id);
     await Promise.all([
       open(first, `/c/${owner.id}`, true),
       open(second, `/c/${owner.id}`, true),
@@ -857,6 +883,7 @@ test("同一元素被另一会话更新后，撤销不会回滚对方修改", as
   const second = await other.newPage();
 
   try {
+    await activate(owner.context, baseURL!, owner.id);
     await open(first, `/c/${owner.id}`, true);
     await draw(first, 350);
     await expect
@@ -1055,7 +1082,7 @@ test("移动端协作画布解锁使用抓手，手动选择工具后远端更�
   const owner = await account(browser, baseURL!);
 
   // These regressions target the collaboration wrapper, not lazy activation.
-  await call(owner.context, baseURL!, owner.id, "access");
+  await activate(owner.context, baseURL!, owner.id);
   const other = await browser.newContext({ baseURL });
   let releaseView!: () => void;
   const viewGate = new Promise<void>((resolve) => {
@@ -1171,7 +1198,7 @@ test("协作箭头高亮开关即时生效并持久化，不改变共享元素�
 }, testInfo) => {
   const owner = await account(browser, baseURL!);
 
-  await call(owner.context, baseURL!, owner.id, "access");
+  await activate(owner.context, baseURL!, owner.id);
   const guestContext = await browser.newContext({
     baseURL,
     viewport: { width: 1440, height: 900 },
@@ -1273,7 +1300,7 @@ test("协作编辑器即时应用 Ctrl 多选开关，独立选择不写入共�
   const owner = await account(browser, baseURL!);
 
   // These regressions target the collaboration wrapper, not lazy activation.
-  await call(owner.context, baseURL!, owner.id, "access");
+  await activate(owner.context, baseURL!, owner.id);
   const guestContext = await browser.newContext({
     baseURL,
     viewport: { width: 1440, height: 900 },
@@ -1478,6 +1505,7 @@ test("富文本会话在远端胜出/删除及撤权时结束，恢复副本生�
   const first = await owner.context.newPage();
 
   try {
+    await activate(owner.context, baseURL!, owner.id);
     await open(first, `/c/${owner.id}`, true);
     await first.getByTestId("toolbar-text").first().click();
     await first.mouse.click(700, 350);
@@ -1747,6 +1775,7 @@ for (const failure of ["QuotaExceededError", "SecurityError"]) {
     const page = await owner.context.newPage();
 
     try {
+      await activate(owner.context, baseURL!, owner.id);
       await open(page, `/c/${owner.id}`, true);
       await page.getByTestId("toolbar-text").first().click();
       await page.mouse.click(700, 350);
@@ -2055,13 +2084,13 @@ test("存量房间单人无需WS，独立同账号浏览器计两方且WS不可�
   let sockets = 0;
 
   try {
-    await call(owner.context, baseURL!, owner.id, "manage");
+    await activate(owner.context, baseURL!, owner.id);
     await first.routeWebSocket("**/realtime", (socket) => {
       sockets++;
       socket.close();
     });
     await open(first, "/", true);
-    await expect(first.locator(".presence-state")).toHaveText(/1 个会话在线/);
+    await expect(first.locator(".presence-state")).toHaveText(/独自编辑.*休眠/);
     expect(sockets).toBe(0);
     await draw(first, 650);
     await expect(
@@ -2082,8 +2111,12 @@ test("存量房间单人无需WS，独立同账号浏览器计两方且WS不可�
     await expect
       .poll(() => editorState(second).then((state) => state.viewModeEnabled))
       .toBe(false);
-    await expect(first.locator(".presence-state")).toHaveText(/2 个会话在线/);
-    await expect(second.locator(".presence-state")).toHaveText(/2 个会话在线/);
+    await expect(first.locator(".presence-state")).toHaveText(
+      /2 个会话.*实时协作/,
+    );
+    await expect(second.locator(".presence-state")).toHaveText(
+      /2 个会话.*实时协作/,
+    );
     await draw(second, 950);
     await expect(
       second.getByRole("status").filter({ hasText: /^已保存/ }),
@@ -2096,7 +2129,7 @@ test("存量房间单人无需WS，独立同账号浏览器计两方且WS不可�
       .toBe(false);
     expect(sockets).toBeGreaterThan(0);
     await second.close();
-    await expect(first.locator(".presence-state")).toHaveText(/1 个会话在线/);
+    await expect(first.locator(".presence-state")).toHaveText(/独自编辑.*休眠/);
     await draw(first, 1100);
     await expect(
       first.getByRole("status").filter({ hasText: /^已保存$/ }),
@@ -2118,23 +2151,29 @@ test("同浏览器克隆标签页独立计数，刷新保留同一参与身份",
   const first = await owner.context.newPage();
 
   try {
-    await call(owner.context, baseURL!, owner.id, "manage");
+    await activate(owner.context, baseURL!, owner.id);
     await open(first, "/", true);
     const popup = first.waitForEvent("popup");
 
     await first.evaluate(() => window.open("/", "_blank"));
     const second = await popup;
 
-    await expect(second.locator(".presence-state")).toHaveText(/2 个会话在线/);
-    await expect(first.locator(".presence-state")).toHaveText(/2 个会话在线/);
+    await expect(second.locator(".presence-state")).toHaveText(
+      /2 个会话.*实时协作/,
+    );
+    await expect(first.locator(".presence-state")).toHaveText(
+      /2 个会话.*实时协作/,
+    );
     await second.reload();
-    await expect(second.locator(".presence-state")).toHaveText(/2 个会话在线/);
+    await expect(second.locator(".presence-state")).toHaveText(
+      /2 个会话.*实时协作/,
+    );
     await draw(second, 850);
     await expect
       .poll(() => editorState(first).then((state) => state.elements.length))
       .toBe(1);
     await second.close();
-    await expect(first.locator(".presence-state")).toHaveText(/1 个会话在线/);
+    await expect(first.locator(".presence-state")).toHaveText(/独自编辑.*休眠/);
   } finally {
     await owner.context.close();
   }
@@ -2149,7 +2188,7 @@ test("WebSocket传输凭证ERROR后HTTP权限仍有效，编辑和保存继续�
   let injected = false;
 
   try {
-    await call(owner.context, baseURL!, owner.id, "manage");
+    await activate(owner.context, baseURL!, owner.id);
     // A second authorized tab lease creates demand without needing another UI.
     await call(owner.context, baseURL!, owner.id, "presence", {
       clientId: "transport-error-peer",
@@ -2218,7 +2257,7 @@ test("WebSocket保持OPEN但无READY时重试，HTTP编辑仍保存", async ({
         .then((value) => diagnostics.push(value));
   });
   try {
-    await call(owner.context, baseURL!, owner.id, "manage");
+    await activate(owner.context, baseURL!, owner.id);
     await call(owner.context, baseURL!, owner.id, "presence", {
       clientId: "silent-realtime-peer",
     });
@@ -2280,6 +2319,7 @@ test("v2 Markdown 块结构同步与重载保留，v1 客户端不能剥离已�
   try {
     const first = await owner.context.newPage();
 
+    await activate(owner.context, baseURL!, owner.id);
     await open(first, `/c/${owner.id}`, true);
     const link = await call(owner.context, baseURL!, owner.id, "links", {
       role: "editor",
@@ -2384,6 +2424,122 @@ test("v2 Markdown 块结构同步与重载保留，v1 客户端不能剥离已�
       .toEqual(text.richText);
   } finally {
     await guest.close();
+    await owner.context.close();
+  }
+});
+
+test("owner legacy直达精确定位且分享面板无建房副作用，窄屏显示未启用", async ({
+  browser,
+  baseURL,
+}, testInfo) => {
+  const owner = await account(browser, baseURL!);
+  const page = await owner.context.newPage();
+
+  try {
+    const original = (
+      await (
+        await owner.context.request.get(`/api/canvases/${owner.id}`)
+      ).json()
+    ).canvas;
+    const catalog = await (
+      await owner.context.request.get(
+        `/api/workspaces/${original.workspaceId}/canvases`,
+      )
+    ).json();
+    const created = await owner.context.request.post(
+      `/api/workspaces/${original.workspaceId}/canvases`,
+      {
+        headers: { Origin: baseURL!, "X-Requested-With": "excalidraw-demo" },
+        data: {
+          name: "非目标最近画布",
+          catalogRevision: catalog.catalogRevision,
+        },
+      },
+    );
+
+    expect(created.status()).toBe(200);
+    const other = (await created.json()).canvas;
+    const presence: string[] = [];
+    let activationReads = 0;
+
+    page.on("request", (request) => {
+      if (request.url().endsWith("/presence")) presence.push(request.url());
+      if (/collaboration\/(access|view|ticket)$/.test(request.url()))
+        activationReads++;
+    });
+    await open(page, `/c/${owner.id}`, true);
+    await expect(page).toHaveURL(new RegExp(`canvas=${owner.id}`));
+    await expect(page.locator(".presence-state .realtime-full")).toHaveText(
+      "独自编辑 · 实时协作未启用",
+    );
+    expect(presence.some((url) => url.includes(other.id))).toBe(false);
+    expect(activationReads).toBe(0);
+    await page.getByRole("button", { name: "分享", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "分享画布" })).toBeVisible();
+    expect(
+      (
+        await (
+          await owner.context.request.get(`/api/canvases/${owner.id}`)
+        ).json()
+      ).canvas.syncMode,
+    ).toBe("legacy");
+    expect(activationReads).toBe(0);
+    await page.getByRole("button", { name: "关闭分享", exact: true }).click();
+    await page.screenshot({ path: testInfo.outputPath("solo-desktop.png") });
+    await page.setViewportSize({ width: 375, height: 812 });
+    const collapseSidebar = page.getByRole("button", {
+      name: "收起侧边栏",
+      exact: true,
+    });
+
+    if (await collapseSidebar.isVisible()) await collapseSidebar.click();
+    await expect(page.locator(".presence-state")).toBeInViewport();
+    expect(
+      await page.locator(".presence-state").evaluate((node) => {
+        const box = node.getBoundingClientRect();
+
+        return node.contains(
+          document.elementFromPoint(
+            box.x + box.width / 2,
+            box.y + box.height / 2,
+          ),
+        );
+      }),
+    ).toBe(true);
+    await expect(
+      page.locator(".presence-state .realtime-compact"),
+    ).toBeVisible();
+    await expect(page.locator(".presence-state .realtime-compact")).toHaveText(
+      "未启用",
+    );
+    const box = await page.locator(".presence-state").boundingBox();
+
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(375);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(375);
+    await page.screenshot({ path: testInfo.outputPath("solo-mobile.png") });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.getByRole("button", { name: "分享", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "分享画布" });
+
+    await dialog.getByRole("button", { name: "分享链接", exact: true }).click();
+    await dialog.getByRole("button", { name: "生成链接" }).click();
+    const link = dialog.getByLabel("新分享链接");
+
+    await expect(link).toHaveValue(/\/share\/.*#/);
+    const secretLink = await link.inputValue();
+
+    await expect(page.locator(".presence-state .realtime-full")).toHaveText(
+      /独自编辑.*休眠/,
+    );
+    await expect(dialog).toBeVisible();
+    await expect(link).toHaveValue(secretLink);
+    await expect(
+      dialog.getByRole("button", { name: "复制链接", exact: true }),
+    ).toBeVisible();
+  } finally {
     await owner.context.close();
   }
 });

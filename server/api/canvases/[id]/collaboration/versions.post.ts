@@ -1,7 +1,11 @@
 import { defineApiHandler, resourceId } from "#server/utils/api";
 import { body, json, name, fail } from "#server/utils/http";
 import { apiRequest } from "#server/utils/request";
-import { canvasCommand } from "#server/collaboration/service";
+import {
+  canvasCommand,
+  ensureRoom,
+  principal,
+} from "#server/collaboration/service";
 
 import { blob } from "@nuxthub/blob";
 import type { CanvasView, PublishedVersion } from "#shared/collaboration/types";
@@ -21,6 +25,7 @@ export default defineApiHandler(async (event) => {
   const prior = manage.versions.find((version) => version.id === data.id);
 
   if (prior) return json({ id: prior.id, seq: prior.seq });
+  await ensureRoom(event, id, await principal(event));
   const view = await canvasCommand<CanvasView>(event, id, { type: "view" });
   const sceneKey = `collaboration/${id}/versions/${crypto.randomUUID()}.json`;
 

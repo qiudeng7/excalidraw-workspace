@@ -235,3 +235,38 @@ test("late account workspace lists cannot publish after reset and a new account 
     fixture.document.reset();
   }
 });
+
+test("explicit canvas navigation bypasses recent tabs and fails closed on a disappearing target", async () => {
+  const fixture = directoryFixture();
+
+  try {
+    await fixture.directory.loadWorkspaces();
+    assert.equal(fixture.document.document.value?.id, "first");
+    await fixture.directory.loadWorkspaces({
+      workspaceId: workspace.id,
+      canvasId: "second",
+    });
+    assert.equal(fixture.document.document.value?.id, "second");
+    fixture.document.reset();
+    let reads = 0;
+
+    fixture.api.readCatalog = async () => ({
+      canvases:
+        ++reads === 1
+          ? [canvas("first", 0), canvas("second", 1)]
+          : [canvas("first", 0)],
+      catalogRevision: reads,
+    });
+    await assert.rejects(
+      fixture.directory.loadWorkspaces({
+        workspaceId: workspace.id,
+        canvasId: "second",
+      }),
+      /目标画布不可访问/,
+    );
+    assert.equal(fixture.document.document.value, undefined);
+    assert.equal(reads, 2);
+  } finally {
+    fixture.document.reset();
+  }
+});

@@ -1,4 +1,4 @@
-import { onBeforeUnmount, watch } from "vue";
+import { onBeforeUnmount, watch, ref, readonly } from "vue";
 import { api } from "~/lib/api";
 import { enqueueCanvasPresence } from "~/lib/canvasPresence";
 import { getTabScope } from "~/lib/persistence";
@@ -9,6 +9,7 @@ export function useCanvasPresence(
   upgrade: (id: string) => Promise<void>,
   reportError: (message: string) => void,
 ) {
+  const status = ref("实时协作 · 状态待确认");
   const client = getTabScope();
   let generation = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -73,12 +74,18 @@ export function useCanvasPresence(
         return;
       }
 
+      status.value =
+        result.syncMode === "legacy"
+          ? "独自编辑 · 实时协作未启用"
+          : "实时协作 · 正在启用";
       if (result.syncMode !== "legacy") await upgrade(value.id);
     } catch (error) {
-      if (ownGeneration === generation)
+      if (ownGeneration === generation) {
+        status.value = "实时协作 · 状态待确认";
         reportError(
           error instanceof Error ? error.message : "画布会话检查失败",
         );
+      }
     } finally {
       pending = false;
       if (current && current.mode !== "collaborative")
@@ -97,6 +104,7 @@ export function useCanvasPresence(
     },
     () => {
       generation++;
+      status.value = "实时协作 · 状态待确认";
       clearTimeout(timer);
       const previous = current;
 
@@ -124,6 +132,7 @@ export function useCanvasPresence(
       return;
     const value = current;
 
+    status.value = "实时协作 · 状态待确认";
     // Returning after suspension/expiry validates the canvas behind its normal
     // read-only guard before allowing another edit or renewing its open lease.
     void upgrade(value.id)
@@ -153,4 +162,6 @@ export function useCanvasPresence(
     window.removeEventListener("online", visible);
     document.removeEventListener("visibilitychange", visible);
   });
+
+  return readonly(status);
 }

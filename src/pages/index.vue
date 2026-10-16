@@ -14,6 +14,7 @@ import {
   hasUnsyncedCollaboration,
 } from "~/lib/collaboration/session";
 import { api } from "~/lib/api";
+import { compactRealtimeStatus } from "~/lib/collaboration/status";
 import { accountApi } from "~/lib/accountApi";
 import type { CanvasResource } from "~/lib/canvasResources";
 import { workspaceApi } from "~/lib/workspaceApi";
@@ -54,9 +55,10 @@ const saveBarrier = {
 const settingsOpen = ref(false);
 const recycleOpen = ref(false);
 const shareOpen = ref(false);
+const shareCanvasId = ref("");
 const shareButton = ref<HTMLButtonElement>();
-const onlineCount = ref(0),
-  onlineLabel = ref("");
+const onlineLabel = ref("");
+const realtimeState = ref("实时协作 · 状态待确认");
 const collaborationStatus = ref("正在连接协作…");
 const sharedOpen = ref(false);
 const sharedLoading = ref(false);
@@ -173,7 +175,17 @@ reorderSlot.value = reordering;
 account = useAccountSession({
   api: accountApi,
   editor: saveBarrier,
-  loadWorkspaces: directory.loadWorkspaces,
+  loadWorkspaces: async () => {
+    const query = new URLSearchParams(window.location.search);
+    const workspace = query.get("workspace");
+    const canvas = query.get("canvas");
+
+    await directory.loadWorkspaces(
+      workspace && canvas
+        ? { workspaceId: workspace, canvasId: canvas }
+        : undefined,
+    );
+  },
   run,
   reportError: operation.reportError,
   clearWorkspace: () => {
@@ -198,7 +210,7 @@ const {
 const { document, current, resources, saveState, loadingCanvas } =
   canvasDocument;
 
-useCanvasPresence(
+const legacyRealtimeState = useCanvasPresence(
   () =>
     user.value && document.value
       ? {
@@ -393,9 +405,11 @@ function protectDrafts(event: BeforeUnloadEvent) {
 
 watch(
   () => document.value?.id,
-  () => {
-    shareOpen.value = false;
+  (id) => {
+    if (id && id !== shareCanvasId.value) shareOpen.value = false;
     collaborationStatus.value = "正在连接协作…";
+    realtimeState.value = "实时协作 · 状态待确认";
+    onlineLabel.value = "";
   },
 );
 
@@ -409,19 +423,12 @@ onBeforeUnmount(() => {
 
 async function openShare() {
   if (!document.value || !user.value) return;
-  await run(async () => {
-    await saveBarrier.flush();
-    // Sharing creates durable permissions, so this is an explicit activation.
-    await api(
-      `/api/canvases/${encodeURIComponent(document.value!.id)}/collaboration/access`,
-    );
-    await canvasDocument.loadCanvas(document.value!.id);
-    shareOpen.value = true;
-  });
+  shareCanvasId.value = document.value.id;
+  shareOpen.value = true;
 }
 
 async function flushForShare() {
-  await editor.value?.flush();
+  await saveBarrier.flush();
 }
 </script>
 
@@ -823,13 +830,19 @@ async function flushForShare() {
         />
         <div class="header-right">
           <span
-            v-if="isCollaborative && onlineCount"
+            v-if="document"
             class="save-state presence-state"
-            :title="onlineLabel"
-            ><QuietIcon name="users" :size="13" />{{
-              onlineCount
-            }}
-            个会话在线</span
+            aria-live="polite"
+            :aria-label="`实时协作状态：${isCollaborative ? realtimeState : legacyRealtimeState}`"
+            :title="`${isCollaborative ? realtimeState : legacyRealtimeState}${onlineLabel ? ' · ' + onlineLabel : ''}`"
+            ><QuietIcon name="users" :size="13" /><span class="realtime-full">{{
+              isCollaborative ? realtimeState : legacyRealtimeState
+            }}</span
+            ><span class="realtime-compact">{{
+              compactRealtimeStatus(
+                isCollaborative ? realtimeState : legacyRealtimeState,
+              )
+            }}</span></span
           >
           <span
             class="save-state"
@@ -948,9 +961,9 @@ async function flushForShare() {
             :user-settings="settingsResource.state.settings"
             :settings-open="settingsOpen || announcementOpen || shareOpen"
             @status="collaborationStatus = $event"
+            @realtime="realtimeState = $event"
             @participants="
               (count, label) => {
-                onlineCount = count;
                 onlineLabel = label;
               }
             "
@@ -1042,10 +1055,11 @@ async function flushForShare() {
       @failed="announcementFailed"
     />
     <CanvasSharePanel
-      v-if="shareOpen && document"
-      :canvas-id="document.id"
+      v-if="shareOpen && shareCanvasId"
+      :canvas-id="shareCanvasId"
       :user-id="user.id"
       :before-publish="flushForShare"
+      @activated="retryCurrentCanvas"
       :return-focus="shareButton"
       @close="shareOpen = false"
     />
@@ -1053,6 +1067,27 @@ async function flushForShare() {
 </template>
 
 <style scoped>
+.presence-state {
+  border: 1px solid var(--color-border, #d5d5db);
+  border-radius: 5px;
+  padding: 3px 6px;
+}
+.realtime-compact {
+  display: none;
+}
+@media (max-width: 760px) {
+  .presence-state.save-state {
+    max-width: none;
+    overflow: visible;
+    font-size: 10px;
+  }
+  .realtime-full {
+    display: none;
+  }
+  .realtime-compact {
+    display: inline;
+  }
+}
 .settings-notice {
   display: flex;
   align-items: center;

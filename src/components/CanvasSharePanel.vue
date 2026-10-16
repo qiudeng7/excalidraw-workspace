@@ -14,7 +14,7 @@ const props = defineProps<{
   beforePublish: () => Promise<void>;
   returnFocus?: HTMLElement;
 }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; activated: [] }>();
 const dialog = ref<HTMLDialogElement>();
 const members = ref<Member[]>([]);
 const links = ref<Omit<ShareLink, "secretHash">[]>([]);
@@ -120,11 +120,14 @@ function grant() {
 }
 
 async function invite() {
+  await props.beforePublish();
   await request("members", { ...grant(), email: email.value });
+  emit("activated");
   email.value = "";
 }
 
 async function createLink() {
+  await props.beforePublish();
   const data = await request<{ path: string }>("links", {
     ...grant(),
     requireLogin: requireLogin.value,
@@ -134,6 +137,7 @@ async function createLink() {
         : Date.now() + Number(expiry.value) * 86400000,
   });
 
+  emit("activated");
   createdLink.value = new URL(data.path, location.origin).href;
   copyFeedback.value = "";
 }
@@ -146,6 +150,7 @@ async function publish() {
     label: label.value || new Date().toLocaleString(),
   });
 
+  emit("activated");
   snapshotId.value = data.id;
   publishId = "";
   label.value = "";
