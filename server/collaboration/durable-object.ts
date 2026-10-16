@@ -79,7 +79,7 @@ export class CanvasRoom extends Server<Environment> {
 
       if (
         stored &&
-        ["access", "view", "manage", "backup", "projection"].includes(
+        ["access", "status", "view", "manage", "backup", "projection"].includes(
           command.type,
         )
       )

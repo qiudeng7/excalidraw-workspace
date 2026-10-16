@@ -93,6 +93,12 @@ async function fixture() {
       baseSeq,
       elements,
     });
+
+  assert.equal(
+    (await call("links", "POST", { role: "viewer", requireLogin: true }))
+      .status,
+    200,
+  );
   const view: CanvasView = await (await call("view")).json();
 
   assert.ok(view.epoch, JSON.stringify(view));
@@ -470,9 +476,9 @@ test("an in-flight legacy PUT cannot publish after room migration freezes the so
 
     while (!blocked) await setImmediate();
     const migrated = await f.request(
-      `/canvases/${id}/collaboration/view`,
-      "GET",
-      undefined,
+      `/canvases/${id}/collaboration/links`,
+      "POST",
+      { role: "viewer", requireLogin: true },
       f.cookie,
     );
 

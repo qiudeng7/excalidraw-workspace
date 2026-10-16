@@ -143,6 +143,7 @@ export function view(room: RoomState, access: Access, now: number): CanvasView {
 export type Command =
   | { type: "view" }
   | { type: "access" }
+  | { type: "status" }
   | { type: "update"; operation: Operation; digest: string }
   | { type: "asset"; file: FileReference }
   | { type: "manage" }
@@ -320,6 +321,20 @@ export function execute(
   switch (command.type) {
     case "access":
       return access;
+    case "status": {
+      const source =
+        access.viewMode === "fixed"
+          ? room.versions.find((version) => version.id === access.snapshotId)!
+          : room;
+
+      return {
+        access,
+        epoch: source.epoch,
+        seq: source.seq,
+        name: source.name,
+      };
+    }
+
     case "view":
       return view(room, access, now);
     case "ticket": {

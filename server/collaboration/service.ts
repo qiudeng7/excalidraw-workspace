@@ -175,7 +175,26 @@ export async function canvasCommand<T>(
 ): Promise<T> {
   const actor = await principal(event);
 
-  await ensureRoom(event, id, actor);
+  const createsRoom = ["member", "link", "publish"].includes(command.type);
+
+  if (createsRoom) await ensureRoom(event, id, actor);
+  else {
+    const row = await canvasRow(id);
+
+    if (!row) return fail(404, "NOT_FOUND", "画布不存在");
+    if (row.deleting || row.workspaceDeletedAt || row.canvas.deletedAt)
+      return fail(410, "CANVAS_DELETED", "画布已删除");
+    if (row.canvas.syncMode === "preparing") await ensureRoom(event, id, actor);
+    else if (row.canvas.syncMode === "legacy") {
+      // An empty management view is still owner-only, never a capability upgrade.
+      if (actor.userId !== row.ownerId || actor.capabilityHash)
+        return fail(404, "NOT_FOUND", "画布不存在");
+      if (command.type === "manage" && row.canvas.syncMode === "legacy")
+        return { members: [], links: [], versions: [], accessRevision: 0 } as T;
+
+      return fail(409, "ROOM_NOT_ACTIVE", "请从工作空间打开画布");
+    }
+  }
 
   return roomCommand<T>(event, id, actor, command);
 }
