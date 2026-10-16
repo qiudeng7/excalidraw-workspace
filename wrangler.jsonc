@@ -39,4 +39,34 @@
   "vars": {
     "PUBLIC_ORIGIN": "https://excalidraw-workspace.qiudeng.workers.dev",
   },
+  "env": {
+    "preview": {
+      "name": "excalidraw-workspace-preview",
+      "workers_dev": true,
+      "preview_urls": false,
+      "routes": [],
+      "vars": {
+        "PUBLIC_ORIGIN": "https://excalidraw-workspace-preview.qiudeng.workers.dev",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "excalidraw-workspace-preview",
+          "database_id": "0e50ab96-a2b9-42bc-832b-de6c51399c6c",
+          "migrations_dir": "server/db/migrations/sqlite",
+          "migrations_table": "d1_migrations",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "BLOB",
+          "bucket_name": "excalidraw-workspace-preview-data",
+        },
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "CANVAS_ROOMS", "class_name": "CanvasRoom" }],
+      },
+      "triggers": { "crons": ["0 * * * *"] },
+    },
+  },
 }

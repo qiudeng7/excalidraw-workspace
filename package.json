@@ -10,6 +10,8 @@
     "build:editor": "pnpm --filter @excalidraw/excalidraw build",
     "start:node": "node .output/server/start.mjs",
     "deploy": "pnpm build && pnpm db:migrate:remote && wrangler deploy --config wrangler.jsonc",
+    "deploy:preview": "node scripts/deploy-preview.mjs",
+    "db:migrate:preview": "wrangler d1 migrations apply DB --remote --env preview --config wrangler.jsonc",
     "db:generate": "nuxt db generate",
     "db:migrate": "nuxt db migrate",
     "db:migrate:local": "wrangler d1 migrations apply DB --config wrangler.jsonc --local",

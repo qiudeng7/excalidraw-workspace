@@ -24,6 +24,14 @@
 
 合入 `dev` 表示改动进入下一批候选发布，不为每个任务单独发布版本或向用户弹出公告。发布时机和范围由用户决定，不以提交数量自动触发。
 
+## preview 固定验收站
+
+`dev` 集成提交可部署到独立持久的 Cloudflare preview 验收站，不等同于生产发布，也不使用临时 Previews。环境 URL、资源和初始化要求以[持久 preview 验收环境](../deployment.md#持久-preview-验收环境)为准；生产仍从 `main` 发布。
+
+部署者在独立 worktree 安装依赖，先执行 `pnpm run deploy:preview --dry-run` 检查本地产物。真实部署前确认改动已合入 `dev`，部署 worktree 干净且 `HEAD` 等于本地 `refs/heads/dev`，再执行 `pnpm run deploy:preview`；允许 detached checkout 到同一提交。不要在运行本地预览的 worktree 构建 Cloudflare 产物，以免覆盖它的生成目录。
+
+部署与验收由获授权的主 agent 或维护者执行，subagent 的本地构建和 dry-run 不代表远端已更新。Git push 不自动触发 preview 或生产部署；首次管理员由用户自行注册，不由部署脚本创建。preview 验收通过后仍按下面的批量发布流程准备正式版本。
+
 ## 批量发布
 
 发布以用户确认的一批 `dev` 改动为范围，按以下顺序完成：
