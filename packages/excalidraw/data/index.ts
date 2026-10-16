@@ -28,6 +28,10 @@ import {
 } from "../clipboard";
 
 import { t } from "../i18n";
+import {
+  beginClipboardOperation,
+  isCurrentClipboardOperation,
+} from "../smartClipboard";
 import { getSelectedElements, isSomeElementSelected } from "../scene";
 import { exportToCanvas, exportToSvg } from "../scene/export";
 
@@ -119,6 +123,9 @@ export const exportCanvas = async (
     exportingFrame: NonDeleted<ExcalidrawFrameLikeElement> | null;
   },
 ) => {
+  const svgClipboardToken =
+    type === "clipboard-svg" ? beginClipboardOperation() : undefined;
+
   if (elements.length === 0) {
     throw new Error(t("alerts.cannotExportEmptyCanvas"));
   }
@@ -157,6 +164,12 @@ export const exportCanvas = async (
       );
     } else if (type === "clipboard-svg") {
       const svg = await svgPromise.then((svg) => svg.outerHTML);
+
+      if (
+        svgClipboardToken !== undefined &&
+        !isCurrentClipboardOperation(svgClipboardToken)
+      )
+        return;
 
       try {
         await copyTextToSystemClipboard(svg);

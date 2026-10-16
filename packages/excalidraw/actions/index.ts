@@ -77,6 +77,7 @@ export { actionFlipHorizontal, actionFlipVertical } from "./actionFlip";
 
 export {
   actionCopy,
+  actionCopyCompatible,
   actionCut,
   actionCopyAsPng,
   actionCopyAsSvg,

@@ -306,6 +306,7 @@ import {
   actionBringForward,
   actionBringToFront,
   actionCopy,
+  actionCopyCompatible,
   actionCopyAsPng,
   actionCopyAsSvg,
   copyText,
@@ -426,6 +427,7 @@ import { LaserTrails } from "../laserTrails";
 import { withBatchedUpdates, withBatchedUpdatesThrottled } from "../reactUtils";
 import { isPointHittingTextAutoResizeHandle } from "../textAutoResizeHandle";
 import { textWysiwyg } from "../wysiwyg/textWysiwyg";
+import { beginClipboardOperation } from "../smartClipboard";
 import { isOverScrollBars } from "../scene/scrollbars";
 import { isMaybeMermaidDefinition } from "../mermaid";
 import { LassoTrail } from "../lasso";
@@ -4860,7 +4862,18 @@ class App extends React.Component<AppProps, AppState> {
       this.ownerDocument.activeElement,
     );
 
-    if (!isExcalidrawActive || isWritableElement(event.target)) {
+    if (!isExcalidrawActive) return;
+    if (
+      event.defaultPrevented ||
+      this.state.editingTextElement ||
+      isWritableElement(event.target) ||
+      (event.target instanceof this.ownerWindow.HTMLElement &&
+        event.target.isContentEditable)
+    ) {
+      // Respect PM's consumed event, including events targeted at nested marks.
+      // Native character copies supersede an in-flight scene copy without changing PM behavior.
+      beginClipboardOperation();
+
       return;
     }
 
@@ -4878,7 +4891,18 @@ class App extends React.Component<AppProps, AppState> {
       this.ownerDocument.activeElement,
     );
 
-    if (!isExcalidrawActive || isWritableElement(event.target)) {
+    if (!isExcalidrawActive) return;
+    if (
+      event.defaultPrevented ||
+      this.state.editingTextElement ||
+      isWritableElement(event.target) ||
+      (event.target instanceof this.ownerWindow.HTMLElement &&
+        event.target.isContentEditable)
+    ) {
+      // Respect PM's consumed event, including events targeted at nested marks.
+      // Native character copies supersede an in-flight scene copy without changing PM behavior.
+      beginClipboardOperation();
+
       return;
     }
 
@@ -5210,7 +5234,12 @@ class App extends React.Component<AppProps, AppState> {
       }
 
       if (this.props.syncReadOnly) return;
-      await this.insertClipboardContent(data, filesList, isPlainPaste);
+      // A native element payload is authoritative; PNG is only another representation.
+      await this.insertClipboardContent(
+        data,
+        data.nativePayload ? [] : filesList,
+        isPlainPaste,
+      );
 
       this.setActiveTool(
         { type: this.state.preferredSelectionTool.type },
@@ -14615,7 +14644,7 @@ class App extends React.Component<AppProps, AppState> {
     options.push(copyText);
 
     if (this.state.viewModeEnabled) {
-      return [actionCopy, ...options];
+      return [actionCopy, actionCopyCompatible, ...options];
     }
 
     const zIndexActions: ContextMenuItems =
@@ -14633,6 +14662,7 @@ class App extends React.Component<AppProps, AppState> {
       CONTEXT_MENU_SEPARATOR,
       actionCut,
       actionCopy,
+      actionCopyCompatible,
       actionPaste,
       CONTEXT_MENU_SEPARATOR,
       actionSelectAllElementsInFrame,

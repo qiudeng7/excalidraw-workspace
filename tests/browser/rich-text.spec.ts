@@ -1,4 +1,5 @@
 import { test, expect, editorState } from "./fixtures";
+import { readNativeClipboardHTML } from "../../packages/excalidraw/smartClipboard";
 
 test("Markdown shortcuts edit formatted text and retain it across Canvas, SVG and re-entry", async ({
   page,
@@ -194,13 +195,23 @@ test("bound rich text wraps, IME commits normally, and whole-element clipboard/l
   expect(text.originalText).toBe(
     "中文 bound formatted text continues over several lines",
   );
+  await page.evaluate(() => navigator.clipboard.writeText("copy-sentinel"));
   await page.keyboard.press("ControlOrMeta+c");
-  const copied = JSON.parse(
-    await page.evaluate(() => navigator.clipboard.readText()),
-  );
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe(text.originalText);
+  const html = await page.evaluate(async () => {
+    for (const item of await navigator.clipboard.read()) {
+      if (item.types.includes("text/html"))
+        return (await item.getType("text/html")).text();
+    }
+
+    return "";
+  });
+  const copied = readNativeClipboardHTML(html);
 
   expect(
-    copied.elements.find((element: any) => element.type === "text").richText,
+    copied?.elements.find((element) => element.type === "text")?.richText,
   ).toEqual(text.richText);
   await page.keyboard.press("ControlOrMeta+v");
   await expect

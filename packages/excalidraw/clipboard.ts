@@ -27,6 +27,37 @@ import type {
 } from "@excalidraw/element/types";
 
 import { ExcalidrawError } from "./errors";
+import { restoreElements } from "./data/restore";
+
+export const isRestorableClipboardSelection = (
+  elements: readonly ExcalidrawElement[],
+) => {
+  try {
+    const restored = restoreElements(structuredClone(elements), null, {
+      deleteInvisibleElements: true,
+    });
+    const retained = new Set(
+      restored
+        .filter((element) => !element.isDeleted)
+        .map((element) => element.id),
+    );
+
+    return (
+      retained.size === elements.length &&
+      elements.every((element) => retained.has(element.id))
+    );
+  } catch (error) {
+    console.warn("Native clipboard restoration preflight failed", error);
+
+    return false;
+  }
+};
+
+import {
+  beginClipboardOperation,
+  isCurrentClipboardOperation,
+  readNativeClipboardHTML,
+} from "./smartClipboard";
 import {
   createFile,
   getFileHandle,
@@ -51,6 +82,8 @@ export interface ClipboardData {
   mixedContent?: PastedMixedContent;
   errorMessage?: string;
   programmaticAPI?: boolean;
+  /** Native payload must win over an accompanying preview file. */
+  nativePayload?: boolean;
 }
 
 type AllowedPasteMimeTypes = (typeof ALLOWED_PASTE_MIME_TYPES)[number];
@@ -204,6 +237,7 @@ export const copyToClipboard = async (
   /** supply if available to make the operation more certain to succeed */
   clipboardEvent?: ClipboardEvent | null,
 ) => {
+  beginClipboardOperation();
   const json = serializeAsClipboardJSON({ elements, files });
 
   await copyTextToSystemClipboard(
@@ -547,6 +581,48 @@ export const parseClipboard = async (
   dataList: ParsedDataTranferList,
   isPlainPaste = false,
 ): Promise<ClipboardData> => {
+  const native = readNativeClipboardHTML(
+    dataList.getData(MIME_TYPES.html) || "",
+  );
+
+  if (native && isRestorableClipboardSelection(native.elements)) {
+    if (isPlainPaste)
+      return {
+        text: dataList.getData(MIME_TYPES.text) || "",
+        nativePayload: true,
+      };
+
+    return {
+      elements: native.elements,
+      files: native.files,
+      nativePayload: true,
+    };
+  }
+
+  // A legacy JSON representation also wins over unrelated HTML and preview files.
+  try {
+    const legacy = JSON.parse(dataList.getData(MIME_TYPES.text) || "");
+    const programmaticAPI =
+      legacy.type === EXPORT_DATA_TYPES.excalidrawClipboardWithAPI;
+
+    if (clipboardContainsElements(legacy)) {
+      return {
+        elements: legacy.elements,
+        files: legacy.files,
+        nativePayload: true,
+        text: isPlainPaste
+          ? JSON.stringify(legacy.elements, null, 2)
+          : undefined,
+        programmaticAPI,
+      };
+    }
+  } catch (error) {
+    console.debug(
+      "Plain clipboard data is not legacy JSON; using external paste",
+      error,
+    );
+  }
+
   const parsedEventData = await parseClipboardEventTextData(
     dataList,
     isPlainPaste,
@@ -584,6 +660,14 @@ export const parseClipboard = async (
 };
 
 export const copyBlobToClipboardAsPng = async (blob: Blob | Promise<Blob>) => {
+  const token = beginClipboardOperation();
+
+  blob = Promise.resolve(blob).then((value) => {
+    if (!isCurrentClipboardOperation(token))
+      throw new Error("复制已被后续操作取代。");
+
+    return value;
+  });
   try {
     // in Safari so far we need to construct the ClipboardItem synchronously
     // (i.e. in the same tick) otherwise browser will complain for lack of
@@ -601,7 +685,7 @@ export const copyBlobToClipboardAsPng = async (blob: Blob | Promise<Blob>) => {
   } catch (error: any) {
     // if we're using a Promise ClipboardItem, let's try constructing
     // with resolution value instead
-    if (isPromiseLike(blob)) {
+    if (isPromiseLike(blob) && isCurrentClipboardOperation(token)) {
       await navigator.clipboard.write([
         new ClipboardItem({
           [MIME_TYPES.png]: await blob,

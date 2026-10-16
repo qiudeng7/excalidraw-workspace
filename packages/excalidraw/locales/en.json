@@ -14,6 +14,8 @@
     "moveCanvas": "Move canvas",
     "cut": "Cut",
     "copy": "Copy",
+    "smartCopy": "Smart copy",
+    "copyCompatible": "Copy original Excalidraw data (compatible)",
     "copyAsPng": "Copy to clipboard as PNG",
     "copyAsSvg": "Copy to clipboard as SVG",
     "copyText": "Copy to clipboard as text",

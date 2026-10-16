@@ -58,7 +58,7 @@ pnpm --filter @excalidraw/excalidraw build:watch
 | React 18 类型兼容 | [TTDPreviewPanel.tsx](components/TTDDialog/TTDPreviewPanel.tsx)、[common.ts](components/TTDDialog/common.ts)、[useMermaidRenderer.ts](components/TTDDialog/hooks/useMermaidRenderer.ts) | 调整 RefObject 泛型以匹配 React 18；引用仍允许为空，不改变运行行为 |
 | 快捷键提示 | [actions/shortcuts.ts](actions/shortcuts.ts)、[components/HelpDialog.tsx](components/HelpDialog.tsx) | 菜单及帮助同步显示新快捷键 |
 
-普通 `Ctrl+C` / `Cmd+C` 仍复制可编辑元素，旧 `Shift+Alt+C` 不再复制 PNG。剪贴板图片写入仍受浏览器权限和安全上下文限制。
+普通 `Ctrl+C` / `Cmd+C` 智能复制人类文字、文档流图文及本项目可编辑元素；右键与命令面板的「原始 Excalidraw 兼容复制」保留旧 JSON 协议。`Ctrl+Shift+C` / `Cmd+Shift+C` 仍复制 PNG，旧 `Shift+Alt+C` 不复制 PNG。图文组织、权限与兼容边界见[导入导出与复制](../../docs/development/editor.md#导入导出与复制)。
 
 画布、SVG、PNG 和复制 PNG 使用同一份实例短头配置。`shortArrowheads` 通过渲染上下文传入几何生成，shape 和位图缓存也按该选项区分；切换时已有箭头重绘，不改元素、连线位置或场景版本。`.excalidraw` JSON 不保存此用户设置，交给其他编辑器打开时按它自身规则显示。组件这两个功能属性默认关闭，宿主从账户配置显式传入项目默认开启值。
 
@@ -116,6 +116,8 @@ Nunito、规整线条、隐藏 “Excalidraw links” 及工具栏底部布局�
 构建通过后，分别在 Nuxt 开发页面和本地 Worker 提供的生产页面检查（启动方式见[本地启动](../../docs/development/local-development.md)）：新图形为规整线条、文字为 Nunito、箭头头部缩短；`Ctrl+C` 复制元素而 `Ctrl+Shift+C` 复制 PNG；外链菜单组隐藏，工具栏在底部且弹层向上展开。切换采样倍率后检查已有图形、新绘制图形及选择框位置，重登录或同账户换浏览器检查设置从服务端恢复；比较各倍率下复制 PNG 的尺寸，确认导出设置独立生效。修改渲染逻辑时还应比较 SVG/PNG 导出与画布外观。
 
 箭头选择高亮可运行 `PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs node packages/excalidraw/tests/arrowSelection.browser.mjs`（先构建编辑器）。该 [Chromium 回归](tests/arrowSelection.browser.mjs) 检查真实交互层像素、单选/多选和开关恢复、曲线与圆角折线、标签留白、旋转/缩放/采样、静态 drawable/位图缓存身份和导出不变；成功截图留在 `test-results/arrow-selection/`，供视觉审阅。宿主设置、重载与切换画布见 [arrow-selection.spec.ts](../../tests/browser/arrow-selection.spec.ts) 和 [canvas-cache.spec.ts](../../tests/browser/canvas-cache.spec.ts)，协作开关见 [collaboration.spec.ts](../../tests/browser/collaboration.spec.ts)。
+
+智能复制可运行 `CHROMIUM_PATH=/path/to/chrome node packages/excalidraw/tests/smartClipboard.browser.mjs`（先构建编辑器）。[该回归](tests/smartClipboard.browser.mjs) 在两个独立回环 origin 使用真实 `navigator.clipboard` 和键盘粘贴，检查普通文本、可编辑 HTML 图文、原生元素/引用文件恢复、PNG 快捷键及菜单入口；权限失败和异步时序另用明确替身验证。成功截图保留在 `test-results/smart-clipboard/`，不启动宿主预览或连接账户。纯数据与 writer 回归见 [smart-clipboard.test.ts](../../tests/unit/smart-clipboard.test.ts)，随 `pnpm test:unit` 运行。QQ、微信、Word 客户端仍需按平台单独验收。
 
 新增功能可以运行 [arrowFlags.browser.mjs](tests/arrowFlags.browser.mjs) 做独立 Chromium 检查。先执行 `pnpm build:editor`；测试会在临时目录构建页面、启动回环服务，不使用账户或后端，并阻止外部请求。Playwright 是可选测试工具，未加入产品依赖，可在独立目录安装：
 
