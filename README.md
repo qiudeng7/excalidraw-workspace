@@ -13,6 +13,7 @@
 
 <p>
   <a href="https://excalidraw-workspace.qiudeng.workers.dev/"><strong>在线使用</strong></a> ·
+  <a href="https://excalidraw-workspace-preview.qiudeng.workers.dev/">新功能测试版本</a>（账号和数据与正式站相互独立） ·
   <a href="docs/deployment.md#docker">Docker 部署</a> ·
   <a href="docs/deployment.md#cloudflare-workers">Cloudflare 部署</a> ·
   <a href="#目录">开发文档</a> ·
