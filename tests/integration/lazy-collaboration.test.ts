@@ -85,6 +85,7 @@ async function fixture() {
     request,
     presence,
     id,
+    workspaceId: spaces[0].id,
     owner,
     cookie,
     interceptBlob(value: typeof blob) {
@@ -109,7 +110,14 @@ const touchCount = async (...args: Parameters<typeof touchCanvasSession>) =>
   (await touchCanvasSession(...args)).participants;
 
 async function presenceState(response: Response) {
-  const { leaseExpiresAt, ...value } = await response.json();
+  const { leaseExpiresAt, access, epoch, seq, name, ...value } =
+    await response.json();
+
+  if (access !== undefined) {
+    assert.equal(typeof epoch, "string");
+    assert.ok(Number.isSafeInteger(seq));
+    assert.equal(typeof name, "string");
+  }
 
   if (leaseExpiresAt !== undefined)
     assert.ok(Number.isSafeInteger(leaseExpiresAt));
@@ -284,10 +292,21 @@ test("presence is owner-only while explicit sharing creates the required room", 
       404,
     );
     assert.deepEqual(await f.database.select().from(collaborationRooms), []);
+    const manage = await f.request(`/canvases/${f.id}/collaboration/manage`);
+
+    assert.equal(manage.status, 200);
+    assert.deepEqual(await manage.json(), {
+      members: [],
+      links: [],
+      versions: [],
+      accessRevision: 0,
+    });
+    assert.deepEqual(await f.database.select().from(collaborationRooms), []);
     assert.equal(
-      (await f.request(`/canvases/${f.id}/collaboration/manage`)).status,
-      200,
+      (await f.database.select().from(canvases))[0]!.syncMode,
+      "legacy",
     );
+    await activateRoom(f);
     assert.equal(
       (await f.database.select().from(collaborationRooms)).length,
       1,
@@ -359,7 +378,7 @@ test("an existing room remains a single participant until a second tab arrives, 
       participants: 1,
       realtime: false,
     });
-    await f.request(`/canvases/${f.id}/collaboration/manage`);
+    await activateRoom(f);
     const row = (
       await f.database.select().from(canvases).where(eq(canvases.id, f.id))
     )[0]!;
@@ -451,7 +470,7 @@ test("presence isolates identical tab IDs by authorized account and cannot leave
     // A delayed leave cannot initialize a legacy room.
     assert.equal((await presence(f.cookie, true)).status, 404);
     assert.deepEqual(await f.database.select().from(collaborationRooms), []);
-    await f.request(`/canvases/${f.id}/collaboration/manage`);
+    await activateRoom(f);
     assert.deepEqual(await presenceState(await presence(f.cookie)), {
       participants: 1,
       realtime: false,
@@ -615,7 +634,10 @@ test("renewed leases reject delayed leaves and account link context does not dup
       },
     );
 
-    assert.deepEqual(await left.json(), { participants: 0, realtime: false });
+    assert.deepEqual(await presenceState(left), {
+      participants: 0,
+      realtime: false,
+    });
     await withDatabase(f.database, async () => {
       const key = await canvasSessionKey(
         { principalId: `user:${f.owner.id}` },
@@ -630,6 +652,287 @@ test("renewed leases reject delayed leaves and account link context does not dup
       await leaveCanvasSession(f.id, key, second.leaseExpiresAt);
       assert.equal(await countCanvasSessions(f.id, 1_000), 0);
     });
+  } finally {
+    await f.close();
+  }
+});
+
+async function activateRoom(f: Awaited<ReturnType<typeof fixture>>) {
+  assert.equal(
+    (
+      await f.request(`/canvases/${f.id}/collaboration/links`, "POST", {
+        role: "viewer",
+        requireLogin: true,
+      })
+    ).status,
+    200,
+  );
+}
+
+test("legacy collaboration probes and owner location are read-only and do not disclose another owner's directory", async () => {
+  const f = await fixture();
+
+  try {
+    const registration = await f.request("/register", "POST", {
+      email: "probe-other@example.test",
+      password: "ProbeOtherPassword123!",
+    });
+    const otherCookie = registration.headers.get("set-cookie")!.split(";")[0]!;
+    const before = await f.database.select().from(canvases);
+    const original = f.blob;
+    let reads = 0;
+    let writes = 0;
+
+    f.interceptBlob({
+      ...original,
+      get: async (...args: Parameters<typeof original.get>) => {
+        reads++;
+
+        return original.get(...args);
+      },
+      put: async (...args: Parameters<typeof original.put>) => {
+        writes++;
+
+        return original.put(...args);
+      },
+    });
+    for (const route of ["access", "view", "backup", "manage"]) {
+      const owner = await f.request(`/canvases/${f.id}/collaboration/${route}`);
+
+      assert.equal(owner.status, route === "manage" ? 200 : 409);
+      for (const cookie of [otherCookie, ""]) {
+        const denied = await f.request(
+          `/canvases/${f.id}/collaboration/${route}`,
+          "GET",
+          undefined,
+          cookie,
+        );
+
+        assert.ok([401, 404].includes(denied.status));
+        assert.equal(
+          JSON.stringify(await denied.json()).includes(f.workspaceId),
+          false,
+        );
+      }
+    }
+
+    const location = await f.request(`/canvases/${f.id}/owner-location`);
+
+    assert.equal(location.status, 200);
+    assert.deepEqual(await location.json(), {
+      workspaceId: f.workspaceId,
+      canvasId: f.id,
+    });
+    for (const id of [f.id, "missing-canvas"]) {
+      const response = await f.request(
+        `/canvases/${id}/owner-location`,
+        "GET",
+        undefined,
+        otherCookie,
+      );
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), {});
+    }
+
+    assert.deepEqual(await f.database.select().from(canvases), before);
+    assert.deepEqual(await f.database.select().from(collaborationRooms), []);
+    assert.deepEqual(await f.database.select().from(canvasSessions), []);
+    assert.equal(reads, 0);
+    assert.equal(writes, 0);
+    await activateRoom(f);
+    assert.deepEqual(
+      await (await f.request(`/canvases/${f.id}/owner-location`)).json(),
+      {},
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("collaboration presence returns authorized lightweight watermarks without hydrating images or writing the room", async () => {
+  const f = await fixture();
+
+  try {
+    await activateRoom(f);
+    const image = {
+      id: "status-image",
+      mimeType: "image/png",
+      created: Date.now(),
+      dataURL: "data:image/png;base64,aGVsbG8=",
+    };
+
+    assert.equal(
+      (await f.request(`/canvases/${f.id}/collaboration/assets`, "POST", image))
+        .status,
+      200,
+    );
+    const initial = await (
+      await f.request(`/canvases/${f.id}/collaboration/view`)
+    ).json();
+
+    assert.equal(
+      (
+        await f.request(`/canvases/${f.id}/collaboration/update`, "POST", {
+          protocolVersion: 1,
+          epoch: initial.epoch,
+          clientId: a,
+          clientSeq: 1,
+          opId: "status-image-operation",
+          baseSeq: initial.seq,
+          elements: [
+            {
+              id: "status-image-element",
+              type: "image",
+              fileId: image.id,
+              x: 0,
+              y: 0,
+              width: 100,
+              height: 100,
+              angle: 0,
+              index: "a0",
+              version: 1,
+              versionNonce: 5,
+            },
+          ],
+        })
+      ).status,
+      200,
+    );
+    const view = await (
+      await f.request(`/canvases/${f.id}/collaboration/view`)
+    ).json();
+
+    assert.equal(view.scene.files[image.id].dataURL, image.dataURL);
+    const rooms = await f.database.select().from(collaborationRooms);
+    const original = f.blob;
+    let reads = 0;
+    let writes = 0;
+
+    f.interceptBlob({
+      ...original,
+      get: async (...args: Parameters<typeof original.get>) => {
+        reads++;
+
+        return original.get(...args);
+      },
+      put: async (...args: Parameters<typeof original.put>) => {
+        writes++;
+
+        return original.put(...args);
+      },
+    });
+    const response = await f.request(
+      `/canvases/${f.id}/collaboration/presence`,
+      "POST",
+      { clientId: a },
+    );
+    const status = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(status.access, view.access);
+    assert.equal(status.epoch, view.epoch);
+    assert.equal(status.seq, view.seq);
+    assert.equal(status.name, view.name);
+    assert.equal(status.participants, 1);
+    assert.equal(status.realtime, false);
+    assert.deepEqual(
+      Object.keys(status).sort(),
+      [
+        "access",
+        "epoch",
+        "seq",
+        "name",
+        "participants",
+        "leaseExpiresAt",
+        "realtime",
+      ].sort(),
+    );
+    assert.equal(JSON.stringify(status).includes("data:image"), false);
+    assert.equal(reads, 0);
+    assert.equal(writes, 0);
+    assert.deepEqual(await f.database.select().from(collaborationRooms), rooms);
+  } finally {
+    await f.close();
+  }
+});
+
+for (const route of ["access", "view", "backup", "manage"]) {
+  test(`preparing collaboration ${route} read resumes an interrupted migration`, async () => {
+    const f = await fixture();
+
+    try {
+      await f.database
+        .update(canvases)
+        .set({
+          syncMode: "preparing",
+          roomEpoch: "pending-epoch",
+          migrationEpoch: "pending-epoch",
+        })
+        .where(eq(canvases.id, f.id));
+      const response = await f.request(
+        `/canvases/${f.id}/collaboration/${route}`,
+      );
+
+      assert.equal(response.status, 200);
+      const row = (await f.database.select().from(canvases))[0]!;
+
+      assert.equal(row.syncMode, "collaborative");
+      assert.equal(row.roomEpoch, "pending-epoch");
+      assert.equal(
+        (await f.database.select().from(collaborationRooms)).length,
+        1,
+      );
+      assert.deepEqual(
+        await (await f.request(`/canvases/${f.id}/owner-location`)).json(),
+        {},
+      );
+    } finally {
+      await f.close();
+    }
+  });
+}
+
+test("owner location identifies each legacy canvas in its own workspace", async () => {
+  const f = await fixture();
+
+  try {
+    const created = await f.request("/workspaces", "POST", {
+      name: "Second workspace",
+    });
+
+    assert.equal(created.status, 200);
+    const workspace = (await created.json()).workspace;
+    const createdCanvas = await f.request(
+      `/workspaces/${workspace.id}/canvases`,
+      "POST",
+      { name: "Second canvas", catalogRevision: 0 },
+    );
+
+    assert.equal(createdCanvas.status, 200);
+    const canvas = (await createdCanvas.json()).canvas;
+    const before = await f.database.select().from(canvases);
+
+    for (const [canvasId, workspaceId] of [
+      [f.id, f.workspaceId],
+      [canvas.id, workspace.id],
+    ]) {
+      const response = await f.request(`/canvases/${canvasId}/owner-location`);
+
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { canvasId, workspaceId });
+      assert.equal(
+        (await f.request(`/canvases/${canvasId}/collaboration/manage`)).status,
+        200,
+      );
+    }
+
+    assert.deepEqual(
+      await (await f.request("/canvases/missing-canvas/owner-location")).json(),
+      {},
+    );
+    assert.deepEqual(await f.database.select().from(canvases), before);
+    assert.deepEqual(await f.database.select().from(collaborationRooms), []);
   } finally {
     await f.close();
   }

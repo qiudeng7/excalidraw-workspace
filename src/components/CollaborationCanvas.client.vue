@@ -67,6 +67,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   ready: [];
   status: [message: string];
+  realtime: [message: string];
   title: [name: string];
   participants: [count: number, label: string];
   access: [role: string, mode: string];
@@ -182,6 +183,7 @@ function applySession() {
     emit("title", session.view.name);
   }
 
+  emit("realtime", session.realtimeText);
   const groups = new Map<string, { name: string; sessions: number }>();
 
   if (session.view?.access.viewMode === "live")

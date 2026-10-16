@@ -83,9 +83,14 @@ export class CollaborationSession {
   private disposed = false;
   private subscribed = false;
   private authorizedOnce = false;
+  private authorityGeneration = 0;
   private failures = 0;
   private confirmedViews = 0;
   participants = 1;
+  presenceKnown = false;
+  private lastPresenceAt = 0;
+  private soloSince?: number;
+  private polling = false;
   realtimeStatus: "idle" | "connecting" | "connected" | "unavailable" = "idle";
   private presenceGeneration = 0;
   private presenceQueue = Promise.resolve();
@@ -99,6 +104,7 @@ export class CollaborationSession {
     )
       return;
     if (this.listeners.size) {
+      this.changed();
       if (this.presenceActive) void this.pollPresence();
       else void this.resumeAfterSuspension();
     }
@@ -172,10 +178,6 @@ export class CollaborationSession {
       return `固定版本 · ${this.view.snapshot?.label ?? ""}`;
     if (this.view?.access.viewMode === "latest")
       return `最新版 · ${new Date(this.view.readAt).toLocaleTimeString()}`;
-    if (this.realtimeStatus === "unavailable")
-      return this.view?.access.role === "viewer"
-        ? "实时查看 · 实时连接中断"
-        : "已保存 · 实时连接中断";
     if (this.view?.access.role === "viewer") return "实时查看";
 
     return "已保存";
@@ -190,7 +192,43 @@ export class CollaborationSession {
     };
   }
 
+  get realtimeText() {
+    if (["denied", "recovery", "error"].includes(this.status))
+      return "实时协作不可用";
+    if (!this.presenceKnown || Date.now() - this.lastPresenceAt > 45_000)
+      return "实时协作 · 状态待确认";
+    if (this.participants <= 1) {
+      const activity =
+        this.view?.access.role === "viewer" ? "仅你在查看" : "独自编辑";
+
+      return `${activity} · 实时协作${this.socket ? "待休眠" : "休眠"}`;
+    }
+
+    const connection =
+      this.realtimeStatus === "connected"
+        ? "已连接"
+        : this.realtimeStatus === "unavailable"
+          ? "连接中断 · HTTP同步"
+          : "连接中";
+
+    return `${this.participants} 个会话 · 实时协作${connection}`;
+  }
+
+  private stopRealtime() {
+    this.socketGeneration++;
+    this.clearHandshake();
+    const socket = this.socket;
+
+    this.socket = undefined;
+    this.subscribed = false;
+    this.peers.clear();
+    this.realtimeStatus = "idle";
+    socket?.close();
+  }
+
   private disconnect() {
+    this.presenceKnown = false;
+    this.soloSince = undefined;
     this.socketGeneration++;
     this.clearHandshake();
     this.presenceGeneration++;
@@ -372,7 +410,7 @@ export class CollaborationSession {
           "权限已变为只读，尚未同步的草稿可下载保留",
         );
       await this.refresh();
-      if (this.disposed) return;
+      if (this.disposed || ["denied", "recovery"].includes(this.status)) return;
       this.authorizedOnce = true;
       // HTTP access + the authoritative view unlock editing and ACK-based saving.
       // A persisted room is not evidence of another currently open editor.
@@ -423,10 +461,12 @@ export class CollaborationSession {
 
   async refresh() {
     if (this.loading) return this.loading;
+    const generation = this.authorityGeneration;
+
     this.loading = (async () => {
       const next = await this.request<HydratedView>("view");
 
-      if (this.disposed) return;
+      if (this.disposed || generation !== this.authorityGeneration) return;
       if (this.operations.some((op) => op.epoch !== next.epoch))
         throw new ApiError(
           409,
@@ -747,7 +787,17 @@ export class CollaborationSession {
   }
 
   private async sendPending() {
-    while (this.operations.length && !this.disposed && !this.discarding) {
+    const generation = this.authorityGeneration;
+    const authorized = () =>
+      generation === this.authorityGeneration &&
+      !["denied", "recovery"].includes(this.status);
+
+    while (
+      this.operations.length &&
+      !this.disposed &&
+      !this.discarding &&
+      authorized()
+    ) {
       const op = this.operations[0]!;
 
       // Keep attempted operations immutable until ACK, including network errors.
@@ -765,10 +815,16 @@ export class CollaborationSession {
         const file = this.files[element.fileId];
 
         if (!file) throw new Error("本地图片文件缺失，请下载备份");
+        if (!authorized()) return;
         await this.request("assets", file);
       }
 
+      if (!authorized()) return;
       const commit = await this.request<Commit>("update", op);
+
+      // Preserve the recoverable queue after an authorization boundary. An old
+      // ACK proves a historical commit, not permission to accept more edits.
+      if (!authorized()) return;
 
       // An ACK never clears updates produced while this request was in flight.
       this.operations = this.operations.filter(
@@ -776,6 +832,7 @@ export class CollaborationSession {
       );
       this.submittedOperations.delete(op.opId);
       await this.accept(commit);
+      if (!authorized()) return;
       const referenced = new Set(
         this.operations.flatMap((pending) =>
           pending.elements.map((element) => element.fileId),
@@ -785,11 +842,13 @@ export class CollaborationSession {
       for (const id of Object.keys(this.files))
         if (!referenced.has(id)) delete this.files[id];
       await this.checkpoint();
+      if (!authorized()) return;
       this.message = commit.skipped.length
         ? "部分同时修改已采用房间中的更新内容"
         : "";
     }
 
+    if (!authorized()) return;
     this.failures = 0;
     this.status = "ready";
     this.rebase();
@@ -864,7 +923,7 @@ export class CollaborationSession {
   private realtimeUnavailable(error?: unknown) {
     if (
       error instanceof ApiError &&
-      [401, 403, 404, 410].includes(error.status)
+      [400, 401, 403, 404, 409, 410, 413, 415].includes(error.status)
     ) {
       this.failed(error);
 
@@ -884,31 +943,68 @@ export class CollaborationSession {
         participants: number;
         realtime: boolean;
         leaseExpiresAt: number;
+        access: Access;
+        epoch: string;
+        seq: number;
+        name: string;
       }>("presence", { clientId: this.presenceClient });
 
       if (!this.presenceActive || generation !== this.presenceGeneration)
         return;
+      if (["denied", "recovery"].includes(this.status)) return;
+      if (
+        !(await this.recheckAccess(
+          () => this.presenceActive && generation === this.presenceGeneration,
+          result.access,
+        ))
+      )
+        return;
       this.presenceLease = result.leaseExpiresAt;
       this.participants = result.participants;
-      if (result.realtime) await this.connect();
-      else {
-        this.socketGeneration++;
-        this.clearHandshake();
-        const socket = this.socket;
-
-        this.socket = undefined;
-        this.subscribed = false;
-        this.peers.clear();
-        this.realtimeStatus = "idle";
-        socket?.close();
+      this.presenceKnown = true;
+      if (Date.now() - this.lastPresenceAt > 45_000) this.soloSince = undefined;
+      this.lastPresenceAt = Date.now();
+      // The authoritative watermark, never an online count, decides whether a
+      // scene fetch can be skipped. A peer may edit and leave between polls.
+      if (
+        !this.view ||
+        result.epoch !== this.view.epoch ||
+        result.seq !== this.view.seq ||
+        result.name !== this.view.name
+      )
+        await this.refresh();
+      if (
+        !this.presenceActive ||
+        generation !== this.presenceGeneration ||
+        ["denied", "recovery"].includes(this.status)
+      )
+        return;
+      if (result.realtime) {
+        this.soloSince = undefined;
+        await this.connect();
+      } else {
+        this.soloSince ??= Date.now();
+        // Require fresh solo confirmations throughout the grace period; failed
+        // heartbeats cannot prove departure or close a still-needed connection.
+        if (Date.now() - this.soloSince >= 30_000) this.stopRealtime();
       }
 
       this.changed();
     });
 
-    this.presenceQueue = task.catch(() => {});
+    const checked = task.catch((error: unknown) => {
+      if (generation === this.presenceGeneration) {
+        this.presenceKnown = false;
+        this.soloSince = undefined;
+        this.changed();
+      }
 
-    return task;
+      throw error;
+    });
+
+    this.presenceQueue = checked.catch(() => {});
+
+    return checked;
   }
 
   private async resumeAfterSuspension() {
@@ -950,18 +1046,18 @@ export class CollaborationSession {
   }
 
   private async pollPresence() {
-    if (this.disposed || !this.listeners.size) return;
+    if (
+      this.disposed ||
+      !this.listeners.size ||
+      this.polling ||
+      ["denied", "recovery"].includes(this.status)
+    )
+      return;
+    this.polling = true;
     try {
-      await this.recheckAccess();
+      if (this.presenceActive) await this.syncPresence();
+      else if (!(await this.recheckAccess())) return;
       if (["denied", "recovery", "error"].includes(this.status)) return;
-      if (this.presenceActive) {
-        await this.syncPresence().catch((error: unknown) =>
-          this.realtimeUnavailable(error),
-        );
-        if (["denied", "recovery"].includes(this.status)) return;
-        // HTTP remains a convergence path while another session cannot reach WS.
-        if (!this.subscribed) await this.refresh();
-      }
 
       if (this.dirty) await this.flush();
       else if (this.status === "offline") {
@@ -971,6 +1067,8 @@ export class CollaborationSession {
       }
     } catch (error) {
       this.failed(error);
+    } finally {
+      this.polling = false;
     }
   }
 
@@ -1169,18 +1267,25 @@ export class CollaborationSession {
     };
   }
 
-  private async recheckAccess(current = () => !this.disposed) {
-    if (!current()) return false;
+  private async recheckAccess(
+    current = () => !this.disposed,
+    confirmed?: Access,
+  ) {
+    if (!current() || ["denied", "recovery"].includes(this.status))
+      return false;
     try {
-      const access = await this.request<Access>(
-        "access",
-        undefined,
-        "GET",
-        false,
-        current,
-      );
+      const access =
+        confirmed ??
+        (await this.request<Access>(
+          "access",
+          undefined,
+          "GET",
+          false,
+          current,
+        ));
 
-      if (!current()) return false;
+      if (!current() || ["denied", "recovery"].includes(this.status))
+        return false;
       if (this.view?.access.viewMode !== "live" && this.status === "offline") {
         this.status = "ready";
         this.changed();
@@ -1188,19 +1293,31 @@ export class CollaborationSession {
 
       if (
         this.view &&
-        (access.epoch !== this.view.access.epoch ||
-          access.grantId !== this.view.access.grantId ||
+        (access.grantId !== this.view.access.grantId ||
           access.role !== this.view.access.role ||
           access.viewMode !== this.view.access.viewMode ||
           access.snapshotId !== this.view.access.snapshotId)
       ) {
-        this.status = "denied";
-        this.clearHandshake();
-        this.message = "分享权限已变更，请重新加载画布";
-        this.socket?.close();
-        this.changed();
+        this.failed(
+          new ApiError(403, "ACCESS_CHANGED", "分享权限已变更，请重新加载画布"),
+        );
 
         return false;
+      }
+
+      if (
+        this.view?.access.viewMode === "live" &&
+        access.epoch !== this.view.access.epoch
+      ) {
+        if (this.dirty)
+          throw new ApiError(
+            409,
+            "DRAFT_RECOVERY_REQUIRED",
+            "画布已恢复或替换，请先下载尚未同步的草稿",
+          );
+        await this.refresh();
+        if (!current() || ["denied", "recovery"].includes(this.status))
+          return false;
       }
 
       return true;
@@ -1219,22 +1336,24 @@ export class CollaborationSession {
   }
 
   private failed(error: unknown) {
-    if (this.disposed) return;
+    if (this.disposed || ["denied", "recovery"].includes(this.status)) return;
     this.message = error instanceof Error ? error.message : "协作同步失败";
     if (
       error instanceof ApiError &&
       [401, 403, 404, 410].includes(error.status)
     ) {
+      this.authorityGeneration++;
       this.status = "denied";
       this.clearHandshake();
-      this.socket?.close();
+      this.disconnect();
     } else if (
       error instanceof ApiError &&
       [400, 409, 413, 415].includes(error.status)
     ) {
+      this.authorityGeneration++;
       this.status = "recovery";
       this.clearHandshake();
-      this.socket?.close();
+      this.disconnect();
     } else {
       this.status = this.authorizedOnce ? "offline" : "error";
       this.retry();
@@ -1249,6 +1368,8 @@ export class CollaborationSession {
     this.retryTimer = setTimeout(
       () => {
         void (async () => {
+          if (this.disposed || ["denied", "recovery"].includes(this.status))
+            return;
           if (this.authorizedOnce) {
             if (
               this.listeners.size &&

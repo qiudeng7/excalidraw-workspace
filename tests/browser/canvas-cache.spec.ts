@@ -292,7 +292,9 @@ async function fixture(
     await expect
       .poll(() => editorState(page).then((value) => value.elements[0]?.id))
       .toBe(id);
-    await expect(page.locator(".save-state")).not.toHaveText("正在校验版本…");
+    await expect(page.locator('.save-state[role="status"]')).not.toHaveText(
+      "正在校验版本…",
+    );
     await expect(page.getByTestId("canvas-sync-lock")).toHaveCount(0);
     await noRuntimeOverlay();
   };
@@ -400,8 +402,10 @@ test("cached preview stays read-only across keyboard, paste, drop and action pat
 
   mock.readGates.set("a", gate);
   await mock.select("a");
-  await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
-  await expect(page.locator(".save-state")).toHaveAttribute(
+  await expect(page.locator('.save-state[role="status"]')).toHaveText(
+    "正在校验版本…",
+  );
+  await expect(page.locator('.save-state[role="status"]')).toHaveAttribute(
     "title",
     "正在确认最新版本，暂时只读，可平移和缩放。",
   );
@@ -488,7 +492,9 @@ test("unchanged canvases with deleted elements do not save on initialization, vi
   for (const id of ["b", "a", "c", "a"]) {
     await mock.select(id);
     await mock.ready(id);
-    await expect(page.locator(".save-state")).toHaveText("已保存");
+    await expect(page.locator('.save-state[role="status"]')).toHaveText(
+      "已保存",
+    );
   }
 
   for (const id of ["a", "b", "c"]) {
@@ -526,7 +532,9 @@ test("pending A network save does not delay B; fast return to A waits for its ow
   await mock.ready("b");
   expect(mock.canvases.a!.revision).toBe(0);
   await mock.select("a");
-  await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+  await expect(page.locator('.save-state[role="status"]')).toHaveText(
+    "正在校验版本…",
+  );
   gate.resolve();
   await mock.ready("a");
   expect((await editorState(page)).elements[0]!.width).toBe(160);
@@ -572,7 +580,9 @@ test("cache preview timing can be measured independently of a deliberately delay
   const start = await page.evaluate(() => performance.now());
 
   await mock.select("a");
-  await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+  await expect(page.locator('.save-state[role="status"]')).toHaveText(
+    "正在校验版本…",
+  );
   await expect
     .poll(() => editorState(page).then((value) => value.elements[0]?.id))
     .toBe("a");
@@ -601,7 +611,9 @@ test("disk cache remains visible and readonly during startup validation after re
 
   mock.readGates.set("a", gate);
   await page.reload();
-  await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+  await expect(page.locator('.save-state[role="status"]')).toHaveText(
+    "正在校验版本…",
+  );
   await expect
     .poll(() => editorState(page).then((value) => value.elements[0]?.id))
     .toBe("a");
@@ -650,13 +662,15 @@ test("new remote content replaces a clean cached preview before editing unlocks"
 
   mock.readGates.set("a", gate);
   await mock.select("a");
-  await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+  await expect(page.locator('.save-state[role="status"]')).toHaveText(
+    "正在校验版本…",
+  );
   expect((await editorState(page)).elements[0]?.id).toBe("a");
   gate.resolve();
   await expect
     .poll(() => editorState(page).then((value) => value.elements[0]?.id))
     .toBe("remote-new");
-  await expect(page.locator(".save-state")).toHaveText("已保存");
+  await expect(page.locator('.save-state[role="status"]')).toHaveText("已保存");
   await expect(page.getByTestId("canvas-sync-lock")).toHaveCount(0);
   expect(mock.counts.get("PUT /api/canvases/a") ?? 0).toBe(0);
   expect(mock.errors).toEqual([]);
@@ -729,7 +743,9 @@ for (const replaced of [false, true])
 
     mock.readGates.set("a", gate);
     await mock.select("a");
-    await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+    await expect(page.locator('.save-state[role="status"]')).toHaveText(
+      "正在校验版本…",
+    );
     // Header status precedes editor mounting; exercise a rendered readonly preview.
     await expect
       .poll(() => editorState(page).then((state) => state.elements[0]?.id))
@@ -788,7 +804,7 @@ for (const status of [503, 409])
     await expect(page.locator(".save-notice[role=alert]")).toContainText(
       status === 409 ? "保存冲突" : "保存失败",
     );
-    await expect(page.locator(".save-state")).toContainText(
+    await expect(page.locator('.save-state[role="status"]')).toContainText(
       status === 409 ? "保存冲突" : "保存异常",
     );
     expect(mock.counts.get("PUT /api/canvases/a") ?? 0).toBe(0);
@@ -796,7 +812,9 @@ for (const status of [503, 409])
       mock.failLibrary(0);
       await page.getByRole("button", { name: "重试保存", exact: true }).click();
       await expect.poll(() => mock.counts.get("PUT /api/library") ?? 0).toBe(2);
-      await expect(page.locator(".save-state")).toHaveText("已保存");
+      await expect(page.locator('.save-state[role="status"]')).toHaveText(
+        "已保存",
+      );
     } else {
       const downloading = page.waitForEvent("download", {
         predicate: (download) =>
@@ -1008,7 +1026,9 @@ test.describe("mobile canvas tools", () => {
 
     mock.readGates.set("a", gate);
     await mock.select("a");
-    await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+    await expect(page.locator('.save-state[role="status"]')).toHaveText(
+      "正在校验版本…",
+    );
     await expect
       .poll(() => editorState(page).then((state) => state.elements[0]?.id))
       .toBe("a");
@@ -1042,7 +1062,9 @@ test.describe("mobile canvas tools", () => {
     mock.canvases.a!.revision = 1;
     mock.canvases.a!.scene.elements = [rectangle("a-new", 240)];
     await page.reload();
-    await expect(page.locator(".save-state")).toHaveText("正在校验版本…");
+    await expect(page.locator('.save-state[role="status"]')).toHaveText(
+      "正在校验版本…",
+    );
     await expect
       .poll(() => editorState(page).then((state) => state.elements[0]?.id))
       .toBe("a");
@@ -1051,7 +1073,9 @@ test.describe("mobile canvas tools", () => {
     await expect
       .poll(() => editorState(page).then((state) => state.elements[0]?.id))
       .toBe("a-new");
-    await expect(page.locator(".save-state")).toHaveText("已保存");
+    await expect(page.locator('.save-state[role="status"]')).toHaveText(
+      "已保存",
+    );
     await expect
       .poll(() => editorState(page).then((state) => state.viewModeEnabled))
       .toBe(false);

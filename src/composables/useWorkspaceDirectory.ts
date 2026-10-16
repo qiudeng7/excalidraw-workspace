@@ -53,7 +53,10 @@ export interface WorkspaceDirectoryController {
   reset(): void;
   refreshDirectory(): Promise<void>;
   refreshAfterRestore(): Promise<void>;
-  loadWorkspaces(): Promise<void>;
+  loadWorkspaces(target?: {
+    workspaceId: string;
+    canvasId: string;
+  }): Promise<void>;
   reorderCanvas(ids: string[]): Promise<void>;
   selectWorkspace(id: string): Promise<void>;
   selectCanvas(id: string): Promise<void>;
@@ -166,20 +169,25 @@ export function useWorkspaceDirectory({
     preferred?: string | null,
     explicit = false,
     generation = ++switchGeneration,
+    strictPreferred = false,
   ) {
     const data = await readDirectory(id);
 
     if (generation !== switchGeneration) return;
+    if (strictPreferred && !data.canvases.some((item) => item.id === preferred))
+      throw new Error("目标画布不可访问");
     tabs.reconcile(
       id,
       data.canvases.map((canvas) => canvas.id),
     );
     const remembered =
-      tabs.active(id) !== undefined
-        ? tabs.active(id)
-        : (preferred ??
-          navigation.value?.workspaces.find((item) => item.workspaceId === id)
-            ?.lastCanvasId);
+      explicit && preferred
+        ? preferred
+        : tabs.active(id) !== undefined
+          ? tabs.active(id)
+          : (preferred ??
+            navigation.value?.workspaces.find((item) => item.workspaceId === id)
+              ?.lastCanvasId);
     const selected =
       remembered === null && tabs.active(id) === null
         ? undefined
@@ -199,7 +207,10 @@ export function useWorkspaceDirectory({
       void recordOpened(selected.id);
   }
 
-  async function loadWorkspaces() {
+  async function loadWorkspaces(target?: {
+    workspaceId: string;
+    canvasId: string;
+  }) {
     const generation = ++switchGeneration;
 
     selecting.value = true;
@@ -217,6 +228,24 @@ export function useWorkspaceDirectory({
       if (!entries.length) {
         reset();
         canvasDocument.clearDocument("没有工作空间");
+
+        return;
+      }
+
+      if (target) {
+        if (!entries.some((item) => item.id === target.workspaceId))
+          throw new Error("目标工作空间不可访问");
+        const listing = await readDirectory(target.workspaceId);
+
+        if (!listing.canvases.some((item) => item.id === target.canvasId))
+          throw new Error("目标画布不可访问");
+        await loadWorkspace(
+          target.workspaceId,
+          target.canvasId,
+          true,
+          generation,
+          true,
+        );
 
         return;
       }

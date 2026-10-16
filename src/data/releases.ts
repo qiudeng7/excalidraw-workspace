@@ -12,6 +12,25 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-10-16-on-demand-collaboration",
+    sequence: 8,
+    version: "0.6.1",
+    date: "2026-10-16",
+    title: "协作状态更清晰，实时连接按需休眠",
+    summary:
+      "保存状态与实时协作状态分开显示；多个会话自动连接，回到单会话后按宽限规则休眠，减少不必要的连接和画布读取。",
+    changes: [
+      "画布顶部独立显示实时协作未启用、待休眠、已休眠、连接中或已连接等状态，窄屏也保留可读标签；不同标签页、浏览器和设备分别计为会话。",
+      "单会话打开画布、仅打开分享面板或所有者的画布入口，不再因此创建协作房间；第二个活跃会话加入或实际邀请、创建分享链接、发布固定版本时才按需启用。",
+      "回到单会话后，在持续确认单人的情况下经过至少 30 秒宽限，再关闭实时连接；离开检测可能有延迟。休眠不删除画布、权限或已发布版本，也不妨碍正常保存。",
+      "稳定单会话不再反复读取完整画布；实时连接中断与保存失败分开提示，权限变化或画布恢复时仍保护未同步草稿。",
+      "首次分享切换到协作模式时，分享面板保持打开，新生成的链接仍可复制；最新版查看仍需手动刷新，固定版本仍保留发布时的内容。",
+    ],
+    actions: [
+      "请刷新已打开的页面后使用新版；多人协作时，请所有参与者刷新页面。",
+    ],
+  },
+  {
     id: "workspace-2026-10-16-smart-copy-arrows",
     sequence: 7,
     version: "0.6.0",

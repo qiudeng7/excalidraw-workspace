@@ -15,14 +15,15 @@ export default defineApiHandler(
   async (event) => {
     const id = resourceId(event);
     // Presence must never create a room (including a delayed leave from an old tab).
-    const access = await roomCommand<Access>(
-      event,
-      id,
-      await principal(event),
-      {
-        type: "access",
-      },
-    );
+    const status = await roomCommand<{
+      access: Access;
+      epoch: string;
+      seq: number;
+      name: string;
+    }>(event, id, await principal(event), {
+      type: "status",
+    });
+    const { access } = status;
     const data = await body(apiRequest(event));
     const key = await canvasSessionKey(access, data.clientId);
     let participants: number;
@@ -41,6 +42,7 @@ export default defineApiHandler(
       ({ participants, leaseExpiresAt } = await touchCanvasSession(id, key));
 
     return json({
+      ...status,
       participants,
       leaseExpiresAt,
       realtime: access.viewMode === "live" && participants > 1,

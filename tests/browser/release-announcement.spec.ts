@@ -278,7 +278,9 @@ test("a delayed announcement preserves edits, in-flight autosave, shortcuts and 
       await other.keyboard.press(shortcut);
     expect(await editorState(other)).toEqual(before);
     releaseSave();
-    await expect(other.locator(".save-state")).toHaveText("已保存");
+    await expect(other.locator('.save-state[role="status"]')).toHaveText(
+      "已保存",
+    );
     await popup(other).getByRole("button", { name: "继续绘图" }).click();
     expect(await editorState(other)).toEqual(before);
     await other.locator(".excalidraw").focus();

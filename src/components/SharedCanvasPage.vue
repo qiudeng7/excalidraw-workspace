@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
 import { accountApi } from "~/lib/accountApi";
 import { api, ApiError } from "~/lib/api";
+import { compactRealtimeStatus } from "~/lib/collaboration/status";
 import { closeCollaboration } from "~/lib/collaboration/session";
 import { getTabScope } from "~/lib/persistence";
 import {
@@ -34,8 +35,8 @@ const shareButton = ref<HTMLButtonElement>();
 const deniedTextRecovery = ref<ExcalidrawElement>();
 let deniedRecoveryKey = "";
 const personalSettings = shallowRef<UserSettingsResource>();
-const onlineCount = ref(0),
-  onlineLabel = ref("");
+const onlineLabel = ref("");
+const realtimeState = ref("实时协作 · 状态待确认");
 let secret = "";
 const scope = `public:${crypto.randomUUID()}`;
 
@@ -72,6 +73,28 @@ async function initialize() {
       if (!token.value) throw new Error("请从原分享链接打开画布");
     } else if (!user.value)
       throw new ApiError(401, "LOGIN_REQUIRED", "请先登录");
+    if (!props.share && user.value) {
+      const location = await api<{ workspaceId?: string; canvasId?: string }>(
+        `/api/canvases/${encodeURIComponent(props.canvasId)}/owner-location`,
+        { headers: { "X-Account-Owner": user.value.id } },
+      );
+
+      if (location.workspaceId && location.canvasId) {
+        await navigateTo(
+          {
+            path: "/",
+            query: {
+              workspace: location.workspaceId,
+              canvas: location.canvasId,
+            },
+          },
+          { replace: true },
+        );
+
+        return;
+      }
+    }
+
     ready.value = true;
   } catch (cause) {
     if (cause instanceof ApiError && cause.status === 401) {
@@ -171,11 +194,18 @@ async function flushForShare() {
           >
         </div>
         <div class="shared-actions">
-          <span v-if="mode === 'live'" class="presence" :title="onlineLabel"
-            ><QuietIcon name="users" :size="14" />{{
-              onlineCount
-            }}
-            个会话在线</span
+          <span
+            v-if="mode === 'live'"
+            class="presence"
+            aria-live="polite"
+            :aria-label="`实时协作状态：${realtimeState}`"
+            :title="`${realtimeState} · ${onlineLabel}`"
+            ><QuietIcon name="users" :size="14" /><span class="realtime-full">{{
+              realtimeState
+            }}</span
+            ><span class="realtime-compact">{{
+              compactRealtimeStatus(realtimeState)
+            }}</span></span
           ><span class="sync-state" role="status">{{ status }}</span>
           <button v-if="mode === 'latest'" type="button" @click="refresh">
             <QuietIcon name="refresh" :size="14" />刷新最新版
@@ -216,10 +246,10 @@ async function flushForShare() {
           :scope="scope"
           :user-settings="personalSettings?.state.settings"
           @status="status = $event"
+          @realtime="realtimeState = $event"
           @title="canvasTitle = $event"
           @participants="
             (count, label) => {
-              onlineCount = count;
               onlineLabel = label;
             }
           "
@@ -243,6 +273,22 @@ async function flushForShare() {
 </template>
 
 <style scoped>
+.presence {
+  border: 1px solid var(--color-border, #d5d5db);
+  border-radius: 5px;
+  padding: 3px 6px;
+}
+.realtime-compact {
+  display: none;
+}
+@media (max-width: 760px) {
+  .realtime-full {
+    display: none;
+  }
+  .realtime-compact {
+    display: inline;
+  }
+}
 .shared-page {
   display: flex;
   flex-direction: column;
