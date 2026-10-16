@@ -119,7 +119,9 @@ test("single-click still opens immediately; cancelled, blank and unchanged names
   }
 
   await expect(target).toHaveAttribute("aria-current", "page");
-  await expect(page.locator(".save-state")).not.toHaveText("正在校验版本…");
+  await expect(page.locator('.save-state[role="status"]')).not.toHaveText(
+    "正在校验版本…",
+  );
   await target.dblclick();
   await dialog.getByLabel("画布名称").fill("   ");
   await expect(dialog.getByRole("button", { name: "保存名称" })).toBeDisabled();
