@@ -38,6 +38,7 @@ const call = async (path, data) =>
     ),
     200,
   );
+await call("links", { role: "viewer", requireLogin: true });
 const view = await call("view");
 const image = {
   id: "backup-image",

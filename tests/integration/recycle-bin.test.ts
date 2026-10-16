@@ -393,9 +393,6 @@ test("collaboration is suspended without destroying grants, snapshots or images;
   const f = await fixture();
 
   try {
-    const initial = await (
-      await f.request(`/canvases/${f.id}/collaboration/view`)
-    ).json();
     const link = await (
       await f.request(`/canvases/${f.id}/collaboration/links`, "POST", {
         role: "viewer",
@@ -403,6 +400,9 @@ test("collaboration is suspended without destroying grants, snapshots or images;
         requireLogin: false,
         expiresAt: null,
       })
+    ).json();
+    const initial = await (
+      await f.request(`/canvases/${f.id}/collaboration/view`)
     ).json();
     const prefix = `/canvases/${f.id}/collaboration`;
     const update = {
@@ -504,6 +504,7 @@ test("recycle synchronization keeps retry intent and stale commands cannot suspe
   const f = await fixture();
 
   try {
+    await activateRoom(f);
     const original = await (
       await f.request(`/canvases/${f.id}/collaboration/view`)
     ).json();
@@ -633,7 +634,6 @@ test("maintenance before expiry retains legacy snapshots, paused room images and
       (row) => row.id === other.id,
     )!;
 
-    await f.request(`/canvases/${f.id}/collaboration/view`);
     assert.equal(
       (
         await f.request(`/canvases/${f.id}/collaboration/versions`, "POST", {
@@ -750,7 +750,7 @@ test("one failed room never blocks another account's expired legacy cleanup", as
   const f = await fixture();
 
   try {
-    await f.request(`/canvases/${f.id}/collaboration/view`);
+    await activateRoom(f);
     const other = (
       await (
         await f.request(`/workspaces/${f.workspaceId}/canvases`, "POST", {
@@ -799,7 +799,7 @@ test("a failed restore delivery is retryable by POST or reopening the owner's re
   const f = await fixture();
 
   try {
-    await f.request(`/canvases/${f.id}/collaboration/view`);
+    await activateRoom(f);
     const namespace = {
       idFromName: (id: string) => id,
       get: () => ({
@@ -918,7 +918,7 @@ test("a failed room maintenance cannot suppress independent legacy orphan collec
   const f = await fixture();
 
   try {
-    await f.request(`/canvases/${f.id}/collaboration/view`);
+    await activateRoom(f);
     await f.context(() => recycleCanvas(f.id, f.owner.id, f.workspaceId, 0));
     await f.blob.put("abandoned.json", "{}");
     const namespace = {
@@ -986,3 +986,15 @@ test("a failing blob listing cannot suppress expired recycle cleanup", async () 
     await f.close();
   }
 });
+
+async function activateRoom(f: Awaited<ReturnType<typeof fixture>>) {
+  assert.equal(
+    (
+      await f.request(`/canvases/${f.id}/collaboration/links`, "POST", {
+        role: "viewer",
+        requireLogin: true,
+      })
+    ).status,
+    200,
+  );
+}
