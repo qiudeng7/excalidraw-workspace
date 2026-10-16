@@ -12,6 +12,26 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-10-16-smart-copy-arrows",
+    sequence: 7,
+    version: "0.6.0",
+    date: "2026-10-16",
+    title: "箭头选中更清晰，图文复制更自然",
+    summary:
+      "箭头沿线高亮，减少选中框遮挡；智能复制让文字可读，并能在支持的目标应用中保留格式继续编辑。",
+    changes: [
+      "选中箭头时沿线高亮，单箭头不再显示外接选中框，端点编辑与多选操作仍保留；可在“设置 → 编辑器”关闭默认开启的箭头选中高亮。",
+      "Ctrl/Cmd+C 智能复制：纯文本可直接阅读，富文本和图文通过 HTML 粘贴到支持的目标应用，文字可继续编辑，非文本图形以 PNG 预览呈现；具体格式取决于目标应用的支持。",
+      "在本应用的画布之间复制粘贴，仍保留可编辑的原生元素；编辑文字时只复制选中的部分，并保留受支持的格式。",
+      "Ctrl/Cmd+Shift+C 仍复制 PNG；粘贴到原版 Excalidraw 或不识别本应用智能复制的兼容画布时，请使用菜单中的“原始 Excalidraw 兼容复制”。",
+      "剪切写入剪贴板失败，或等待写入期间选区、文档发生变化时，不再删除原有内容。",
+      "应用随附本项目与 Excalidraw 的许可声明，便于查看使用与分发条件。",
+    ],
+    actions: [
+      "已打开的页面请刷新后使用新版；多人协作时，请所有参与者刷新页面。",
+    ],
+  },
+  {
     id: "workspace-2026-10-14-markdown-layout",
     sequence: 6,
     version: "0.5.0",
