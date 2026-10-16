@@ -1210,10 +1210,12 @@ test("协作箭头高亮开关即时生效并持久化，不改变共享元素�
     await expect
       .poll(() => editorState(guest).then((s) => s.elements.length))
       .toBe(2);
-    await page.getByTestId("toolbar-selection").first().click();
+    if ((await editorState(page)).activeTool.type !== "selection")
+      await page.getByTestId("toolbar-selection").first().click();
     await page.mouse.click(box.x + 525, box.y + 315);
     await page.keyboard.down("Control");
-    await page.mouse.click(box.x + 900, box.y + 300);
+    // draw() uses viewport coordinates, unlike the canvas-relative arrow.
+    await page.mouse.click(900, 300);
     await page.keyboard.up("Control");
     await expect
       .poll(() =>

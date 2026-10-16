@@ -33,7 +33,7 @@ import { getTransformHandles } from ${JSON.stringify(packagePath + "/lib/element
 import { LinearElementEditor } from ${JSON.stringify(packagePath + "/lib/element/src/linearElementEditor.ts")};
 import rough from ${JSON.stringify(require.resolve("roughjs/bin/rough"))};
 window.core={getArrowSelectionShape,ShapeCache,renderArrowSelection,elementWithCanvasCache,renderElement,getTransformHandles,LinearElementEditor,rough};
-window.makeElements=convertToExcalidrawElements;
+window.makeElements=specs=>convertToExcalidrawElements(specs,{regenerateIds:false});
 window.exports={exportToSvg,exportToBlob,serializeAsJSON};
 function Harness(){
  const [flags,setFlags]=React.useState({arrowSelectionHighlight:true,shortArrowheads:true});
@@ -65,7 +65,10 @@ window.select=(specs,ids)=>{
       ".png": "file",
       ".svg": "file",
     },
-    define: { "process.env.NODE_ENV": '"development"' },
+    define: {
+      "process.env.NODE_ENV": '"development"',
+      "import.meta.env": "{}",
+    },
     logLevel: "silent",
   });
   await writeFile(
@@ -177,7 +180,7 @@ window.select=(specs,ids)=>{
     "other element bbox remains",
   );
   assert.ok(
-    (await page.evaluate(() => window.alpha(200, 142))) > 0,
+    (await page.evaluate(() => window.alpha(500, 146))) > 0,
     "multi common bounds remain",
   );
   await page.screenshot({ path: resolve(screenshots, "multi-on.png") });
@@ -287,6 +290,8 @@ window.select=(specs,ids)=>{
   });
   await page.mouse.move(...handle);
   await page.mouse.down();
+  await page.mouse.move(handle[0] + 5, handle[1] + 5);
+  await settle();
   assert.equal(
     await page.evaluate(() => window.api.getAppState().isRotating),
     false,
@@ -301,6 +306,8 @@ window.select=(specs,ids)=>{
   await page.screenshot({ path: resolve(screenshots, "curve-single-off.png") });
   await page.mouse.move(...handle);
   await page.mouse.down();
+  await page.mouse.move(handle[0] + 5, handle[1] + 5);
+  await settle();
   assert.equal(
     await page.evaluate(() => window.api.getAppState().isRotating),
     true,
@@ -527,7 +534,7 @@ window.select=(specs,ids)=>{
         state,
         "#f00",
       );
-      headInteriors.push(alpha(cv, x, y, 1));
+      headInteriors.push(alpha(cv, x, y, 0));
     }
     const overlap = window.makeElements([
       {
@@ -557,7 +564,7 @@ window.select=(specs,ids)=>{
       state,
       "#f00",
     );
-    const overlapAlpha = alpha(oc, 120, 155, 1);
+    const overlapAlpha = alpha(oc, 120, 155, 0);
     const big = window.makeElements([
       {
         type: "arrow",

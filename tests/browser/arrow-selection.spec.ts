@@ -19,7 +19,8 @@ test("arrow path highlight defaults on, toggles immediately without document edi
   await page.mouse.down();
   await page.mouse.move(box.x + 900, box.y + 340);
   await page.mouse.up();
-  await page.getByTestId("toolbar-selection").first().click();
+  if ((await editorState(page)).activeTool.type !== "selection")
+    await page.getByTestId("toolbar-selection").first().click();
   await page.mouse.click(box.x + 475, box.y + 335);
   await page.keyboard.down("Control");
   await page.mouse.click(box.x + 850, box.y + 240);

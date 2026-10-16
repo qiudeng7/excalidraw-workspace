@@ -5815,7 +5815,11 @@ class App extends React.Component<AppProps, AppState> {
       }
 
       if (appState) {
-        this.setState(appState as Pick<AppState, K> | null);
+        this.setState({
+          ...appState,
+          // This is an instance preference, never a scene/remote override.
+          arrowSelectionHighlight: !!this.props.arrowSelectionHighlight,
+        } as Pick<AppState, K>);
       }
 
       if (elements) {
