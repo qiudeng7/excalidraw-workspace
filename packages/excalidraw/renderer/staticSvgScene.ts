@@ -894,10 +894,11 @@ const renderElementToSvg = (
             rect.setAttribute("opacity", String(decoration.opacity));
             rect.setAttribute(
               "fill",
-              applyDarkModeFilter(
-                element.strokeColor,
-                renderConfig.theme === THEME.DARK,
-              ),
+              decoration.fill ??
+                applyDarkModeFilter(
+                  element.strokeColor,
+                  renderConfig.theme === THEME.DARK,
+                ),
             );
             node.append(rect);
           }

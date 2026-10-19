@@ -83,8 +83,8 @@ export interface PublishedVersion {
 
 export interface Operation {
   protocolVersion: 1;
-  /** Clients must understand structured text before rewriting a rich-text scene. */
-  textFormatVersion?: 1 | 2;
+  /** Write capability: 1 inline text, 2 blocks, 3 highlights (document stays v2). */
+  textFormatVersion?: 1 | 2 | 3;
   epoch: string;
   clientId: string;
   clientSeq: number;

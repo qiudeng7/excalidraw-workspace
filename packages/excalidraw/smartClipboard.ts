@@ -322,7 +322,13 @@ function renderNode(node: RichTextBlock | RichTextV2Inline): string {
     let text = escapeClipboardHTML(node.text);
 
     for (const mark of node.marks ?? []) {
-      const tags = { bold: "strong", italic: "em", code: "code", strike: "s" };
+      const tags = {
+        bold: "strong",
+        italic: "em",
+        code: "code",
+        strike: "s",
+        highlight: "mark",
+      };
 
       if (mark.type === "link") {
         if (

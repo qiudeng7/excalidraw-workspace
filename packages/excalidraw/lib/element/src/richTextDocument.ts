@@ -156,7 +156,7 @@ export const normalizeRichText = <T extends SupportedRichText>(value: T): T => {
 };
 
 export type RichTextV2Mark =
-  | { type: RichTextMark | "strike" }
+  | { type: RichTextMark | "strike" | "highlight" }
   | { type: "link"; attrs: { href: string; title?: string | null } };
 
 export type RichTextV2Inline =
@@ -184,7 +184,7 @@ export type RichTextV2 = {
 };
 
 export type SupportedRichText = RichTextV1 | RichTextV2;
-const V2_MARKS = ["bold", "italic", "code", "strike", "link"];
+const V2_MARKS = ["bold", "italic", "code", "strike", "link", "highlight"];
 
 export const isSafeRichTextLink = (href: string): boolean =>
   href.length <= 10000 &&
@@ -389,6 +389,14 @@ function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
   };
 }
 
+const hasHighlight = (node: RichTextBlock | RichTextV2Inline): boolean => {
+  if (node.type === "text") {
+    return node.marks?.some((mark) => mark.type === "highlight") ?? false;
+  }
+
+  return node.type !== "hardBreak" && (node.content ?? []).some(hasHighlight);
+};
+
 /** Unknown versions require a newer client too, even if its restore stripped the field. */
 export function supportsRichTextWrite(
   elements: unknown[],
@@ -396,12 +404,26 @@ export function supportsRichTextWrite(
 ): boolean {
   return elements.every((element) => {
     if (!object(element) || element.richText === undefined) return true;
-    if (!object(element.richText)) return capability === 1 || capability === 2;
+    if (!object(element.richText)) {
+      return capability === 1 || capability === 2 || capability === 3;
+    }
+
     const version = element.richText.version;
+
+    // Guard the current document as well as the incoming one: stale clients may
+    // submit a pre-highlight snapshot with the new mark already missing.
+    if (
+      capability !== 3 &&
+      isRichTextV2(element.richText) &&
+      element.richText.doc.content.some(hasHighlight)
+    ) {
+      return false;
+    }
 
     return (
       (capability === 1 && version === 1) ||
-      (capability === 2 && (version === 1 || version === 2))
+      ((capability === 2 || capability === 3) &&
+        (version === 1 || version === 2))
     );
   });
 }
