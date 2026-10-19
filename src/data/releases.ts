@@ -12,6 +12,24 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-10-19-text-highlight",
+    sequence: 9,
+    version: "0.7.0",
+    date: "2026-10-19",
+    title: "局部文字高亮，补写列表更自然",
+    summary:
+      "用 ==重点== 给部分文字添加高亮，保存、再次编辑和导出都保留格式；已有文字补写列表标记时更自然。",
+    changes: [
+      "编辑文字时输入或普通粘贴 ==重点==，即可添加局部黄色高亮，并可与粗体等格式叠加；代码中的标记和纯文本粘贴仍保持原样。",
+      "高亮在保存后重新打开、画布显示及 SVG、PNG 导出中保留，支持深色主题和自动换行。",
+      "已有段落开头已经有空格时，在空格前补上减号 - 也会转成无序列表；正文格式和光标位置保留，转换可以撤销。原有先输入 - 再输入空格的方式不变。",
+      "含高亮内容的画布和素材库会拒绝旧页面覆盖，避免旧版本丢失新格式。",
+    ],
+    actions: [
+      "请刷新已打开的页面后使用新版；多人协作时，请所有参与者刷新页面。若提示格式不受支持或需要更新，请先保留本地草稿或恢复副本，再刷新。",
+    ],
+  },
+  {
     id: "workspace-2026-10-16-on-demand-collaboration",
     sequence: 8,
     version: "0.6.1",
