@@ -586,7 +586,7 @@ export class CollaborationSession {
     } else
       this.operations.push({
         protocolVersion: 1,
-        textFormatVersion: 2,
+        textFormatVersion: 3,
         epoch: this.view.epoch,
         clientId: this.clientId,
         clientSeq: ++this.clientSeq,

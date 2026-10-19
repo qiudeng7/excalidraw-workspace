@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import markdownMark from "markdown-it-mark";
 // @ts-expect-error markdown-it only publishes types for its public parser, not builtin rules.
 import markdownImage from "markdown-it/lib/rules_inline/image.mjs";
 import {
@@ -21,6 +22,7 @@ import {
   splitListItem,
   liftListItem,
   sinkListItem,
+  wrapRangeInList,
 } from "prosemirror-schema-list";
 import type { Command } from "prosemirror-state";
 import { isSafeRichTextLink } from "../lib/element/src/richTextDocument";
@@ -116,6 +118,10 @@ export const richTextSchema = new Schema({
       toDOM: () => ["s", 0],
       parseDOM: [{ tag: "s" }, { tag: "del" }],
     },
+    highlight: {
+      toDOM: () => ["mark", 0],
+      parseDOM: [{ tag: "mark" }],
+    },
     link: {
       attrs: { href: {}, title: { default: null } },
       inclusive: false,
@@ -143,6 +149,7 @@ export const richTextSchema = new Schema({
 // Keep unsupported constructs literal, including HTML, images and horizontal rules.
 // The commonmark preset has no table extension or syntax highlighting.
 const markdown = new MarkdownIt("commonmark", { html: false })
+  .use(markdownMark)
   .enable("strikethrough")
   .disable(["hr"]);
 
@@ -199,6 +206,7 @@ const markdownParser = new MarkdownParser(richTextSchema, markdown, {
   em: { mark: "italic" },
   strong: { mark: "bold" },
   s: { mark: "strike" },
+  mark: { mark: "highlight" },
   code_inline: { mark: "code", noCloseToken: true },
   link: {
     mark: "link",
@@ -213,25 +221,95 @@ export const parseRichTextMarkdown = (text: string) =>
   markdownParser.parse(text);
 
 const markInputRule = (regexp: RegExp, mark: string, delimiterLength: number) =>
-  new InputRule(regexp, (state, match, start, end) => {
-    if (start > 1 && state.doc.textBetween(start - 1, start) === "\\")
-      return null;
-    const transaction = state.tr
-      .delete(end - delimiterLength + 1, end)
-      .delete(start, start + delimiterLength);
+  new InputRule(
+    regexp,
+    (state, match, start, end) => {
+      if (
+        mark !== "highlight" &&
+        start > 1 &&
+        state.doc.textBetween(start - 1, start) === "\\"
+      ) {
+        return null;
+      }
 
-    transaction.addMark(
-      start,
-      start + match[1].length,
-      richTextSchema.marks[mark].create(),
-    );
+      if (mark === "highlight") {
+        const position = state.doc.resolve(start);
+        const prefix = position.parent.textBetween(0, position.parentOffset);
+        const backslashes = prefix.match(/\\+$/)?.[0].length ?? 0;
 
-    return transaction.removeStoredMark(richTextSchema.marks[mark]);
-  });
+        if (backslashes % 2 !== 0) {
+          return null;
+        }
+
+        const parsed = parseRichTextMarkdown(match[0]);
+        const highlighted = parsed.firstChild?.firstChild?.marks.some(
+          (item) => item.type === richTextSchema.marks.highlight,
+        );
+
+        // Use the same delimiter/escape semantics as paste, while retaining the
+        // existing document marks instead of reparsing/replacing formatted text.
+        if (!highlighted || parsed.textContent !== match[1]) {
+          return null;
+        }
+      }
+
+      const transaction = state.tr
+        .delete(end - delimiterLength + 1, end)
+        .delete(start, start + delimiterLength);
+
+      transaction.addMark(
+        start,
+        start + match[1].length,
+        richTextSchema.marks[mark].create(),
+      );
+
+      return transaction.removeStoredMark(richTextSchema.marks[mark]);
+    },
+    { inCodeMark: mark !== "highlight" },
+  );
+
+// InputRules normally inspect only text before the caret. When the separator
+// already exists after it, recognize just the newly typed marker instead.
+const bulletBeforeSpaceInputRule = () =>
+  new InputRule(
+    /^[-+*]$/,
+    (state, _match, start, end) => {
+      const position = state.doc.resolve(start);
+
+      if (
+        !state.selection.empty ||
+        position.parent.type !== richTextSchema.nodes.paragraph ||
+        position.parentOffset !== 0 ||
+        state.doc.textBetween(end, end + 1) !== " "
+      ) {
+        return null;
+      }
+
+      for (let depth = position.depth; depth > 0; depth--) {
+        if (position.node(depth).type === richTextSchema.nodes.listItem) {
+          return null;
+        }
+      }
+
+      const transaction = state.tr.delete(start, end + 1);
+      const range = transaction.doc.resolve(start).blockRange();
+
+      if (
+        !range ||
+        !wrapRangeInList(transaction, range, richTextSchema.nodes.bulletList)
+      ) {
+        return null;
+      }
+
+      return transaction;
+    },
+    { inCodeMark: false },
+  );
 
 export const richTextInputRules = () =>
   inputRules({
     rules: [
+      bulletBeforeSpaceInputRule(),
       wrappingInputRule(/^\s*>\s$/, richTextSchema.nodes.blockquote),
       wrappingInputRule(/^\s*([-+*])\s$/, richTextSchema.nodes.bulletList),
       wrappingInputRule(
@@ -257,6 +335,7 @@ export const richTextInputRules = () =>
       markInputRule(/(?<![\w_])_([^_\n]+)_$/, "italic", 1),
       markInputRule(/`([^`\n]+)`$/, "code", 1),
       markInputRule(/~~([^~\n]+)~~$/, "strike", 2),
+      markInputRule(/==((?:[^=\n]|=(?!=))+)==$/, "highlight", 2),
       new InputRule(
         /(?<!!)\[([^\]\n]+)\]\(([^\s)]+)(?:\s+"([^"\n]*)")?\)$/,
         (state, match, start, end) => {

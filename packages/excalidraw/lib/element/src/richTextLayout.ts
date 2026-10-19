@@ -5,6 +5,10 @@ import type { ExcalidrawTextElement } from "./types";
 
 type RichTextMark = RichTextV2Mark["type"];
 
+export const RICH_TEXT_HIGHLIGHT_COLOR = "#ffd43b";
+
+export const RICH_TEXT_HIGHLIGHT_OPACITY = 0.4;
+
 export const RICH_TEXT_CODE_FONT =
   "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 
@@ -71,6 +75,7 @@ ${scope} pre { font-family:${RICH_TEXT_CODE_FONT}; padding:.3em .4em; background
 ${scope} code { font-family:${RICH_TEXT_CODE_FONT}; font-size:1em; }
 ${scope} a { color:inherit; text-decoration:underline; cursor:text; }
 ${scope} :is(s,del) { text-decoration:line-through; }
+${scope} mark { color:inherit; background:color-mix(in srgb, ${RICH_TEXT_HIGHLIGHT_COLOR} ${RICH_TEXT_HIGHLIGHT_OPACITY * 100}%, transparent); }
 ${scope} strong { font-weight:700; } ${scope} em { font-style:italic; }
 ${scope} [data-rich-marker] { position:absolute; right:calc(100% + .4em); white-space:pre; }
 ${scope}[data-rich-measure] li::before { content:none; }
@@ -111,6 +116,7 @@ export interface RichTextDecoration {
   width: number;
   height: number;
   opacity: number;
+  fill?: string;
 }
 
 export interface RichTextLayout {
@@ -183,6 +189,7 @@ export const layoutRichText = (
             italic: "em",
             code: "code",
             strike: "s",
+            highlight: "mark",
             link: "a",
           } as Record<string, string>
         )[mark.type];
@@ -298,11 +305,26 @@ export const layoutRichText = (
     const bounds = block.getBoundingClientRect();
     const runs: RichTextRun[] = [];
     const decorations: RichTextDecoration[] = [];
+    const highlights: RichTextDecoration[] = [];
     const lines = new Map<string, string>();
     const leafIndices = new Map(leaves.map((leaf, index) => [leaf, index]));
     const range = document.createRange();
 
     for (const { node, marks, leaf } of nodes) {
+      if (marks.includes("highlight")) {
+        range.selectNodeContents(node);
+        for (const rect of range.getClientRects()) {
+          highlights.push({
+            x: rect.left - bounds.left,
+            y: rect.top - bounds.top,
+            width: rect.width,
+            height: rect.height,
+            fill: RICH_TEXT_HIGHLIGHT_COLOR,
+            opacity: RICH_TEXT_HIGHLIGHT_OPACITY,
+          });
+        }
+      }
+
       const style = getComputedStyle(node.parentElement!);
       const leafStyle = getComputedStyle(leaf);
       const lineHeight = parseFloat(leafStyle.lineHeight);
@@ -402,6 +424,8 @@ export const layoutRichText = (
       });
     }
 
+    // Block backgrounds first, then inline highlights, then text decorations.
+    decorations.push(...highlights);
     for (const run of runs) {
       if (run.marks.includes("strike"))
         decorations.push({

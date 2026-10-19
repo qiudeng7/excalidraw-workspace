@@ -664,6 +664,10 @@ const drawElementOnCanvas = (
           for (const decoration of richLayout.decorations) {
             context.save();
             context.globalAlpha *= decoration.opacity;
+            if (decoration.fill) {
+              context.fillStyle = decoration.fill;
+            }
+
             context.fillRect(
               decoration.x,
               decoration.y,
