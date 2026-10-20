@@ -42,7 +42,14 @@ export function useCanvasReorder({
     const index = ids.indexOf(canvas.id),
       target = index + offset;
 
-    if (target < 0 || target >= ids.length) return;
+    if (
+      locked.value ||
+      index < 0 ||
+      target < 0 ||
+      target >= ids.length ||
+      !!canvases.value[index]?.pinned !== !!canvases.value[target]?.pinned
+    )
+      return;
     ids.splice(index, 1);
     ids.splice(target, 0, canvas.id);
     void reorder(ids);
@@ -70,9 +77,18 @@ export function useCanvasReorder({
 
     if (
       row?.dataset.canvasId &&
-      canvases.value.some((canvas) => canvas.id === row.dataset.canvasId)
-    )
+      canvases.value.some(
+        (canvas) =>
+          canvas.id === row.dataset.canvasId &&
+          !!canvas.pinned ===
+            !!canvases.value.find((entry) => entry.id === drag.value?.id)
+              ?.pinned,
+      )
+    ) {
       drag.value.targetId = row.dataset.canvasId;
+    } else {
+      drag.value.targetId = drag.value.id;
+    }
   }
 
   function cancelDrag() {
@@ -90,10 +106,23 @@ export function useCanvasReorder({
     const ids = canvases.value.map((item) => item.id),
       target = ids.indexOf(current.targetId);
 
-    ids.splice(ids.indexOf(current.id), 1);
+    const source = ids.indexOf(current.id);
+
+    if (
+      source < 0 ||
+      target < 0 ||
+      source === target ||
+      !!canvases.value[source]?.pinned !== !!canvases.value[target]?.pinned
+    ) {
+      cancelDrag();
+
+      return;
+    }
+
+    ids.splice(source, 1);
     ids.splice(target, 0, current.id);
     cancelDrag();
-    void reorder(ids);
+    if (!locked.value) void reorder(ids);
   }
 
   function dragKey(event: KeyboardEvent, canvas: CanvasMeta) {

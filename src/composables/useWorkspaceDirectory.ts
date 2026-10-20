@@ -14,6 +14,7 @@ export interface WorkspaceDirectoryDependencies {
     | "listWorkspaces"
     | "readCatalog"
     | "reorder"
+    | "setCanvasPinned"
     | "createWorkspace"
     | "renameWorkspace"
     | "deleteWorkspace"
@@ -57,6 +58,9 @@ export interface WorkspaceDirectoryController {
     workspaceId: string;
     canvasId: string;
   }): Promise<void>;
+  /** 设置置顶而不切换编辑器；失败回读目录，无法确认时锁定目录修改。 */
+  setCanvasPinned(canvas: CanvasMeta, pinned: boolean): Promise<void>;
+  /** 接收置顶组在前的完整显示顺序，仅允许组内调整基础排序槽位。 */
   reorderCanvas(ids: string[]): Promise<void>;
   selectWorkspace(id: string): Promise<void>;
   selectCanvas(id: string): Promise<void>;
@@ -121,8 +125,10 @@ export function useWorkspaceDirectory({
   }
 
   async function refreshAfterRestore() {
+    const generation = switchGeneration;
     const entries = await api.listWorkspaces();
 
+    if (generation !== switchGeneration) return;
     workspaces.value = entries;
     if (
       workspaceId.value &&
@@ -133,10 +139,13 @@ export function useWorkspaceDirectory({
   }
 
   async function readDirectory(id: string) {
+    const generation = switchGeneration;
     const catalog = await api.readCatalog(id);
 
-    for (const canvas of catalog.canvases)
+    for (const canvas of catalog.canvases) {
+      if (generation !== switchGeneration) break;
       await canvasDocument.restoreCanvas?.(canvas.id);
+    }
 
     return catalog;
   }
@@ -154,9 +163,17 @@ export function useWorkspaceDirectory({
 
   async function refreshDirectory() {
     if (!workspaceId.value) return;
+    const id = workspaceId.value;
+    const generation = switchGeneration;
+
     try {
-      setDirectory(workspaceId.value, await readDirectory(workspaceId.value));
+      const data = await readDirectory(id);
+
+      if (generation === switchGeneration && id === workspaceId.value) {
+        setDirectory(id, data);
+      }
     } catch (error) {
+      if (generation !== switchGeneration || id !== workspaceId.value) return;
       directoryStale.value = true;
       throw new Error("未能确认最新画布列表，请重新加载列表后再操作。", {
         cause: error,
@@ -171,6 +188,7 @@ export function useWorkspaceDirectory({
     generation = ++switchGeneration,
     strictPreferred = false,
   ) {
+    if (generation !== switchGeneration) return;
     const data = await readDirectory(id);
 
     if (generation !== switchGeneration) return;
@@ -237,6 +255,7 @@ export function useWorkspaceDirectory({
           throw new Error("目标工作空间不可访问");
         const listing = await readDirectory(target.workspaceId);
 
+        if (generation !== switchGeneration) return;
         if (!listing.canvases.some((item) => item.id === target.canvasId))
           throw new Error("目标画布不可访问");
         await loadWorkspace(
@@ -303,6 +322,42 @@ export function useWorkspaceDirectory({
     }
   }
 
+  async function setCanvasPinned(canvas: CanvasMeta, pinned: boolean) {
+    if (
+      directoryLocked.value ||
+      !canvases.value.some((entry) => entry.id === canvas.id)
+    )
+      return;
+    const id = workspaceId.value;
+    const generation = switchGeneration;
+    const revision = catalogRevision.value;
+    const stillCurrent = () =>
+      generation === switchGeneration && id === workspaceId.value;
+
+    await run(async () => {
+      try {
+        const data = await api.setCanvasPinned(canvas.id, pinned, revision);
+
+        if (stillCurrent()) setDirectory(id, data);
+      } catch (cause) {
+        if (!stillCurrent()) return;
+        await refreshDirectory();
+        if (!stillCurrent()) return;
+        const confirmed = canvases.value.find(
+          (entry) => entry.id === canvas.id,
+        );
+
+        if (confirmed && !!confirmed.pinned === pinned) return;
+        throw new Error(
+          cause instanceof ApiError && cause.code === "CATALOG_CONFLICT"
+            ? "列表已在其他页面更新，请重新设置置顶。"
+            : "置顶状态未保存，已恢复服务端列表，请重试。",
+          { cause },
+        );
+      }
+    });
+  }
+
   async function reorderCanvas(ids: string[]) {
     if (
       directoryLocked.value ||
@@ -310,21 +365,41 @@ export function useWorkspaceDirectory({
     )
       return;
     const previous = [...canvases.value];
+
+    if (
+      ids.length !== previous.length ||
+      new Set(ids).size !== ids.length ||
+      ids.some((id) => !previous.some((canvas) => canvas.id === id))
+    )
+      return;
     const ordered = ids.map((id) =>
       previous.find((canvas) => canvas.id === id)!,
     );
 
+    if (
+      ordered.some(
+        (canvas, index) => !!canvas.pinned !== !!previous[index]?.pinned,
+      )
+    )
+      return;
+    const id = workspaceId.value;
+    const generation = switchGeneration;
+    const revision = catalogRevision.value;
+    const stillCurrent = () =>
+      generation === switchGeneration && id === workspaceId.value;
+
     await run(async () => {
       canvases.value = ordered;
       try {
-        setDirectory(
-          workspaceId.value,
-          await api.reorder(workspaceId.value, ids, catalogRevision.value),
-        );
+        const data = await api.reorder(id, ids, revision);
+
+        if (stillCurrent()) setDirectory(id, data);
       } catch (cause) {
+        if (!stillCurrent()) return;
         canvases.value = previous;
         // A response can be lost after commit. Always re-read instead of sending the old order again.
         await refreshDirectory();
+        if (!stillCurrent()) return;
         const accepted =
           canvases.value
             .map((item) => item.id)
@@ -611,6 +686,7 @@ export function useWorkspaceDirectory({
     refreshDirectory,
     refreshAfterRestore,
     loadWorkspaces,
+    setCanvasPinned,
     reorderCanvas,
     selectWorkspace,
     selectCanvas,

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { CanvasMeta } from "#shared/contracts";
+import { APP_VERSION } from "#shared/app-version";
+import CanvasContextMenu from "~/components/CanvasContextMenu.vue";
+import { useCanvasContextMenu } from "~/composables/use-canvas-context-menu";
 import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "~/components/AccountGate.vue";
 import QuietIcon from "~/components/QuietIcon.vue";
@@ -287,7 +290,38 @@ const {
   createCanvas,
   renameCanvas,
   deleteCanvas,
+  setCanvasPinned,
 } = directory;
+const canvasMenu = useCanvasContextMenu({
+  canvases,
+  workspaceId,
+  enabled: computed(
+    () => !!user.value && sidebarOpen.value && !directoryLocked.value,
+  ),
+});
+const menuTarget = canvasMenu.target;
+const menuCanvas = computed(() =>
+  canvases.value.find((canvas) => canvas.id === menuTarget.value?.id),
+);
+const canMoveCanvas = (canvas: CanvasMeta, offset: number) => {
+  const index = canvases.value.findIndex((entry) => entry.id === canvas.id);
+  const neighbor = canvases.value[index + offset];
+
+  return !!neighbor && !!neighbor.pinned === !!canvas.pinned;
+};
+const menuAction = (
+  action: "pin" | "rename" | "delete" | "move",
+  offset = 0,
+) => {
+  const canvas = menuCanvas.value;
+
+  if (!canvas) return;
+  canvasMenu.close(true);
+  if (action === "pin") void setCanvasPinned(canvas, !canvas.pinned);
+  else if (action === "rename") void renameCanvas(canvas);
+  else if (action === "delete") void deleteCanvas(canvas);
+  else moveCanvas(canvas, offset);
+};
 let sidebarSelection = Promise.resolve();
 
 function selectSidebarCanvas(event: MouseEvent, id: string) {
@@ -464,7 +498,26 @@ async function flushForShare() {
           ><span class="brand-symbol"
             ><QuietIcon name="canvas" :size="17" /></span
           >画布空间</span
-        ><button
+        ><span class="app-version">v{{ APP_VERSION }}</span>
+        <a
+          class="github-link icon-button"
+          href="https://github.com/qiudeng7/excalidraw-workspace"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="GitHub 仓库"
+          title="GitHub 仓库"
+          ><svg
+            viewBox="0 0 24 24"
+            width="17"
+            height="17"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 .75a11.25 11.25 0 0 0-3.558 21.923c.563.104.768-.244.768-.542 0-.267-.01-.974-.015-1.912-3.13.68-3.79-1.51-3.79-1.51-.512-1.3-1.25-1.647-1.25-1.647-1.022-.7.078-.686.078-.686 1.13.08 1.724 1.16 1.724 1.16 1.005 1.722 2.637 1.225 3.279.937.102-.728.393-1.225.715-1.506-2.498-.284-5.124-1.25-5.124-5.56 0-1.228.44-2.233 1.16-3.02-.116-.285-.503-1.43.11-2.98 0 0 .945-.303 3.094 1.154A10.8 10.8 0 0 1 12 6.183c.956.005 1.918.13 2.817.378 2.148-1.457 3.092-1.154 3.092-1.154.615 1.55.228 2.695.113 2.98.72.787 1.157 1.792 1.157 3.02 0 4.322-2.63 5.273-5.136 5.55.404.35.765 1.044.765 2.105 0 1.52-.014 2.746-.014 3.119 0 .3.202.651.774.54A11.252 11.252 0 0 0 12 .75Z"
+            /></svg
+        ></a>
+        <button
           class="icon-button"
           title="收起侧边栏"
           aria-label="收起侧边栏"
@@ -646,11 +699,14 @@ async function flushForShare() {
           <QuietIcon name="plus" :size="16" />
         </button>
       </div>
-      <ul class="canvas-list">
+      <ul class="canvas-list" @click.capture="canvasMenu.suppressClick">
         <li
-          v-for="(canvas, index) in canvases"
+          v-for="canvas in canvases"
           :key="canvas.id"
           :data-canvas-id="canvas.id"
+          @contextmenu="canvasMenu.contextMenu($event, canvas)"
+          @keydown="canvasMenu.keyDown($event, canvas)"
+          @pointerdown="canvasMenu.pointerDown($event, canvas)"
           :class="{
             selected: document?.id === canvas.id,
             dragging: drag?.id === canvas.id,
@@ -691,6 +747,13 @@ async function flushForShare() {
             @dblclick="renameSidebarCanvas(canvas)"
           >
             <QuietIcon name="canvas" :size="16" /><span>{{ canvas.name }}</span>
+            <QuietIcon
+              v-if="canvas.pinned"
+              name="pin"
+              :size="13"
+              class="pin-mark"
+              aria-label="已置顶"
+            />
             <small
               v-if="resources?.canvases.get(canvas.id)?.resource.dirty"
               :title="
@@ -705,42 +768,6 @@ async function flushForShare() {
               }}</small
             >
           </button>
-          <details class="action-menu canvas-menu">
-            <summary
-              :aria-label="`画布 ${canvas.name} 的操作`"
-              title="画布操作"
-            >
-              <QuietIcon name="more" :size="16" />
-            </summary>
-            <div class="menu-popover" @click="closeActionMenu">
-              <button
-                :aria-label="`上移画布 ${canvas.name}`"
-                :disabled="directoryLocked || index === 0"
-                @click="moveCanvas(canvas, -1)"
-              >
-                ↑ 上移</button
-              ><button
-                :aria-label="`下移画布 ${canvas.name}`"
-                :disabled="directoryLocked || index === canvases.length - 1"
-                @click="moveCanvas(canvas, 1)"
-              >
-                ↓ 下移</button
-              ><button
-                :aria-label="`重命名画布 ${canvas.name}`"
-                :disabled="directoryLocked"
-                @click="renameCanvas(canvas)"
-              >
-                <QuietIcon name="edit" :size="15" />重命名</button
-              ><button
-                class="danger"
-                :aria-label="`删除画布 ${canvas.name}`"
-                :disabled="directoryLocked"
-                @click="deleteCanvas(canvas)"
-              >
-                <QuietIcon name="trash" :size="15" />删除画布
-              </button>
-            </div>
-          </details>
         </li>
       </ul>
       <p v-if="!canvases.length" class="sidebar-empty">
@@ -787,6 +814,19 @@ async function flushForShare() {
         </div>
       </div>
     </aside>
+    <CanvasContextMenu
+      v-if="menuTarget && menuCanvas"
+      :canvas="menuCanvas"
+      :target="menuTarget"
+      :locked="directoryLocked"
+      :can-move-up="canMoveCanvas(menuCanvas, -1)"
+      :can-move-down="canMoveCanvas(menuCanvas, 1)"
+      @close="canvasMenu.close"
+      @pin="menuAction('pin')"
+      @move="menuAction('move', $event)"
+      @rename="menuAction('rename')"
+      @delete="menuAction('delete')"
+    />
     <div class="draw-content">
       <div
         v-for="entry in [...(resources?.canvases.values() ?? [])].filter(
@@ -1293,6 +1333,20 @@ async function flushForShare() {
   height: 68px;
   flex: none;
   padding: 0 4px;
+}
+.app-version {
+  color: var(--app-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.github-link {
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+.pin-mark {
+  flex: none;
+  color: var(--app-accent);
 }
 .workspace-brand {
   display: flex;

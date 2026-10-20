@@ -88,6 +88,7 @@ export const canvases = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     position: integer().notNull().default(0),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
     deletedAt: text("deleted_at"),
     recycleRevision: integer("recycle_revision").notNull().default(0),
     recyclePending: integer("recycle_pending").notNull().default(0),
