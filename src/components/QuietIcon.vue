@@ -18,6 +18,7 @@ const paths: Record<string, string> = {
   panel:
     "M9 3v18M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z",
   plus: "M12 5v14M5 12h14",
+  pin: "m16 3 5 5-4 1-3 4v4l-7-7h4l4-3ZM9 15l-6 6",
   more: "M5 12h.01M12 12h.01M19 12h.01",
   canvas: "M5 3h10l4 4v14H5ZM14 3v5h5M8 13h8M8 17h5",
   edit: "m15 4 5 5M4 20l1-5L16 4a2 2 0 0 1 4 4L9 19Z",

@@ -116,6 +116,7 @@ export async function createAccount(
           createdAt: sql<string>`${now}`.as("createdAt"),
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           position: sql<number>`0`.as("position"),
+          pinned: sql<boolean>`0`.as("pinned"),
           deletedAt: sql<string | null>`NULL`.as("deletedAt"),
           recycleRevision: sql<number>`0`.as("recycleRevision"),
           recyclePending: sql<number>`0`.as("recyclePending"),

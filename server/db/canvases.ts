@@ -2,6 +2,7 @@ import { db } from "@nuxthub/db";
 import {
   and,
   asc,
+  desc,
   eq,
   exists,
   getTableColumns,
@@ -68,6 +69,7 @@ export async function createCanvas(
           createdAt: sql<string>`${now}`.as("createdAt"),
           updatedAt: sql<string>`${now}`.as("updatedAt"),
           position: sql<number>`0`.as("position"),
+          pinned: sql<boolean>`0`.as("pinned"),
           deletedAt: sql<string | null>`NULL`.as("deletedAt"),
           recycleRevision: sql<number>`0`.as("recycleRevision"),
           recyclePending: sql<number>`0`.as("recyclePending"),
@@ -157,6 +159,48 @@ export async function deleteCanvas(
   return { changed: result[1].length, objectKey: result[0][0]?.objectKey };
 }
 
+/** Pin metadata and the directory revision publish together, without touching scene state. */
+export async function setCanvasPinned(
+  id: string,
+  user: string,
+  workspace: string,
+  pinned: boolean,
+  revision: number,
+) {
+  const available = and(
+    eq(tables.canvases.id, id),
+    eq(tables.canvases.workspaceId, workspace),
+    isNull(tables.canvases.deletedAt),
+  );
+  const result = await db.batch([
+    db
+      .update(tables.canvases)
+      .set({ pinned })
+      .where(and(available, catalogMatches(workspace, user, revision))),
+    db
+      .update(tables.workspaces)
+      .set({ catalogRevision: sql`${tables.workspaces.catalogRevision}+1` })
+      .where(
+        and(
+          eq(tables.workspaces.id, workspace),
+          eq(tables.workspaces.userId, user),
+          eq(tables.workspaces.deleting, 0),
+          isNull(tables.workspaces.deletedAt),
+          eq(tables.workspaces.catalogRevision, revision),
+          exists(
+            db
+              .select({ id: tables.canvases.id })
+              .from(tables.canvases)
+              .where(available),
+          ),
+        ),
+      )
+      .returning({ id: tables.workspaces.id }),
+  ]);
+
+  return result[1].length;
+}
+
 export async function reorderCanvases(
   workspace: string,
   user: string,
@@ -221,7 +265,11 @@ export async function canvasCatalog(workspace: string, user: string) {
           inArray(tables.canvases.workspaceId, ownedWorkspaceIds(user)),
         ),
       )
-      .orderBy(asc(tables.canvases.position), asc(tables.canvases.id)),
+      .orderBy(
+        desc(tables.canvases.pinned),
+        asc(tables.canvases.position),
+        asc(tables.canvases.id),
+      ),
   ]);
 
   return result[0][0]

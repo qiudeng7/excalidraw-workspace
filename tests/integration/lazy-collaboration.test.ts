@@ -1,3 +1,5 @@
+// 使用真实 H3、临时 SQLite 和协作存储验证懒迁移、会话及条件读取；不覆盖浏览器或云端部署。
+// 置顶改变协作元数据缓存标识，不改变房间 epoch/seq、场景或内容版本。
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -316,7 +318,7 @@ test("presence is owner-only while explicit sharing creates the required room", 
   }
 });
 
-test("preparing reads expose authoritative collaborative metadata and conditional validation; restore retains the original migration epoch", async () => {
+test("迁移中读取返回权威协作元数据，置顶更新ETag但不改场景seq，恢复保留迁移epoch", async () => {
   const f = await fixture();
 
   try {
@@ -333,7 +335,7 @@ test("preparing reads expose authoritative collaborative metadata and conditiona
     assert.equal(value.migrationEpoch, value.roomEpoch);
     assert.equal(
       response.headers.get("etag"),
-      `"collaboration:${value.roomEpoch}:${value.revision}:${encodeURIComponent(value.name)}"`,
+      `"collaboration:${value.roomEpoch}:${value.revision}:${encodeURIComponent(value.name)}:false"`,
     );
     const conditional = await f.request(
       `/canvases/${f.id}`,
@@ -344,6 +346,55 @@ test("preparing reads expose authoritative collaborative metadata and conditiona
     );
 
     assert.equal(conditional.status, 304);
+    assert.equal(await conditional.text(), "");
+    assert.equal(value.pinned, false);
+    const catalog = await (
+      await f.request(`/workspaces/${f.workspaceId}/canvases`)
+    ).json();
+    const beforePinView = await (
+      await f.request(`/canvases/${f.id}/collaboration/view`)
+    ).json();
+    const pin = await f.request(`/canvases/${f.id}/pin`, "PUT", {
+      pinned: true,
+      catalogRevision: catalog.catalogRevision,
+    });
+
+    assert.equal(pin.status, 200);
+    const changed = await f.request(
+      `/canvases/${f.id}`,
+      "GET",
+      undefined,
+      undefined,
+      { "If-None-Match": response.headers.get("etag")! },
+    );
+
+    assert.equal(changed.status, 200);
+    const pinned = (await changed.json()).canvas;
+
+    assert.equal(pinned.pinned, true);
+    assert.equal(pinned.revision, value.revision);
+    assert.equal(pinned.updatedAt, value.updatedAt);
+    assert.equal(pinned.roomEpoch, value.roomEpoch);
+    assert.deepEqual(pinned.scene, value.scene);
+    assert.notEqual(changed.headers.get("etag"), response.headers.get("etag"));
+    assert.ok(changed.headers.get("etag"));
+    const afterPinView = await (
+      await f.request(`/canvases/${f.id}/collaboration/view`)
+    ).json();
+
+    assert.equal(afterPinView.seq, beforePinView.seq);
+    assert.equal(afterPinView.epoch, beforePinView.epoch);
+    assert.deepEqual(afterPinView.scene, beforePinView.scene);
+    const freshConditional = await f.request(
+      `/canvases/${f.id}`,
+      "GET",
+      undefined,
+      undefined,
+      { "If-None-Match": changed.headers.get("etag")! },
+    );
+
+    assert.equal(freshConditional.status, 304);
+    assert.equal(await freshConditional.text(), "");
     const backup = await (
       await f.request(`/canvases/${f.id}/collaboration/backup`)
     ).json();

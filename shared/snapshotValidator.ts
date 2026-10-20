@@ -25,7 +25,7 @@ export function canvasValidator(
   canvas: import("#shared/contracts").CanvasMeta,
 ) {
   if (canvas.syncMode === "collaborative" && canvas.roomEpoch)
-    return `"collaboration:${canvas.roomEpoch}:${canvas.revision}:${encodeURIComponent(canvas.name)}"`;
+    return `"collaboration:${canvas.roomEpoch}:${canvas.revision}:${encodeURIComponent(canvas.name)}:${!!canvas.pinned}"`;
 
   return snapshotValidator(
     "canvas",
@@ -37,6 +37,7 @@ export function canvasValidator(
       canvas.position,
       canvas.workspaceId,
       canvas.createdAt,
+      !!canvas.pinned,
     ]),
   );
 }

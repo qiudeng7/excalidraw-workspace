@@ -93,6 +93,11 @@ test(`node: navigation and catalog CAS are atomic, migrated order and foreign ke
         ["c", 2],
       ],
     );
+    // 从真实 0001 旧库迁移的每条记录必须显式返回 false，而非省略新字段。
+    assert.deepEqual(
+      migrated!.canvases.map((row) => row.pinned),
+      [false, false, false],
+    );
     assert.equal(migrated!.catalogRevision, 0);
     assert.equal((await storage.queries.navigation("legacy")).revision, 0);
     raw.exec(

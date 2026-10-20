@@ -12,6 +12,22 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-10-20-sidebar-menu",
+    sequence: 10,
+    version: "0.8.0",
+    date: "2026-10-20",
+    title: "常用文件可置顶，侧栏操作更顺手",
+    summary:
+      "常用文件可置顶到列表前方，文件操作统一收进右键菜单；侧栏标题旁可查看当前版本并访问 GitHub 仓库。",
+    changes: [
+      "在工作空间文件列表中置顶或取消置顶，状态按账号保存；同一账号在其他设备刷新页面或重新进入工作空间后可见，不会实时同步，也不适用于“与我共享”列表。",
+      "文件右键菜单取代原来的行尾三个点入口，集中提供置顶、重命名、排序和删除等操作。",
+      "键盘聚焦文件名后，可按 Shift+F10 或菜单键（ContextMenu）打开菜单；移动端可长按文件打开。",
+      "侧栏“画布空间”标题旁显示当前版本，并新增 GitHub 仓库入口。",
+    ],
+    actions: ["已打开的页面请刷新后使用新版。"],
+  },
+  {
     id: "workspace-2026-10-19-text-highlight",
     sequence: 9,
     version: "0.7.0",
