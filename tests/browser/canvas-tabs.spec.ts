@@ -580,9 +580,12 @@ test("tabs support keyboard navigation, adjacent close focus, rename, delete and
     page.getByRole("tab", { name: "画布 A", exact: true }),
   ).toBeFocused();
   await openCanvas(page, "b");
-  await page.locator('[data-canvas-id="b"] summary').click();
   await page
-    .getByRole("button", { name: "删除画布 新的标签名称", exact: true })
+    .locator('[data-canvas-id="b"] .canvas-name')
+    .click({ button: "right" });
+  await page
+    .getByRole("menu", { name: "画布 新的标签名称 的操作", exact: true })
+    .getByRole("menuitem", { name: "删除画布", exact: true })
     .click();
   await page
     .getByRole("dialog", { name: "移入回收站", exact: true })

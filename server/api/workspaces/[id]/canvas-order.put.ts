@@ -33,8 +33,41 @@ export default defineApiHandler(async (event) => {
       "INVALID_CANVAS_ORDER",
       "画布顺序必须包含该空间所有画布且不可重复",
     );
-  if (!(await reorderCanvases(id, user.id, ids, revision)))
+  const byId = new Map(catalog.canvases.map((canvas) => [canvas.id, canvas]));
+  const pinnedCount = catalog.canvases.filter((canvas) => canvas.pinned).length;
+
+  if (
+    ids.some(
+      (canvasId, index) => !!byId.get(canvasId)!.pinned !== index < pinnedCount,
+    )
+  ) {
+    return fail(
+      400,
+      "INVALID_CANVAS_ORDER",
+      "只能在置顶或未置顶分组内调整顺序",
+    );
+  }
+
+  // Preserve each group's original slots, including after pinning interleaved files.
+  // Normalize tied positions (possible after restore) using the canonical ID tie-break.
+  const base = [...catalog.canvases].sort(
+    (a, b) =>
+      a.position - b.position || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+  const pinnedIds = ids.slice(0, pinnedCount);
+  const unpinnedIds = ids.slice(pinnedCount);
+  let pinnedIndex = 0;
+  let unpinnedIndex = 0;
+  const baseIds = base.map((canvas) =>
+    canvas.pinned ? pinnedIds[pinnedIndex++]! : unpinnedIds[unpinnedIndex++]!,
+  );
+
+  if (!(await reorderCanvases(id, user.id, baseIds, revision)))
     return fail(409, "CATALOG_CONFLICT", "列表已在其他页面更新，请重新排序");
 
-  return json(await canvasCatalog(id, user.id));
+  const updated = await canvasCatalog(id, user.id);
+
+  if (!updated) return fail(404, "NOT_FOUND", "工作区不存在");
+
+  return json(updated);
 });

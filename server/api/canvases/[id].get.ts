@@ -23,7 +23,13 @@ export default defineApiHandler(async (event) => {
   if (row.syncMode !== "legacy") {
     const view = await canvasCommand<CanvasView>(event, id, { type: "view" });
     const active = await requireCanvas(id, user);
-    const ETag = `"collaboration:${view.epoch}:${view.seq}:${encodeURIComponent(view.name)}"`;
+    const ETag = canvasValidator({
+      ...meta(active),
+      syncMode: "collaborative",
+      name: view.name,
+      roomEpoch: view.epoch,
+      revision: view.seq,
+    });
 
     if (req.headers.get("if-none-match") === ETag)
       return new Response(null, { status: 304, headers: { ETag } });

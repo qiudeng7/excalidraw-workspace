@@ -148,8 +148,9 @@ test("rename failure retains the name; menu and drag controls do not trigger dou
 
   await row.locator(".drag-handle").dblclick();
   await expect(dialog).toBeHidden();
-  await row.locator("summary").dblclick();
+  await target.click({ button: "right" });
   await expect(dialog).toBeHidden();
+  await page.keyboard.press("Escape");
   mock.failRename(true);
   await target.dblclick();
   await dialog.getByLabel("画布名称").fill("新的名称");
@@ -158,9 +159,12 @@ test("rename failure retains the name; menu and drag controls do not trigger dou
   await expect(target).toHaveAttribute("aria-label", "测试画布");
   mock.failRename(false);
   // The existing menu remains keyboard accessible and uses the same dialog.
-  await row.locator("summary").focus();
-  await page.keyboard.press("Enter");
-  await row.getByRole("button", { name: "重命名画布 测试画布" }).click();
+  await target.focus();
+  await page.keyboard.press("Shift+F10");
+  await page
+    .getByRole("menu", { name: "画布 测试画布 的操作", exact: true })
+    .getByRole("menuitem", { name: "重命名", exact: true })
+    .click();
   await dialog.getByLabel("画布名称").fill("第二个画布");
   await dialog.getByRole("button", { name: "保存名称" }).click();
   await expect(target).toHaveAttribute("aria-label", "第二个画布");

@@ -1938,9 +1938,13 @@ test("回收站同页删除恢复重新打开，实时成员立即失去访问�
       .toBe(1);
     const before = await call(owner.context, baseURL!, owner.id, "view");
 
-    await page.getByLabel("画布 未命名画布 的操作", { exact: true }).click();
     await page
-      .getByRole("button", { name: "删除画布 未命名画布", exact: true })
+      .locator(".canvas-name")
+      .filter({ hasText: "未命名画布" })
+      .click({ button: "right" });
+    await page
+      .getByRole("menu", { name: "画布 未命名画布 的操作", exact: true })
+      .getByRole("menuitem", { name: "删除画布", exact: true })
       .click();
     await page
       .getByRole("dialog", { name: "移入回收站", exact: true })
@@ -2035,9 +2039,13 @@ test("回收工作空间保留曾单独回收的画布，并可同页恢复父�
 
     expect(second.status()).toBe(200);
     await open(page, "/", true);
-    await page.getByLabel("画布 未命名画布 的操作", { exact: true }).click();
     await page
-      .getByRole("button", { name: "删除画布 未命名画布", exact: true })
+      .locator(".canvas-name")
+      .filter({ hasText: "未命名画布" })
+      .click({ button: "right" });
+    await page
+      .getByRole("menu", { name: "画布 未命名画布 的操作", exact: true })
+      .getByRole("menuitem", { name: "删除画布", exact: true })
       .click();
     await page
       .getByRole("dialog", { name: "移入回收站", exact: true })

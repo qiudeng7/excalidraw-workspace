@@ -137,6 +137,7 @@ function directoryFixture() {
     reorder: async () => {
       throw new ApiError(409, "CATALOG_CONFLICT", "conflict");
     },
+    setCanvasPinned: unused,
     createWorkspace: unused,
     renameWorkspace: unused,
     deleteWorkspace: unused,
@@ -174,6 +175,193 @@ function directoryFixture() {
     },
   };
 }
+
+// 以下置顶用例使用真实目录控制器与替代 API；只证明客户端协调，不证明云端写入。
+for (const status of [409, 503]) {
+  test(`置顶写入${status}失败后回读目标状态，不自动重试或切换编辑器`, async () => {
+    const f = directoryFixture();
+    let writes = 0;
+
+    await f.directory.loadWorkspaces();
+    f.api.setCanvasPinned = async () => {
+      writes++;
+      throw new ApiError(status, "PIN_FAILED", "置顶失败");
+    };
+
+    f.api.readCatalog = async () => ({
+      canvases: [{ ...canvas("second", 1), pinned: true }, canvas("first", 0)],
+      catalogRevision: 4,
+    });
+    await f.directory.setCanvasPinned(f.directory.canvases.value[1]!, true);
+    assert.equal(writes, 1);
+    assert.equal(f.directory.canvases.value[0]!.pinned, true);
+    assert.equal(f.document.document.value?.id, "first");
+    assert.equal(f.directory.directoryStale.value, false);
+    assert.equal(Boolean(f.operation.error.value), false);
+  });
+}
+
+test("置顶写入未确认前不乐观重排，失败回读未达目标则保留原状态并提示", async () => {
+  const f = directoryFixture();
+
+  await f.directory.loadWorkspaces();
+  let reject!: (error: Error) => void;
+  let writes = 0;
+
+  f.api.setCanvasPinned = () => {
+    writes++;
+
+    return new Promise((_, fail) => {
+      reject = fail;
+    });
+  };
+
+  const action = f.directory.setCanvasPinned(
+    f.directory.canvases.value[1]!,
+    true,
+  );
+
+  await Promise.resolve();
+  assert.deepEqual(
+    f.directory.canvases.value.map((item) => item.id),
+    ["first", "second"],
+  );
+  assert.equal(Boolean(f.directory.canvases.value[1]!.pinned), false);
+  reject(new ApiError(503, "PIN_FAILED", "置顶失败"));
+  await action;
+  assert.equal(writes, 1);
+  assert.equal(Boolean(f.operation.error.value), true);
+  assert.equal(Boolean(f.directory.canvases.value[1]!.pinned), false);
+  assert.equal(f.document.document.value?.id, "first");
+});
+
+test("置顶失败且回读失败会锁定目录，不能继续写入未知版本", async () => {
+  const f = directoryFixture();
+
+  await f.directory.loadWorkspaces();
+  let writes = 0;
+
+  f.api.setCanvasPinned = async () => {
+    writes++;
+    throw new ApiError(503, "PIN_FAILED", "置顶失败");
+  };
+
+  f.failCatalog();
+  const target = f.directory.canvases.value[1]!;
+
+  await f.directory.setCanvasPinned(target, true);
+  assert.equal(f.directory.directoryStale.value, true);
+  assert.equal(f.directory.directoryLocked.value, true);
+  await f.directory.setCanvasPinned(target, true);
+  assert.equal(writes, 1);
+});
+
+for (const outcome of ["success", "failure"] as const) {
+  test(`账号重置后旧置顶${outcome}响应不得覆盖或锁定新目录`, async () => {
+    const f = directoryFixture();
+
+    await f.directory.loadWorkspaces();
+    let resolve!: (value: {
+      canvases: CanvasMeta[];
+      catalogRevision: number;
+    }) => void;
+    let reject!: (reason: Error) => void;
+
+    f.api.setCanvasPinned = () =>
+      new Promise((done, fail) => {
+        resolve = done;
+        reject = fail;
+      });
+    const action = f.directory.setCanvasPinned(
+      f.directory.canvases.value[1]!,
+      true,
+    );
+
+    await Promise.resolve();
+    f.directory.reset();
+    f.document.reset();
+    f.api.listWorkspaces = async () => [{ ...workspace, id: "new-space" }];
+    f.api.readCatalog = async () => ({
+      canvases: [{ ...canvas("new-canvas", 0), workspaceId: "new-space" }],
+      catalogRevision: 7,
+    });
+    await f.directory.loadWorkspaces();
+    if (outcome === "success") {
+      resolve({
+        canvases: [{ ...canvas("second", 1), pinned: true }],
+        catalogRevision: 1,
+      });
+    } else {
+      reject(new ApiError(503, "OLD_ACCOUNT_FAILURE", "旧账号失败"));
+    }
+
+    await action;
+    assert.equal(f.directory.workspaceId.value, "new-space");
+    assert.deepEqual(
+      f.directory.canvases.value.map((item) => item.id),
+      ["new-canvas"],
+    );
+    assert.equal(f.directory.directoryStale.value, false);
+    assert.equal(f.directory.directoryLocked.value, false);
+    assert.equal(Boolean(f.operation.error.value), false);
+  });
+}
+
+test(
+  "置顶失败回读尚未完成时切换账号，旧回读失败不得锁定新目录",
+  { timeout: 5000 },
+  async () => {
+    const f = directoryFixture();
+
+    await f.directory.loadWorkspaces();
+    let begin!: () => void;
+    let rejectRead!: (error: Error) => void;
+    const started = new Promise<void>((resolve) => {
+      begin = resolve;
+    });
+
+    f.api.setCanvasPinned = async () => {
+      throw new ApiError(503, "PIN_FAILED", "旧置顶失败");
+    };
+
+    f.api.readCatalog = () => {
+      begin();
+
+      return new Promise((_, reject) => {
+        rejectRead = reject;
+      });
+    };
+
+    const action = f.directory.setCanvasPinned(
+      f.directory.canvases.value[1]!,
+      true,
+    );
+
+    await started;
+    f.directory.reset();
+    f.document.reset();
+    f.api.listWorkspaces = async () => [{ ...workspace, id: "new-space" }];
+    f.api.readCatalog = async () => ({
+      canvases: [{ ...canvas("new-canvas", 0), workspaceId: "new-space" }],
+      catalogRevision: 7,
+    });
+    try {
+      await f.directory.loadWorkspaces();
+    } finally {
+      rejectRead(new ApiError(503, "OLD_READ_FAILED", "旧账号回读失败"));
+    }
+
+    await action;
+    assert.equal(f.directory.workspaceId.value, "new-space");
+    assert.deepEqual(
+      f.directory.canvases.value.map((item) => item.id),
+      ["new-canvas"],
+    );
+    assert.equal(f.directory.directoryStale.value, false);
+    assert.equal(f.directory.directoryLocked.value, false);
+    assert.equal(Boolean(f.operation.error.value), false);
+  },
+);
 
 test("directory refuses switching past a failed editor save barrier", async () => {
   const { directory, document, operation, failFlush } = directoryFixture();

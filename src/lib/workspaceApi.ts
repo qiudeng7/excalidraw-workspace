@@ -32,6 +32,15 @@ export interface WorkspaceApi {
     revision: number,
     ownerId?: string,
   ): Promise<Navigation>;
+  /**
+   * 设置所有者目录中的置顶状态，返回服务端确认的完整目录。
+   * 使用目录版本比较更新，不修改基础顺序或内容版本；失败后调用方回读确认。
+   */
+  setCanvasPinned(
+    canvasId: string,
+    pinned: boolean,
+    catalogRevision: number,
+  ): Promise<CanvasCatalog>;
   reorder(
     workspaceId: string,
     canvasIds: string[],
@@ -109,6 +118,11 @@ export const workspaceApi: WorkspaceApi = {
       ...json("PUT", { canvasId, revision }),
       headers: ownerId ? { "X-Resource-Owner": ownerId } : {},
     }),
+  setCanvasPinned: (id, pinned, catalogRevision) =>
+    api<CanvasCatalog>(
+      `/api/canvases/${segment(id)}/pin`,
+      json("PUT", { pinned, catalogRevision }),
+    ),
   reorder: (id, canvasIds, catalogRevision) =>
     api<CanvasCatalog>(
       `/api/workspaces/${segment(id)}/canvas-order`,

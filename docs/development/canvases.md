@@ -8,7 +8,7 @@
 
 ## 创建画布
 
-`createCanvas()` 等待当前编辑器保存，再通过 [POST /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.post.ts) 提交名称和目录版本 `catalogRevision`。后端验证空间归属，通过 [db/canvases.ts](../../server/db/canvases.ts) 原子插入画布到目录顶部，并递增目录版本。
+`createCanvas()` 等待当前编辑器保存，再通过 [POST /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.post.ts) 提交名称和目录版本 `catalogRevision`。后端验证空间归属，通过 [db/canvases.ts](../../server/db/canvases.ts) 原子插入画布到基础顺序顶部，并递增目录版本；新画布未置顶，显示在未置顶组顶部。
 
 成功后前端重新读取 [GET /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.get.ts)，再读取新画布、后台记录最近位置，后两步见[切换画布](#切换画布)。新画布尚无快照，读取时返回空场景。
 
@@ -114,11 +114,41 @@ flowchart TD
 
 拖拽及键盘动作由 [useCanvasReorder.ts](../../src/composables/useCanvasReorder.ts) 转成完整 ID 顺序，交给 `useWorkspaceDirectory.reorderCanvas()`。前端先预览顺序，再通过 [PUT /api/workspaces/:id/canvas-order](../../server/api/workspaces/[id]/canvas-order.put.ts) 提交 `{ canvasIds, catalogRevision }`。
 
-后端要求列表包含空间内全部画布、没有重复或遗漏，通过 [reorderCanvases()](../../server/db/canvases.ts) 原子更新顺序和目录版本。版本不符返回 `409 CATALOG_CONFLICT`。
+后端要求列表包含空间内全部画布、没有重复或遗漏，置顶组必须在前；通过 [reorderCanvases()](../../server/db/canvases.ts) 原子更新同组基础排序槽位和目录版本，详见[置顶与基础顺序](#置顶与基础顺序)。版本不符返回 `409 CATALOG_CONFLICT`。
 
 请求失败后，前端先恢复原列表，再通过 [GET /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.get.ts) 确认服务端结果，不自动重试旧顺序。目录仍无法读取时锁定目录修改，用户重新加载成功后再开放操作。
 
+## 文件置顶与操作菜单契约
+
+### 置顶与基础顺序
+
+置顶属于当前账号拥有的工作空间目录，不涉及“与我共享”。数据库画布行保存 `pinned`，旧数据和新画布默认为 `false`；客户端兼容未带此字段的旧响应，按未置顶处理。目录读取先显示置顶组，再显示未置顶组，两组内部均沿用 `position, id` 顺序。置顶和取消置顶不改变 `position`、内容版本、更新时间或最近打开位置。
+
+例如基础顺序为 `A B C D`，先置顶 C，再置顶 A，显示 `A C B D`；取消 C 后显示 `A B C D`。新建画布仍插入基础顺序顶部，但显示在未置顶组顶部，不超过已有置顶文件。
+
+拖拽、方向键和菜单上下移只能在同组内操作，组边界移动禁用，不能借移动取消置顶。现有排序接口仍接收完整显示顺序；置顶组不在前时返回 `400 INVALID_CANVAS_ORDER`。合法组内重排将该组的新顺序填回基础顺序中原属于该组的槽位，不将分组显示顺序直接保存为基础顺序。例如基础 `A B C D` 中 B、D 置顶，把显示 `B D A C` 改为 `D B A C`，基础顺序成为 `A D C B`，取消全部置顶后也显示这个顺序。恢复可能产生重复 `position`；重排按 `position, id` 确定基础槽位后规范化为连续位置，保持另一组的相对顺序。
+
+### 写入、失败与同步
+
+[WorkspaceApi](../../src/lib/workspaceApi.ts) 新增 `setCanvasPinned(canvasId, pinned, catalogRevision): Promise<CanvasCatalog>`；[目录控制器](../../src/composables/useWorkspaceDirectory.ts) 新增 `setCanvasPinned(canvas, pinned): Promise<void>`。HTTP 契约为 `PUT /api/canvases/:id/pin`，请求 `{ pinned: boolean, catalogRevision: number }`，成功返回完整 `{ canvases, catalogRevision }`。每次通过目录版本比较更新的请求均递增目录版本，包括设置为当前相同值；不使用反转状态的 toggle 请求。返回的是当前权威目录，可能包含本次写入之后其他设备的更新，不保证仍是请求的目标状态或恰好只增加一个版本。写入后空间被并发回收时返回 `404 NOT_FOUND`，前端仍按失败回读处理。
+
+接口只允许所有者。未登录返回 401；其他账号、仅有共享权限或已删除的文件/空间返回 `404 NOT_FOUND`。非布尔置顶值返回 `400 INVALID_PIN_STATE`，目录版本沿用现有非负安全整数校验；旧目录版本返回 `409 CATALOG_CONFLICT`，不修改数据。
+
+前端写入期间锁定目录，收到成功响应后采用服务端目录，不切换画布或标签，也不触发内容保存。任何写入错误都先重新读取目录：若目标状态已经达成，视为成功；否则采用服务端值并提示失败或冲突。重读也失败时保留先前列表并标记目录过期，禁止继续修改，直到重新加载成功。不得发送反向请求“回滚”，也不得自动重试覆盖其他设备；旧账号或旧空间的迟到响应不得覆盖当前目录。
+
+同账号跨浏览器设备共享服务端数据，刷新页面、重新进入工作空间或重新加载目录后可见最新置顶状态；不承诺已打开页面实时推送。软删除隐藏文件但保留置顶状态和基础位置，恢复后按当前目录顺序重新分组；删除期间的其他排序操作可能改变恢复后的绝对行号。恢复空间同理，彻底删除时清除对应行。
+
+### 菜单与标题
+
+文件行不再显示三个点，工作空间操作菜单保持不变。右键打开目标文件的菜单，不打开或切换画布；聚焦文件名后可用 `Shift+F10` 或 `ContextMenu` 键打开。菜单使用 `role="menu"`、名称“画布 {名称} 的操作”，操作项使用 `menuitem`：置顶/取消置顶、上移、下移、重命名、删除画布。方向键、Home、End 移动菜单焦点，Enter/Space 执行动作；Escape 关闭并返回触发行焦点。外部点击、滚动、切换空间、退出账号或目标文件消失时关闭。
+
+触屏在文件行非拖拽把手区域长按 500ms 打开菜单；移动超过 10px、取消指针或滚动时取消。长按成功后抑制后续点击，避免误打开画布。菜单应保持在视口内，矮屏允许菜单滚动，最后一项可访问。
+
+主侧栏“画布空间”标题旁显示根 [package.json](../../package.json) 的真实构建版本，格式为 `v{version}`，不使用编辑器包版本或另写版本常量。GitHub logo 链接到 <https://github.com/qiudeng7/excalidraw-workspace>，可访问名称为“GitHub 仓库”，以新标签页打开并带 `rel="noopener noreferrer"`。版本展示不改变版本号和更新公告。
+
 ## 验证入口
+
+[canvas-pinning.test.ts](../../tests/integration/canvas-pinning.test.ts) 通过真实 H3 和临时 SQLite 验证迁移、置顶持久化、权限、目录竞争、槽位排序与回收恢复；[sidebar-menu.spec.ts](../../tests/browser/sidebar-menu.spec.ts) 通过真实 Chromium 和 API 替身验证菜单、长按、键盘、视口、版本及 GitHub 入口，不验证真实设备触摸或云端同步。
 
 [canvas-tabs.test.ts](../../tests/unit/canvas-tabs.test.ts) 检查标签去重、关闭草稿保护、工作空间恢复与账号重置；[canvas-tabs.spec.ts](../../tests/browser/canvas-tabs.spec.ts) 检查真实编辑器的工具/视角、内容撤销/重做、图片撤销、远端变化、后台保存、文件管理和窄屏布局。
 

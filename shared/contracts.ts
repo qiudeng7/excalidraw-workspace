@@ -23,6 +23,8 @@ export interface Workspace {
 }
 
 export interface CanvasMeta {
+  /** 所有者目录的置顶状态；旧响应缺失时按未置顶处理。 */
+  pinned?: boolean;
   syncMode?: "legacy" | "preparing" | "collaborative";
   roomEpoch?: string | null;
   migrationEpoch?: string | null;
