@@ -103,87 +103,115 @@ test("删除空间使所有已知资源与缓存失效，包括不在目录页�
   }
 });
 
-test("删除空间中止未完成读取，忽略无视取消的迟到响应且不影响另一空间读取", async () => {
-  const disk = isolatedCache();
-  const deletedResponse = deferred<CanvasDocument>();
-  const otherResponse = deferred<CanvasDocument>();
-  const startedDeleted = deferred<AbortSignal>();
-  const startedOther = deferred<AbortSignal>();
-  let deletedPreviews = 0;
-  const manager = new CanvasResources(
-    "workspace-delete-flight",
-    {
-      readCanvas: async () => {
-        throw new Error("应使用支持取消的校验端口");
-      },
-      readLibrary: async () => ({ items: [], revision: 0 }),
-      validateCanvas: async (id, _owner, _known, signal) => {
-        assert.ok(signal);
-        if (id === "pending-one") {
-          startedDeleted.resolve(signal);
+for (const tracking of ["metadata", "workspaceHint"] as const) {
+  test(
+    `删除空间中止${tracking}归属的未完成读取，迟到响应无效且隔离其他与未知空间`,
+    { timeout: 5000 },
+    async () => {
+      const disk = isolatedCache();
+      const deletedResponse = deferred<CanvasDocument>();
+      const otherResponse = deferred<CanvasDocument>();
+      const unknownResponse = deferred<CanvasDocument>();
+      const startedDeleted = deferred<AbortSignal>();
+      const startedOther = deferred<AbortSignal>();
+      const startedUnknown = deferred<AbortSignal>();
+      let deletedPreviews = 0;
+      const manager = new CanvasResources(
+        `workspace-delete-flight-${tracking}`,
+        {
+          readCanvas: async () => {
+            throw new Error("应使用支持取消的校验端口");
+          },
+          readLibrary: async () => ({ items: [], revision: 0 }),
+          validateCanvas: async (id, _owner, _known, signal) => {
+            assert.ok(signal);
+            if (id === "pending-one") {
+              startedDeleted.resolve(signal);
 
-          return deletedResponse.promise;
-        }
+              return deletedResponse.promise;
+            }
 
-        startedOther.resolve(signal);
+            if (id === "pending-unknown") {
+              startedUnknown.resolve(signal);
 
-        return otherResponse.promise;
-      },
+              return unknownResponse.promise;
+            }
+
+            startedOther.resolve(signal);
+
+            return otherResponse.promise;
+          },
+        },
+        () => {},
+        disk.cache,
+      );
+      const deletingRead = manager.open(
+        "pending-one",
+        () => {
+          deletedPreviews++;
+        },
+        tracking === "metadata" ? document("pending-one", "one") : undefined,
+        tracking === "workspaceHint" ? "one" : undefined,
+      );
+      // 立即接管拒绝，避免失效与晚响应之间出现未处理 Promise 拒绝。
+      const deletingOutcome = deletingRead.then(
+        (value) => ({ value, error: undefined }),
+        (error: unknown) => ({ value: undefined, error }),
+      );
+      const otherRead = manager.open(
+        "pending-two",
+        () => {},
+        document("pending-two", "two"),
+      );
+
+      const unknownRead = manager.open("pending-unknown", () => {});
+
+      try {
+        const [deletedSignal, otherSignal, unknownSignal] = await Promise.all([
+          startedDeleted.promise,
+          startedOther.promise,
+          startedUnknown.promise,
+        ]);
+
+        assert.equal(
+          manager.canvases.has("pending-one"),
+          false,
+          "此读取尚未产生可遍历资源",
+        );
+        await manager.invalidateWorkspace("one");
+        assert.equal(deletedSignal.aborted, true);
+        assert.equal(otherSignal.aborted, false);
+        assert.equal(unknownSignal.aborted, false);
+        deletedResponse.resolve(document("pending-one", "one"));
+        otherResponse.resolve(document("pending-two", "two"));
+        unknownResponse.resolve(document("pending-unknown", "unknown"));
+        const [deleted, other, unknown] = await Promise.all([
+          deletingOutcome,
+          otherRead,
+          unknownRead,
+        ]);
+
+        assert.ok(deleted.error instanceof Error);
+        assert.equal(deleted.error.name, "AbortError");
+        assert.equal(deleted.value, undefined);
+        assert.equal(deletedPreviews, 0);
+        assert.equal(manager.canvases.has("pending-one"), false);
+        assert.equal(
+          await disk.cache.get(
+            cacheKey(manager.owner, "canvas", "pending-one"),
+          ),
+          undefined,
+        );
+        assert.equal(other.document.id, "pending-two");
+        assert.equal(manager.canvases.has("pending-two"), true);
+        assert.equal(unknown.document.id, "pending-unknown");
+      } finally {
+        deletedResponse.resolve(document("pending-one", "one"));
+        otherResponse.resolve(document("pending-two", "two"));
+        unknownResponse.resolve(document("pending-unknown", "unknown"));
+        await Promise.allSettled([deletingOutcome, otherRead, unknownRead]);
+        manager.dispose();
+      }
     },
-    () => {},
-    disk.cache,
   );
-  const deletingRead = manager.open(
-    "pending-one",
-    () => {
-      deletedPreviews++;
-    },
-    document("pending-one", "one"),
-  );
-  // 立即接管拒绝，避免失效与晚响应之间出现未处理 Promise 拒绝。
-  const deletingOutcome = deletingRead.then(
-    (value) => ({ value, error: undefined }),
-    (error: unknown) => ({ value: undefined, error }),
-  );
-  const otherRead = manager.open(
-    "pending-two",
-    () => {},
-    document("pending-two", "two"),
-  );
-
-  try {
-    const [deletedSignal, otherSignal] = await Promise.all([
-      startedDeleted.promise,
-      startedOther.promise,
-    ]);
-
-    assert.equal(
-      manager.canvases.has("pending-one"),
-      false,
-      "此读取尚未产生可遍历资源",
-    );
-    await manager.invalidateWorkspace("one");
-    assert.equal(deletedSignal.aborted, true);
-    assert.equal(otherSignal.aborted, false);
-    deletedResponse.resolve(document("pending-one", "one"));
-    otherResponse.resolve(document("pending-two", "two"));
-    const [deleted, other] = await Promise.all([deletingOutcome, otherRead]);
-
-    assert.ok(deleted.error instanceof Error);
-    assert.equal(deleted.error.name, "AbortError");
-    assert.equal(deleted.value, undefined);
-    assert.equal(deletedPreviews, 0);
-    assert.equal(manager.canvases.has("pending-one"), false);
-    assert.equal(
-      await disk.cache.get(cacheKey(manager.owner, "canvas", "pending-one")),
-      undefined,
-    );
-    assert.equal(other.document.id, "pending-two");
-    assert.equal(manager.canvases.has("pending-two"), true);
-  } finally {
-    deletedResponse.resolve(document("pending-one", "one"));
-    otherResponse.resolve(document("pending-two", "two"));
-    await Promise.allSettled([deletingOutcome, otherRead]);
-    manager.dispose();
-  }
-});
+}
