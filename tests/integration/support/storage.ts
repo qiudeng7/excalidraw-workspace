@@ -36,11 +36,28 @@ const operations = {
 export async function nodeStorage(
   directory: string,
   migrationsDir = resolve("server/db/migrations"),
+  traceBatches = false,
 ) {
   const client = createClient({
     url: pathToFileURL(resolve(directory, "workspace.sqlite")).href,
   });
   const statements: string[] = [];
+
+  // Drizzle 的 libSQL batch 不经过 logger；只为显式启用的查询边界测试记录驱动 SQL。
+  if (traceBatches) {
+    const batch = client.batch.bind(client);
+
+    client.batch = (queries, mode) => {
+      statements.push(
+        ...Array.from(queries, (query) =>
+          typeof query === "string" ? query : query.sql,
+        ),
+      );
+
+      return batch(queries, mode);
+    };
+  }
+
   const database = drizzle(client, {
     schema,
     logger: {
