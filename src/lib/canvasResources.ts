@@ -101,6 +101,16 @@ export class CanvasResources {
     if (!this.disposed) this.changed();
   }
 
+  private assertCanvasCurrent(id: string, incarnation: number) {
+    this.assertActive();
+    if (
+      this.deleted.has(id) ||
+      incarnation !== (this.incarnations.get(id) ?? 0)
+    ) {
+      throw new DOMException("Canvas invalidated", "AbortError");
+    }
+  }
+
   async invalidate(id: string) {
     this.incarnations.set(id, (this.incarnations.get(id) ?? 0) + 1);
     this.deleted.add(id);
@@ -309,6 +319,7 @@ export class CanvasResources {
   ): Promise<CanvasResource> {
     if (this.deleted.has(id))
       throw new ApiError(404, "NOT_FOUND", "画布已删除");
+    const incarnation = this.incarnations.get(id) ?? 0;
     const existing = this.canvases.get(id);
     const workspace =
       metadata?.workspaceId ?? workspaceHint ?? existing?.document.workspaceId;
@@ -320,7 +331,7 @@ export class CanvasResources {
     if (existing) {
       if (existing.document.syncMode !== "collaborative" && this.prepareHandoff)
         await this.prepareHandoff(id);
-      this.assertActive();
+      this.assertCanvasCurrent(id, incarnation);
       existing.resource.pauseAutosave();
       existing.touched = Date.now();
       existing.status = "checking";
@@ -332,6 +343,7 @@ export class CanvasResources {
     if (flight) {
       const entry = await flight;
 
+      this.assertCanvasCurrent(id, incarnation);
       preview(entry);
 
       return entry;
@@ -341,7 +353,11 @@ export class CanvasResources {
 
     this.flights.set(id, task);
     try {
-      return await task;
+      const entry = await task;
+
+      this.assertCanvasCurrent(id, incarnation);
+
+      return entry;
     } finally {
       if (this.flights.get(id) === task) this.flights.delete(id);
       this.evict();
@@ -354,14 +370,7 @@ export class CanvasResources {
     metadata?: CanvasMeta,
   ) {
     const incarnation = this.incarnations.get(id) ?? 0;
-    const assertCurrent = () => {
-      this.assertActive();
-      if (
-        incarnation !== (this.incarnations.get(id) ?? 0) ||
-        this.deleted.has(id)
-      )
-        throw new DOMException("Canvas invalidated", "AbortError");
-    };
+    const assertCurrent = () => this.assertCanvasCurrent(id, incarnation);
     let entry = this.canvases.get(id);
     const controller = new AbortController();
 

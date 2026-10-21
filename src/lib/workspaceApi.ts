@@ -89,7 +89,9 @@ export const workspaceApi: WorkspaceApi = {
     api<CanvasCatalog>(`/api/workspaces/${segment(id)}/canvases`),
   readCatalogPage: (id, options = {}) => {
     const query = new URLSearchParams({ limit: String(options.limit ?? 30) });
+
     if (options.cursor) query.set("cursor", options.cursor);
+
     return api<CanvasCatalogPage>(
       `/api/workspaces/${segment(id)}/canvases?${query}`,
       { signal: options.signal },
