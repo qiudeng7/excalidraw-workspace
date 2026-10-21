@@ -833,6 +833,8 @@ test("两页后另一标签页新增删除置顶或移动使旧游标冲突，�
           catalogRevision: f.revision(),
         });
       f.releaseAppend();
+      // 同步换上下一次追加的屏障；无游标的60条刷新仍可完成，避免合法触底追加抢过断言。
+      f.holdAppend();
       await expect.poll(f.conflicts).toBe(1);
       await expect
         .poll(() =>
@@ -904,6 +906,8 @@ test("冲突刷新时首可见画布被另一标签页删除，保留最近相�
       "DELETE",
     );
     f.releaseAppend();
+    // 同步换上下一次追加的屏障；无游标的60条刷新仍可完成，避免合法触底追加抢过断言。
+    f.holdAppend();
     await expect.poll(f.conflicts).toBe(1);
     await expect
       .poll(() =>
