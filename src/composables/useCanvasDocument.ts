@@ -15,13 +15,18 @@ export interface CanvasDocumentController {
   resources: Readonly<Ref<CanvasResources | undefined>>;
   saveState: Readonly<Ref<string>>;
   loadingCanvas: Readonly<Ref<boolean>>;
-  loadCanvas(id: string, metadata?: CanvasMeta): Promise<void>;
+  loadCanvas(
+    id: string,
+    metadata?: CanvasMeta,
+    workspaceHint?: string,
+  ): Promise<void>;
   checkpoint(): Promise<void>;
   flushAll(): Promise<void>;
   ensureLibrary(): Promise<void>;
   renameLoadedCanvas(id: string, name: string): void;
   clearDocument(message?: string): void;
   invalidateCanvas(id: string): boolean;
+  invalidateWorkspace(workspaceId: string): Promise<void>;
   restoreCanvas(id: string): Promise<void>;
   releaseEditorHistory(id: string): void;
   reset(): void;
@@ -52,6 +57,7 @@ export function useCanvasDocument({
   const loadingCanvas = ref(false);
   let selection = 0;
   let selectedId = "";
+  let selectedWorkspace = "";
 
   function publish() {
     const entry = current.value;
@@ -100,10 +106,15 @@ export function useCanvasDocument({
     return resources.value!;
   }
 
-  async function loadCanvas(id: string, metadata?: CanvasMeta) {
+  async function loadCanvas(
+    id: string,
+    metadata?: CanvasMeta,
+    workspaceHint?: string,
+  ) {
     const generation = ++selection;
 
     selectedId = id;
+    selectedWorkspace = metadata?.workspaceId ?? workspaceHint ?? "";
     // Keep the original editor mounted until native text/IME has committed.
     if (current.value?.document.id === id && prepareHandoff)
       await prepareHandoff(id);
@@ -128,7 +139,7 @@ export function useCanvasDocument({
     document.value = undefined;
     saveState.value = "正在加载";
     try {
-      await store.open(id, preview, metadata);
+      await store.open(id, preview, metadata, workspaceHint);
     } catch (error) {
       if (generation !== selection || resources.value !== store) return;
       if (error instanceof ApiError && [401, 403, 404].includes(error.status))
@@ -142,6 +153,7 @@ export function useCanvasDocument({
   function clearDocument(message = "没有画布") {
     selection++;
     selectedId = "";
+    selectedWorkspace = "";
     loadingCanvas.value = false;
     current.value = undefined;
     document.value = undefined;
@@ -168,6 +180,16 @@ export function useCanvasDocument({
       void resources.value?.invalidate(id);
 
       return selected;
+    },
+    async invalidateWorkspace(workspaceId) {
+      if (
+        selectedWorkspace === workspaceId ||
+        document.value?.workspaceId === workspaceId
+      ) {
+        clearDocument();
+      }
+
+      await resources.value?.invalidateWorkspace(workspaceId);
     },
     checkpoint: async () => {
       if (current.value)
