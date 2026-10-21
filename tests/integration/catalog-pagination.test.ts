@@ -282,8 +282,15 @@ test("目录并发新增时每个页面的总数、版本和首条记录来自�
         page.catalogRevision === revision ||
           page.catalogRevision === revision + 1,
       );
-      // fixture 有置顶项；新画布属于普通组，不影响该组之前的首条记录。
-      assert.deepEqual(page.canvases[0], before.canvases[0]);
+      // 新画布插入普通组首部，已有画布的基础位置随目录版本整体后移。
+      // 同时检查元数据与版本，避免旧条目和新总数被拼成一个页面。
+      assert.deepEqual(page.canvases[0], {
+        ...before.canvases[0],
+        position:
+          before.canvases[0]!.position +
+          page.catalogRevision -
+          before.catalogRevision,
+      });
     }
   } finally {
     await f.close();
@@ -543,6 +550,7 @@ test("追加迁移建立活动画布组合排序索引且升级既有数据库�
 
   try {
     await mkdir(join(oldDirectory, "sqlite"), { recursive: true });
+    await mkdir(oldDatabase, { recursive: true });
     const files = await readdir(resolve("server/db/migrations/sqlite"));
     const extra = files.filter(
       (file) => file.endsWith(".sql") && file > "0011_canvas_pins.sql",
