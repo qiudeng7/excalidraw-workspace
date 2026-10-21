@@ -215,3 +215,157 @@ for (const tracking of ["metadata", "workspaceHint"] as const) {
     },
   );
 }
+
+test(
+  "已缓存画布等待交接时删除空间，旧打开不能预览失效资源、再次读取或回填缓存",
+  { timeout: 5000 },
+  async () => {
+    const disk = isolatedCache();
+    const handoffStarted = deferred<void>();
+    const releaseHandoff = deferred<void>();
+    let reads = 0;
+    let previewsAfterDelete = 0;
+    const manager = new CanvasResources(
+      "workspace-delete-handoff",
+      {
+        readCanvas: async (id) => {
+          reads++;
+
+          return document(id, "one");
+        },
+        readLibrary: async () => ({ items: [], revision: 0 }),
+      },
+      () => {},
+      disk.cache,
+      async () => {
+        handoffStarted.resolve();
+        await releaseHandoff.promise;
+      },
+    );
+
+    try {
+      await manager.open("cached", () => {}, document("cached", "one"));
+      assert.equal(reads, 1);
+      const reopening = manager.open(
+        "cached",
+        () => {
+          previewsAfterDelete++;
+        },
+        document("cached", "one"),
+      );
+      const outcome = reopening.then(
+        (value) => ({ value, error: undefined }),
+        (error: unknown) => ({ value: undefined, error }),
+      );
+
+      await handoffStarted.promise;
+      await manager.invalidateWorkspace("one");
+      releaseHandoff.resolve();
+      const result = await outcome;
+
+      assert.equal(
+        previewsAfterDelete,
+        0,
+        "交接期间失效的旧资源不能再交给编辑器",
+      );
+      assert.equal(reads, 1, "删除后的旧打开操作不能重新读取画布");
+      assert.ok(result.error instanceof Error);
+      assert.ok(
+        result.error.name === "AbortError" ||
+          ("code" in result.error && result.error.code === "NOT_FOUND"),
+      );
+      assert.equal(result.value, undefined);
+      assert.equal(manager.canvases.has("cached"), false);
+      assert.equal(
+        await disk.cache.get(cacheKey(manager.owner, "canvas", "cached")),
+        undefined,
+      );
+    } finally {
+      releaseHandoff.resolve();
+      manager.dispose();
+    }
+  },
+);
+
+test(
+  "共享读取完成后预览前删除空间，等待同一读取的第二个打开不能预览或返回失效资源",
+  { timeout: 5000 },
+  async () => {
+    const disk = isolatedCache();
+    const response = deferred<CanvasDocument>();
+    const readStarted = deferred<void>();
+    let reads = 0;
+    let joinedPreviews = 0;
+    let invalidating: Promise<void> | undefined;
+    const manager = new CanvasResources(
+      "workspace-delete-joined-flight",
+      {
+        readCanvas: async () => {
+          reads++;
+          readStarted.resolve();
+
+          return response.promise;
+        },
+        readLibrary: async () => ({ items: [], revision: 0 }),
+      },
+      () => {},
+      disk.cache,
+    );
+    const first = manager.open(
+      "joined",
+      () => {
+        // load 已得成功结果；删除发生在等待同一 flight 的第二个 open 恢复之前。
+        queueMicrotask(() => {
+          invalidating = manager.invalidateWorkspace("one");
+        });
+      },
+      document("joined", "one"),
+    );
+    const firstOutcome = first.then(
+      (value) => ({ value, error: undefined }),
+      (error: unknown) => ({ value: undefined, error }),
+    );
+
+    try {
+      await readStarted.promise;
+      const joined = manager.open(
+        "joined",
+        () => {
+          joinedPreviews++;
+        },
+        document("joined", "one"),
+      );
+      const joinedOutcome = joined.then(
+        (value) => ({ value, error: undefined }),
+        (error: unknown) => ({ value: undefined, error }),
+      );
+
+      response.resolve(document("joined", "one"));
+      const result = await joinedOutcome;
+
+      await invalidating;
+      assert.equal(reads, 1);
+      assert.equal(
+        joinedPreviews,
+        0,
+        "join flight 也必须在交给编辑器前重检失效状态",
+      );
+      assert.ok(result.error instanceof Error);
+      assert.ok(
+        result.error.name === "AbortError" ||
+          ("code" in result.error && result.error.code === "NOT_FOUND"),
+      );
+      assert.equal(result.value, undefined);
+      assert.equal(manager.canvases.has("joined"), false);
+      assert.equal(
+        await disk.cache.get(cacheKey(manager.owner, "canvas", "joined")),
+        undefined,
+      );
+    } finally {
+      response.resolve(document("joined", "one"));
+      await firstOutcome;
+      await invalidating;
+      manager.dispose();
+    }
+  },
+);
