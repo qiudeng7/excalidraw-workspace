@@ -32,9 +32,13 @@ const show = async () => {
   maxHeight.value = Math.max(44, bounds.top - 12);
   open.value = true;
   await nextTick();
-  menu.value?.focus({ preventScroll: true });
+  (
+    menu.value?.querySelector<HTMLButtonElement>("button:not(:disabled)") ??
+    menu.value
+  )?.focus({ preventScroll: true });
 };
 const keyDown = (event: KeyboardEvent) => {
+  event.stopPropagation();
   if (["Escape", "Tab"].includes(event.key)) {
     event.preventDefault();
     close();
@@ -97,8 +101,8 @@ onBeforeUnmount(() => {
     :disabled="locked"
     :title="name || email"
     @click="open ? close() : show()"
-    @keydown.down.prevent="show"
-    @keydown.up.prevent="show"
+    @keydown.down.stop.prevent="show"
+    @keydown.up.stop.prevent="show"
   >
     <span class="avatar">{{ (name || email).slice(0, 1).toUpperCase() }}</span>
     <span class="account-name">{{ name || email }}</span>
