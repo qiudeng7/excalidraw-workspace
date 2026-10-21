@@ -887,6 +887,17 @@ test("冲突刷新时首可见画布被另一标签页删除，保留最近相�
 
     expect(anchor).toBeDefined();
     expect(neighbor).toBeDefined();
+    const anchorIndex = f.orderedIds().indexOf(anchor!.id);
+    const previousId = f.orderedIds()[anchorIndex - 1]!;
+    const previous = (await page
+      .locator(`.canvas-list [data-canvas-id="${previousId}"]`)
+      .boundingBox())!;
+    // 计划没有规定等距前后相邻项的优先级；两者均可成为替代锚点。
+    const candidates = [
+      { id: previousId, top: previous.y },
+      { id: neighbor!.id, top: neighbor!.top },
+    ];
+
     await remoteWrite(
       remote,
       `/api/canvases/${anchor!.id}?catalogRevision=${f.revision()}`,
@@ -910,8 +921,25 @@ test("冲突刷新时首可见画布被另一标签页删除，保留最近相�
 
     await expect(fallback).toBeInViewport();
     await expect
-      .poll(async () => (await fallback.boundingBox())!.y)
-      .toBeCloseTo(neighbor!.top, 0);
+      .poll(
+        async () => {
+          const positions = await Promise.all(
+            candidates.map(async (candidate) => {
+              const restored = await page
+                .locator(`.canvas-list [data-canvas-id="${candidate.id}"]`)
+                .boundingBox();
+
+              return !!restored && Math.abs(restored.y - candidate.top) <= 1;
+            }),
+          );
+
+          return positions.some(Boolean);
+        },
+        {
+          message: "最近前驱或后继至少一项保持原视口偏移，删除不能导致跳回顶部",
+        },
+      )
+      .toBe(true);
   } finally {
     f.releaseAppend();
     await remote.close();
