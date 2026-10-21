@@ -1,6 +1,7 @@
 // 真实 Chromium 运行 Vue 侧栏、目录控制器和编辑器；HTTP API 使用本文件隔离替身。
 // 保护布局、分页交互、账号菜单、局部移动与最近画布；不证明数据库查询、权限或真实保存持久化。
-// 替身仅提供分页协议及受控延迟/错误；所有滚动、焦点、可见性及列表合并均检查真实界面。
+// 替身提供分页协议、跨标签页共享状态及受控延迟/错误；滚动、焦点、列表合并均检查真实界面。
+// 第二标签页通过同源 fetch 修改替身目录，证明原页冲突恢复；不覆盖第二页操作按钮或真实后端。
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
@@ -77,6 +78,7 @@ async function directory(
     }),
   );
   let revision = 0;
+  let conflicts = 0;
   let user: User = { ...workspace.mock.user };
   let failNextAppend = false;
   let releaseAppend: (() => void) | undefined;
@@ -95,7 +97,7 @@ async function directory(
     workspaces: [{ workspaceId: "test-space", lastCanvasId: canvasId }],
   });
 
-  await page.route("**/api/**", async (route) => {
+  await page.context().route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
@@ -137,9 +139,23 @@ async function directory(
       const cursor = url.searchParams.get("cursor");
       const limit = url.searchParams.get("limit");
 
-      reads.push({ space, limit, cursor });
+      if (request.frame().page() === page) reads.push({ space, limit, cursor });
       if (cursor) {
         if (appendGate) await appendGate;
+        if (Number(cursor.split(":")[0]) !== revision) {
+          conflicts++;
+
+          return route.fulfill({
+            status: 409,
+            json: {
+              error: {
+                code: "CATALOG_CONFLICT",
+                message: "目录已在另一标签页修改",
+              },
+            },
+          });
+        }
+
         if (failNextAppend) {
           failNextAppend = false;
 
@@ -163,6 +179,43 @@ async function directory(
           total: entries.length,
           nextCursor: end < entries.length ? `${revision}:${end}` : null,
         },
+      });
+    }
+
+    if (listing && request.method() === "POST") {
+      const body = request.postDataJSON();
+      const canvas = {
+        ...canvases[0]!,
+        id: `remote-${revision}`,
+        name: body.name,
+        pinned: false,
+        position: -1,
+      };
+
+      expect(body.catalogRevision).toBe(revision);
+      canvases.unshift(canvas);
+      revision++;
+
+      return route.fulfill({ json: { canvas } });
+    }
+
+    const pinned = canvases.find(
+      (entry) => path === `/api/canvases/${entry.id}/pin`,
+    );
+
+    if (pinned && request.method() === "PUT") {
+      const body = request.postDataJSON();
+
+      expect(body.catalogRevision).toBe(revision);
+      pinned.pinned = body.pinned;
+      canvases.sort(
+        (a, b) =>
+          Number(b.pinned) - Number(a.pinned) || a.position - b.position,
+      );
+      revision++;
+
+      return route.fulfill({
+        json: { canvas: pinned, catalogRevision: revision },
       });
     }
 
@@ -195,6 +248,14 @@ async function directory(
       (entry) => path === `/api/canvases/${entry.id}`,
     );
 
+    if (canvas && request.method() === "DELETE") {
+      expect(Number(url.searchParams.get("catalogRevision"))).toBe(revision);
+      canvases.splice(canvases.indexOf(canvas), 1);
+      revision++;
+
+      return route.fulfill({ json: { ok: true } });
+    }
+
     if (canvas && request.method() === "PUT") {
       saving.push(canvas.id);
       if (saveGate) await saveGate;
@@ -222,6 +283,9 @@ async function directory(
 
   return {
     reads,
+    conflicts: () => conflicts,
+    revision: () => revision,
+    orderedIds: () => canvases.map((canvas) => canvas.id),
     opened,
     moves,
     logoutCalls: () => logoutCalls,
@@ -663,4 +727,263 @@ test.describe("触屏账号入口", () => {
     await expect.poll(f.logoutCalls).toBe(1);
     await expect(page.getByLabel("邮箱", { exact: true })).toBeVisible();
   });
+});
+
+// 独立的同源标签页只调用公开接口；它与主页面共享隔离的 HTTP 替身状态。
+async function remoteTab(page: Page) {
+  const remote = await page.context().newPage();
+  const url = new URL("/browser-catalog-peer", page.url()).href;
+
+  await remote.route(url, (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><title>另一个目录标签页</title>",
+    }),
+  );
+  await remote.goto(url);
+
+  return remote;
+}
+
+async function remoteWrite(
+  remote: Page,
+  path: string,
+  method: string,
+  body?: unknown,
+) {
+  const status = await remote.evaluate(
+    async ({ path, method, body }) => {
+      const response = await fetch(path, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+
+      return response.status;
+    },
+    { path, method, body },
+  );
+
+  expect(status).toBe(200);
+}
+
+async function visibleRows(page: Page) {
+  return scrollArea(page).evaluate((root) => {
+    const bounds = root.getBoundingClientRect();
+
+    return [
+      ...root.querySelectorAll<HTMLElement>(".canvas-list [data-canvas-id]"),
+    ]
+      .map((row) => ({
+        id: row.dataset.canvasId!,
+        top: row.getBoundingClientRect().top,
+        bottom: row.getBoundingClientRect().bottom,
+      }))
+      .filter((row) => row.bottom > bounds.top && row.top < bounds.bottom);
+  });
+}
+
+async function loadedTwoPages(page: Page) {
+  await expect(canvasRows(page)).toHaveCount(30);
+  await scrollBottom(page);
+  await expect(canvasRows(page)).toHaveCount(60);
+}
+
+test("两页后另一标签页新增删除置顶或移动使旧游标冲突，整体刷新已加载范围并保持首可见画布位置", async ({
+  page,
+  workspace,
+}) => {
+  for (const action of ["create", "delete", "pin", "move"] as const) {
+    const f = await directory(page, workspace, 95);
+    const remote = await remoteTab(page);
+
+    try {
+      await loadedTwoPages(page);
+      f.holdAppend();
+      await scrollBottom(page);
+      await expect
+        .poll(() => f.reads.some((read) => read.cursor === "0:60"))
+        .toBe(true);
+      const anchor = (await visibleRows(page))[0]!;
+
+      if (action === "create")
+        await remoteWrite(
+          remote,
+          "/api/workspaces/test-space/canvases",
+          "POST",
+          { name: "另一标签页新建", catalogRevision: f.revision() },
+        );
+      if (action === "delete")
+        await remoteWrite(
+          remote,
+          `/api/canvases/canvas-5?catalogRevision=${f.revision()}`,
+          "DELETE",
+        );
+      if (action === "pin")
+        await remoteWrite(
+          remote,
+          "/api/canvases/canvas-70/pin?return=summary",
+          "PUT",
+          { pinned: true, catalogRevision: f.revision() },
+        );
+      if (action === "move")
+        await remoteWrite(remote, "/api/canvases/canvas-70/move", "PUT", {
+          targetId: "canvas-5",
+          placement: "before",
+          catalogRevision: f.revision(),
+        });
+      f.releaseAppend();
+      await expect.poll(f.conflicts).toBe(1);
+      await expect
+        .poll(() =>
+          canvasRows(page).evaluateAll((rows) =>
+            rows.map((row) => row.getAttribute("data-canvas-id")),
+          ),
+        )
+        .toEqual(f.orderedIds().slice(0, 60));
+      await expect(page.locator(".canvas-heading .count")).toHaveText(
+        String(f.orderedIds().length),
+      );
+      const restored = page.locator(
+        `.canvas-list [data-canvas-id="${anchor.id}"]`,
+      );
+
+      await expect
+        .poll(async () => (await restored.boundingBox())!.y)
+        .toBeCloseTo(anchor.top, 0);
+      expect(
+        new Set(
+          await canvasRows(page).evaluateAll((rows) =>
+            rows.map((row) => row.getAttribute("data-canvas-id")),
+          ),
+        ).size,
+      ).toBe(60);
+      await expect(page.locator(".excalidraw")).toHaveCount(1);
+      await expect(
+        page.getByRole("tab", { name: "分页画布 1", exact: true }),
+      ).toHaveAttribute("aria-selected", "true");
+    } finally {
+      f.releaseAppend();
+      await remote.close();
+    }
+  }
+});
+
+test("冲突刷新时首可见画布被另一标签页删除，保留最近相邻画布的视口位置", async ({
+  page,
+  workspace,
+}) => {
+  const f = await directory(page, workspace, 95);
+  const remote = await remoteTab(page);
+
+  try {
+    await loadedTwoPages(page);
+    f.holdAppend();
+    await scrollBottom(page);
+    await expect
+      .poll(() => f.reads.some((read) => read.cursor === "0:60"))
+      .toBe(true);
+    const [anchor, neighbor] = await visibleRows(page);
+
+    expect(anchor).toBeDefined();
+    expect(neighbor).toBeDefined();
+    await remoteWrite(
+      remote,
+      `/api/canvases/${anchor!.id}?catalogRevision=${f.revision()}`,
+      "DELETE",
+    );
+    f.releaseAppend();
+    await expect.poll(f.conflicts).toBe(1);
+    await expect
+      .poll(() =>
+        canvasRows(page).evaluateAll((rows) =>
+          rows.map((row) => row.getAttribute("data-canvas-id")),
+        ),
+      )
+      .toEqual(f.orderedIds().slice(0, 60));
+    await expect(
+      page.locator(`.canvas-list [data-canvas-id="${anchor!.id}"]`),
+    ).toHaveCount(0);
+    const fallback = page.locator(
+      `.canvas-list [data-canvas-id="${neighbor!.id}"]`,
+    );
+
+    await expect(fallback).toBeInViewport();
+    await expect
+      .poll(async () => (await fallback.boundingBox())!.y)
+      .toBeCloseTo(neighbor!.top, 0);
+  } finally {
+    f.releaseAppend();
+    await remote.close();
+  }
+});
+
+test("拖动靠近中部下边缘后静止指针继续滚动，拖动期间暂停分页并在释放后恢复", async ({
+  page,
+  workspace,
+}) => {
+  const f = await directory(page, workspace, 95);
+  const initialReads = f.reads.length;
+  const handle = (await canvasRow(page, 1)
+    .locator(".drag-handle")
+    .boundingBox())!;
+  const bounds = (await scrollArea(page).boundingBox())!;
+  const scrollTop = () =>
+    scrollArea(page).evaluate((element) => element.scrollTop);
+
+  await page.mouse.move(
+    handle.x + handle.width / 2,
+    handle.y + handle.height / 2,
+  );
+  await page.mouse.down();
+  try {
+    await page.mouse.move(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height - 5,
+      { steps: 8 },
+    );
+    const firstPosition = await scrollTop();
+
+    // 不再发送 pointermove：持续滚动必须来自产品的边缘自动滚动。
+    await expect.poll(scrollTop).toBeGreaterThan(firstPosition + 40);
+    await expect
+      .poll(() =>
+        scrollArea(page).evaluate(
+          (element) =>
+            element.scrollHeight - element.clientHeight - element.scrollTop,
+        ),
+      )
+      .toBeLessThanOrEqual(1);
+    expect(f.reads).toHaveLength(initialReads);
+    await expect(canvasRows(page)).toHaveCount(30);
+  } finally {
+    await page.mouse.up();
+  }
+
+  await expect.poll(() => canvasRows(page).count()).toBeGreaterThan(30);
+  expect(
+    f.reads.some((read) => read.cursor === "0:30" || read.cursor === "1:30"),
+  ).toBe(true);
+});
+
+test("侧栏关闭时滚动到页尾不追加，重新打开后恢复触底加载", async ({
+  page,
+  workspace,
+}) => {
+  const f = await directory(page, workspace, 61);
+  const trigger = page.getByRole("button", {
+    name: "切换工作空间侧边栏",
+    exact: true,
+  });
+
+  await expect(canvasRows(page)).toHaveCount(30);
+  await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  // 隐藏期间改变真实滚动容器位置，重新展开时 sentinel 已接近底部。
+  await scrollBottom(page);
+  await renderFrames(page);
+  expect(f.reads).toHaveLength(1);
+  await trigger.click();
+  await expect(canvasRows(page)).toHaveCount(60);
+  expect(f.reads).toHaveLength(2);
 });
