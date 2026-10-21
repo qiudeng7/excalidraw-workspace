@@ -78,6 +78,29 @@ export interface CanvasCatalog {
   catalogRevision: number;
 }
 
+/** 所有者目录的一页；游标只适用于同一空间、同一目录版本。 */
+export interface CanvasCatalogPage extends CanvasCatalog {
+  total: number;
+  nextCursor: string | null;
+}
+
+export interface CanvasCatalogPageRequest {
+  limit?: number;
+  cursor?: string;
+  signal?: AbortSignal;
+}
+
+export interface CanvasMove {
+  targetId: string;
+  placement: "before" | "after";
+  catalogRevision: number;
+}
+
+export interface CanvasPinSummary {
+  canvas: CanvasMeta;
+  catalogRevision: number;
+}
+
 export interface UserSettings {
   version: 1;
   features: {

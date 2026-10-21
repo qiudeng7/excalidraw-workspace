@@ -9,19 +9,25 @@ import type { promptDialog, confirmDialog } from "~/lib/dialogs";
 import { useCanvasTabs } from "~/composables/useCanvasTabs";
 
 export interface WorkspaceDirectoryDependencies {
-  api: Pick<
-    WorkspaceApi,
-    | "listWorkspaces"
-    | "readCatalog"
-    | "reorder"
-    | "setCanvasPinned"
-    | "createWorkspace"
-    | "renameWorkspace"
-    | "deleteWorkspace"
-    | "createCanvas"
-    | "renameCanvas"
-    | "deleteCanvas"
-  >;
+  api: Partial<
+    Pick<
+      WorkspaceApi,
+      "readCatalogPage" | "moveCanvas" | "setCanvasPinnedSummary" | "readCanvas"
+    >
+  > &
+    Pick<
+      WorkspaceApi,
+      | "listWorkspaces"
+      | "readCatalog"
+      | "reorder"
+      | "setCanvasPinned"
+      | "createWorkspace"
+      | "renameWorkspace"
+      | "deleteWorkspace"
+      | "createCanvas"
+      | "renameCanvas"
+      | "deleteCanvas"
+    >;
   navigationController: Pick<
     NavigationController,
     "navigation" | "refreshNavigationQuietly" | "recordOpened"
@@ -49,6 +55,19 @@ export interface WorkspaceDirectoryController {
   currentWorkspace: Readonly<Ref<Workspace | undefined>>;
   directoryStale: Readonly<Ref<boolean>>;
   directoryLocked: Readonly<Ref<boolean>>;
+  total: Readonly<Ref<number>>;
+  nextCursor: Readonly<Ref<string | null>>;
+  loadingMore: Readonly<Ref<boolean>>;
+  paginationError: Readonly<Ref<string>>;
+  refreshing: Readonly<Ref<boolean>>;
+  /** 同空间去重追加；冲突刷新已加载范围，失败保留已有页并等待显式重试。 */
+  loadNextPage(): Promise<void>;
+  /** 局部移动，写响应丢失时回读确认而不重复提交。 */
+  moveCanvas(
+    canvasId: string,
+    targetId: string,
+    placement: "before" | "after",
+  ): Promise<void>;
   canvasTabs: Readonly<Ref<readonly CanvasMeta[]>>;
   closeCanvasTab(id: string): Promise<void>;
   reset(): void;
