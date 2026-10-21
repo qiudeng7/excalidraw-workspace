@@ -998,7 +998,7 @@ test("拖动靠近中部下边缘后静止指针继续滚动，拖动期间暂�
   ).toBe(true);
 });
 
-test("侧栏关闭时滚动到页尾不追加，重新打开后恢复触底加载", async ({
+test("侧栏关闭时迟到滚动不追加，重新打开复用已有页并恢复触底加载", async ({
   page,
   workspace,
 }) => {
@@ -1009,13 +1009,22 @@ test("侧栏关闭时滚动到页尾不追加，重新打开后恢复触底加�
   });
 
   await expect(canvasRows(page)).toHaveCount(30);
+  const previousScroll = (await scrollArea(page).elementHandle())!;
+
   await trigger.click();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
-  // 隐藏期间改变真实滚动容器位置，重新展开时 sentinel 已接近底部。
-  await scrollBottom(page);
+  await expect(scrollArea(page)).toBeHidden();
+  // 保留旧容器引用验证关闭后的迟到滚动；允许侧栏卸载DOM或隐藏。
+  await previousScroll.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.dispatchEvent(new Event("scroll"));
+  });
   await renderFrames(page);
   expect(f.reads).toHaveLength(1);
   await trigger.click();
+  await expect(canvasRows(page)).toHaveCount(30);
+  expect(f.reads).toHaveLength(1);
+  await scrollBottom(page);
   await expect(canvasRows(page)).toHaveCount(60);
   expect(f.reads).toHaveLength(2);
 });
