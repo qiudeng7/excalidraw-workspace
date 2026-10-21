@@ -1,0 +1,1 @@
+CREATE INDEX `canvas_active_catalog` ON `canvases` (`workspace_id`,"pinned" DESC,`position`,`id`) WHERE "canvases"."deleted_at" IS NULL;

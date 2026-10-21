@@ -97,6 +97,14 @@ export const canvases = sqliteTable(
   (table) => [
     index("canvas_workspace").on(table.workspaceId),
     index("canvas_position").on(table.workspaceId, table.position, table.id),
+    index("canvas_active_catalog")
+      .on(
+        table.workspaceId,
+        sql`${table.pinned} DESC`,
+        table.position,
+        table.id,
+      )
+      .where(sql`${table.deletedAt} IS NULL`),
     index("canvas_object_key").on(table.objectKey),
     index("canvas_deleted_at").on(table.deletedAt),
     index("canvas_recycle_pending").on(table.recyclePending),
