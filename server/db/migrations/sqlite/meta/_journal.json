@@ -78,6 +78,13 @@
       "when": 1792478845582,
       "tag": "0011_canvas_pins",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792621336711,
+      "tag": "0012_active_canvas_catalog",
+      "breakpoints": true
     }
   ]
 }

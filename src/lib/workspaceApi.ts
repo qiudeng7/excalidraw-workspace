@@ -1,5 +1,9 @@
 import type {
   CanvasCatalog,
+  CanvasCatalogPage,
+  CanvasCatalogPageRequest,
+  CanvasMove,
+  CanvasPinSummary,
   CanvasDocument,
   CanvasMeta,
   LibraryDocument,
@@ -13,7 +17,22 @@ import { api, conditionalApi } from "~/lib/api";
 export interface WorkspaceApi {
   listWorkspaces(): Promise<Workspace[]>;
   readCatalog(workspaceId: string): Promise<CanvasCatalog>;
-  readCanvas(canvasId: string): Promise<CanvasDocument>;
+  /** 按版本游标读取一页，失败不影响已加载内容。 */
+  readCatalogPage(
+    workspaceId: string,
+    options?: CanvasCatalogPageRequest,
+  ): Promise<CanvasCatalogPage>;
+  /** 只移动同组源画布，保持未加载项的相对顺序。 */
+  moveCanvas(
+    canvasId: string,
+    move: CanvasMove,
+  ): Promise<{ catalogRevision: number }>;
+  setCanvasPinnedSummary(
+    canvasId: string,
+    pinned: boolean,
+    catalogRevision: number,
+  ): Promise<CanvasPinSummary>;
+  readCanvas(canvasId: string, signal?: AbortSignal): Promise<CanvasDocument>;
   readLibrary(ownerId: string): Promise<LibraryDocument>;
   validateCanvas?(
     id: string,
@@ -68,9 +87,29 @@ export const workspaceApi: WorkspaceApi = {
     (await api<{ workspaces: Workspace[] }>("/api/workspaces")).workspaces,
   readCatalog: (id) =>
     api<CanvasCatalog>(`/api/workspaces/${segment(id)}/canvases`),
-  readCanvas: async (id) =>
-    (await api<{ canvas: CanvasDocument }>(`/api/canvases/${segment(id)}`))
-      .canvas,
+  readCatalogPage: (id, options = {}) => {
+    const query = new URLSearchParams({ limit: String(options.limit ?? 30) });
+
+    if (options.cursor) query.set("cursor", options.cursor);
+
+    return api<CanvasCatalogPage>(
+      `/api/workspaces/${segment(id)}/canvases?${query}`,
+      { signal: options.signal },
+    );
+  },
+  moveCanvas: (id, move) =>
+    api(`/api/canvases/${segment(id)}/move`, json("PUT", move)),
+  setCanvasPinnedSummary: (id, pinned, catalogRevision) =>
+    api<CanvasPinSummary>(
+      `/api/canvases/${segment(id)}/pin?return=summary`,
+      json("PUT", { pinned, catalogRevision }),
+    ),
+  readCanvas: async (id, signal) =>
+    (
+      await api<{ canvas: CanvasDocument }>(`/api/canvases/${segment(id)}`, {
+        signal,
+      })
+    ).canvas,
   readLibrary: (ownerId) =>
     api<LibraryDocument>("/api/library", {
       headers: { "X-Resource-Owner": ownerId },

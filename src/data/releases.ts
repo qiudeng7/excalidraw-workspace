@@ -12,6 +12,23 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-10-22-sidebar-pagination",
+    sequence: 11,
+    version: "0.9.0",
+    date: "2026-10-22",
+    title: "侧栏更紧凑，更多画布按需加载",
+    summary:
+      "侧栏顶部与底部固定，画布列表滚动时仍可访问账号、回收站和设置；画布按每页 30 张触底加载。",
+    changes: [
+      "侧栏固定品牌与工作空间入口，底部并排显示回收站和设置；点击账号行向上展开完整账号信息和退出入口，支持鼠标、触屏和键盘操作。",
+      "画布列表首次加载 30 张，接近底部时继续加载；标题显示画布总数，加载失败可重试，已打开画布仍可继续编辑。",
+      "画布分组可手动折叠，按账号和工作空间记住当前浏览器中的选择；折叠只收起列表，不会关闭画布。共享列表与画布列表共用滚动区域。",
+      "跨页调整画布顺序时保留其他画布的相对位置，仍只能在相同置顶分组内排序；其他页面修改列表后，会重新获取最新画布列表。",
+      "最近画布、已打开标签与深链接可直接打开尚未加载到列表的画布，侧栏提供当前画布快捷入口；翻页或列表刷新失败时保留标签、本地草稿与后台保存。",
+    ],
+    actions: ["已打开的页面请刷新后使用新版。"],
+  },
+  {
     id: "workspace-2026-10-20-sidebar-menu",
     sequence: 10,
     version: "0.8.0",

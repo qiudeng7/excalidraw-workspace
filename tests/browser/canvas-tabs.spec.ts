@@ -624,7 +624,8 @@ test("workspace tabs restore their active file and clear when changing account",
   await expect(
     page.getByRole("tab", { name: "画布 B", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("button", { name: "退出登录", exact: true }).click();
+  await page.getByRole("button", { name: "账号菜单", exact: true }).click();
+  await page.getByRole("menuitem", { name: "退出登录", exact: true }).click();
   await page.getByLabel("邮箱", { exact: true }).fill("second@example.test");
   await page.getByLabel("密码", { exact: true }).fill("Password-2026!");
   await page.getByRole("button", { name: "进入我的空间", exact: true }).click();

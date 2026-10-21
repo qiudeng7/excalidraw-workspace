@@ -1,4 +1,5 @@
 import { canvasCatalog, setCanvasPinned } from "#server/db/canvases";
+import { canvasPinSummary } from "#server/db/canvas-catalog";
 import { defineApiHandler, resourceId } from "#server/utils/api";
 import { apiRequest } from "#server/utils/request";
 import { requireUser } from "#server/utils/auth";
@@ -27,6 +28,10 @@ export default defineApiHandler(async (event) => {
     ))
   ) {
     return fail(409, "CATALOG_CONFLICT", "列表已在其他页面更新，请重新操作");
+  }
+
+  if (new URL(apiRequest(event).url).searchParams.get("return") === "summary") {
+    return json(await canvasPinSummary(canvas.workspaceId, user.id, id));
   }
 
   const catalog = await canvasCatalog(canvas.workspaceId, user.id);

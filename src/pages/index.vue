@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { CanvasMeta } from "#shared/contracts";
 import { APP_VERSION } from "#shared/app-version";
 import CanvasContextMenu from "~/components/CanvasContextMenu.vue";
+import SidebarAccountMenu from "~/components/SidebarAccountMenu.vue";
+import { useSidebarPagination } from "~/composables/use-sidebar-pagination";
 import { useCanvasContextMenu } from "~/composables/use-canvas-context-menu";
 import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "~/components/AccountGate.vue";
@@ -172,6 +174,9 @@ const reordering = useCanvasReorder({
   canvases: directory.canvases,
   locked: directory.directoryLocked,
   reorder: directory.reorderCanvas,
+  move: directory.moveCanvas,
+  loadNextPage: directory.loadNextPage,
+  hasMore: computed(() => !!directory.nextCursor.value),
 });
 
 reorderSlot.value = reordering;
@@ -275,6 +280,12 @@ watch(
 const {
   workspaces,
   canvases,
+  total,
+  nextCursor,
+  loadingMore,
+  paginationError,
+  refreshing,
+  loadNextPage,
   workspaceId,
   currentWorkspace,
   directoryStale,
@@ -292,6 +303,35 @@ const {
   deleteCanvas,
   setCanvasPinned,
 } = directory;
+const paginationEnabled = computed(
+  () =>
+    sidebarOpen.value &&
+    !!nextCursor.value &&
+    !loadingMore.value &&
+    !paginationError.value &&
+    !refreshing.value &&
+    !directoryLocked.value,
+);
+const {
+  scroll: sidebarScroll,
+  sentinel: paginationSentinel,
+  expanded: canvasesExpanded,
+  anchorPadding,
+  toggle: toggleCanvases,
+} = useSidebarPagination({
+  owner: () => user.value?.id,
+  workspaceId,
+  enabled: paginationEnabled,
+  refreshing,
+  loadedCount: () => canvases.value.length,
+  loadNextPage,
+});
+const currentCanvasOutsidePage = computed(() =>
+  document.value?.workspaceId === workspaceId.value &&
+  !canvases.value.some((canvas) => canvas.id === document.value?.id)
+    ? document.value
+    : undefined,
+);
 const canvasMenu = useCanvasContextMenu({
   canvases,
   workspaceId,
@@ -307,7 +347,9 @@ const canMoveCanvas = (canvas: CanvasMeta, offset: number) => {
   const index = canvases.value.findIndex((entry) => entry.id === canvas.id);
   const neighbor = canvases.value[index + offset];
 
-  return !!neighbor && !!neighbor.pinned === !!canvas.pinned;
+  return neighbor
+    ? !!neighbor.pinned === !!canvas.pinned
+    : offset > 0 && index === canvases.value.length - 1 && !!nextCursor.value;
 };
 const menuAction = (
   action: "pin" | "rename" | "delete" | "move",
@@ -630,188 +672,244 @@ async function flushForShare() {
           </ul>
         </div>
       </div>
-      <div class="shared-canvases">
-        <div class="shared-heading">
-          <button
-            class="shared-toggle"
-            type="button"
-            aria-label="与我共享"
-            :aria-expanded="sharedOpen"
-            aria-controls="shared-canvas-list"
-            @click="toggleShared"
+      <div ref="sidebarScroll" class="sidebar-scroll">
+        <div class="shared-canvases">
+          <div class="shared-heading">
+            <button
+              class="shared-toggle"
+              type="button"
+              aria-label="与我共享"
+              :aria-expanded="sharedOpen"
+              aria-controls="shared-canvas-list"
+              @click="toggleShared"
+            >
+              <QuietIcon name="users" :size="16" /><span>与我共享</span
+              ><span v-if="shared.length" class="count">{{
+                shared.length
+              }}</span
+              ><QuietIcon
+                class="shared-chevron"
+                :class="{ expanded: sharedOpen }"
+                name="chevron"
+                :size="13"
+              />
+            </button>
+            <button
+              v-if="sharedOpen"
+              class="icon-button"
+              type="button"
+              aria-label="刷新共享画布"
+              title="刷新共享画布"
+              :disabled="sharedLoading"
+              @click="loadShared"
+            >
+              <QuietIcon name="refresh" :size="14" />
+            </button>
+          </div>
+          <div
+            v-if="sharedOpen"
+            id="shared-canvas-list"
+            class="shared-list"
+            :aria-busy="sharedLoading"
           >
-            <QuietIcon name="users" :size="16" /><span>与我共享</span
-            ><span v-if="shared.length" class="count">{{ shared.length }}</span
-            ><QuietIcon
+            <NuxtLink
+              v-for="item in shared"
+              :key="item.id"
+              :to="`/c/${item.id}`"
+              :title="item.name"
+              ><QuietIcon name="canvas" :size="15" /><span>{{ item.name }}</span
+              ><QuietIcon v-if="item.role === 'editor'" name="edit" :size="12"
+            /></NuxtLink>
+            <p v-if="!shared.length" class="sidebar-empty">
+              {{
+                sharedLoading
+                  ? "正在加载…"
+                  : sharedLoaded
+                    ? "他人邀请的画布会显示在这里"
+                    : "暂时无法加载，请重试"
+              }}
+            </p>
+          </div>
+        </div>
+        <div class="canvas-heading">
+          <button
+            class="canvas-toggle"
+            type="button"
+            :aria-label="canvasesExpanded ? '折叠画布' : '展开画布'"
+            :aria-expanded="canvasesExpanded"
+            aria-controls="canvas-list"
+            @click="toggleCanvases"
+          >
+            <span
+              >画布 <span class="count">{{ total }}</span></span
+            >
+            <QuietIcon
               class="shared-chevron"
-              :class="{ expanded: sharedOpen }"
+              :class="{ expanded: canvasesExpanded }"
               name="chevron"
               :size="13"
-            />
-          </button>
-          <button
-            v-if="sharedOpen"
+            /></button
+          ><button
             class="icon-button"
-            type="button"
-            aria-label="刷新共享画布"
-            title="刷新共享画布"
-            :disabled="sharedLoading"
-            @click="loadShared"
+            title="新建画布"
+            aria-label="新建画布"
+            :disabled="directoryLocked || !workspaceId"
+            @click="createCanvas"
           >
-            <QuietIcon name="refresh" :size="14" />
+            <QuietIcon name="plus" :size="16" />
           </button>
         </div>
-        <div
-          v-if="sharedOpen"
-          id="shared-canvas-list"
-          class="shared-list"
-          :aria-busy="sharedLoading"
-        >
-          <NuxtLink
-            v-for="item in shared"
-            :key="item.id"
-            :to="`/c/${item.id}`"
-            :title="item.name"
-            ><QuietIcon name="canvas" :size="15" /><span>{{ item.name }}</span
-            ><QuietIcon v-if="item.role === 'editor'" name="edit" :size="12"
-          /></NuxtLink>
-          <p v-if="!shared.length" class="sidebar-empty">
-            {{
-              sharedLoading
-                ? "正在加载…"
-                : sharedLoaded
-                  ? "他人邀请的画布会显示在这里"
-                  : "暂时无法加载，请重试"
-            }}
-          </p>
-        </div>
-      </div>
-      <div class="canvas-heading">
-        <span
-          >画布 <span class="count">{{ canvases.length }}</span></span
-        ><button
-          class="icon-button"
-          title="新建画布"
-          aria-label="新建画布"
-          :disabled="directoryLocked || !workspaceId"
-          @click="createCanvas"
-        >
-          <QuietIcon name="plus" :size="16" />
-        </button>
-      </div>
-      <ul class="canvas-list" @click.capture="canvasMenu.suppressClick">
-        <li
-          v-for="canvas in canvases"
-          :key="canvas.id"
-          :data-canvas-id="canvas.id"
-          @contextmenu="canvasMenu.contextMenu($event, canvas)"
-          @keydown="canvasMenu.keyDown($event, canvas)"
-          @pointerdown="canvasMenu.pointerDown($event, canvas)"
-          :class="{
-            selected: document?.id === canvas.id,
-            dragging: drag?.id === canvas.id,
-            'drop-target':
-              drag && drag.targetId === canvas.id && drag.id !== canvas.id,
-          }"
-        >
-          <button
-            class="drag-handle"
-            :aria-label="`调整画布 ${canvas.name} 的顺序`"
-            title="拖动排序；方向键上移或下移"
-            :disabled="busy || directoryStale"
-            @pointerdown="startDrag($event, canvas)"
-            @pointermove="dragMove"
-            @pointerup="finishDrag"
-            @pointercancel="cancelDrag"
-            @lostpointercapture="cancelDrag"
-            @keydown="dragKey($event, canvas)"
-          >
-            <svg viewBox="0 0 12 16" aria-hidden="true">
-              <circle
-                v-for="dot in 6"
-                :key="dot"
-                :cx="dot % 2 ? 4 : 8"
-                :cy="Math.ceil(dot / 2) * 4"
-                r="1"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
-          <button
-            class="canvas-name"
-            :aria-label="canvas.name"
-            :title="canvas.name"
-            :aria-current="document?.id === canvas.id ? 'page' : undefined"
-            :disabled="interactionLocked"
-            @click="selectSidebarCanvas($event, canvas.id)"
-            @dblclick="renameSidebarCanvas(canvas)"
-          >
-            <QuietIcon name="canvas" :size="16" /><span>{{ canvas.name }}</span>
-            <QuietIcon
-              v-if="canvas.pinned"
-              name="pin"
-              :size="13"
-              class="pin-mark"
-              aria-label="已置顶"
-            />
-            <small
-              v-if="resources?.canvases.get(canvas.id)?.resource.dirty"
-              :title="
-                resources.canvases.get(canvas.id)?.message || '正在后台保存'
-              "
-              >{{
-                resources.canvases.get(canvas.id)?.resource.conflict
-                  ? "冲突"
-                  : resources.canvases.get(canvas.id)?.message
-                    ? "保存失败"
-                    : "保存中"
-              }}</small
+        <template v-if="canvasesExpanded">
+          <div v-if="currentCanvasOutsidePage" class="current-canvas-shortcut">
+            <span>当前画布</span
+            ><button
+              type="button"
+              :title="currentCanvasOutsidePage.name"
+              :disabled="interactionLocked"
+              @click="selectCanvas(currentCanvasOutsidePage.id)"
             >
-          </button>
-        </li>
-      </ul>
-      <p v-if="!canvases.length" class="sidebar-empty">
-        {{ workspaceId ? "这个空间还没有画布" : "还没有工作空间" }}
-      </p>
-      <div class="sidebar-bottom">
-        <button
-          type="button"
-          class="settings-entry recycle-entry"
-          aria-haspopup="dialog"
-          :aria-expanded="recycleOpen"
-          :disabled="interactionLocked"
-          @click="recycleOpen = true"
-        >
-          <QuietIcon name="trash" :size="18" /><span>回收站</span>
-        </button>
-        <button
-          type="button"
-          class="settings-entry"
-          aria-haspopup="dialog"
-          :aria-expanded="settingsOpen"
-          :disabled="interactionLocked || !settingsResource"
-          @click="settingsOpen = true"
-        >
-          <QuietIcon name="settings" :size="18" /><span>设置</span>
-        </button>
-        <div class="account-info">
-          <span class="avatar">{{
-            (user.name || user.email).slice(0, 1).toUpperCase()
-          }}</span>
-          <div class="account-text">
-            <strong>{{ user.name || user.email }}</strong
-            ><small :title="user.email">{{ user.email }}</small>
+              <QuietIcon name="canvas" :size="16" /><span>{{
+                currentCanvasOutsidePage.name
+              }}</span>
+            </button>
           </div>
-          <button
-            class="icon-button"
-            title="退出登录"
-            aria-label="退出登录"
-            :disabled="interactionLocked"
-            @click="logout"
+          <ul
+            id="canvas-list"
+            class="canvas-list"
+            @click.capture="canvasMenu.suppressClick"
           >
-            <QuietIcon name="logout" :size="17" />
+            <li
+              v-for="canvas in canvases"
+              :key="canvas.id"
+              :data-canvas-id="canvas.id"
+              @contextmenu="canvasMenu.contextMenu($event, canvas)"
+              @keydown="canvasMenu.keyDown($event, canvas)"
+              @pointerdown="canvasMenu.pointerDown($event, canvas)"
+              :class="{
+                selected: document?.id === canvas.id,
+                dragging: drag?.id === canvas.id,
+                'drop-target':
+                  drag && drag.targetId === canvas.id && drag.id !== canvas.id,
+              }"
+            >
+              <button
+                class="drag-handle"
+                :aria-label="`调整画布 ${canvas.name} 的顺序`"
+                title="拖动排序；方向键上移或下移"
+                :disabled="busy || directoryStale"
+                @pointerdown="startDrag($event, canvas)"
+                @pointermove="dragMove"
+                @pointerup="finishDrag"
+                @pointercancel="cancelDrag"
+                @lostpointercapture="cancelDrag"
+                @keydown="dragKey($event, canvas)"
+              >
+                <svg viewBox="0 0 12 16" aria-hidden="true">
+                  <circle
+                    v-for="dot in 6"
+                    :key="dot"
+                    :cx="dot % 2 ? 4 : 8"
+                    :cy="Math.ceil(dot / 2) * 4"
+                    r="1"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+              <button
+                class="canvas-name"
+                :aria-label="canvas.name"
+                :title="canvas.name"
+                :aria-current="document?.id === canvas.id ? 'page' : undefined"
+                :disabled="interactionLocked"
+                @click="selectSidebarCanvas($event, canvas.id)"
+                @dblclick="renameSidebarCanvas(canvas)"
+              >
+                <QuietIcon name="canvas" :size="16" /><span>{{
+                  canvas.name
+                }}</span>
+                <QuietIcon
+                  v-if="canvas.pinned"
+                  name="pin"
+                  :size="13"
+                  class="pin-mark"
+                  aria-label="已置顶"
+                />
+                <small
+                  v-if="resources?.canvases.get(canvas.id)?.resource.dirty"
+                  :title="
+                    resources.canvases.get(canvas.id)?.message || '正在后台保存'
+                  "
+                  >{{
+                    resources.canvases.get(canvas.id)?.resource.conflict
+                      ? "冲突"
+                      : resources.canvases.get(canvas.id)?.message
+                        ? "保存失败"
+                        : "保存中"
+                  }}</small
+                >
+              </button>
+            </li>
+          </ul>
+          <p v-if="!canvases.length" class="sidebar-empty">
+            {{ workspaceId ? "这个空间还没有画布" : "还没有工作空间" }}
+          </p>
+          <div class="pagination-status" aria-live="polite">
+            <button
+              v-if="paginationError"
+              type="button"
+              :disabled="loadingMore || refreshing"
+              @click="loadNextPage"
+            >
+              加载失败，重试
+            </button>
+            <span v-else-if="loadingMore">正在加载更多…</span>
+            <span v-else-if="!nextCursor && workspaceId"
+              >已显示全部 {{ total }} 张画布</span
+            >
+          </div>
+          <div
+            v-if="nextCursor"
+            ref="paginationSentinel"
+            class="pagination-sentinel"
+            aria-hidden="true"
+          />
+          <div
+            v-if="anchorPadding"
+            class="scroll-anchor-spacer"
+            :style="{ height: `${anchorPadding}px` }"
+            aria-hidden="true"
+          />
+        </template>
+      </div>
+      <div class="sidebar-bottom">
+        <div class="sidebar-actions">
+          <button
+            type="button"
+            class="settings-entry recycle-entry"
+            aria-haspopup="dialog"
+            :aria-expanded="recycleOpen"
+            :disabled="interactionLocked"
+            @click="recycleOpen = true"
+          >
+            <QuietIcon name="trash" :size="16" /><span>回收站</span>
+          </button>
+          <button
+            type="button"
+            class="settings-entry"
+            aria-haspopup="dialog"
+            :aria-expanded="settingsOpen"
+            :disabled="interactionLocked || !settingsResource"
+            @click="settingsOpen = true"
+          >
+            <QuietIcon name="settings" :size="16" /><span>设置</span>
           </button>
         </div>
+        <SidebarAccountMenu
+          :name="user.name"
+          :email="user.email"
+          :locked="interactionLocked"
+          @logout="logout"
+        />
       </div>
     </aside>
     <CanvasContextMenu
@@ -1174,7 +1272,7 @@ async function flushForShare() {
   padding-left: 5px !important;
 }
 .shared-canvases {
-  margin: 16px 0 8px;
+  margin: 0 0 8px;
 }
 .shared-heading {
   display: flex;
@@ -1324,7 +1422,17 @@ async function flushForShare() {
   background: var(--app-sidebar);
   border-right: 1px solid var(--line);
   z-index: 20;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  scrollbar-width: thin;
 }
 .sidebar-heading {
   display: flex;
@@ -1366,8 +1474,9 @@ async function flushForShare() {
   border-radius: 6px;
 }
 .workspace-controls {
-  margin-top: 15px;
-  margin-bottom: 24px;
+  flex: none;
+  margin-top: 8px;
+  margin-bottom: 14px;
 }
 .section-label,
 .canvas-heading {
@@ -1500,8 +1609,7 @@ async function flushForShare() {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  flex: 1;
-  min-height: 110px;
+  min-height: 0;
 }
 .canvas-list li {
   display: flex;
@@ -1596,77 +1704,96 @@ async function flushForShare() {
   color: var(--app-danger);
 }
 .sidebar-bottom {
-  margin-top: 26px;
   flex: none;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+}
+.sidebar-actions {
+  display: flex;
+  gap: 4px;
 }
 .settings-entry {
   display: flex;
+  flex: 1;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 12px 8px;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 8px;
   border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
+  border-radius: 5px;
   background: transparent;
   color: var(--app-muted);
   font: inherit;
   font-size: 12px;
-  text-align: left;
   cursor: pointer;
 }
-.recycle-entry {
-  margin-bottom: 0;
-  padding-bottom: 8px;
-}
-.settings-entry:hover {
+.settings-entry:hover,
+.settings-entry:focus-visible {
   background: var(--app-hover);
   color: var(--app-text);
 }
 .settings-entry:focus-visible {
   outline: 2px solid var(--app-focus);
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
-.account-info {
+.canvas-toggle {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 17px 5px;
-  border-top: 1px solid var(--line);
-}
-.avatar {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  flex: none;
-  border-radius: 50%;
-  background: var(--app-selected);
-  color: var(--app-muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-.account-text {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 8px;
   flex: 1;
   min-width: 0;
+  padding: 7px 0;
+  text-align: left;
+  color: inherit;
+  font-size: 12px;
 }
-.account-text strong,
-.account-text small {
+.canvas-toggle .shared-chevron {
+  margin-left: 6px;
+}
+.canvas-toggle:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: -2px;
+}
+.current-canvas-shortcut {
+  padding: 4px 6px 9px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+.current-canvas-shortcut button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+  padding: 8px;
+  background: var(--app-selected);
+  border-radius: 5px;
+  color: var(--app-selected-text);
+}
+.current-canvas-shortcut button span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.account-text strong {
-  font-size: 12px;
-  font-weight: 500;
+.current-canvas-shortcut svg {
+  flex: none;
 }
-.account-text small {
-  font-size: 10px;
+.pagination-status {
+  padding: 10px 6px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--app-subtle);
+}
+.pagination-status button {
+  padding: 6px 8px;
   color: var(--app-muted);
+  border: 1px solid var(--app-border);
+  border-radius: 5px;
+}
+.pagination-sentinel {
+  height: 1px;
 }
 .canvas-panel {
   display: flex;
@@ -1815,8 +1942,11 @@ button:focus-visible {
   .menu-popover {
     max-width: 200px;
   }
-  .account-info {
-    padding-bottom: calc(17px + env(safe-area-inset-bottom));
+  .sidebar-bottom {
+    padding-bottom: calc(5px + env(safe-area-inset-bottom));
+  }
+  .settings-entry {
+    min-height: 44px;
   }
 }
 </style>

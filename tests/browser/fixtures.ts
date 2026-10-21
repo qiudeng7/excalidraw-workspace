@@ -204,7 +204,12 @@ export const test = base.extend<{
           data = { canvases: [] };
           break;
         case "GET /api/workspaces/test-space/canvases":
-          data = { canvases: [canvas], catalogRevision: 0 };
+          data = {
+            canvases: [canvas],
+            catalogRevision: 0,
+            total: 1,
+            nextCursor: null,
+          };
           break;
         case "GET /api/canvases/test-canvas":
           data = { canvas };
