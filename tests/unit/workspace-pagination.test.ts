@@ -69,6 +69,9 @@ function fixture(count = 65, recentId?: string) {
   const pageRequests: PageRequest[] = [];
   const readCanvasIds: string[] = [];
   const invalidated: string[] = [];
+  const restored: string[] = [];
+  const localTombstones = new Set<string>();
+  const loadCanvasIds: string[] = [];
   const historyReleased: string[] = [];
   const moveWrites: { id: string; move: CanvasMove }[] = [];
   const pinWrites: { id: string; pinned: boolean; catalogRevision: number }[] =
@@ -253,7 +256,14 @@ function fixture(count = 65, recentId?: string) {
     canvasDocument: {
       document,
       loadCanvas: async (id) => {
+        loadCanvasIds.push(id);
+        if (localTombstones.has(id))
+          throw new ApiError(404, "NOT_FOUND", "本地资源已失效");
         document.value = await api.readCanvas(id);
+      },
+      restoreCanvas: async (id) => {
+        restored.push(id);
+        localTombstones.delete(id);
       },
       clearDocument: () => {
         document.value = undefined;
@@ -263,6 +273,7 @@ function fixture(count = 65, recentId?: string) {
       },
       invalidateCanvas: (id) => {
         invalidated.push(id);
+        localTombstones.add(id);
         drafts.delete(id);
         const active = document.value?.id === id;
 
@@ -294,6 +305,9 @@ function fixture(count = 65, recentId?: string) {
     pageRequests,
     readCanvasIds,
     invalidated,
+    restored,
+    localTombstones,
+    loadCanvasIds,
     historyReleased,
     drafts,
     moveWrites,
@@ -309,6 +323,26 @@ function fixture(count = 65, recentId?: string) {
     },
     failPages: (value = true) => {
       pageFailure = value;
+    },
+    rememberCanvas: (id: string) => {
+      navigation.value = {
+        revision: 1,
+        lastWorkspaceId: "one",
+        lastCanvasId: id,
+        workspaces: [{ workspaceId: "one", lastCanvasId: id }],
+      };
+    },
+    restoreDeletedWorkspace: () => {
+      catalogs.one = Array.from({ length: count }, (_, index) =>
+        canvas(index + 1),
+      );
+      workspaces.unshift({
+        id: "one",
+        name: "one",
+        catalogRevision: ++revisions.one!,
+        createdAt: "",
+        updatedAt: "",
+      });
     },
     remoteChange: (update: (entries: CanvasDocument[]) => void) => {
       update(catalogs.one!);
@@ -776,4 +810,163 @@ test("按ID重开已知标签遇到网络错误时保留标签与草稿，可再
   f.api.readCanvas = read;
   await f.controller.selectCanvas("one-65");
   assert.equal(f.document.value?.id, "one-65");
+});
+
+for (const entry of ["最近位置", "深链接"] as const) {
+  test(`回收站恢复页外65后${entry}以权威ID读取解除本地失效，不扫描前置页`, async () => {
+    const f = fixture(65, entry === "最近位置" ? "one-65" : undefined);
+
+    f.localTombstones.add("one-65");
+    await f.controller.loadWorkspaces(
+      entry === "深链接"
+        ? { workspaceId: "one", canvasId: "one-65" }
+        : undefined,
+    );
+    assert.equal(f.document.value?.id, "one-65");
+    assert.deepEqual(
+      f.loadCanvasIds.filter((id) => id === "one-65"),
+      ["one-65", "one-65"],
+    );
+    assert.deepEqual(
+      f.readCanvasIds.filter((id) => id === "one-65"),
+      ["one-65", "one-65"],
+      "先权威确认，再由文档资源读取；本地404不发HTTP",
+    );
+    assert.deepEqual(
+      f.restored.filter((id) => id === "one-65"),
+      ["one-65"],
+    );
+    assert.equal(f.pageRequests.length, 1);
+    assert.equal(f.pageRequests[0]!.options.cursor, undefined);
+    assert.equal(f.controller.canvases.value.length, 30);
+    assert.deepEqual(ids(f.controller.canvasTabs.value), ["one-65"]);
+    assert.equal(f.localTombstones.has("one-65"), false);
+  });
+}
+
+for (const status of [403, 404, 503]) {
+  test(`已知页外标签遇到本地404后权威读取${status}，${status === 503 ? "保留标签与草稿供重试" : "确认不可访问后移除标签"}且不复活`, async () => {
+    const f = fixture();
+
+    await f.controller.loadWorkspaces();
+    await f.controller.selectCanvas("one-65");
+    await f.controller.selectCanvas("one-1");
+    f.drafts.set("one-65", "已知标签的未同步草稿");
+    f.localTombstones.add("one-65");
+    const read = f.api.readCanvas;
+    let probes = 0;
+
+    f.api.readCanvas = async (id) => {
+      if (id === "one-65") {
+        probes++;
+        throw new ApiError(
+          status,
+          status === 503 ? "UNAVAILABLE" : "NOT_FOUND",
+          "权威读取失败",
+        );
+      }
+
+      return read(id);
+    };
+
+    await f.controller.selectCanvas("one-65");
+    assert.equal(probes, 1);
+    assert.equal(f.restored.includes("one-65"), false);
+    assert.equal(f.localTombstones.has("one-65"), true);
+    assert.equal(f.document.value?.id, "one-1");
+    assert.equal(
+      ids(f.controller.canvasTabs.value).includes("one-65"),
+      status === 503,
+    );
+    assert.equal(f.drafts.get("one-65"), "已知标签的未同步草稿");
+    if (status === 503) {
+      f.api.readCanvas = read;
+      await f.controller.selectCanvas("one-65");
+      assert.equal(f.document.value?.id, "one-65");
+    }
+  });
+}
+
+for (const selection of ["另一空间", "同空间画布"] as const) {
+  test(
+    `页外本地404的权威确认未完成时切到${selection}，迟到成功不能解除旧失效或抢回编辑器`,
+    { timeout: 5000 },
+    async () => {
+      const f = fixture();
+
+      await f.controller.loadWorkspaces();
+      f.localTombstones.add("one-65");
+      const gate = deferred<CanvasDocument>();
+      const started = deferred<AbortSignal>();
+      const read = f.api.readCanvas;
+
+      f.api.readCanvas = async (...[id, signal]: [string, AbortSignal?]) => {
+        if (id === "one-65") {
+          assert.ok(signal, "权威确认必须绑定当前空间的取消信号");
+          started.resolve(signal);
+
+          return gate.promise;
+        }
+
+        return read(id);
+      };
+
+      const pending = f.controller.selectCanvas("one-65");
+
+      try {
+        const signal = await Promise.race([
+          started.promise,
+          pending.then(() => {
+            throw new Error("本地404后应先启动权威读取，而不是直接移除标签");
+          }),
+        ]);
+
+        if (selection === "另一空间") await f.controller.selectWorkspace("two");
+        else await f.controller.selectCanvas("one-2");
+        if (selection === "另一空间") assert.equal(signal.aborted, true);
+        gate.resolve(canvas(65));
+        await pending;
+        assert.equal(
+          f.document.value?.id,
+          selection === "另一空间" ? "two-1" : "one-2",
+        );
+        assert.equal(f.restored.includes("one-65"), false);
+        assert.equal(f.localTombstones.has("one-65"), true);
+        assert.equal(f.loadCanvasIds.filter((id) => id === "one-65").length, 1);
+        assert.equal(
+          ids(f.controller.canvasTabs.value).includes("one-65"),
+          false,
+        );
+      } finally {
+        gate.resolve(canvas(65));
+        await pending;
+      }
+    },
+  );
+}
+
+test("删除后恢复整个工作空间时最近页外画布可以重开，其他空间已有标签仍保留", async () => {
+  const f = fixture();
+
+  await f.controller.loadWorkspaces();
+  await f.controller.selectCanvas("one-65");
+  await f.controller.deleteWorkspace();
+  await f.controller.selectCanvas("two-2");
+  assert.deepEqual(ids(f.controller.canvasTabs.value), ["two-1", "two-2"]);
+  f.restoreDeletedWorkspace();
+  f.rememberCanvas("one-65");
+  await f.controller.refreshAfterRestore();
+  const pagesBefore = f.pageRequests.length;
+
+  await f.controller.selectWorkspace("one");
+  assert.equal(f.pageRequests.length - pagesBefore, 1);
+  assert.equal(
+    f.document.value?.id,
+    "one-65",
+    "空间删除状态不能被误认为用户手动关闭了全部标签",
+  );
+  assert.deepEqual(ids(f.controller.canvasTabs.value), ["one-65"]);
+  await f.controller.selectWorkspace("two");
+  assert.deepEqual(ids(f.controller.canvasTabs.value), ["two-1", "two-2"]);
+  assert.equal(f.document.value?.id, "two-2");
 });
