@@ -8,6 +8,7 @@ interface SidebarPaginationOptions {
   workspaceId: ReadonlyRef<string>;
   enabled: ReadonlyRef<boolean>;
   refreshing: ReadonlyRef<boolean>;
+  loadedCount: () => number;
   loadNextPage(): Promise<void>;
 }
 
@@ -16,6 +17,7 @@ export const useSidebarPagination = (options: SidebarPaginationOptions) => {
   const scroll = ref<HTMLElement>();
   const sentinel = ref<HTMLElement>();
   const expanded = ref(true);
+  const anchorPadding = ref(0);
   const storageKey = computed(
     () =>
       `excalidraw:canvases-expanded:${options.owner() ?? ""}:${options.workspaceId.value}`,
@@ -54,6 +56,10 @@ export const useSidebarPagination = (options: SidebarPaginationOptions) => {
   };
   const toggle = () => {
     expanded.value = !expanded.value;
+    if (!expanded.value) {
+      anchorPadding.value = 0;
+    }
+
     try {
       localStorage.setItem(storageKey.value, String(expanded.value));
     } catch (cause) {
@@ -86,27 +92,85 @@ export const useSidebarPagination = (options: SidebarPaginationOptions) => {
     }));
   };
   const restoreAnchor = async () => {
+    const context = storageKey.value;
+    const captured = anchors;
+
     await nextTick();
     const root = scroll.value;
     const rows = [
       ...(root?.querySelectorAll<HTMLElement>("[data-canvas-id]") ?? []),
     ];
-    const anchor = anchors.find((entry) =>
+    const anchor = captured.find((entry) =>
       rows.some((row) => row.dataset.canvasId === entry.id),
     );
     const row = rows.find((entry) => entry.dataset.canvasId === anchor?.id);
 
-    if (root && row && anchor) {
-      root.scrollTop += row.getBoundingClientRect().top - anchor.top;
+    if (
+      !root ||
+      !row ||
+      !anchor ||
+      context !== storageKey.value ||
+      !expanded.value
+    ) {
+      return;
     }
 
-    anchors = [];
+    const target =
+      root.scrollTop + row.getBoundingClientRect().top - anchor.top;
+    const shortage = Math.max(
+      0,
+      Math.ceil(target - (root.scrollHeight - root.clientHeight)),
+    );
+
+    // A refreshed prefix can move the anchor down without growing the loaded range.
+    // Reserve only the missing scroll distance; the next appended page absorbs it.
+    if (shortage) {
+      anchorPadding.value += shortage;
+      await nextTick();
+    }
+
+    if (
+      root === scroll.value &&
+      context === storageKey.value &&
+      expanded.value
+    ) {
+      root.scrollTop = target;
+    }
+
+    if (anchors === captured) {
+      anchors = [];
+    }
+  };
+  const trimAnchorPadding = async () => {
+    const context = storageKey.value;
+
+    await nextTick();
+    const root = scroll.value;
+
+    if (
+      !root ||
+      !anchorPadding.value ||
+      options.refreshing.value ||
+      context !== storageKey.value
+    ) {
+      return;
+    }
+
+    const naturalMaximum =
+      root.scrollHeight - root.clientHeight - anchorPadding.value;
+
+    anchorPadding.value = Math.max(
+      0,
+      Math.ceil(root.scrollTop - naturalMaximum),
+    );
   };
 
   watch(
     storageKey,
     () => {
       expanded.value = true;
+      anchorPadding.value = 0;
+      anchors = [];
       try {
         expanded.value = localStorage.getItem(storageKey.value) !== "false";
       } catch (cause) {
@@ -119,6 +183,20 @@ export const useSidebarPagination = (options: SidebarPaginationOptions) => {
     },
     { immediate: true },
   );
+  watch(
+    options.loadedCount,
+    (count, previous) => {
+      if (count > previous && !options.refreshing.value) {
+        void trimAnchorPadding();
+      }
+    },
+    { flush: "sync" },
+  );
+  watch(scroll, (root) => {
+    if (!root) {
+      anchorPadding.value = 0;
+    }
+  });
   watch(
     options.refreshing,
     (refreshing) => {
@@ -164,5 +242,5 @@ export const useSidebarPagination = (options: SidebarPaginationOptions) => {
     observer?.disconnect();
   });
 
-  return { scroll, sentinel, expanded, toggle };
+  return { scroll, sentinel, expanded, anchorPadding, toggle };
 };

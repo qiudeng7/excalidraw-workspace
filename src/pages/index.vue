@@ -316,12 +316,14 @@ const {
   scroll: sidebarScroll,
   sentinel: paginationSentinel,
   expanded: canvasesExpanded,
+  anchorPadding,
   toggle: toggleCanvases,
 } = useSidebarPagination({
   owner: () => user.value?.id,
   workspaceId,
   enabled: paginationEnabled,
   refreshing,
+  loadedCount: () => canvases.value.length,
   loadNextPage,
 });
 const currentCanvasOutsidePage = computed(() =>
@@ -869,6 +871,12 @@ async function flushForShare() {
             v-if="nextCursor"
             ref="paginationSentinel"
             class="pagination-sentinel"
+            aria-hidden="true"
+          />
+          <div
+            v-if="anchorPadding"
+            class="scroll-anchor-spacer"
+            :style="{ height: `${anchorPadding}px` }"
             aria-hidden="true"
           />
         </template>
@@ -1423,6 +1431,7 @@ async function flushForShare() {
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
+  overflow-anchor: none;
   scrollbar-width: thin;
 }
 .sidebar-heading {
