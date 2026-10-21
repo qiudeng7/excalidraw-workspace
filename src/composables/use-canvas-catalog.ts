@@ -238,6 +238,7 @@ export const useCanvasCatalog = (api: CatalogApi) => {
     paginationError,
     refreshing,
     cancel,
+    getReadSignal: () => abort.signal,
     read,
     publish,
     normalize,

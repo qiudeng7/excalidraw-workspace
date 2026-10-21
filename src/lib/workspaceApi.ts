@@ -32,7 +32,7 @@ export interface WorkspaceApi {
     pinned: boolean,
     catalogRevision: number,
   ): Promise<CanvasPinSummary>;
-  readCanvas(canvasId: string): Promise<CanvasDocument>;
+  readCanvas(canvasId: string, signal?: AbortSignal): Promise<CanvasDocument>;
   readLibrary(ownerId: string): Promise<LibraryDocument>;
   validateCanvas?(
     id: string,
@@ -104,9 +104,12 @@ export const workspaceApi: WorkspaceApi = {
       `/api/canvases/${segment(id)}/pin?return=summary`,
       json("PUT", { pinned, catalogRevision }),
     ),
-  readCanvas: async (id) =>
-    (await api<{ canvas: CanvasDocument }>(`/api/canvases/${segment(id)}`))
-      .canvas,
+  readCanvas: async (id, signal) =>
+    (
+      await api<{ canvas: CanvasDocument }>(`/api/canvases/${segment(id)}`, {
+        signal,
+      })
+    ).canvas,
   readLibrary: (ownerId) =>
     api<LibraryDocument>("/api/library", {
       headers: { "X-Resource-Owner": ownerId },

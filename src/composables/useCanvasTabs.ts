@@ -43,6 +43,9 @@ export function useCanvasTabs() {
     open,
     close,
     reconcile,
+    forgetWorkspace(workspaceId: string) {
+      delete workspaces.value[workspaceId];
+    },
     reset() {
       workspaces.value = {};
     },
