@@ -34,6 +34,8 @@ const directory = async (page: Page) => {
   }));
   const catalog = () => ({
     catalogRevision: revision,
+    total: canvases.length,
+    nextCursor: null,
     canvases: [...canvases].sort(
       (a, b) => Number(b.pinned) - Number(a.pinned) || a.position - b.position,
     ),
@@ -49,10 +51,11 @@ const directory = async (page: Page) => {
       return route.fulfill({ json: catalog() });
     }
 
-    if (
-      path === "/api/workspaces/test-space/canvas-order" &&
-      request.method() === "PUT"
-    ) {
+    const moving = canvases.find(
+      (canvas) => path === `/api/canvases/${canvas.id}/move`,
+    );
+
+    if (moving && request.method() === "PUT") {
       const body = request.postDataJSON();
 
       writes.push(body);
@@ -64,23 +67,28 @@ const directory = async (page: Page) => {
         });
       }
 
-      for (const pinned of [true, false]) {
-        const slots = canvases
-          .filter((canvas) => canvas.pinned === pinned)
-          .map((canvas) => canvas.position)
-          .sort((a, b) => a - b);
-        const group = (body.canvasIds as string[])
-          .map((id) => canvases.find((canvas) => canvas.id === id)!)
-          .filter((canvas) => canvas.pinned === pinned);
+      const ordered = catalog().canvases;
+      const sourceIndex = ordered.findIndex(
+        (canvas) => canvas.id === moving.id,
+      );
 
-        group.forEach((canvas, index) => {
-          canvas.position = slots[index]!;
-        });
-      }
+      ordered.splice(sourceIndex, 1);
+      const targetIndex = ordered.findIndex(
+        (canvas) => canvas.id === body.targetId,
+      );
 
+      expect(ordered[targetIndex]?.pinned).toBe(moving.pinned);
+      ordered.splice(
+        targetIndex + (body.placement === "after" ? 1 : 0),
+        0,
+        moving,
+      );
+      ordered.forEach((canvas, index) => {
+        canvas.position = index;
+      });
       revision++;
 
-      return route.fulfill({ json: catalog() });
+      return route.fulfill({ json: { catalogRevision: revision } });
     }
 
     const target = canvases.find(
@@ -102,7 +110,9 @@ const directory = async (page: Page) => {
       target.pinned = body.pinned;
       revision++;
 
-      return route.fulfill({ json: catalog() });
+      return route.fulfill({
+        json: { canvas: target, catalogRevision: revision },
+      });
     }
 
     const opened = canvases.find(
@@ -202,7 +212,7 @@ test("菜单上移按组排序，失败回读恢复顺序，置顶组边界不�
   await expect(page.getByRole("alert").first()).toBeVisible();
   await expect(names(page)).toHaveText(["测试画布", "第二画布", "第三画布"]);
   expect(f.writes).toEqual([
-    { canvasIds: ["second", "test-canvas", "third"], catalogRevision: 0 },
+    { targetId: "test-canvas", placement: "before", catalogRevision: 0 },
   ]);
   f.fail("ok");
   await row(page).click({ button: "right" });
