@@ -10,7 +10,7 @@
 | 隔离测试            | `pnpm test:unit`                                                           | 前端控制器、缓存、异步保存与快照失败处理；接口和存储使用替身                 |
 | 进程内集成          | `pnpm test:integration`                                                    | SQLite、迁移、blob 驱动与真实 H3 处理器，包括认证并发时序、鉴权后的条件读取  |
 | 前端 UI             | `pnpm test:browser`                                                        | Chromium 中的真实界面和编辑器，常规用例模拟 API；真实协作用例使用专用 runner |
-| 本地 Workers / D1   | `pnpm test:worker`                                                         | 临时 Worker 上的设置、改密、旧版设置兼容和缓存条件读取 HTTP 回归             |
+| 本地 Workers / D1   | `pnpm test:worker`                                                         | 临时 Worker 上的设置、改密、兼容、缓存及目录分页 HTTP 回归                   |
 | 真实协作浏览器      | `pnpm test:collaboration node`、`pnpm test:collaboration worker`           | 隔离真实服务，无 API mocks，并发编辑、三种查看模式、离线与撤销               |
 | 代码风格与工具      | `pnpm lint`、`pnpm format:check`、`pnpm test:lint`、`pnpm check:staged`    | 静态检查、规则自身回归及临时 Git 仓库中的暂存区检查回归                      |
 | 独立 HTTP 验收      | 本文后面的 `node tests/http/…` 命令                                        | API 重启持久化、目录与导航，分别使用全新测试库                               |
@@ -153,7 +153,9 @@ pnpm test:worker
 
 命令先构建 Workers 产物，再创建临时 Wrangler state 目录，只向该目录的**本地 D1**迁移；随后使用空闲回环端口启动 Worker。正常结束、测试失败或终止时关闭 Worker 并删除这份状态，不迁移仓库默认 `.wrangler` 数据，不操作远端资源。构建会更新当前 checkout 的 `.nuxt` / `.output`，请与其他构建串行运行。
 
-测试通过真实 HTTP 新建随机账户，验证当前会话保留/其他会话撤销、旧新密码、缺少新 flag 的原版及中间版 v1 设置保留已有 false、首次保存默认值及版本比较更新（CAS）。`test:worker` 执行 `tests/http/user-settings.mjs`、`tests/http/account-compatibility.mjs` 与 `tests/http/cache.mjs`，覆盖设置白名单、账户隔离和并发保存。缓存 HTTP 回归在独立随机账户内写入画布和素材库，检查真实 `304` 无响应体、版本不匹配全量读取、owner/未登录拒绝及旧 revision 保存冲突；不执行需要独立空库的 `api.mjs`、`navigation.mjs`。这验证本地 Cloudflare runtime 的 D1 查询与批处理，不覆盖云端绑定、线上发布或浏览器交互。
+测试通过真实 HTTP 新建随机账户，验证当前会话保留/其他会话撤销、旧新密码、缺少新 flag 的原版及中间版 v1 设置保留已有 false、首次保存默认值及版本比较更新（CAS）。`test:worker` 执行 `tests/http/user-settings.mjs`、`tests/http/account-compatibility.mjs`、`tests/http/cache.mjs` 与 `tests/http/catalog-pagination.mjs`，覆盖设置白名单、账户隔离和并发保存。缓存 HTTP 回归在独立随机账户内写入画布和素材库，检查真实 `304` 无响应体、版本不匹配全量读取、owner/未登录拒绝及旧 revision 保存冲突；不执行需要独立空库的 `api.mjs`、`navigation.mjs`。目录 HTTP 回归在随机账号中创建 35 张画布，检查首屏分页、跨 30/31 条边界的局部移动、旧游标冲突、置顶精简响应与旧完整接口兼容。
+
+这验证本地 Cloudflare runtime 的 D1 查询与批处理，不覆盖云端绑定、线上发布或浏览器交互。
 
 也可使用已启动的独立本地 Worker：
 

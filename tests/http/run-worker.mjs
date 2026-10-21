@@ -63,6 +63,7 @@ try {
     origin,
   ]);
   await command(["exec", "node", "tests/http/cache.mjs", origin]);
+  await command(["exec", "node", "tests/http/catalog-pagination.mjs", origin]);
 } finally {
   await cleanup();
 }

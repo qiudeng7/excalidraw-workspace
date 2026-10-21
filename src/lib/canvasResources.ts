@@ -59,6 +59,8 @@ export class CanvasResources {
   private flights = new Map<string, Promise<CanvasResource>>();
   private libraryFlight?: Promise<void>;
   private reads = new Set<AbortController>();
+  private canvasWorkspaces = new Map<string, string>();
+  private canvasReads = new Map<string, Set<AbortController>>();
   private disposed = false;
   private activeId = "";
   private editorContexts = new Map<
@@ -99,9 +101,23 @@ export class CanvasResources {
     if (!this.disposed) this.changed();
   }
 
+  private assertCanvasCurrent(id: string, incarnation: number) {
+    this.assertActive();
+    if (
+      this.deleted.has(id) ||
+      incarnation !== (this.incarnations.get(id) ?? 0)
+    ) {
+      throw new DOMException("Canvas invalidated", "AbortError");
+    }
+  }
+
   async invalidate(id: string) {
     this.incarnations.set(id, (this.incarnations.get(id) ?? 0) + 1);
     this.deleted.add(id);
+    for (const controller of this.canvasReads.get(id) ?? []) {
+      controller.abort();
+    }
+
     this.flights.delete(id);
     this.canvases.get(id)?.resource.dispose();
     this.canvases.delete(id);
@@ -111,6 +127,38 @@ export class CanvasResources {
     this.invalidations.set(id, removing);
     await removing;
     this.notify();
+  }
+
+  /** Account resources include off-page canvases and reads that have no snapshot yet. */
+  async invalidateWorkspace(workspaceId: string) {
+    const ids = [...this.canvasWorkspaces]
+      .filter(([, workspace]) => workspace === workspaceId)
+      .map(([id]) => id);
+
+    await Promise.all(ids.map((id) => this.invalidate(id)));
+  }
+
+  private trackCanvasRead(id: string, controller: AbortController) {
+    let controllers = this.canvasReads.get(id);
+
+    if (!controllers) {
+      controllers = new Set();
+      this.canvasReads.set(id, controllers);
+    }
+
+    controllers.add(controller);
+    this.reads.add(controller);
+  }
+
+  private releaseCanvasRead(id: string, controller: AbortController) {
+    const controllers = this.canvasReads.get(id);
+
+    controllers?.delete(controller);
+    if (!controllers?.size) {
+      this.canvasReads.delete(id);
+    }
+
+    this.reads.delete(controller);
   }
 
   /** Only an authoritative live catalog may revive a locally invalidated identity. */
@@ -244,7 +292,7 @@ export class CanvasResources {
     this.assertActive();
     const controller = signal ? undefined : new AbortController();
 
-    if (controller) this.reads.add(controller);
+    if (controller) this.trackCanvasRead(id, controller);
     try {
       const combined = AbortSignal.any([
         signal ?? controller!.signal,
@@ -259,7 +307,7 @@ export class CanvasResources {
 
       return result ?? known!;
     } finally {
-      if (controller) this.reads.delete(controller);
+      if (controller) this.releaseCanvasRead(id, controller);
     }
   }
 
@@ -267,15 +315,23 @@ export class CanvasResources {
     id: string,
     preview: (entry: CanvasResource) => void,
     metadata?: CanvasMeta,
+    workspaceHint?: string,
   ): Promise<CanvasResource> {
     if (this.deleted.has(id))
       throw new ApiError(404, "NOT_FOUND", "画布已删除");
+    const incarnation = this.incarnations.get(id) ?? 0;
     const existing = this.canvases.get(id);
+    const workspace =
+      metadata?.workspaceId ?? workspaceHint ?? existing?.document.workspaceId;
+
+    if (workspace) {
+      this.canvasWorkspaces.set(id, workspace);
+    }
 
     if (existing) {
       if (existing.document.syncMode !== "collaborative" && this.prepareHandoff)
         await this.prepareHandoff(id);
-      this.assertActive();
+      this.assertCanvasCurrent(id, incarnation);
       existing.resource.pauseAutosave();
       existing.touched = Date.now();
       existing.status = "checking";
@@ -287,6 +343,7 @@ export class CanvasResources {
     if (flight) {
       const entry = await flight;
 
+      this.assertCanvasCurrent(id, incarnation);
       preview(entry);
 
       return entry;
@@ -296,7 +353,11 @@ export class CanvasResources {
 
     this.flights.set(id, task);
     try {
-      return await task;
+      const entry = await task;
+
+      this.assertCanvasCurrent(id, incarnation);
+
+      return entry;
     } finally {
       if (this.flights.get(id) === task) this.flights.delete(id);
       this.evict();
@@ -309,18 +370,11 @@ export class CanvasResources {
     metadata?: CanvasMeta,
   ) {
     const incarnation = this.incarnations.get(id) ?? 0;
-    const assertCurrent = () => {
-      this.assertActive();
-      if (
-        incarnation !== (this.incarnations.get(id) ?? 0) ||
-        this.deleted.has(id)
-      )
-        throw new DOMException("Canvas invalidated", "AbortError");
-    };
+    const assertCurrent = () => this.assertCanvasCurrent(id, incarnation);
     let entry = this.canvases.get(id);
     const controller = new AbortController();
 
-    this.reads.add(controller);
+    this.trackCanvasRead(id, controller);
     try {
       // Memory hits send a conditional request immediately. Disk and network race on cold memory.
       let remoteTask: Promise<CanvasDocument> | undefined;
@@ -409,6 +463,7 @@ export class CanvasResources {
         ));
 
       assertCurrent();
+      this.canvasWorkspaces.set(id, remote.workspaceId);
       // Explicit retry/logout saves remain allowed while checking. Never roll an accepted
       // local revision back to a GET that started before that write completed.
       if (entry) {
@@ -542,7 +597,7 @@ export class CanvasResources {
 
       throw error;
     } finally {
-      this.reads.delete(controller);
+      this.releaseCanvasRead(id, controller);
     }
   }
 
@@ -691,6 +746,8 @@ export class CanvasResources {
     this.writeWaiters.splice(0).forEach((resolve) => resolve());
     this.canvases.clear();
     this.editorContexts.clear();
+    this.canvasReads.clear();
+    this.canvasWorkspaces.clear();
     this.cache.clearMemory();
   }
 }
