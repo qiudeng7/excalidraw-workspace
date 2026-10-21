@@ -1,11 +1,18 @@
-import { computed, ref, shallowReadonly, type Ref } from "vue";
-import type { Workspace, CanvasMeta, CanvasCatalog } from "#shared/contracts";
+import { computed, ref, shallowReadonly } from "vue";
+import type { Ref } from "vue";
+import type {
+  Workspace,
+  CanvasMeta,
+  CanvasCatalog,
+  CanvasCatalogPage,
+} from "#shared/contracts";
 import { ApiError } from "~/lib/api";
 import type { WorkspaceApi } from "~/lib/workspaceApi";
 import type { NavigationController } from "~/composables/useWorkspaceNavigation";
 import type { CanvasDocumentController } from "~/composables/useCanvasDocument";
 import type { SaveBarrier } from "~/lib/editor";
 import type { promptDialog, confirmDialog } from "~/lib/dialogs";
+import { useCanvasCatalog } from "~/composables/use-canvas-catalog";
 import { useCanvasTabs } from "~/composables/useCanvasTabs";
 
 export interface WorkspaceDirectoryDependencies {
@@ -32,11 +39,17 @@ export interface WorkspaceDirectoryDependencies {
     NavigationController,
     "navigation" | "refreshNavigationQuietly" | "recordOpened"
   >;
-  canvasDocument: Partial<Pick<CanvasDocumentController, "restoreCanvas">> &
+  canvasDocument: {
+    invalidateWorkspace?(workspaceId: string): Promise<void>;
+    loadCanvas(
+      id: string,
+      metadata?: CanvasMeta,
+      workspaceHint?: string,
+    ): Promise<void>;
+  } & Partial<Pick<CanvasDocumentController, "restoreCanvas">> &
     Pick<
       CanvasDocumentController,
       | "document"
-      | "loadCanvas"
       | "clearDocument"
       | "renameLoadedCanvas"
       | "invalidateCanvas"
@@ -102,52 +115,98 @@ export function useWorkspaceDirectory({
 }: WorkspaceDirectoryDependencies): WorkspaceDirectoryController {
   const workspaces = ref<Workspace[]>([]);
   const selecting = ref(false);
-  const canvases = ref<CanvasMeta[]>([]);
+  const catalog = useCanvasCatalog(api);
+  const {
+    canvases,
+    catalogRevision,
+    directoryStale,
+    total,
+    nextCursor,
+    loadingMore,
+    paginationError,
+    refreshing,
+  } = catalog;
+  const mutating = ref(false);
   const workspaceId = ref("");
   const tabs = useCanvasTabs();
   const canvasTabs = computed(() =>
     tabs.ids(workspaceId.value).flatMap((id) => {
-      const canvas = canvases.value.find((entry) => entry.id === id);
+      const canvas = catalog.known.value[id];
 
       return canvas ? [canvas] : [];
     }),
   );
 
-  type Directory = CanvasCatalog;
+  type Directory = CanvasCatalogPage;
 
-  const catalogRevision = ref(0);
-  const directoryStale = ref(false);
   const directoryLocked = computed(
-    () => interactionLocked.value || directoryStale.value || selecting.value,
+    () =>
+      interactionLocked.value ||
+      directoryStale.value ||
+      selecting.value ||
+      refreshing.value ||
+      mutating.value,
   );
   const currentWorkspace = computed(() =>
     workspaces.value.find((item) => item.id === workspaceId.value),
   );
   const { navigation, refreshNavigationQuietly, recordOpened } =
     navigationController;
-  const { document, loadCanvas } = canvasDocument;
+  const { document } = canvasDocument;
+  const loadCanvas = async (
+    id: string,
+    metadata?: CanvasMeta,
+    expectedWorkspace = workspaceId.value,
+  ) => {
+    try {
+      await canvasDocument.loadCanvas(
+        id,
+        metadata ?? catalog.known.value[id],
+        expectedWorkspace,
+      );
+      const loaded = document.value;
+
+      if (loaded && loaded.id === id) {
+        if (api.readCatalogPage && loaded.workspaceId !== expectedWorkspace) {
+          canvasDocument.clearDocument("目标画布不可访问");
+          throw new Error("目标画布不可访问");
+        }
+
+        catalog.remember(loaded);
+      }
+    } catch (error) {
+      if (error instanceof ApiError && [403, 404].includes(error.status)) {
+        tabs.close(expectedWorkspace, id);
+        delete catalog.known.value[id];
+        canvasDocument.invalidateCanvas(id);
+      }
+
+      throw error;
+    }
+  };
   const flush = () => editor.flush();
   const checkpoint = () => (editor.checkpoint ? editor.checkpoint() : flush());
   let switchGeneration = 0;
+  let workspaceGeneration = 0;
   let requestedWorkspace = "";
 
   function reset() {
     switchGeneration++;
+    workspaceGeneration++;
     requestedWorkspace = "";
     selecting.value = false;
     workspaces.value = [];
-    canvases.value = [];
+    catalog.reset();
     workspaceId.value = "";
-    catalogRevision.value = 0;
-    directoryStale.value = false;
+    mutating.value = false;
     tabs.reset();
   }
 
   async function refreshAfterRestore() {
-    const generation = switchGeneration;
+    const generation = workspaceGeneration;
     const entries = await api.listWorkspaces();
 
-    if (generation !== switchGeneration) return;
+    if (generation !== workspaceGeneration) return;
     workspaces.value = entries;
     if (
       workspaceId.value &&
@@ -157,48 +216,91 @@ export function useWorkspaceDirectory({
     else if (!document.value) await loadWorkspaces();
   }
 
-  async function readDirectory(id: string) {
-    const generation = switchGeneration;
-    const catalog = await api.readCatalog(id);
+  const readDirectory = async (id: string) => {
+    const data = await catalog.read(id);
 
-    for (const canvas of catalog.canvases) {
-      if (generation !== switchGeneration) break;
+    for (const canvas of data.canvases) {
       await canvasDocument.restoreCanvas?.(canvas.id);
     }
 
-    return catalog;
-  }
+    return data;
+  };
 
-  function setDirectory(id: string, data: Directory) {
+  const setDirectory = (id: string, data: Directory | CanvasCatalog) => {
     workspaceId.value = id;
-    canvases.value = data.canvases;
-    catalogRevision.value = data.catalogRevision;
-    directoryStale.value = false;
-    tabs.reconcile(
-      id,
-      data.canvases.map((canvas) => canvas.id),
-    );
-  }
-
-  async function refreshDirectory() {
-    if (!workspaceId.value) return;
-    const id = workspaceId.value;
-    const generation = switchGeneration;
-
-    try {
-      const data = await readDirectory(id);
-
-      if (generation === switchGeneration && id === workspaceId.value) {
-        setDirectory(id, data);
-      }
-    } catch (error) {
-      if (generation !== switchGeneration || id !== workspaceId.value) return;
-      directoryStale.value = true;
-      throw new Error("未能确认最新画布列表，请重新加载列表后再操作。", {
-        cause: error,
-      });
+    catalog.publish("total" in data ? data : catalog.normalize(data));
+    if (!api.readCatalogPage) {
+      tabs.reconcile(
+        id,
+        data.canvases.map((canvas) => canvas.id),
+      );
     }
-  }
+  };
+
+  const refreshDirectory = async () => {
+    if (!workspaceId.value) {
+      return;
+    }
+
+    const id = workspaceId.value;
+
+    await catalog.refresh(id);
+    if (id !== workspaceId.value) {
+      return;
+    }
+
+    for (const canvas of canvases.value) {
+      await canvasDocument.restoreCanvas?.(canvas.id);
+    }
+
+    if (
+      !api.readCatalogPage &&
+      workspaceId.value === id &&
+      !directoryStale.value
+    ) {
+      tabs.reconcile(
+        id,
+        canvases.value.map((canvas) => canvas.id),
+      );
+    }
+  };
+  const loadNextPage = async () => {
+    if (
+      interactionLocked.value ||
+      selecting.value ||
+      mutating.value ||
+      refreshing.value ||
+      !workspaceId.value
+    ) {
+      return;
+    }
+
+    if (directoryStale.value) {
+      try {
+        await refreshDirectory();
+      } catch (error) {
+        paginationError.value =
+          error instanceof Error ? error.message : "加载失败，请重试。";
+      }
+
+      return;
+    }
+
+    await catalog.loadNext(workspaceId.value);
+  };
+  const runMutation = async (action: () => Promise<void>) => {
+    const generation = workspaceGeneration;
+
+    catalog.cancel();
+    mutating.value = true;
+    try {
+      await run(action);
+    } finally {
+      if (generation === workspaceGeneration) {
+        mutating.value = false;
+      }
+    }
+  };
 
   async function loadWorkspace(
     id: string,
@@ -206,17 +308,25 @@ export function useWorkspaceDirectory({
     explicit = false,
     generation = ++switchGeneration,
     strictPreferred = false,
+    listing?: Directory,
   ) {
     if (generation !== switchGeneration) return;
-    const data = await readDirectory(id);
+    const data = listing ?? (await readDirectory(id));
 
     if (generation !== switchGeneration) return;
-    if (strictPreferred && !data.canvases.some((item) => item.id === preferred))
+    if (
+      !api.readCatalogPage &&
+      strictPreferred &&
+      !data.canvases.some((item) => item.id === preferred)
+    )
       throw new Error("目标画布不可访问");
-    tabs.reconcile(
-      id,
-      data.canvases.map((canvas) => canvas.id),
-    );
+    if (!api.readCatalogPage) {
+      tabs.reconcile(
+        id,
+        data.canvases.map((canvas) => canvas.id),
+      );
+    }
+
     const remembered =
       explicit && preferred
         ? preferred
@@ -232,16 +342,49 @@ export function useWorkspaceDirectory({
           data.canvases[0]);
 
     // Scene loading is independent of the account-level lazy library.
-    if (selected) await loadCanvas(selected.id, selected);
-    else {
+    const selectedId =
+      api.readCatalogPage && remembered ? remembered : selected?.id;
+
+    if (selectedId) {
+      try {
+        await loadCanvas(
+          selectedId,
+          data.canvases.find((item) => item.id === selectedId),
+          id,
+        );
+      } catch (error) {
+        if (
+          strictPreferred ||
+          !(error instanceof ApiError) ||
+          ![403, 404].includes(error.status)
+        ) {
+          throw error;
+        }
+
+        const fallback = data.canvases[0];
+
+        if (fallback) {
+          await loadCanvas(fallback.id, fallback, id);
+        }
+      }
+    } else {
       canvasDocument.clearDocument();
     }
 
     if (generation !== switchGeneration) return;
     setDirectory(id, data);
-    if (selected) tabs.open(id, selected.id);
-    if (selected && (explicit || !navigation.value?.lastCanvasId))
-      void recordOpened(selected.id);
+    const opened = document.value;
+
+    if (opened?.workspaceId === id) {
+      tabs.open(id, opened.id);
+    }
+
+    if (
+      opened?.workspaceId === id &&
+      (explicit || !navigation.value?.lastCanvasId)
+    ) {
+      void recordOpened(opened.id);
+    }
   }
 
   async function loadWorkspaces(target?: {
@@ -250,6 +393,8 @@ export function useWorkspaceDirectory({
   }) {
     const generation = ++switchGeneration;
 
+    workspaceGeneration++;
+    catalog.cancel();
     selecting.value = true;
 
     try {
@@ -275,7 +420,10 @@ export function useWorkspaceDirectory({
         const listing = await readDirectory(target.workspaceId);
 
         if (generation !== switchGeneration) return;
-        if (!listing.canvases.some((item) => item.id === target.canvasId))
+        if (
+          !api.readCatalogPage &&
+          !listing.canvases.some((item) => item.id === target.canvasId)
+        )
           throw new Error("目标画布不可访问");
         await loadWorkspace(
           target.workspaceId,
@@ -283,11 +431,13 @@ export function useWorkspaceDirectory({
           true,
           generation,
           true,
+          api.readCatalogPage ? listing : undefined,
         );
 
         return;
       }
 
+      const listings = new Map<string, Directory>();
       const remembered = entries.find(
         (item) => item.id === navigation.value?.lastWorkspaceId,
       );
@@ -295,6 +445,8 @@ export function useWorkspaceDirectory({
       // A deleted/empty recent space falls back to the first nonempty space, without creating data.
       if (remembered) {
         const recentDirectory = await readDirectory(remembered.id);
+
+        listings.set(remembered.id, recentDirectory);
 
         if (generation !== switchGeneration) return;
 
@@ -304,6 +456,8 @@ export function useWorkspaceDirectory({
             navigation.value?.lastCanvasId,
             false,
             generation,
+            false,
+            api.readCatalogPage ? recentDirectory : undefined,
           );
 
           return;
@@ -311,7 +465,11 @@ export function useWorkspaceDirectory({
       }
 
       for (const entry of entries) {
-        const listing = await readDirectory(entry.id);
+        const listing =
+          (api.readCatalogPage && listings.get(entry.id)) ||
+          (await readDirectory(entry.id));
+
+        listings.set(entry.id, listing);
 
         if (generation !== switchGeneration) return;
 
@@ -321,6 +479,8 @@ export function useWorkspaceDirectory({
             listing.canvases[0]!.id,
             false,
             generation,
+            false,
+            api.readCatalogPage ? listing : undefined,
           );
 
           return;
@@ -332,6 +492,10 @@ export function useWorkspaceDirectory({
         undefined,
         false,
         generation,
+        false,
+        api.readCatalogPage
+          ? listings.get(remembered?.id ?? entries[0]!.id)
+          : undefined,
       );
     } catch (error) {
       if (generation !== switchGeneration) return;
@@ -344,27 +508,50 @@ export function useWorkspaceDirectory({
   async function setCanvasPinned(canvas: CanvasMeta, pinned: boolean) {
     if (
       directoryLocked.value ||
-      !canvases.value.some((entry) => entry.id === canvas.id)
+      catalog.known.value[canvas.id]?.workspaceId !== workspaceId.value
     )
       return;
     const id = workspaceId.value;
-    const generation = switchGeneration;
+    const generation = workspaceGeneration;
     const revision = catalogRevision.value;
     const stillCurrent = () =>
-      generation === switchGeneration && id === workspaceId.value;
+      generation === workspaceGeneration && id === workspaceId.value;
 
-    await run(async () => {
+    await runMutation(async () => {
       try {
-        const data = await api.setCanvasPinned(canvas.id, pinned, revision);
+        if (api.setCanvasPinnedSummary) {
+          const summary = await api.setCanvasPinnedSummary(
+            canvas.id,
+            pinned,
+            revision,
+          );
 
-        if (stillCurrent()) setDirectory(id, data);
+          if (stillCurrent()) {
+            catalog.remember(summary.canvas);
+            await refreshDirectory();
+          }
+        } else {
+          const data = await api.setCanvasPinned(canvas.id, pinned, revision);
+
+          if (stillCurrent()) {
+            setDirectory(id, data);
+          }
+        }
       } catch (cause) {
         if (!stillCurrent()) return;
         await refreshDirectory();
         if (!stillCurrent()) return;
-        const confirmed = canvases.value.find(
-          (entry) => entry.id === canvas.id,
-        );
+        const confirmed =
+          canvases.value.find((entry) => entry.id === canvas.id) ??
+          (await api.readCanvas?.(canvas.id));
+
+        if (!stillCurrent()) {
+          return;
+        }
+
+        if (confirmed) {
+          catalog.remember(confirmed);
+        }
 
         if (confirmed && !!confirmed.pinned === pinned) return;
         throw new Error(
@@ -377,9 +564,80 @@ export function useWorkspaceDirectory({
     });
   }
 
+  const moveCanvas = async (
+    canvasId: string,
+    targetId: string,
+    placement: "before" | "after",
+  ) => {
+    const source = catalog.known.value[canvasId];
+    const target = catalog.known.value[targetId];
+
+    if (
+      directoryLocked.value ||
+      !api.moveCanvas ||
+      canvasId === targetId ||
+      !source ||
+      !target ||
+      source.workspaceId !== workspaceId.value ||
+      target.workspaceId !== source.workspaceId ||
+      !!source.pinned !== !!target.pinned
+    ) {
+      return;
+    }
+
+    const id = workspaceId.value;
+    const generation = workspaceGeneration;
+
+    await runMutation(async () => {
+      let failure: unknown;
+
+      try {
+        await api.moveCanvas!(canvasId, {
+          targetId,
+          placement,
+          catalogRevision: catalogRevision.value,
+        });
+      } catch (cause) {
+        failure = cause;
+      }
+
+      if (generation !== workspaceGeneration || id !== workspaceId.value) {
+        return;
+      }
+
+      await refreshDirectory();
+      if (
+        generation !== workspaceGeneration ||
+        id !== workspaceId.value ||
+        !failure
+      ) {
+        return;
+      }
+
+      const sourceIndex = canvases.value.findIndex(
+        (canvas) => canvas.id === canvasId,
+      );
+      const targetIndex = canvases.value.findIndex(
+        (canvas) => canvas.id === targetId,
+      );
+
+      if (
+        sourceIndex >= 0 &&
+        sourceIndex === targetIndex + (placement === "after" ? 1 : -1)
+      ) {
+        return;
+      }
+
+      throw new Error("排序未完成，已恢复服务端列表，请重试。", {
+        cause: failure,
+      });
+    });
+  };
+
   async function reorderCanvas(ids: string[]) {
     if (
       directoryLocked.value ||
+      (api.readCatalogPage && nextCursor.value !== null) ||
       ids.every((id, i) => id === canvases.value[i]?.id)
     )
       return;
@@ -402,12 +660,12 @@ export function useWorkspaceDirectory({
     )
       return;
     const id = workspaceId.value;
-    const generation = switchGeneration;
+    const generation = workspaceGeneration;
     const revision = catalogRevision.value;
     const stillCurrent = () =>
-      generation === switchGeneration && id === workspaceId.value;
+      generation === workspaceGeneration && id === workspaceId.value;
 
-    await run(async () => {
+    await runMutation(async () => {
       canvases.value = ordered;
       try {
         const data = await api.reorder(id, ids, revision);
@@ -443,6 +701,8 @@ export function useWorkspaceDirectory({
       return;
     const generation = ++switchGeneration;
 
+    workspaceGeneration++;
+    catalog.cancel();
     requestedWorkspace = id;
     selecting.value = true;
     try {
@@ -516,10 +776,7 @@ export function useWorkspaceDirectory({
       const next = tabs.active(workspaceId.value);
 
       if (next) {
-        await loadCanvas(
-          next,
-          canvases.value.find((canvas) => canvas.id === next),
-        );
+        await loadCanvas(next, catalog.known.value[next]);
         if (generation === switchGeneration) void recordOpened(next);
       } else canvasDocument.clearDocument("没有打开的画布");
     } catch (error) {
@@ -542,7 +799,7 @@ export function useWorkspaceDirectory({
     });
 
     if (!name) return;
-    await run(async () => {
+    await runMutation(async () => {
       await flush();
       const workspace = await api.createWorkspace(name);
 
@@ -562,7 +819,7 @@ export function useWorkspaceDirectory({
     });
 
     if (!name || name === currentWorkspace.value?.name) return;
-    await run(async () => {
+    await runMutation(async () => {
       const workspace = await api.renameWorkspace(workspaceId.value, name);
 
       workspaces.value = workspaces.value.map((item) =>
@@ -582,7 +839,7 @@ export function useWorkspaceDirectory({
       }))
     )
       return;
-    await run(async () => {
+    await runMutation(async () => {
       await flush();
       const deletingId = workspaceId.value;
       let failure: unknown;
@@ -598,8 +855,16 @@ export function useWorkspaceDirectory({
         (await api.listWorkspaces()).some((entry) => entry.id === deletingId)
       )
         throw failure;
-      for (const canvas of canvases.value)
-        canvasDocument.invalidateCanvas(canvas.id);
+      catalog.cancel();
+      await canvasDocument.invalidateWorkspace?.(deletingId);
+      for (const canvas of Object.values(catalog.known.value)) {
+        if (canvas.workspaceId === deletingId) {
+          canvasDocument.invalidateCanvas(canvas.id);
+        }
+      }
+
+      tabs.reconcile(deletingId, []);
+      catalog.forgetWorkspace(deletingId);
       canvasDocument.clearDocument();
       workspaceId.value = "";
       canvases.value = [];
@@ -618,7 +883,7 @@ export function useWorkspaceDirectory({
     });
 
     if (!name) return;
-    await run(async () => {
+    await runMutation(async () => {
       await flush();
       let canvas: CanvasMeta;
 
@@ -634,7 +899,8 @@ export function useWorkspaceDirectory({
       }
 
       await refreshDirectory();
-      await loadCanvas(canvas.id);
+      catalog.remember(canvas);
+      await loadCanvas(canvas.id, canvas);
       tabs.open(workspaceId.value, canvas.id);
       await recordOpened(canvas.id);
     });
@@ -650,13 +916,14 @@ export function useWorkspaceDirectory({
     });
 
     if (!name || name === canvas.name) return;
-    await run(async () => {
+    await runMutation(async () => {
       await flush();
       const updated = await api.renameCanvas(canvas.id, name);
 
       canvases.value = canvases.value.map((item) =>
         item.id === canvas.id ? updated : item,
       );
+      catalog.remember(updated);
       canvasDocument.renameLoadedCanvas(canvas.id, updated.name);
     });
   }
@@ -672,7 +939,7 @@ export function useWorkspaceDirectory({
       }))
     )
       return;
-    await run(async () => {
+    await runMutation(async () => {
       await flush();
       let failure: unknown;
 
@@ -683,8 +950,31 @@ export function useWorkspaceDirectory({
       }
 
       await refreshDirectory();
-      if (failure && canvases.value.some((item) => item.id === canvas.id))
-        throw failure;
+      if (failure) {
+        if (api.readCanvas) {
+          try {
+            await api.readCanvas(canvas.id);
+          } catch (error) {
+            if (
+              !(error instanceof ApiError) ||
+              ![403, 404].includes(error.status)
+            ) {
+              throw error;
+            }
+
+            failure = undefined;
+          }
+        } else if (!canvases.value.some((item) => item.id === canvas.id)) {
+          failure = undefined;
+        }
+
+        if (failure) {
+          throw failure;
+        }
+      }
+
+      tabs.close(workspaceId.value, canvas.id);
+      delete catalog.known.value[canvas.id];
       if (canvasDocument.invalidateCanvas(canvas.id)) {
         await refreshNavigationQuietly();
         await loadWorkspace(workspaceId.value);
@@ -699,6 +989,13 @@ export function useWorkspaceDirectory({
     currentWorkspace,
     directoryStale: shallowReadonly(directoryStale),
     directoryLocked,
+    total: shallowReadonly(total),
+    nextCursor: shallowReadonly(nextCursor),
+    loadingMore: shallowReadonly(loadingMore),
+    paginationError: shallowReadonly(paginationError),
+    refreshing: shallowReadonly(refreshing),
+    loadNextPage,
+    moveCanvas,
     canvasTabs,
     closeCanvasTab,
     reset,
