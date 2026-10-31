@@ -621,7 +621,10 @@ async function flushForShare() {
         </div>
       </div>
       <div class="sidebar-scroll">
-        <div class="shared-canvases">
+        <div
+          class="shared-canvases"
+          @click.capture="treeView?.clearSelection()"
+        >
           <div class="shared-heading">
             <button
               class="shared-toggle"
@@ -689,6 +692,7 @@ async function flushForShare() {
           @recycle="recycleOpen = true"
         />
       </div>
+      <div id="directory-status" class="directory-status" />
       <div
         v-if="resourceTree.moveUndo.value"
         class="sidebar-move-status"
@@ -1290,6 +1294,8 @@ async function flushForShare() {
   overflow: hidden;
 }
 .sidebar-scroll {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -1297,6 +1303,14 @@ async function flushForShare() {
   overscroll-behavior: contain;
   overflow-anchor: none;
   scrollbar-width: thin;
+}
+.shared-canvases {
+  flex: none;
+}
+.directory-status {
+  flex: none;
+  max-height: 35dvh;
+  overflow-y: auto;
 }
 .sidebar-heading {
   display: flex;

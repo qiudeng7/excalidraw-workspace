@@ -10,7 +10,10 @@ import QuietIcon from "~/components/QuietIcon.vue";
 
 const props = defineProps<{
   workspaceId: string;
-  source: NodeRef;
+  source?: NodeRef;
+  sources?: readonly DirectoryNode[];
+  catalogRevision?: number;
+  blocked?: boolean;
   name: string;
   restoring?: boolean;
   busy?: boolean;
@@ -42,6 +45,14 @@ const read = async (append = false) => {
     );
 
     if (stamp !== generation) return;
+    if (
+      (props.catalogRevision !== undefined &&
+        result.catalogRevision !== props.catalogRevision) ||
+      (append &&
+        page.value &&
+        result.catalogRevision !== page.value.catalogRevision)
+    )
+      throw new Error("目录已更新，请关闭对话框并重新选择资源。");
     page.value =
       append && page.value
         ? { ...result, items: [...page.value.items, ...result.items] }
@@ -60,15 +71,36 @@ const navigate = (item?: DirectoryNode, index?: number) => {
   page.value = undefined;
   void read();
 };
+const sourceFolders = computed(() =>
+  props.sources
+    ? props.sources
+        .filter((item) => item.kind === "folder")
+        .map((item) => ({ id: item.id, subtreeDepth: item.subtreeDepth }))
+    : props.source?.kind === "folder"
+      ? [{ id: props.source.id, subtreeDepth: props.subtreeDepth ?? 1 }]
+      : [],
+);
 const unavailableReason = (item: DirectoryNode) => {
-  if (item.kind !== "folder" || props.source.kind !== "folder")
-    return undefined;
-  if (item.id === props.source.id) return "不能移动到自身或自己的子文件夹";
-  if (item.depth + (props.subtreeDepth ?? 1) > 5)
+  if (item.kind !== "folder") return undefined;
+  if (sourceFolders.value.some((source) => source.id === item.id))
+    return "不能移动到自身或自己的子文件夹";
+  if (
+    sourceFolders.value.some((source) => item.depth + source.subtreeDepth > 5)
+  )
     return "放入后文件夹将超过 5 层";
 
   return undefined;
 };
+const invalidDestination = computed(() => {
+  const parent = trail.value.at(-1);
+  const depth = parent?.kind === "folder" ? parent.depth : 0;
+
+  return (
+    trail.value.some((item) =>
+      sourceFolders.value.some((source) => source.id === item.id),
+    ) || sourceFolders.value.some((source) => depth + source.subtreeDepth > 5)
+  );
+});
 
 onMounted(() => {
   returnFocus = document.activeElement as HTMLElement | null;
@@ -79,7 +111,11 @@ onBeforeUnmount(() => {
   generation++;
   abort.abort();
   dialog.value?.close();
-  if (returnFocus?.isConnected) returnFocus.focus();
+  if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+  else
+    document
+      .querySelector<HTMLElement>('[data-drop-zone="tree"] button')
+      ?.focus({ preventScroll: true });
 });
 </script>
 
@@ -183,7 +219,14 @@ onBeforeUnmount(() => {
           ><button
             type="button"
             class="primary"
-            :disabled="busy || loading || !!failure || !page"
+            :disabled="
+              busy ||
+              blocked ||
+              loading ||
+              !!failure ||
+              !page ||
+              invalidDestination
+            "
             @click="emit('choose', parentId)"
           >
             {{ busy ? "处理中…" : restoring ? "恢复到这里" : "移动到这里" }}

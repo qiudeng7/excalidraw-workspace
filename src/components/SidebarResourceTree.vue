@@ -11,6 +11,7 @@ import {
 import type { DirectoryNode, NodeRef } from "#shared/directory-contracts";
 import type { DirectoryTreeController } from "~/composables/use-directory-tree";
 import { useDirectoryDrag } from "~/composables/use-directory-drag";
+import { useDirectorySelection } from "~/composables/use-directory-selection";
 import { nodeKey } from "~/lib/directory-api";
 import QuietIcon from "~/components/QuietIcon.vue";
 import DirectoryContextMenu from "~/components/DirectoryContextMenu.vue";
@@ -37,18 +38,66 @@ const editing = ref<{
 const input = ref<HTMLInputElement>();
 const submitting = ref(false);
 const moving = ref<DirectoryNode>();
+const movingBatch = ref<{
+  sources: DirectoryNode[];
+  revision: number;
+  unconfirmed: boolean;
+}>();
 const menu = ref<{
   item: DirectoryNode;
   x: number;
   y: number;
   trigger: HTMLElement;
   favorite: boolean;
+  batch: boolean;
 }>();
 const tree = props.tree;
-const { drag, start, cancel, cancelPress, suppressClick } = useDirectoryDrag(
-  tree,
-  (active) => emit("dragging", active),
+const selection = useDirectorySelection(() =>
+  rootExpanded.value
+    ? rows.value.flatMap((row) =>
+        row.type === "node" ? [nodeKey(row.item)] : [],
+      )
+    : [],
 );
+const selectionState = selection.state;
+const selectedItems = computed(() =>
+  selectionState.value.selectedKeys.flatMap((key) =>
+    tree.known.value[key] ? [tree.known.value[key]!] : [],
+  ),
+);
+const selectedCount = computed(() => selectedItems.value.length);
+const hasSelection = (item: NodeRef) =>
+  selectionState.value.selectedKeys.includes(nodeKey(item));
+const clearWithEscape = (event: KeyboardEvent) => {
+  if (
+    tree.busy.value ||
+    !host.value?.closest(".workspace-sidebar")?.contains(event.target as Node)
+  )
+    return false;
+  const snapshot = selection.snapshot();
+
+  if (snapshot.selectedKeys.length) {
+    selection.restore({ ...snapshot, selectedKeys: [], anchor: undefined });
+
+    return true;
+  }
+
+  if (!snapshot.explicitMode && !snapshot.anchor) return false;
+  selection.clear();
+
+  return true;
+};
+const { drag, box, start, startBlank, cancel, cancelPress, suppressClick } =
+  useDirectoryDrag(tree, (active) => emit("dragging", active), {
+    selection,
+    host: () => host.value,
+    selectedItems: () => selectedItems.value,
+    deferEscape: () =>
+      !!document.querySelector("dialog[open]") ||
+      !!menu.value ||
+      !!editing.value,
+    clearWithEscape,
+  });
 const dragHint = ref<HTMLElement>();
 const dragHintId = useId();
 const dragHintPosition = ref({ left: 8, top: 8 });
@@ -96,7 +145,15 @@ const startRow = (
   item: DirectoryNode,
   zone: "tree" | "favorites" = "tree",
 ) => {
-  if (editing.value || submitting.value) return;
+  if (
+    editing.value ||
+    submitting.value ||
+    movingBatch.value ||
+    moving.value ||
+    menu.value
+  )
+    return;
+  if (zone === "favorites") selection.clear();
   start(event, item, zone);
 };
 const contextKey = computed(() => `${props.ownerId}:${props.workspaceId}`);
@@ -132,6 +189,108 @@ const rows = computed(() => {
 
   return result;
 });
+const clickRow = (
+  event: Pick<MouseEvent, "ctrlKey" | "metaKey" | "shiftKey">,
+  item: DirectoryNode,
+  favorite = false,
+) => {
+  if (tree.busy.value || drag.value || box.value) return;
+  if (favorite) {
+    selection.clear();
+    void tree.attempt(() =>
+      item.kind === "folder" ? reveal(item) : tree.open(item),
+    );
+
+    return;
+  }
+
+  const additive = event.ctrlKey || event.metaKey;
+  const intent = event.shiftKey
+    ? additive
+      ? "add-range"
+      : "range"
+    : additive || selectionState.value.explicitMode
+      ? "toggle"
+      : "plain";
+
+  selection.click(nodeKey(item), intent);
+  if (intent === "plain") void tree.attempt(() => tree.open(item));
+};
+const startBlankSelection = (event: PointerEvent) => {
+  if (
+    !editing.value &&
+    !submitting.value &&
+    !moving.value &&
+    !movingBatch.value &&
+    !menu.value
+  )
+    startBlank(event);
+};
+const beginBatchMove = () => {
+  if (tree.locked.value || !selectedCount.value) return;
+  tree.error.value = "";
+  movingBatch.value = {
+    sources: [...selectedItems.value],
+    revision: tree.revision.value,
+    unconfirmed: false,
+  };
+};
+const removeSelected = async () => {
+  const trigger = document.activeElement as HTMLElement | null;
+  const context = contextKey.value;
+  const sources = selectedItems.value.map(({ kind, id }) => ({ kind, id }));
+
+  if (!sources.length) return;
+  const outcome = await tree.removeMany(sources, tree.revision.value);
+
+  if (context !== contextKey.value) return;
+  if (outcome.kind === "applied") selection.clear();
+  await nextTick();
+  if (context !== contextKey.value) return;
+  if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+  else
+    host.value
+      ?.querySelector<HTMLElement>('[data-drop-zone="tree"] button')
+      ?.focus({ preventScroll: true });
+};
+const chooseBatchDestination = async (parentId: string | null) => {
+  const command = movingBatch.value;
+  const context = contextKey.value;
+
+  if (!command || command.unconfirmed) return;
+  const outcome = await tree.moveMany({
+    sources: command.sources.map(({ kind, id }) => ({ kind, id })),
+    parentId,
+    placement: "end",
+    catalogRevision: command.revision,
+  });
+
+  if (context !== contextKey.value || movingBatch.value !== command) return;
+  if (outcome.kind === "applied") {
+    movingBatch.value = undefined;
+    selection.clear();
+  } else if (outcome.kind === "unconfirmed") command.unconfirmed = true;
+};
+
+watch(
+  () => [
+    rows.value,
+    rootExpanded.value,
+    tree.refreshing.value,
+    tree.busy.value,
+    tree.stale.value,
+  ],
+  () => {
+    if (
+      !tree.refreshing.value &&
+      !tree.busy.value &&
+      !tree.stale.value &&
+      !box.value
+    )
+      selection.reconcile();
+  },
+  { deep: true, flush: "post" },
+);
 const menuScrollPositions = new Map<Element, { top: number; left: number }>();
 const rememberMenuScroll = (trigger: HTMLElement) => {
   menuScrollPositions.clear();
@@ -163,9 +322,13 @@ const openMenu = (
   if (
     tree.locked.value ||
     editing.value ||
-    (event as PointerEvent).pointerType === "touch"
+    (event.type === "contextmenu" &&
+      (event as PointerEvent).pointerType === "touch")
   )
     return;
+  const batch = !favorite && hasSelection(item);
+
+  if (!batch) selection.clear();
   const element = event.currentTarget as HTMLElement;
   const trigger = element.matches("button")
     ? element
@@ -180,6 +343,7 @@ const openMenu = (
     y: keyboard ? bounds.bottom : event.clientY,
     trigger,
     favorite,
+    batch,
   };
 };
 const onScroll = (event: Event) => {
@@ -216,6 +380,7 @@ const beginCreate = async (
   parentId: string | null = null,
 ) => {
   if (tree.locked.value) return;
+  selection.clear();
   rootExpanded.value = true;
   const parent = parentId ? tree.known.value[`folder:${parentId}`] : undefined;
 
@@ -320,6 +485,20 @@ const menuAction = (action: string) => {
   if (!target) return;
   const item = target.item;
 
+  if (action === "select-multiple") {
+    selection.enterExplicit(nodeKey(item));
+
+    return;
+  }
+
+  if (target.batch) {
+    if (action === "move") beginBatchMove();
+    else if (action === "delete") void removeSelected();
+    else if (action === "clear-selection") selection.clear();
+
+    return;
+  }
+
   void tree.attempt(async () => {
     if (action === "favorite") await tree.favorite(item);
     else if (action === "rename") await beginRename(item);
@@ -349,6 +528,18 @@ const chooseRestoreDestination = async (parentId: string | null) => {
   await tree.restore(parentId);
 };
 const key = (event: KeyboardEvent, item: DirectoryNode, favorite = false) => {
+  if (
+    !favorite &&
+    (event.key === " " ||
+      (event.key === "Enter" &&
+        (event.ctrlKey || event.metaKey || event.shiftKey)))
+  ) {
+    event.preventDefault();
+    clickRow(event, item);
+
+    return;
+  }
+
   if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
     openMenu(event, item, favorite);
 
@@ -420,6 +611,7 @@ const observe = async () => {
   if (
     !host.value ||
     drag.value ||
+    box.value ||
     tree.busy.value ||
     tree.stale.value ||
     editing.value
@@ -462,6 +654,8 @@ watch(
     closeMenu(false);
     editing.value = undefined;
     moving.value = undefined;
+    movingBatch.value = undefined;
+    selection.clear();
     anchorPadding.value = 0;
     anchors = [];
     rootExpanded.value = true;
@@ -487,6 +681,7 @@ watch(
     tree.expanded.value,
     rootExpanded.value,
     drag.value,
+    box.value,
     tree.busy.value,
     tree.stale.value,
     editing.value,
@@ -604,7 +799,7 @@ watch(
   },
   { flush: "sync" },
 );
-defineExpose({ beginCreate });
+defineExpose({ beginCreate, clearSelection: selection.clear });
 onMounted(() => {
   void observe();
   if (rootExpanded.value) void locate();
@@ -628,7 +823,9 @@ onBeforeUnmount(() => {
   <section
     ref="host"
     class="resource-tree"
+    tabindex="-1"
     aria-label="空间文件管理"
+    @pointerdown="startBlankSelection"
     @click.capture="suppressClick"
   >
     <div
@@ -681,7 +878,7 @@ onBeforeUnmount(() => {
           :disabled="tree.busy.value"
           :aria-disabled="tree.busy.value || !!drag"
           @keydown="key($event, item, true)"
-          @click="item.kind === 'folder' ? reveal(item) : tree.open(item)"
+          @click="clickRow($event, item, true)"
         >
           <span data-node-icon :data-icon-kind="item.kind" class="node-icon"
             ><QuietIcon
@@ -782,7 +979,10 @@ onBeforeUnmount(() => {
             {
               selected: row.item.kind === 'canvas' && currentId === row.item.id,
               located: tree.located.value === nodeKey(row.item),
-              dragging: drag && nodeKey(drag.item) === nodeKey(row.item),
+              'batch-selected': hasSelection(row.item),
+              dragging:
+                drag &&
+                drag.items.some((item) => nodeKey(item) === nodeKey(row.item)),
             },
           ]"
           :style="{ paddingLeft: `${row.level * 14}px` }"
@@ -817,6 +1017,30 @@ onBeforeUnmount(() => {
             </button>
           </form>
           <template v-else>
+            <input
+              v-if="selectionState.explicitMode"
+              class="selection-checkbox"
+              type="checkbox"
+              :checked="hasSelection(row.item)"
+              :disabled="tree.locked.value"
+              :aria-label="`选择 ${row.item.name}`"
+              @click.stop="selection.click(nodeKey(row.item), 'toggle')"
+            />
+            <button
+              v-if="selectionState.explicitMode && row.item.kind === 'folder'"
+              class="selection-expand"
+              type="button"
+              :disabled="tree.locked.value"
+              :aria-label="`${tree.expanded.value.includes(row.item.id) ? '收起' : '展开'}文件夹 ${row.item.name}`"
+              :aria-expanded="tree.expanded.value.includes(row.item.id)"
+              @click.stop="tree.toggle(row.item)"
+            >
+              <QuietIcon
+                name="chevron"
+                :size="13"
+                :class="{ expanded: tree.expanded.value.includes(row.item.id) }"
+              />
+            </button>
             <button
               type="button"
               class="directory-name canvas-name"
@@ -842,7 +1066,8 @@ onBeforeUnmount(() => {
               :title="row.item.name"
               :disabled="tree.busy.value"
               :aria-disabled="tree.busy.value || !!drag"
-              @click="tree.open(row.item)"
+              :aria-pressed="hasSelection(row.item)"
+              @click="clickRow($event, row.item)"
               @keydown="key($event, row.item)"
             >
               <span
@@ -937,6 +1162,7 @@ onBeforeUnmount(() => {
           <button
             v-if="branch(row.parentId)?.page?.hasPrevious"
             type="button"
+            :disabled="!!drag || !!box || tree.busy.value"
             @click="tree.load(row.parentId)"
           >
             显示前面的项目
@@ -945,6 +1171,7 @@ onBeforeUnmount(() => {
           <button
             v-else-if="branch(row.parentId)?.error"
             type="button"
+            :disabled="!!drag || !!box || tree.busy.value"
             @click="tree.load(row.parentId, !!branch(row.parentId)?.page)"
           >
             加载失败，重试
@@ -952,7 +1179,7 @@ onBeforeUnmount(() => {
           <template v-else-if="branch(row.parentId)?.page?.nextCursor"
             ><button
               type="button"
-              :disabled="!!drag || tree.busy.value"
+              :disabled="!!drag || !!box || tree.busy.value"
               @click="tree.load(row.parentId, true)"
             >
               加载更多项目</button
@@ -986,30 +1213,92 @@ onBeforeUnmount(() => {
         </div>
       </Transition>
     </Teleport>
-    <div
-      v-if="tree.error.value || tree.stale.value"
-      class="tree-error"
-      role="alert"
-    >
-      <span>{{ tree.error.value || "目录已更新，请重新加载。" }}</span
-      ><button
-        type="button"
-        :disabled="tree.busy.value"
-        @click="tree.attempt(tree.refresh)"
+    <Teleport to="body">
+      <div
+        v-if="box"
+        class="directory-selection-box"
+        data-directory-selection-box
+        aria-hidden="true"
+        :style="{
+          left: `${box.left}px`,
+          top: `${box.top}px`,
+          width: `${Math.max(0, box.right - box.left)}px`,
+          height: `${Math.max(0, box.bottom - box.top)}px`,
+        }"
+      />
+    </Teleport>
+    <Teleport to="#directory-status" defer>
+      <div
+        v-if="selectedCount || selectionState.explicitMode"
+        class="selection-actions"
+        aria-label="所选资源操作"
       >
-        重新加载目录
-      </button>
-    </div>
-    <div v-if="tree.undo.value" class="undo-notice" role="status">
-      <span>已移入回收站</span
-      ><button
-        type="button"
-        :disabled="tree.locked.value"
-        @click="tree.attempt(tree.restore)"
+        <span role="status">已选 {{ selectedCount }} 项</span>
+        <button
+          type="button"
+          :disabled="tree.locked.value || !selectedCount"
+          @click="beginBatchMove"
+        >
+          移动到…
+        </button>
+        <button
+          type="button"
+          :disabled="tree.locked.value || !selectedCount"
+          @click="removeSelected"
+        >
+          移入回收站
+        </button>
+        <button
+          type="button"
+          :disabled="tree.busy.value"
+          @click="selection.clear()"
+        >
+          {{ selectionState.explicitMode ? "退出多选" : "取消选择" }}
+        </button>
+      </div>
+      <div v-if="tree.batchNotice.value" class="undo-notice" role="status">
+        <span>{{ tree.batchNotice.value }}</span>
+        <button
+          v-if="tree.batchUndo.value"
+          type="button"
+          :disabled="!tree.batchUndoAvailable.value"
+          @click="tree.undoBatch()"
+        >
+          {{ tree.batchUndo.value.kind === "move" ? "撤销移动" : "撤销删除" }}
+        </button>
+        <button
+          v-if="tree.batchUndo.value?.kind === 'delete'"
+          type="button"
+          @click="emit('recycle')"
+        >
+          回收站
+        </button>
+      </div>
+      <div
+        v-if="tree.error.value || tree.stale.value"
+        class="tree-error"
+        role="alert"
       >
-        撤销删除</button
-      ><button type="button" @click="emit('recycle')">回收站</button>
-    </div>
+        <span>{{ tree.error.value || "目录已更新，请重新加载。" }}</span
+        ><button
+          type="button"
+          :disabled="tree.busy.value"
+          @click="tree.attempt(tree.refresh)"
+        >
+          重新加载目录
+        </button>
+      </div>
+      <div v-if="tree.undo.value" class="undo-notice" role="status">
+        <span>已移入回收站</span
+        ><button
+          type="button"
+          :disabled="tree.locked.value"
+          @click="tree.attempt(tree.restore)"
+        >
+          撤销删除</button
+        ><button type="button" @click="emit('recycle')">回收站</button>
+      </div>
+    </Teleport>
     <div
       v-if="anchorPadding"
       class="scroll-anchor-spacer"
@@ -1039,10 +1328,23 @@ onBeforeUnmount(() => {
       :y="menu.y"
       :locked="tree.locked.value"
       :favorite-context="menu.favorite"
+      :selection-count="menu.batch ? selectedCount : undefined"
       :can-move-up="canMove(-1)"
       :can-move-down="canMove(1)"
       @close="closeMenu()"
       @action="menuAction"
+    />
+    <MoveResourceDialog
+      v-if="movingBatch"
+      :workspace-id="workspaceId"
+      :sources="movingBatch.sources"
+      :catalog-revision="movingBatch.revision"
+      :name="`所选 ${movingBatch.sources.length} 项`"
+      :busy="tree.busy.value"
+      :blocked="movingBatch.unconfirmed"
+      :error="tree.error.value"
+      @close="movingBatch = undefined"
+      @choose="chooseBatchDestination"
     />
     <MoveResourceDialog
       v-if="moving"
@@ -1094,9 +1396,50 @@ onBeforeUnmount(() => {
   }
 }
 .resource-tree {
-  padding-bottom: 10px;
+  position: relative;
+  flex: 1 0 auto;
+  padding: 0 10px 28px;
   color: var(--app-muted);
+  outline: none;
 }
+.directory-selection-box {
+  position: fixed;
+  z-index: 1200;
+  pointer-events: none;
+  border: 1px solid var(--app-muted);
+  background: color-mix(in srgb, var(--app-muted) 14%, transparent);
+  box-sizing: border-box;
+}
+.resource-tree .resource-list > li.batch-selected {
+  background: color-mix(in srgb, var(--app-muted) 24%, var(--app-surface));
+}
+.selection-checkbox {
+  flex: none;
+  margin: 0 4px;
+  accent-color: var(--app-muted);
+}
+.selection-expand {
+  flex: none;
+  padding: 5px 2px;
+  display: flex;
+  align-items: center;
+}
+.selection-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  font-size: 11px;
+}
+.selection-actions > span {
+  flex-basis: 100%;
+}
+.selection-actions button {
+  padding: 4px 6px;
+  border: 1px solid var(--app-border);
+}
+
 button {
   font: inherit;
   color: inherit;

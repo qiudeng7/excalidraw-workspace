@@ -8,6 +8,7 @@ const props = defineProps<{
   y: number;
   locked: boolean;
   favoriteContext?: boolean;
+  selectionCount?: number;
   canMoveUp: boolean;
   canMoveDown: boolean;
 }>();
@@ -23,7 +24,9 @@ const emit = defineEmits<{
       | "down"
       | "create-canvas"
       | "create-folder"
-      | "locate",
+      | "locate"
+      | "select-multiple"
+      | "clear-selection",
   ];
 }>();
 const menu = ref<HTMLElement>();
@@ -100,81 +103,118 @@ onBeforeUnmount(() => {
       ref="menu"
       class="directory-menu"
       role="menu"
-      :aria-label="`${item.kind === 'folder' ? '文件夹' : '画布'} ${item.name} 的操作`"
+      :aria-label="
+        selectionCount !== undefined
+          ? `所选 ${selectionCount} 项的操作`
+          : `${item.kind === 'folder' ? '文件夹' : '画布'} ${item.name} 的操作`
+      "
       :style="{ left: `${left}px`, top: `${top}px` }"
       @keydown="key"
       @contextmenu.prevent
     >
-      <template v-if="item.kind === 'folder' && !favoriteContext">
+      <template v-if="selectionCount !== undefined">
+        <div class="selection-summary" role="presentation">
+          所选 {{ selectionCount }} 项
+        </div>
         <button
           role="menuitem"
           :disabled="locked"
-          @click="emit('action', 'create-canvas')"
+          @click="emit('action', 'move')"
         >
-          新建画布
+          移动到…
         </button>
         <button
           role="menuitem"
-          :disabled="locked || item.depth >= 5"
-          :title="
-            item.depth >= 5 ? '文件夹最多支持 5 层，仍可新建画布' : undefined
-          "
-          @click="emit('action', 'create-folder')"
+          class="danger"
+          :disabled="locked"
+          @click="emit('action', 'delete')"
         >
-          新建文件夹
+          移入回收站…
+        </button>
+        <button role="menuitem" @click="emit('action', 'clear-selection')">
+          取消选择
         </button>
       </template>
-      <button
-        v-if="favoriteContext"
-        role="menuitem"
-        :disabled="locked"
-        @click="emit('action', 'locate')"
-      >
-        定位原位置
-      </button>
-      <button
-        role="menuitem"
-        :disabled="locked"
-        @click="emit('action', 'favorite')"
-      >
-        {{ item.favorite ? "取消收藏" : "收藏" }}
-      </button>
-      <button
-        role="menuitem"
-        :disabled="locked || !canMoveUp"
-        @click="emit('action', 'up')"
-      >
-        ↑ 上移
-      </button>
-      <button
-        role="menuitem"
-        :disabled="locked || !canMoveDown"
-        @click="emit('action', 'down')"
-      >
-        ↓ 下移
-      </button>
-      <button
-        role="menuitem"
-        :disabled="locked"
-        @click="emit('action', 'move')"
-      >
-        移动到…
-      </button>
-      <button
-        role="menuitem"
-        :disabled="locked"
-        @click="emit('action', 'rename')"
-      >
-        重命名
-      </button>
-      <button
-        role="menuitem"
-        class="danger"
-        :disabled="locked"
-        @click="emit('action', 'delete')"
-      >
-        删除{{ item.kind === "folder" ? "文件夹" : "画布" }}
-      </button>
+      <template v-else>
+        <button
+          v-if="!favoriteContext"
+          role="menuitem"
+          :disabled="locked"
+          @click="emit('action', 'select-multiple')"
+        >
+          选择多个
+        </button>
+        <template v-if="item.kind === 'folder' && !favoriteContext">
+          <button
+            role="menuitem"
+            :disabled="locked"
+            @click="emit('action', 'create-canvas')"
+          >
+            新建画布
+          </button>
+          <button
+            role="menuitem"
+            :disabled="locked || item.depth >= 5"
+            :title="
+              item.depth >= 5 ? '文件夹最多支持 5 层，仍可新建画布' : undefined
+            "
+            @click="emit('action', 'create-folder')"
+          >
+            新建文件夹
+          </button>
+        </template>
+        <button
+          v-if="favoriteContext"
+          role="menuitem"
+          :disabled="locked"
+          @click="emit('action', 'locate')"
+        >
+          定位原位置
+        </button>
+        <button
+          role="menuitem"
+          :disabled="locked"
+          @click="emit('action', 'favorite')"
+        >
+          {{ item.favorite ? "取消收藏" : "收藏" }}
+        </button>
+        <button
+          role="menuitem"
+          :disabled="locked || !canMoveUp"
+          @click="emit('action', 'up')"
+        >
+          ↑ 上移
+        </button>
+        <button
+          role="menuitem"
+          :disabled="locked || !canMoveDown"
+          @click="emit('action', 'down')"
+        >
+          ↓ 下移
+        </button>
+        <button
+          role="menuitem"
+          :disabled="locked"
+          @click="emit('action', 'move')"
+        >
+          移动到…
+        </button>
+        <button
+          role="menuitem"
+          :disabled="locked"
+          @click="emit('action', 'rename')"
+        >
+          重命名
+        </button>
+        <button
+          role="menuitem"
+          class="danger"
+          :disabled="locked"
+          @click="emit('action', 'delete')"
+        >
+          删除{{ item.kind === "folder" ? "文件夹" : "画布" }}
+        </button>
+      </template>
     </div>
   </Teleport>
 </template>
@@ -194,6 +234,11 @@ onBeforeUnmount(() => {
   background: var(--app-surface);
   color: var(--app-text);
   box-shadow: 0 8px 28px #0002;
+}
+.selection-summary {
+  padding: 6px 12px;
+  color: var(--app-muted);
+  font-size: 11px;
 }
 button {
   display: block;

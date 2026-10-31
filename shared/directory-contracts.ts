@@ -154,3 +154,79 @@ export interface PurgeFolderRequest {
 }
 
 export type PurgeFolderResponse = Record<never, never>;
+
+export interface BatchDirectoryRequest {
+  sources: NodeRef[];
+  catalogRevision: number;
+}
+
+export type BatchDirectorySummaryRequest = BatchDirectoryRequest;
+
+export interface BatchDirectorySummaryResponse {
+  normalizedSources: NodeRef[];
+  folderCount: number;
+  canvasCount: number;
+  catalogRevision: number;
+}
+
+export interface BatchMoveDirectoryRequest extends BatchDirectoryRequest {
+  parentId: string | null;
+  target?: NodeRef;
+  placement: "before" | "after" | "end";
+}
+
+export interface MoveOrigin {
+  source: NodeRef;
+  parentId: string | null;
+  /** Zero-based ordinal in the original mixed folder/canvas sibling order. */
+  index: number;
+}
+
+export interface MoveDirectoryUndoReceipt {
+  kind: "move";
+  expectedCatalogRevision: number;
+  destinationParentId: string | null;
+  origins: MoveOrigin[];
+}
+
+export interface BatchMoveDirectoryResponse {
+  changed: boolean;
+  catalogRevision: number;
+  normalizedSources: NodeRef[];
+  undo: MoveDirectoryUndoReceipt | null;
+}
+
+export type BatchDeleteDirectoryRequest = BatchDirectoryRequest;
+
+export interface DeleteRootReceipt {
+  root: NodeRef;
+  /** Folder roots have a batch ID; standalone canvas roots retain legacy null semantics. */
+  deleteBatchId: string | null;
+}
+
+export interface DeleteDirectoryUndoReceipt {
+  kind: "delete";
+  expectedCatalogRevision: number;
+  roots: DeleteRootReceipt[];
+}
+
+export interface BatchDeleteDirectoryResponse {
+  catalogRevision: number;
+  normalizedSources: NodeRef[];
+  receipt: DeleteDirectoryUndoReceipt;
+  affectedFolderIds: string[];
+  affectedCanvasIds: string[];
+}
+
+export interface BatchUndoDirectoryRequest {
+  receipt: MoveDirectoryUndoReceipt | DeleteDirectoryUndoReceipt;
+}
+
+export type BatchUndoDirectoryResponse =
+  | { kind: "move"; catalogRevision: number }
+  | {
+      kind: "delete";
+      catalogRevision: number;
+      restoredFolderIds: string[];
+      restoredCanvasIds: string[];
+    };
