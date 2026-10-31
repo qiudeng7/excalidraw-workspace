@@ -1,24 +1,24 @@
 :root {
   color-scheme: light;
-  --app-bg: #f7f7fa;
+  --app-bg: #fafafa;
   --app-surface: #fff;
-  --app-sidebar: #f8f9f6;
-  --app-welcome: #f4f5f2;
-  --app-text: #303632;
-  --app-muted: #717b6d;
-  --app-subtle: #8c9784;
-  --app-border: #e0e5dc;
-  --app-border-strong: #cad4c5;
-  --app-hover: #eef1eb;
-  --app-selected: #e9eee5;
-  --app-selected-text: #34432e;
-  --app-accent: #354237;
-  --app-accent-hover: #455545;
+  --app-sidebar: #fafafa;
+  --app-welcome: #f5f5f5;
+  --app-text: #373737;
+  --app-muted: #737373;
+  --app-subtle: #8a8a8a;
+  --app-border: #e6e6e6;
+  --app-border-strong: #d2d2d2;
+  --app-hover: #f5f5f5;
+  --app-selected: #f0f0f0;
+  --app-selected-text: #404040;
+  --app-accent: #404040;
+  --app-accent-hover: #525252;
   --app-on-accent: #fff;
-  --app-focus: #7d9277;
-  --app-focus-ring: #7d927740;
-  --app-switch: #d5ddcf;
-  --app-switch-active: #617a56;
+  --app-focus: #8a8a8a;
+  --app-focus-ring: #8a8a8a40;
+  --app-switch: #d9d9d9;
+  --app-switch-active: #737373;
   --app-success: #246139;
   --app-success-bg: #f3faf5;
   --app-success-border: #d9e5dc;
@@ -30,34 +30,31 @@
   --app-warning: #786342;
   --app-warning-bg: #fff5e7;
   --app-warning-border: #e0d1b8;
-  --app-shadow: #26302516;
-  --app-backdrop: #202a2359;
-  --app-purple: #6750a4;
-  --app-purple-bg: #f0ebfa;
-  --app-purple-border: #ddd5ee;
+  --app-shadow: #00000010;
+  --app-backdrop: #00000066;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --app-bg: #151719;
-  --app-surface: #202124;
-  --app-sidebar: #191b1d;
-  --app-welcome: #1b1c1e;
-  --app-text: #e5e7e5;
-  --app-muted: #b0b3b5;
-  --app-subtle: #93979a;
-  --app-border: #373a3d;
-  --app-border-strong: #555a5e;
-  --app-hover: #2b2e31;
-  --app-selected: #333e2e;
-  --app-selected-text: #d4e5c8;
-  --app-accent: #53694a;
-  --app-accent-hover: #647e59;
-  --app-on-accent: #fff;
-  --app-focus: #9dbb8f;
-  --app-focus-ring: #9dbb8f40;
-  --app-switch: #444d3f;
-  --app-switch-active: #8da77e;
+  --app-bg: #191919;
+  --app-surface: #252525;
+  --app-sidebar: #202020;
+  --app-welcome: #222222;
+  --app-text: #e5e5e5;
+  --app-muted: #a3a3a3;
+  --app-subtle: #8a8a8a;
+  --app-border: #363636;
+  --app-border-strong: #4a4a4a;
+  --app-hover: #292929;
+  --app-selected: #303030;
+  --app-selected-text: #dedede;
+  --app-accent: #d4d4d4;
+  --app-accent-hover: #e5e5e5;
+  --app-on-accent: #262626;
+  --app-focus: #a3a3a3;
+  --app-focus-ring: #a3a3a340;
+  --app-switch: #404040;
+  --app-switch-active: #b0b0b0;
   --app-success: #a4d5b2;
   --app-success-bg: #24372b;
   --app-success-border: #3e5d47;
@@ -71,9 +68,6 @@
   --app-warning-border: #65553b;
   --app-shadow: #0005;
   --app-backdrop: #0009;
-  --app-purple: #c3b2ed;
-  --app-purple-bg: #322b42;
-  --app-purple-border: #5b4d74;
 }
 
 :root {
@@ -118,7 +112,7 @@ body {
   text-decoration: none;
 }
 .app-header nav a.router-link-exact-active {
-  color: var(--app-purple);
+  color: var(--app-accent);
 }
 .app-main {
   flex: 1;
@@ -139,10 +133,10 @@ body {
 }
 .demo-button {
   padding: 10px 18px;
-  border: 1px solid var(--app-purple-border);
+  border: 1px solid var(--app-border);
   border-radius: 8px;
-  background: var(--app-purple-bg);
-  color: var(--app-purple);
+  background: var(--app-selected);
+  color: var(--app-accent);
   cursor: pointer;
   font: inherit;
 }

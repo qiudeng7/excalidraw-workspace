@@ -82,6 +82,25 @@ export interface WorkspaceFixture {
   setBottomToolbar: (bottom: boolean) => Promise<void>;
 }
 
+const directoryCanvas = (canvas: {
+  id: string;
+  workspaceId: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}) => ({
+  kind: "canvas" as const,
+  id: canvas.id,
+  workspaceId: canvas.workspaceId,
+  parentId: null,
+  name: canvas.name,
+  position: 0,
+  createdAt: canvas.createdAt,
+  updatedAt: canvas.updatedAt,
+  favorite: false,
+  canvas,
+});
+
 export const test = base.extend<{
   workspace: WorkspaceFixture;
   accountRole: "admin" | "user";
@@ -210,6 +229,58 @@ export const test = base.extend<{
             total: 1,
             nextCursor: null,
           };
+          break;
+        case "GET /api/workspaces/test-space/directory": {
+          const parentId = new URL(request.url()).searchParams.get("parentId");
+          const node = directoryCanvas(canvas);
+
+          data = parentId
+            ? {
+                parentId,
+                items: [],
+                total: 0,
+                nextCursor: null,
+                catalogRevision: 0,
+                hasPrevious: false,
+              }
+            : {
+                parentId: null,
+                items: [node],
+                total: 1,
+                nextCursor: null,
+                catalogRevision: 0,
+                hasPrevious: false,
+              };
+          break;
+        }
+
+        case "GET /api/workspaces/test-space/directory/path": {
+          const query = new URL(request.url()).searchParams;
+
+          if (query.get("kind") !== "canvas" || query.get("id") !== canvas.id) {
+            return fail(404, "NOT_FOUND", "目录项目不存在");
+          }
+
+          const page = {
+            parentId: null,
+            items: [directoryCanvas(canvas)],
+            total: 1,
+            nextCursor: null,
+            catalogRevision: 0,
+            hasPrevious: false,
+          };
+
+          data = {
+            ancestors: [],
+            item: page.items[0],
+            catalogRevision: 0,
+            pages: [page],
+          };
+          break;
+        }
+
+        case "GET /api/workspaces/test-space/favorites":
+          data = { items: [], catalogRevision: 0 };
           break;
         case "GET /api/canvases/test-canvas":
           data = { canvas };

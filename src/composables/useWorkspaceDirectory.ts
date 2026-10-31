@@ -79,6 +79,12 @@ export interface WorkspaceDirectoryController {
   ): Promise<void>;
   canvasTabs: Readonly<Ref<readonly CanvasMeta[]>>;
   closeCanvasTab(id: string): Promise<void>;
+  /** 树目录提供权威画布元数据；不加载场景或改变当前标签。 */
+  rememberCanvas(canvas: CanvasMeta): void;
+  renameCanvasMetadata(id: string, name: string): void;
+  /** 先批量关闭并失效所有回收项；当前画布被回收时再接管一次剩余标签。 */
+  removeCanvases(ids: string[]): Promise<void>;
+  knownCanvasIds(): string[];
   reset(): void;
   refreshDirectory(): Promise<void>;
   refreshAfterRestore(): Promise<void>;
@@ -1070,6 +1076,61 @@ export function useWorkspaceDirectory({
     moveCanvas,
     canvasTabs,
     closeCanvasTab,
+    rememberCanvas: (canvas) => catalog.remember(canvas),
+    renameCanvasMetadata(id, name) {
+      const canvas = catalog.known.value[id];
+
+      if (canvas) catalog.remember({ ...canvas, name });
+      canvases.value = canvases.value.map((item) =>
+        item.id === id ? { ...item, name } : item,
+      );
+      canvasDocument.renameLoadedCanvas(id, name);
+    },
+    async removeCanvases(ids) {
+      const workspace = workspaceId.value;
+      const workspaceStamp = workspaceGeneration;
+      let removedCurrent = false;
+
+      // Finish the entire batch before selecting a successor. A neighboring tab
+      // may also belong to this deleted folder and must never open in between.
+      for (const id of ids) {
+        const metadata = catalog.known.value[id];
+
+        if (metadata && metadata.workspaceId !== workspace) continue;
+        tabs.close(workspace, id);
+        removedCurrent = canvasDocument.invalidateCanvas(id) || removedCurrent;
+        delete catalog.known.value[id];
+      }
+
+      canvases.value = canvases.value.filter((item) => !ids.includes(item.id));
+      if (!removedCurrent || !workspace) return;
+      const selection = ++switchGeneration;
+      const stillCurrent = () =>
+        workspaceStamp === workspaceGeneration &&
+        selection === switchGeneration &&
+        workspace === workspaceId.value;
+
+      selecting.value = true;
+      try {
+        await refreshNavigationQuietly();
+        if (!stillCurrent()) return;
+        await loadWorkspace(workspace, undefined, false, selection);
+      } finally {
+        // Account reset and workspace switches both advance workspaceGeneration.
+        if (stillCurrent()) selecting.value = false;
+      }
+    },
+    knownCanvasIds: () => [
+      ...new Set([
+        ...Object.values(catalog.known.value)
+          .filter((canvas) => canvas.workspaceId === workspaceId.value)
+          .map((canvas) => canvas.id),
+        ...tabs.ids(workspaceId.value),
+        ...(document.value?.workspaceId === workspaceId.value
+          ? [document.value.id]
+          : []),
+      ]),
+    ],
     reset,
     refreshDirectory,
     refreshAfterRestore,

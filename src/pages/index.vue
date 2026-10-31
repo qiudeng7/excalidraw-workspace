@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
-import type { CanvasMeta } from "#shared/contracts";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { APP_VERSION } from "#shared/app-version";
-import CanvasContextMenu from "~/components/CanvasContextMenu.vue";
+import SidebarResourceTree from "~/components/SidebarResourceTree.vue";
+import { useDirectoryTree } from "~/composables/use-directory-tree";
 import SidebarAccountMenu from "~/components/SidebarAccountMenu.vue";
-import { useSidebarPagination } from "~/composables/use-sidebar-pagination";
-import { useCanvasContextMenu } from "~/composables/use-canvas-context-menu";
 import { onBeforeRouteLeave } from "vue-router";
 import AccountGate from "~/components/AccountGate.vue";
 import QuietIcon from "~/components/QuietIcon.vue";
@@ -38,10 +36,6 @@ import {
   type WorkspaceDirectoryController,
 } from "~/composables/useWorkspaceDirectory";
 import { useWorkspacePicker } from "~/composables/useWorkspacePicker";
-import {
-  useCanvasReorder,
-  type CanvasReorderController,
-} from "~/composables/useCanvasReorder";
 
 const editor = ref<EditorHandle>();
 const saveBarrier = {
@@ -138,10 +132,9 @@ const canvasDocument = useCanvasDocument({
       sidebarOpen.value = false;
   },
 });
-// Reorder is bound after directory creation. This reactive slot makes the lock safe even
-// if a controller reads it while the composition root is still initializing.
-const reorderSlot = shallowRef<CanvasReorderController>();
-const operation = useOperation(() => !!reorderSlot.value?.drag.value);
+const directoryDragging = ref(false);
+const treeBusy = ref(false);
+const operation = useOperation(() => directoryDragging.value);
 const { busy, error, run } = operation;
 
 async function retryCurrentCanvas() {
@@ -158,7 +151,7 @@ async function retryCurrentCanvas() {
 }
 
 const interactionLocked = computed(
-  () => busy.value || !!reorderSlot.value?.drag.value,
+  () => busy.value || directoryDragging.value || treeBusy.value,
 );
 
 directory = useWorkspaceDirectory({
@@ -170,16 +163,6 @@ directory = useWorkspaceDirectory({
   run,
   dialogs: { prompt: promptDialog, confirm: confirmDialog },
 });
-const reordering = useCanvasReorder({
-  canvases: directory.canvases,
-  locked: directory.directoryLocked,
-  reorder: directory.reorderCanvas,
-  move: directory.moveCanvas,
-  loadNextPage: directory.loadNextPage,
-  hasMore: computed(() => !!directory.nextCursor.value),
-});
-
-reorderSlot.value = reordering;
 account = useAccountSession({
   api: accountApi,
   editor: saveBarrier,
@@ -279,13 +262,6 @@ watch(
 );
 const {
   workspaces,
-  canvases,
-  total,
-  nextCursor,
-  loadingMore,
-  paginationError,
-  refreshing,
-  loadNextPage,
   workspaceId,
   currentWorkspace,
   directoryStale,
@@ -298,96 +274,68 @@ const {
   createWorkspace,
   renameWorkspace,
   deleteWorkspace,
-  createCanvas,
-  renameCanvas,
-  deleteCanvas,
-  setCanvasPinned,
 } = directory;
-const paginationEnabled = computed(
-  () =>
-    sidebarOpen.value &&
-    !!nextCursor.value &&
-    !loadingMore.value &&
-    !paginationError.value &&
-    !refreshing.value &&
-    !directoryLocked.value,
-);
-const {
-  scroll: sidebarScroll,
-  sentinel: paginationSentinel,
-  expanded: canvasesExpanded,
-  anchorPadding,
-  toggle: toggleCanvases,
-} = useSidebarPagination({
+const resourceTree = useDirectoryTree({
+  workspaceId,
   owner: () => user.value?.id,
-  workspaceId,
-  enabled: paginationEnabled,
-  refreshing,
-  loadedCount: () => canvases.value.length,
-  loadNextPage,
+  locked: directoryLocked,
+  flush: saveBarrier.flush,
+  remember: directory.rememberCanvas,
+  open: async (canvas) => {
+    directory.rememberCanvas(canvas);
+    await directory.selectCanvas(canvas.id);
+  },
+  renamed: directory.renameCanvasMetadata,
+  removed: directory.removeCanvases,
+  knownCanvasIds: () => [
+    ...new Set([
+      ...directory.knownCanvasIds(),
+      ...[...(resources.value?.canvases.values() ?? [])]
+        .filter((entry) => entry.document.workspaceId === workspaceId.value)
+        .map((entry) => entry.document.id),
+    ]),
+  ],
 });
-const currentCanvasOutsidePage = computed(() =>
-  document.value?.workspaceId === workspaceId.value &&
-  !canvases.value.some((canvas) => canvas.id === document.value?.id)
-    ? document.value
-    : undefined,
-);
-const canvasMenu = useCanvasContextMenu({
-  canvases,
-  workspaceId,
-  enabled: computed(
-    () => !!user.value && sidebarOpen.value && !directoryLocked.value,
-  ),
-});
-const menuTarget = canvasMenu.target;
-const menuCanvas = computed(() =>
-  canvases.value.find((canvas) => canvas.id === menuTarget.value?.id),
-);
-const canMoveCanvas = (canvas: CanvasMeta, offset: number) => {
-  const index = canvases.value.findIndex((entry) => entry.id === canvas.id);
-  const neighbor = canvases.value[index + offset];
-
-  return neighbor
-    ? !!neighbor.pinned === !!canvas.pinned
-    : offset > 0 && index === canvases.value.length - 1 && !!nextCursor.value;
+const revealFolder = async (id?: string) => {
+  sidebarOpen.value = true;
+  await resourceTree.attempt(async () => {
+    if (id) await resourceTree.reveal({ kind: "folder", id });
+    else await resourceTree.load(null);
+  });
 };
-const menuAction = (
-  action: "pin" | "rename" | "delete" | "move",
-  offset = 0,
-) => {
-  const canvas = menuCanvas.value;
 
-  if (!canvas) return;
-  canvasMenu.close(true);
-  if (action === "pin") void setCanvasPinned(canvas, !canvas.pinned);
-  else if (action === "rename") void renameCanvas(canvas);
-  else if (action === "delete") void deleteCanvas(canvas);
-  else moveCanvas(canvas, offset);
+watch(
+  () => [document.value?.id, workspaceId.value],
+  ([id, workspace]) => {
+    if (document.value && document.value.workspaceId !== workspace) return;
+    void resourceTree.attempt(async () => {
+      if (id && workspace) {
+        await Promise.all([
+          resourceTree.readPath({ kind: "canvas", id }),
+          resourceTree.reveal({ kind: "canvas", id }, false, false),
+        ]);
+      } else await resourceTree.readPath();
+    });
+  },
+);
+watch(
+  resourceTree.busy,
+  (value) => {
+    treeBusy.value = value;
+  },
+  { flush: "sync" },
+);
+const treeView = ref<InstanceType<typeof SidebarResourceTree>>();
+const createCanvas = async () => {
+  sidebarOpen.value = true;
+  await nextTick();
+  await treeView.value?.beginCreate("canvas");
 };
-let sidebarSelection = Promise.resolve();
-
-function selectSidebarCanvas(event: MouseEvent, id: string) {
-  // The second click of a double-click must not replace the pending selection.
-  if (event.detail > 1) return;
-  sidebarSelection = selectCanvas(id);
-}
-
-async function renameSidebarCanvas(canvas: CanvasMeta) {
-  // An unopened canvas may still be loading after the first click.
-  await sidebarSelection;
-  await renameCanvas(canvas);
-}
-
+const refreshAfterRestore = async () => {
+  await directory.refreshAfterRestore();
+  await resourceTree.refresh();
+};
 const { navigationNotice, clearNotice } = navigationController;
-const {
-  drag,
-  moveCanvas,
-  startDrag,
-  dragMove,
-  finishDrag,
-  cancelDrag,
-  dragKey,
-} = reordering;
 const picker = useWorkspacePicker({
   workspaces,
   workspaceId,
@@ -672,7 +620,7 @@ async function flushForShare() {
           </ul>
         </div>
       </div>
-      <div ref="sidebarScroll" class="sidebar-scroll">
+      <div class="sidebar-scroll">
         <div class="shared-canvases">
           <div class="shared-heading">
             <button
@@ -731,155 +679,29 @@ async function flushForShare() {
             </p>
           </div>
         </div>
-        <div class="canvas-heading">
-          <button
-            class="canvas-toggle"
-            type="button"
-            :aria-label="canvasesExpanded ? '折叠画布' : '展开画布'"
-            :aria-expanded="canvasesExpanded"
-            aria-controls="canvas-list"
-            @click="toggleCanvases"
-          >
-            <span
-              >画布 <span class="count">{{ total }}</span></span
-            >
-            <QuietIcon
-              class="shared-chevron"
-              :class="{ expanded: canvasesExpanded }"
-              name="chevron"
-              :size="13"
-            /></button
-          ><button
-            class="icon-button"
-            title="新建画布"
-            aria-label="新建画布"
-            :disabled="directoryLocked || !workspaceId"
-            @click="createCanvas"
-          >
-            <QuietIcon name="plus" :size="16" />
-          </button>
-        </div>
-        <template v-if="canvasesExpanded">
-          <div v-if="currentCanvasOutsidePage" class="current-canvas-shortcut">
-            <span>当前画布</span
-            ><button
-              type="button"
-              :title="currentCanvasOutsidePage.name"
-              :disabled="interactionLocked"
-              @click="selectCanvas(currentCanvasOutsidePage.id)"
-            >
-              <QuietIcon name="canvas" :size="16" /><span>{{
-                currentCanvasOutsidePage.name
-              }}</span>
-            </button>
-          </div>
-          <ul
-            id="canvas-list"
-            class="canvas-list"
-            @click.capture="canvasMenu.suppressClick"
-          >
-            <li
-              v-for="canvas in canvases"
-              :key="canvas.id"
-              :data-canvas-id="canvas.id"
-              @contextmenu="canvasMenu.contextMenu($event, canvas)"
-              @keydown="canvasMenu.keyDown($event, canvas)"
-              @pointerdown="canvasMenu.pointerDown($event, canvas)"
-              :class="{
-                selected: document?.id === canvas.id,
-                dragging: drag?.id === canvas.id,
-                'drop-target':
-                  drag && drag.targetId === canvas.id && drag.id !== canvas.id,
-              }"
-            >
-              <button
-                class="drag-handle"
-                :aria-label="`调整画布 ${canvas.name} 的顺序`"
-                title="拖动排序；方向键上移或下移"
-                :disabled="busy || directoryStale"
-                @pointerdown="startDrag($event, canvas)"
-                @pointermove="dragMove"
-                @pointerup="finishDrag"
-                @pointercancel="cancelDrag"
-                @lostpointercapture="cancelDrag"
-                @keydown="dragKey($event, canvas)"
-              >
-                <svg viewBox="0 0 12 16" aria-hidden="true">
-                  <circle
-                    v-for="dot in 6"
-                    :key="dot"
-                    :cx="dot % 2 ? 4 : 8"
-                    :cy="Math.ceil(dot / 2) * 4"
-                    r="1"
-                    fill="currentColor"
-                  />
-                </svg>
-              </button>
-              <button
-                class="canvas-name"
-                :aria-label="canvas.name"
-                :title="canvas.name"
-                :aria-current="document?.id === canvas.id ? 'page' : undefined"
-                :disabled="interactionLocked"
-                @click="selectSidebarCanvas($event, canvas.id)"
-                @dblclick="renameSidebarCanvas(canvas)"
-              >
-                <QuietIcon name="canvas" :size="16" /><span>{{
-                  canvas.name
-                }}</span>
-                <QuietIcon
-                  v-if="canvas.pinned"
-                  name="pin"
-                  :size="13"
-                  class="pin-mark"
-                  aria-label="已置顶"
-                />
-                <small
-                  v-if="resources?.canvases.get(canvas.id)?.resource.dirty"
-                  :title="
-                    resources.canvases.get(canvas.id)?.message || '正在后台保存'
-                  "
-                  >{{
-                    resources.canvases.get(canvas.id)?.resource.conflict
-                      ? "冲突"
-                      : resources.canvases.get(canvas.id)?.message
-                        ? "保存失败"
-                        : "保存中"
-                  }}</small
-                >
-              </button>
-            </li>
-          </ul>
-          <p v-if="!canvases.length" class="sidebar-empty">
-            {{ workspaceId ? "这个空间还没有画布" : "还没有工作空间" }}
-          </p>
-          <div class="pagination-status" aria-live="polite">
-            <button
-              v-if="paginationError"
-              type="button"
-              :disabled="loadingMore || refreshing"
-              @click="loadNextPage"
-            >
-              加载失败，重试
-            </button>
-            <span v-else-if="loadingMore">正在加载更多…</span>
-            <span v-else-if="!nextCursor && workspaceId"
-              >已显示全部 {{ total }} 张画布</span
-            >
-          </div>
-          <div
-            v-if="nextCursor"
-            ref="paginationSentinel"
-            class="pagination-sentinel"
-            aria-hidden="true"
-          />
-          <div
-            v-if="anchorPadding"
-            class="scroll-anchor-spacer"
-            :style="{ height: `${anchorPadding}px` }"
-            aria-hidden="true"
-          />
-        </template>
+        <SidebarResourceTree
+          ref="treeView"
+          :tree="resourceTree"
+          :workspace-id="workspaceId"
+          :owner-id="user.id"
+          :current-id="document?.id"
+          @dragging="directoryDragging = $event"
+          @recycle="recycleOpen = true"
+        />
+      </div>
+      <div
+        v-if="resourceTree.moveUndo.value"
+        class="sidebar-move-status"
+        role="status"
+      >
+        <span>已移动</span
+        ><button
+          type="button"
+          :disabled="resourceTree.locked.value"
+          @click="resourceTree.attempt(resourceTree.undoMove)"
+        >
+          撤销移动
+        </button>
       </div>
       <div class="sidebar-bottom">
         <div class="sidebar-actions">
@@ -912,19 +734,6 @@ async function flushForShare() {
         />
       </div>
     </aside>
-    <CanvasContextMenu
-      v-if="menuTarget && menuCanvas"
-      :canvas="menuCanvas"
-      :target="menuTarget"
-      :locked="directoryLocked"
-      :can-move-up="canMoveCanvas(menuCanvas, -1)"
-      :can-move-down="canMoveCanvas(menuCanvas, 1)"
-      @close="canvasMenu.close"
-      @pin="menuAction('pin')"
-      @move="menuAction('move', $event)"
-      @rename="menuAction('rename')"
-      @delete="menuAction('delete')"
-    />
     <div class="draw-content">
       <div
         v-for="entry in [...(resources?.canvases.values() ?? [])].filter(
@@ -1014,6 +823,21 @@ async function flushForShare() {
           </button>
         </div>
       </header>
+      <nav v-if="document" class="canvas-path" aria-label="画布路径">
+        <button type="button" @click="revealFolder()">
+          {{ currentWorkspace?.name ?? "我的文件" }}
+        </button>
+        <template
+          v-for="folder in resourceTree.ancestry.value"
+          :key="folder.id"
+        >
+          <span>/</span
+          ><button type="button" @click="revealFolder(folder.id)">
+            {{ folder.name }}
+          </button>
+        </template>
+        <span>/</span><span :title="document.name">{{ document.name }}</span>
+      </nav>
       <div v-if="navigationNotice" class="navigation-notice" role="status">
         <span>{{ navigationNotice }}</span
         ><button
@@ -1085,7 +909,7 @@ async function flushForShare() {
         <div
           v-if="document && current && resources && settingsResource"
           class="draw-editor"
-          :inert="busy"
+          :inert="busy || treeBusy"
         >
           <CollaborationCanvas
             v-if="isCollaborative"
@@ -1133,7 +957,13 @@ async function flushForShare() {
             >
               新建工作空间
             </button></template
-          ><template v-else-if="!canvases.length"
+          ><template
+            v-else-if="
+              directory.total.value === 0 &&
+              !Object.values(resourceTree.known.value).some(
+                (item) => item.kind === 'canvas',
+              )
+            "
             ><p>这个工作空间还没有画布。</p>
             <button
               class="empty-create"
@@ -1170,7 +1000,7 @@ async function flushForShare() {
     <RecycleBinPanel
       v-if="recycleOpen && user"
       :key="user.id"
-      :refresh="directory.refreshAfterRestore"
+      :refresh="refreshAfterRestore"
       @close="recycleOpen = false"
     />
     <SettingsPanel
@@ -1205,6 +1035,40 @@ async function flushForShare() {
 </template>
 
 <style scoped>
+.canvas-path {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 16px;
+  border-bottom: 1px solid var(--app-border);
+  font-size: 11px;
+  color: var(--app-muted);
+}
+.canvas-path button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 3px 5px;
+  cursor: pointer;
+  border-radius: 4px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canvas-path button:hover {
+  background: var(--app-hover);
+}
+.canvas-path > span:last-child {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .presence-state {
   border: 1px solid var(--color-border, #d5d5db);
   border-radius: 5px;
@@ -1249,7 +1113,7 @@ async function flushForShare() {
   place-items: center;
   flex: none;
   width: 18px;
-  height: 30px;
+  height: 27px;
   padding: 0 !important;
   color: var(--app-subtle);
   touch-action: none;
@@ -1304,7 +1168,7 @@ async function flushForShare() {
 }
 .shared-list {
   display: grid;
-  gap: 3px;
+  gap: 1px;
   padding: 4px 0 0 12px;
 }
 .shared-list a {
@@ -1312,7 +1176,7 @@ async function flushForShare() {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 9px 10px;
+  padding: 7px 10px;
   color: var(--app-muted);
   font-size: 11px;
   text-decoration: none;
@@ -1608,14 +1472,14 @@ async function flushForShare() {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
   min-height: 0;
 }
 .canvas-list li {
   display: flex;
   align-items: center;
   border-radius: 5px;
-  min-height: 37px;
+  min-height: 32px;
   padding-right: 3px;
   color: var(--app-muted);
 }
@@ -1633,7 +1497,7 @@ async function flushForShare() {
   flex: 1;
   min-width: 0;
   text-align: left;
-  padding: 10px 10px !important;
+  padding: 7px 10px !important;
   font-size: 13px !important;
   background: none !important;
 }
@@ -1702,6 +1566,34 @@ async function flushForShare() {
 }
 .menu-popover .danger {
   color: var(--app-danger);
+}
+.sidebar-move-status {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+.sidebar-move-status button {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sidebar-move-status button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sidebar-move-status button:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 1px;
 }
 .sidebar-bottom {
   flex: none;

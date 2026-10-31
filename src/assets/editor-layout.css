@@ -6,6 +6,57 @@
   container-type: inline-size;
 }
 
+/* 编辑器界面复用应用主题；不改画布背景、笔触或用户的颜色面板。 */
+.canvas-host .excalidraw,
+.canvas-host .excalidraw.theme--dark {
+  --color-primary: var(--app-accent);
+  --color-primary-darker: var(--app-accent-hover);
+  --color-primary-darkest: var(--app-accent);
+  --color-primary-hover: var(--app-accent-hover);
+  --color-primary-light: var(--app-selected);
+  --color-primary-light-darker: var(--app-border);
+  --color-brand-hover: var(--app-accent-hover);
+  --color-brand-active: var(--app-accent);
+  --color-on-primary-container: var(--app-selected-text);
+  --color-surface-primary-container: var(--app-selected);
+  --color-surface-high: var(--app-hover);
+  --color-surface-mid: var(--app-bg);
+  --color-surface-low: var(--app-selected);
+  --color-surface-lowest: var(--app-surface);
+  --color-on-surface: var(--app-text);
+  --color-border-outline: var(--app-muted);
+  --color-border-outline-variant: var(--app-border-strong);
+  --island-bg-color: var(--app-surface);
+  --island-bg-color-alt: var(--app-surface);
+  --default-bg-color: var(--app-surface);
+  --default-border-color: var(--app-border);
+  --input-bg-color: var(--app-surface);
+  --input-border-color: var(--app-border);
+  --input-hover-bg-color: var(--app-hover);
+  --input-label-color: var(--app-muted);
+  --popup-secondary-bg-color: var(--app-hover);
+  --popup-text-color: var(--app-text);
+  --popup-text-inverted-color: var(--app-on-accent);
+  --icon-fill-color: var(--app-muted);
+  --button-hover-bg: var(--app-hover);
+  --button-active-bg: var(--app-selected);
+  --button-active-border: var(--app-focus);
+  --focus-highlight-color: var(--app-focus-ring);
+  --select-highlight-color: var(--app-focus);
+  --color-selection: var(--app-focus);
+  --color-slider-track: var(--app-border-strong);
+  --link-color: var(--app-accent);
+  --link-color-hover: var(--app-accent-hover);
+  --link-color-active: var(--app-selected);
+  --color-logo-icon: var(--app-accent);
+  --color-logo-text: var(--app-text);
+  --overlay-bg-color: var(--app-backdrop);
+}
+
+.canvas-host .excalidraw .ExcButton--color-primary.ExcButton--variant-filled {
+  --text-color: var(--app-on-accent);
+}
+
 /* Keep native editor context menus in the workspace theme. The scroll surface
    belongs to this popover only; color pickers and other editor popovers retain
    their own layout and behavior. */

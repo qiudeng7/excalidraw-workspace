@@ -107,6 +107,8 @@ export async function createAccount(
         .select({
           id: sql<string>`${canvas}`.as("id"),
           workspaceId: tables.workspaces.id,
+          parentId: sql<string | null>`NULL`.as("parentId"),
+          deleteBatchId: sql<string | null>`NULL`.as("deleteBatchId"),
           name: sql<string>`'未命名画布'`.as("name"),
           revision: sql<number>`0`.as("revision"),
           objectKey: sql<string | null>`NULL`.as("objectKey"),

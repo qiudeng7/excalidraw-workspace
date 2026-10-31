@@ -85,6 +85,13 @@
       "when": 1792621336711,
       "tag": "0012_active_canvas_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1793421686821,
+      "tag": "0013_sidebar_directory",
+      "breakpoints": true
     }
   ]
 }

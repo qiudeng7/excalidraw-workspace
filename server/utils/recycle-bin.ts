@@ -1,6 +1,22 @@
 import { db } from "@nuxthub/db";
-import { and, asc, eq, gt, inArray, isNotNull, lte, or } from "drizzle-orm";
-import { canvases, workspaces } from "#server/db/schema";
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
+import {
+  canvases,
+  directoryFavorites,
+  folders,
+  workspaces,
+} from "#server/db/schema";
 import { markRecyclePurge, RECYCLE_RETENTION } from "#server/db/recycle-bin";
 import {
   dispatchRoomCommand,
@@ -10,7 +26,7 @@ import { projectNodeRoom } from "#server/collaboration/node-projection";
 import { deleteSnapshots } from "#server/utils/snapshots";
 import { buildRoomSeed } from "#server/collaboration/service";
 import { ApiError } from "#server/utils/http";
-import type { RecycleEntry } from "#shared/contracts";
+import type { DirectoryRecycleEntry } from "#shared/directory-contracts";
 
 async function rows(
   workspaceId?: string,
@@ -109,10 +125,23 @@ export async function syncRecycleRooms(
 }
 
 export async function purgeRecycleEntry(
-  kind: RecycleEntry["kind"],
+  kind: DirectoryRecycleEntry["kind"],
   id: string,
   namespace?: RoomNamespace,
 ) {
+  const folderEntry =
+    kind === "folder"
+      ? (
+          await db
+            .select({
+              workspaceId: folders.workspaceId,
+              deleteBatchId: folders.deleteBatchId,
+            })
+            .from(folders)
+            .where(and(eq(folders.id, id), eq(folders.purging, 1)))
+            .limit(1)
+        )[0]
+      : undefined;
   const targets = await db
     .select({ canvas: canvases, ownerId: workspaces.userId })
     .from(canvases)
@@ -120,7 +149,15 @@ export async function purgeRecycleEntry(
     .where(
       kind === "workspace"
         ? and(eq(workspaces.id, id), eq(workspaces.deleting, 1))
-        : and(eq(canvases.id, id), eq(canvases.purging, 1)),
+        : kind === "canvas"
+          ? and(eq(canvases.id, id), eq(canvases.purging, 1))
+          : folderEntry?.deleteBatchId
+            ? and(
+                eq(canvases.workspaceId, folderEntry.workspaceId),
+                eq(canvases.deleteBatchId, folderEntry.deleteBatchId),
+                eq(canvases.purging, 1),
+              )
+            : sql`0`,
     );
 
   for (const { canvas, ownerId } of targets) {
@@ -145,7 +182,7 @@ export async function purgeRecycleEntry(
     canvas.objectKey ? [canvas.objectKey] : [],
   );
 
-  if (kind === "workspace")
+  if (kind === "workspace") {
     await db.batch([
       db.delete(canvases).where(
         inArray(
@@ -160,10 +197,71 @@ export async function purgeRecycleEntry(
         .delete(workspaces)
         .where(and(eq(workspaces.id, id), eq(workspaces.deleting, 1))),
     ]);
-  else
+  } else if (kind === "canvas") {
+    await db
+      .delete(directoryFavorites)
+      .where(
+        and(
+          eq(directoryFavorites.itemKind, "canvas"),
+          eq(directoryFavorites.itemId, id),
+        ),
+      );
     await db
       .delete(canvases)
       .where(and(eq(canvases.id, id), eq(canvases.purging, 1)));
+  } else if (folderEntry?.deleteBatchId) {
+    const folderIds = await db
+      .select({ id: folders.id })
+      .from(folders)
+      .where(
+        and(
+          eq(folders.workspaceId, folderEntry.workspaceId),
+          eq(folders.deleteBatchId, folderEntry.deleteBatchId),
+          eq(folders.purging, 1),
+        ),
+      );
+    const canvasIds = targets.map(({ canvas }) => canvas.id);
+
+    await db.batch([
+      db.delete(directoryFavorites).where(
+        and(
+          eq(directoryFavorites.workspaceId, folderEntry.workspaceId),
+          or(
+            and(
+              eq(directoryFavorites.itemKind, "folder"),
+              inArray(
+                directoryFavorites.itemId,
+                folderIds.map((row) => row.id),
+              ),
+            ),
+            and(
+              eq(directoryFavorites.itemKind, "canvas"),
+              inArray(directoryFavorites.itemId, canvasIds),
+            ),
+          ),
+        ),
+      ),
+      db
+        .delete(canvases)
+        .where(
+          and(
+            eq(canvases.workspaceId, folderEntry.workspaceId),
+            eq(canvases.deleteBatchId, folderEntry.deleteBatchId),
+            eq(canvases.purging, 1),
+          ),
+        ),
+      db
+        .delete(folders)
+        .where(
+          and(
+            eq(folders.workspaceId, folderEntry.workspaceId),
+            eq(folders.deleteBatchId, folderEntry.deleteBatchId),
+            eq(folders.purging, 1),
+          ),
+        ),
+    ]);
+  }
+
   if (keys.length) await deleteSnapshots(keys);
 }
 
@@ -177,7 +275,7 @@ export async function collectRecycleBin(
   await syncRecycleRooms(namespace, undefined, undefined, recordError);
   const deadline = new Date(now - RECYCLE_RETENTION).toISOString();
 
-  for (const kind of ["workspace", "canvas"] as const) {
+  for (const kind of ["workspace", "canvas", "folder"] as const) {
     let after = "";
 
     for (;;) {
@@ -198,21 +296,44 @@ export async function collectRecycleBin(
               )
               .orderBy(asc(workspaces.id))
               .limit(100)
-          : await db
-              .select({ id: canvases.id })
-              .from(canvases)
-              .where(
-                and(
-                  gt(canvases.id, after),
-                  isNotNull(canvases.deletedAt),
-                  or(
-                    eq(canvases.purging, 1),
-                    lte(canvases.deletedAt, deadline),
+          : kind === "canvas"
+            ? await db
+                .select({ id: canvases.id })
+                .from(canvases)
+                .where(
+                  and(
+                    gt(canvases.id, after),
+                    isNull(canvases.deleteBatchId),
+                    isNotNull(canvases.deletedAt),
+                    or(
+                      eq(canvases.purging, 1),
+                      lte(canvases.deletedAt, deadline),
+                    ),
                   ),
-                ),
-              )
-              .orderBy(asc(canvases.id))
-              .limit(100);
+                )
+                .orderBy(asc(canvases.id))
+                .limit(100)
+            : await db
+                .select({ id: folders.id })
+                .from(folders)
+                .innerJoin(workspaces, eq(folders.workspaceId, workspaces.id))
+                .where(
+                  and(
+                    gt(folders.id, after),
+                    eq(workspaces.deleting, 0),
+                    isNull(workspaces.deletedAt),
+                    isNotNull(folders.deleteBatchId),
+                    isNotNull(folders.deletedAt),
+                    or(
+                      eq(folders.purging, 1),
+                      lte(folders.deletedAt, deadline),
+                    ),
+                    sql`NOT EXISTS (SELECT 1 FROM folders parent WHERE parent.id = ${folders.parentId}
+                  AND parent.delete_batch_id = ${folders.deleteBatchId})`,
+                  ),
+                )
+                .orderBy(asc(folders.id))
+                .limit(100);
 
       if (!page.length) break;
       after = page.at(-1)!.id;

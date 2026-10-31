@@ -76,6 +76,77 @@ async function tabsFixture(page: Page, longName = false) {
           workspaces: [],
         },
       });
+    const directoryPage = path.match(/^\/api\/workspaces\/([^/]+)\/directory$/);
+
+    if (directoryPage) {
+      const items = canvases
+        .filter((canvas) => canvas.workspaceId === directoryPage[1])
+        .map((canvas, position) => ({
+          kind: "canvas" as const,
+          id: canvas.id,
+          workspaceId: canvas.workspaceId,
+          parentId: null,
+          name: canvas.name,
+          position,
+          createdAt: canvas.createdAt,
+          updatedAt: canvas.updatedAt,
+          favorite: false,
+          canvas,
+        }));
+
+      return route.fulfill({
+        json: {
+          parentId: null,
+          items,
+          total: items.length,
+          nextCursor: null,
+          catalogRevision: 0,
+          hasPrevious: false,
+        },
+      });
+    }
+
+    if (/^\/api\/workspaces\/[^/]+\/directory\/path$/.test(path)) {
+      const id = new URL(request.url()).searchParams.get("id");
+      const target = canvases.find((canvas) => canvas.id === id);
+
+      if (!target) return route.fallback();
+      const items = canvases
+        .filter((canvas) => canvas.workspaceId === target.workspaceId)
+        .map((canvas, position) => ({
+          kind: "canvas" as const,
+          id: canvas.id,
+          workspaceId: canvas.workspaceId,
+          parentId: null,
+          name: canvas.name,
+          position,
+          createdAt: canvas.createdAt,
+          updatedAt: canvas.updatedAt,
+          favorite: false,
+          canvas,
+        }));
+      const page = {
+        parentId: null,
+        items,
+        total: items.length,
+        nextCursor: null,
+        catalogRevision: 0,
+        hasPrevious: items[0]?.id !== target.id,
+      };
+
+      return route.fulfill({
+        json: {
+          ancestors: [],
+          item: items.find((item) => item.id === target.id),
+          catalogRevision: 0,
+          pages: [page],
+        },
+      });
+    }
+
+    if (/^\/api\/workspaces\/[^/]+\/favorites$/.test(path))
+      return route.fulfill({ json: { items: [], catalogRevision: 0 } });
+
     const directory = path.match(/^\/api\/workspaces\/([^/]+)\/canvases$/);
 
     if (directory) {
@@ -566,11 +637,21 @@ test("tabs support keyboard navigation, adjacent close focus, rename, delete and
   await expect(
     page.getByRole("tab", { name: "画布 B", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
-  await page.locator('[data-canvas-id="b"] .canvas-name').dblclick();
-  const rename = page.getByRole("dialog", { name: "重命名画布", exact: true });
+  await page
+    .locator('[data-canvas-id="b"] .canvas-name')
+    .click({ button: "right" });
+  await page
+    .getByRole("menu", { name: "画布 画布 B 的操作", exact: true })
+    .getByRole("menuitem", { name: "重命名", exact: true })
+    .click();
+  const rename = page.getByRole("textbox", {
+    name: "重命名画布名称",
+    exact: true,
+  });
 
-  await rename.getByRole("textbox").fill("新的标签名称");
-  await rename.getByRole("button", { name: "保存名称", exact: true }).click();
+  await rename.fill("新的标签名称");
+  await rename.press("Enter");
+  await expect(rename).toHaveCount(0);
   await expect(
     page.getByRole("tab", { name: "新的标签名称", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
@@ -598,10 +679,13 @@ test("tabs support keyboard navigation, adjacent close focus, rename, delete and
     page.getByRole("tab", { name: "画布 A", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
   await page.getByRole("button", { name: "新建画布", exact: true }).click();
-  const create = page.getByRole("dialog", { name: "新建画布", exact: true });
+  const create = page.getByRole("textbox", {
+    name: "新建画布名称",
+    exact: true,
+  });
 
-  await create.getByRole("textbox").fill("新标签");
-  await create.getByRole("button", { name: "创建", exact: true }).click();
+  await create.fill("新标签");
+  await create.press("Enter");
   await expect(
     page.getByRole("tab", { name: "新标签", exact: true }),
   ).toHaveAttribute("aria-selected", "true");

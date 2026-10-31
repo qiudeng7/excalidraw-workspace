@@ -14,9 +14,9 @@ export const moveCanvas = async (
   move: CanvasMove,
 ) => {
   const available = sql`EXISTS (
-    SELECT 1 FROM canvases source JOIN canvases target ON source.workspace_id = target.workspace_id AND source.pinned = target.pinned
+    SELECT 1 FROM canvases source JOIN canvases target ON source.workspace_id = target.workspace_id AND source.pinned = target.pinned AND source.parent_id IS target.parent_id
     WHERE source.id = ${id} AND target.id = ${move.targetId}
-      AND source.workspace_id = ${workspace} AND source.deleted_at IS NULL AND target.deleted_at IS NULL
+      AND source.workspace_id = ${workspace} AND source.deleted_at IS NULL AND target.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM folders WHERE workspace_id = ${workspace} AND deleted_at IS NULL)
   )`;
   const matching = and(
     eq(tables.workspaces.id, workspace),
