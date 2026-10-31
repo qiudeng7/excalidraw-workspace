@@ -5,16 +5,16 @@
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
-import type { CanvasDocument, User } from "../../shared/contracts";
 import { test, expect, type WorkspaceFixture } from "./fixtures";
-
-type Read = { space: string; limit: string | null; cursor: string | null };
+import { installDirectoryMock } from "./directory-mock";
 
 const canvasRows = (page: Page) =>
-  page.locator(".canvas-list [data-canvas-id]");
+  page.locator("#directory-list [data-canvas-id]");
 const canvasRow = (page: Page, index: number) =>
-  page.locator(`.canvas-list [data-canvas-id="canvas-${index}"]`);
+  page.locator(`#directory-list [data-canvas-id="canvas-${index}"]`);
 const scrollArea = (page: Page) => page.locator(".sidebar-scroll");
+const directoryToggle = (page: Page) =>
+  page.locator('[aria-controls="directory-list"]');
 const accountTrigger = (page: Page) =>
   page.getByRole("button", { name: "账号菜单", exact: true });
 const accountMenu = (page: Page) =>
@@ -56,266 +56,18 @@ async function directory(
   count: number,
   options: { recent?: number; shared?: number } = {},
 ) {
-  const spaces = ["test-space", "second-space"].map((id, index) => ({
-    id,
-    name: index ? "第二空间" : "测试空间",
-    catalogRevision: 0,
-    createdAt: "2026-10-22",
-    updatedAt: "2026-10-22",
-  }));
-  const canvases: CanvasDocument[] = Array.from(
-    { length: count },
-    (_, index) => ({
-      id: `canvas-${index}`,
-      workspaceId: "test-space",
-      name: `分页画布 ${index + 1}`,
-      pinned: false,
-      position: index,
-      revision: 0,
-      createdAt: "2026-10-22",
-      updatedAt: "2026-10-22",
-      scene: { elements: [], appState: {}, files: {} },
-    }),
-  );
-  let revision = 0;
-  let conflicts = 0;
-  let user: User = { ...workspace.mock.user };
-  let failNextAppend = false;
-  let releaseAppend: (() => void) | undefined;
-  let appendGate: Promise<void> | undefined;
-  let logoutCalls = 0;
-  let releaseSave: (() => void) | undefined;
-  let saveGate: Promise<void> | undefined;
-  const saving: string[] = [];
-  const reads: Read[] = [];
-  const opened: string[] = [];
-  const moves: { id: string; body: unknown }[] = [];
-  const navigation = (canvasId: string | null) => ({
-    revision: 0,
-    lastWorkspaceId: "test-space",
-    lastCanvasId: canvasId,
-    workspaces: [{ workspaceId: "test-space", lastCanvasId: canvasId }],
+  const mock = await installDirectoryMock(page, workspace, {
+    count,
+    recent: options.recent === undefined ? null : `canvas-${options.recent}`,
+    shared: options.shared,
   });
 
-  await page.context().route("**/api/**", async (route) => {
-    const request = route.request();
-    const url = new URL(request.url());
-    const path = url.pathname;
-
-    if (path === "/api/session") return route.fulfill({ json: { user } });
-    if (path === "/api/logout") {
-      logoutCalls++;
-
-      return route.fulfill({ json: { ok: true } });
-    }
-
-    if (path === "/api/workspaces")
-      return route.fulfill({ json: { workspaces: spaces } });
-    if (path === "/api/navigation")
-      return route.fulfill({
-        json: navigation(
-          request.method() === "PUT"
-            ? request.postDataJSON().canvasId
-            : count
-              ? `canvas-${options.recent ?? 0}`
-              : null,
-        ),
-      });
-    if (path === "/api/shared-canvases")
-      return route.fulfill({
-        json: {
-          canvases: Array.from({ length: options.shared ?? 0 }, (_, index) => ({
-            ...canvases[0],
-            id: `shared-${index}`,
-            name: `共享画布 ${index + 1}`,
-            role: "viewer",
-          })),
-        },
-      });
-    const listing = path.match(/^\/api\/workspaces\/([^/]+)\/canvases$/);
-
-    if (listing && request.method() === "GET") {
-      const space = listing[1]!;
-      const cursor = url.searchParams.get("cursor");
-      const limit = url.searchParams.get("limit");
-
-      if (request.frame().page() === page) reads.push({ space, limit, cursor });
-      if (cursor) {
-        if (appendGate) await appendGate;
-        if (Number(cursor.split(":")[0]) !== revision) {
-          conflicts++;
-
-          return route.fulfill({
-            status: 409,
-            json: {
-              error: {
-                code: "CATALOG_CONFLICT",
-                message: "目录已在另一标签页修改",
-              },
-            },
-          });
-        }
-
-        if (failNextAppend) {
-          failNextAppend = false;
-
-          return route.fulfill({
-            status: 503,
-            json: {
-              error: { code: "TEST_UNAVAILABLE", message: "分页暂不可用" },
-            },
-          });
-        }
-      }
-
-      const entries = space === "test-space" ? canvases : [];
-      const offset = cursor ? Number(cursor.split(":")[1]) : 0;
-      const end = limit ? offset + Number(limit) : entries.length;
-
-      return route.fulfill({
-        json: {
-          catalogRevision: revision,
-          canvases: entries.slice(offset, end),
-          total: entries.length,
-          nextCursor: end < entries.length ? `${revision}:${end}` : null,
-        },
-      });
-    }
-
-    if (listing && request.method() === "POST") {
-      const body = request.postDataJSON();
-      const canvas = {
-        ...canvases[0]!,
-        id: `remote-${revision}`,
-        name: body.name,
-        pinned: false,
-        position: -1,
-      };
-
-      expect(body.catalogRevision).toBe(revision);
-      canvases.unshift(canvas);
-      revision++;
-
-      return route.fulfill({ json: { canvas } });
-    }
-
-    const pinned = canvases.find(
-      (entry) => path === `/api/canvases/${entry.id}/pin`,
-    );
-
-    if (pinned && request.method() === "PUT") {
-      const body = request.postDataJSON();
-
-      expect(body.catalogRevision).toBe(revision);
-      pinned.pinned = body.pinned;
-      canvases.sort(
-        (a, b) =>
-          Number(b.pinned) - Number(a.pinned) || a.position - b.position,
-      );
-      revision++;
-
-      return route.fulfill({
-        json: { canvas: pinned, catalogRevision: revision },
-      });
-    }
-
-    const move = path.match(/^\/api\/canvases\/([^/]+)\/move$/);
-
-    if (move && request.method() === "PUT") {
-      const body = request.postDataJSON();
-      const source = canvases.findIndex((canvas) => canvas.id === move[1]);
-      const [canvas] = canvases.splice(source, 1);
-      const target = canvases.findIndex((entry) => entry.id === body.targetId);
-
-      expect(canvas, "移动源必须是现有画布").toBeDefined();
-      expect(target, "移动目标必须是真实相邻画布").toBeGreaterThanOrEqual(0);
-      expect(body.catalogRevision).toBe(revision);
-      canvases.splice(
-        target + (body.placement === "after" ? 1 : 0),
-        0,
-        canvas!,
-      );
-      canvases.forEach((entry, index) => {
-        entry.position = index;
-      });
-      moves.push({ id: move[1]!, body });
-      revision++;
-
-      return route.fulfill({ json: { catalogRevision: revision } });
-    }
-
-    const canvas = canvases.find(
-      (entry) => path === `/api/canvases/${entry.id}`,
-    );
-
-    if (canvas && request.method() === "DELETE") {
-      expect(Number(url.searchParams.get("catalogRevision"))).toBe(revision);
-      canvases.splice(canvases.indexOf(canvas), 1);
-      revision++;
-
-      return route.fulfill({ json: { ok: true } });
-    }
-
-    if (canvas && request.method() === "PUT") {
-      saving.push(canvas.id);
-      if (saveGate) await saveGate;
-      canvas.scene = request.postDataJSON().scene;
-      canvas.revision++;
-
-      return route.fulfill({
-        json: { revision: canvas.revision, updatedAt: canvas.updatedAt },
-      });
-    }
-
-    if (canvas && request.method() === "GET") {
-      opened.push(canvas.id);
-
-      return route.fulfill({ json: { canvas } });
-    }
-
-    return route.fallback();
-  });
   await page.reload();
   await openSidebar(page);
-  await expect(page.locator(".canvas-heading .count")).toHaveText(
-    String(count),
-  );
+  if (options.recent === undefined)
+    await expect(canvasRows(page)).toHaveCount(Math.min(30, count));
 
-  return {
-    reads,
-    conflicts: () => conflicts,
-    revision: () => revision,
-    orderedIds: () => canvases.map((canvas) => canvas.id),
-    opened,
-    moves,
-    logoutCalls: () => logoutCalls,
-    saving,
-    saved: (index: number) => canvases[index]!.scene.elements.length,
-    holdSave: () => {
-      saveGate = new Promise<void>((resolveGate) => {
-        releaseSave = resolveGate;
-      });
-    },
-    releaseSave: () => {
-      saveGate = undefined;
-      releaseSave?.();
-    },
-    failAppend: () => {
-      failNextAppend = true;
-    },
-    holdAppend: () => {
-      appendGate = new Promise<void>((resolveGate) => {
-        releaseAppend = resolveGate;
-      });
-    },
-    releaseAppend: () => {
-      appendGate = undefined;
-      releaseAppend?.();
-    },
-    changeUser: (id: string) => {
-      user = { ...user, id };
-    },
-  };
+  return mock;
 }
 
 async function assertLayout(page: Page) {
@@ -446,19 +198,22 @@ test("首屏仅取30条，触底请求单飞并追加无重复，末页停止请
   const f = await directory(page, workspace, 61);
 
   await expect(canvasRows(page)).toHaveCount(30);
-  expect(f.reads).toHaveLength(1);
-  expect(f.reads[0]).toEqual({
-    space: "test-space",
-    limit: "30",
-    cursor: null,
-  });
+  expect(
+    f.reads.filter((read) => read.cursor === null).length,
+    "首屏最多一次无游标读取；path 定位页不计入 children 读取",
+  ).toBeLessThanOrEqual(1);
   f.holdAppend();
   await scrollBottom(page);
-  await expect.poll(() => f.reads.length).toBe(2);
-  await expect(page.getByText("正在加载更多…", { exact: true })).toBeVisible();
+  await expect
+    .poll(() => f.reads.filter((read) => read.cursor === "0:30").length)
+    .toBe(1);
+  await expect(page.getByText("正在加载…", { exact: true })).toBeVisible();
   await scrollArea(page).dispatchEvent("scroll");
   await renderFrames(page);
-  expect(f.reads).toHaveLength(2);
+  expect(
+    f.reads.filter((read) => read.cursor === "0:30").length,
+    "相同游标只能有一个追加请求",
+  ).toBe(1);
   // 追加等待期间仍可打开已加载画布。
   await canvasRow(page, 29).locator(".canvas-name").click();
   await expect.poll(() => f.opened.includes("canvas-29")).toBe(true);
@@ -467,20 +222,20 @@ test("首屏仅取30条，触底请求单飞并追加无重复，末页停止请
   await scrollBottom(page);
   await expect(canvasRows(page)).toHaveCount(61);
   await expect(
-    page.getByText("已显示全部 61 张画布", { exact: true }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "加载更多项目", exact: true }),
+  ).toHaveCount(0);
   expect(
     await canvasRows(page).evaluateAll(
       (rows) =>
         new Set(rows.map((row) => row.getAttribute("data-canvas-id"))).size,
     ),
   ).toBe(61);
-  const finished = f.reads.length;
+  const finished = f.reads.filter((read) => read.cursor !== null).length;
 
   await scrollBottom(page);
   await scrollArea(page).dispatchEvent("scroll");
   await renderFrames(page);
-  expect(f.reads).toHaveLength(finished);
+  expect(f.reads.filter((read) => read.cursor !== null)).toHaveLength(finished);
 });
 
 test("追加失败保留30条和当前编辑器，停止自动重试直到手动重试", async ({
@@ -502,11 +257,11 @@ test("追加失败保留30条和当前编辑器，停止自动重试直到手动
   await expect(
     page.locator('[role="tab"][aria-selected="true"]'),
   ).toContainText("分页画布 1");
-  const failed = f.reads.length;
+  const failed = f.reads.filter((read) => read.cursor !== null).length;
 
   await scrollArea(page).dispatchEvent("scroll");
   await renderFrames(page);
-  expect(f.reads).toHaveLength(failed);
+  expect(f.reads.filter((read) => read.cursor !== null)).toHaveLength(failed);
   await retry.click();
   await expect(canvasRows(page)).toHaveCount(31);
   await expect(retry).toBeHidden();
@@ -518,61 +273,58 @@ test("画布折叠暂停触底，展开复用已加载页，按工作空间和�
 }) => {
   const f = await directory(page, workspace, 60);
 
-  await page.getByRole("button", { name: "折叠画布", exact: true }).click();
+  await directoryToggle(page).click();
+  await expect(directoryToggle(page)).toHaveAttribute("aria-expanded", "false");
   await scrollBottom(page);
   await renderFrames(page);
-  expect(f.reads).toHaveLength(1);
+  expect(f.reads.filter((read) => read.cursor !== null)).toHaveLength(0);
   await page.reload();
   await openSidebar(page);
-  await expect(
-    page.getByRole("button", { name: "展开画布", exact: true }),
-  ).toBeVisible();
+  await expect(directoryToggle(page)).toHaveAttribute("aria-expanded", "false");
   await page.locator("#workspace-select").click();
   await page.getByRole("option", { name: "第二空间", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "折叠画布", exact: true }),
-  ).toBeVisible();
+  await expect(directoryToggle(page)).toHaveAttribute("aria-expanded", "true");
   await page.locator("#workspace-select").click();
   await page.getByRole("option", { name: "测试空间", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "展开画布", exact: true }),
-  ).toBeVisible();
+  await expect(directoryToggle(page)).toHaveAttribute("aria-expanded", "false");
   const beforeExpand = f.reads.length;
 
-  await page.getByRole("button", { name: "展开画布", exact: true }).click();
+  await directoryToggle(page).click();
   await expect(canvasRows(page)).toHaveCount(30);
   expect(f.reads).toHaveLength(beforeExpand);
-  await page.getByRole("button", { name: "折叠画布", exact: true }).click();
+  await directoryToggle(page).click();
   f.changeUser("another-user");
   await page.reload();
   await openSidebar(page);
-  await expect(
-    page.getByRole("button", { name: "折叠画布", exact: true }),
-  ).toBeVisible();
+  await expect(directoryToggle(page)).toHaveAttribute("aria-expanded", "true");
 });
 
-test("最近画布超过首屏时按ID直接打开并展示当前快捷行，加载到该项后自动去重", async ({
+test("最近画布超过首屏时按ID定位并显示前面的项目，加载到该项后仍可打开", async ({
   page,
   workspace,
 }) => {
   const f = await directory(page, workspace, 61, { recent: 45 });
 
-  await expect(canvasRows(page)).toHaveCount(30);
-  expect(f.reads).toHaveLength(1);
-  expect(f.opened).toContain("canvas-45");
+  await expect.poll(() => f.opened).toContain("canvas-45");
   await expect(
     page.locator('[role="tab"][aria-selected="true"]'),
   ).toContainText("分页画布 46");
-  await expect(page.locator(".current-canvas-shortcut")).toContainText(
-    "当前画布",
-  );
-  await expect(page.locator(".current-canvas-shortcut")).toContainText(
-    "分页画布 46",
-  );
+  await expect(canvasRow(page, 45)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "显示前面的项目", exact: true }),
+  ).toBeVisible();
+  expect(f.pathReads).toContainEqual({ kind: "canvas", id: "canvas-45" });
+  expect(
+    f.reads.filter((read) => read.cursor !== null),
+    "按 ID 定位不应顺序扫描前置页",
+  ).toHaveLength(0);
+  await page
+    .getByRole("button", { name: "显示前面的项目", exact: true })
+    .click();
+  await expect(canvasRow(page, 0)).toBeVisible();
+  await expect(canvasRow(page, 45)).toHaveCount(0);
   await scrollBottom(page);
-  await expect(canvasRows(page)).toHaveCount(60);
-  await expect(canvasRow(page, 45)).toHaveCount(1);
-  await expect(page.locator(".current-canvas-shortcut")).toHaveCount(0);
+  await expect(canvasRow(page, 45)).toBeVisible();
   await expect(page.locator(".excalidraw")).toHaveCount(1);
 });
 
@@ -583,16 +335,29 @@ test("末项下移先取得下一页真实相邻项，再通过局部移动刷�
   const f = await directory(page, workspace, 31);
 
   await expect(canvasRows(page)).toHaveCount(30);
-  // 键盘从已加载末项触发，避免浏览器把末项滚入视图后 observer 抢先加载。
-  await canvasRow(page, 29)
-    .locator(".drag-handle")
+  // 从已加载末项的常显操作入口触发，避免滚动后 observer 抢先加载下一页。
+  await page
+    .getByRole("button", { name: "画布 分页画布 30 的操作", exact: true })
     .evaluate((element: HTMLElement) => element.focus({ preventScroll: true }));
-  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  const menu = page.getByRole("menu", {
+    name: "画布 分页画布 30 的操作",
+    exact: true,
+  });
+
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "↓ 下移", exact: true }).click();
   await expect.poll(() => f.moves.length).toBe(1);
   expect(f.reads.some((read) => read.cursor !== null)).toBe(true);
   expect(f.moves[0]).toEqual({
     id: "canvas-29",
-    body: { targetId: "canvas-30", placement: "after", catalogRevision: 0 },
+    body: {
+      source: { kind: "canvas", id: "canvas-29" },
+      parentId: null,
+      target: { kind: "canvas", id: "canvas-30" },
+      placement: "after",
+      catalogRevision: 0,
+    },
   });
   await expect(canvasRows(page).locator(".canvas-name")).toHaveText([
     ...Array.from({ length: 29 }, (_, index) => `分页画布 ${index + 1}`),
@@ -656,7 +421,11 @@ for (const viewport of [
     await expect(menu).toBeHidden();
     await expect(trigger).toBeFocused();
     await trigger.click();
-    await page.locator(".canvas-heading").click();
+    await page.evaluate(() =>
+      document.body.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true }),
+      ),
+    );
     await expect(menu).toBeHidden();
     await expect(trigger).toBeFocused();
   });
@@ -772,7 +541,7 @@ async function visibleRows(page: Page) {
     const bounds = root.getBoundingClientRect();
 
     return [
-      ...root.querySelectorAll<HTMLElement>(".canvas-list [data-canvas-id]"),
+      ...root.querySelectorAll<HTMLElement>("#directory-list [data-canvas-id]"),
     ]
       .map((row) => ({
         id: row.dataset.canvasId!,
@@ -789,11 +558,11 @@ async function loadedTwoPages(page: Page) {
   await expect(canvasRows(page)).toHaveCount(60);
 }
 
-test("两页后另一标签页新增删除置顶或移动使旧游标冲突，整体刷新已加载范围并保持首可见画布位置", async ({
+test("两页后另一标签页新增删除收藏或移动使旧游标冲突，整体刷新已加载范围并保持首可见画布位置", async ({
   page,
   workspace,
 }) => {
-  for (const action of ["create", "delete", "pin", "move"] as const) {
+  for (const action of ["create", "delete", "favorite", "move"] as const) {
     const f = await directory(page, workspace, 95);
     const remote = await remoteTab(page);
 
@@ -811,43 +580,53 @@ test("两页后另一标签页新增删除置顶或移动使旧游标冲突，�
           remote,
           "/api/workspaces/test-space/canvases",
           "POST",
-          { name: "另一标签页新建", catalogRevision: f.revision() },
+          { name: "另一标签页新建", catalogRevision: f.revisions() },
         );
       if (action === "delete")
         await remoteWrite(
           remote,
-          `/api/canvases/canvas-5?catalogRevision=${f.revision()}`,
+          `/api/canvases/canvas-5?catalogRevision=${f.revisions()}`,
           "DELETE",
         );
-      if (action === "pin")
+      if (action === "favorite")
         await remoteWrite(
           remote,
-          "/api/canvases/canvas-70/pin?return=summary",
+          "/api/workspaces/test-space/favorites",
           "PUT",
-          { pinned: true, catalogRevision: f.revision() },
+          {
+            source: { kind: "canvas", id: "canvas-70" },
+            favorite: true,
+            catalogRevision: f.revisions(),
+          },
         );
       if (action === "move")
-        await remoteWrite(remote, "/api/canvases/canvas-70/move", "PUT", {
-          targetId: "canvas-5",
-          placement: "before",
-          catalogRevision: f.revision(),
-        });
+        await remoteWrite(
+          remote,
+          "/api/workspaces/test-space/directory/move",
+          "PUT",
+          {
+            source: { kind: "canvas", id: "canvas-70" },
+            parentId: null,
+            target: { kind: "canvas", id: "canvas-5" },
+            placement: "before",
+            catalogRevision: f.revisions(),
+          },
+        );
       f.releaseAppend();
-      // 同步换上下一次追加的屏障；无游标的60条刷新仍可完成，避免合法触底追加抢过断言。
-      f.holdAppend();
       await expect.poll(f.conflicts).toBe(1);
+      // 刷新会按原已加载长度重取；允许随后合法触底追加，但前 60 条必须完整且顺序正确。
       await expect
-        .poll(() =>
-          canvasRows(page).evaluateAll((rows) =>
-            rows.map((row) => row.getAttribute("data-canvas-id")),
-          ),
+        .poll(async () =>
+          (
+            await canvasRows(page).evaluateAll((rows) =>
+              rows.map((row) => row.getAttribute("data-canvas-id")),
+            )
+          ).slice(0, 60),
         )
         .toEqual(f.orderedIds().slice(0, 60));
-      await expect(page.locator(".canvas-heading .count")).toHaveText(
-        String(f.orderedIds().length),
-      );
+      expect(await canvasRows(page).count()).toBeGreaterThanOrEqual(60);
       const restored = page.locator(
-        `.canvas-list [data-canvas-id="${anchor.id}"]`,
+        `#directory-list [data-canvas-id="${anchor.id}"]`,
       );
 
       await expect
@@ -859,7 +638,7 @@ test("两页后另一标签页新增删除置顶或移动使旧游标冲突，�
             rows.map((row) => row.getAttribute("data-canvas-id")),
           ),
         ).size,
-      ).toBe(60);
+      ).toBeGreaterThanOrEqual(60);
       await expect(page.locator(".excalidraw")).toHaveCount(1);
       await expect(
         page.getByRole("tab", { name: "分页画布 1", exact: true }),
@@ -892,7 +671,7 @@ test("冲突刷新时首可见画布被另一标签页删除，保留最近相�
     const anchorIndex = f.orderedIds().indexOf(anchor!.id);
     const previousId = f.orderedIds()[anchorIndex - 1]!;
     const previous = (await page
-      .locator(`.canvas-list [data-canvas-id="${previousId}"]`)
+      .locator(`#directory-list [data-canvas-id="${previousId}"]`)
       .boundingBox())!;
     // 计划没有规定等距前后相邻项的优先级；两者均可成为替代锚点。
     const candidates = [
@@ -902,25 +681,25 @@ test("冲突刷新时首可见画布被另一标签页删除，保留最近相�
 
     await remoteWrite(
       remote,
-      `/api/canvases/${anchor!.id}?catalogRevision=${f.revision()}`,
+      `/api/canvases/${anchor!.id}?catalogRevision=${f.revisions()}`,
       "DELETE",
     );
     f.releaseAppend();
-    // 同步换上下一次追加的屏障；无游标的60条刷新仍可完成，避免合法触底追加抢过断言。
-    f.holdAppend();
     await expect.poll(f.conflicts).toBe(1);
     await expect
-      .poll(() =>
-        canvasRows(page).evaluateAll((rows) =>
-          rows.map((row) => row.getAttribute("data-canvas-id")),
-        ),
+      .poll(async () =>
+        (
+          await canvasRows(page).evaluateAll((rows) =>
+            rows.map((row) => row.getAttribute("data-canvas-id")),
+          )
+        ).slice(0, 60),
       )
       .toEqual(f.orderedIds().slice(0, 60));
     await expect(
-      page.locator(`.canvas-list [data-canvas-id="${anchor!.id}"]`),
+      page.locator(`#directory-list [data-canvas-id="${anchor!.id}"]`),
     ).toHaveCount(0);
     const fallback = page.locator(
-      `.canvas-list [data-canvas-id="${neighbor!.id}"]`,
+      `#directory-list [data-canvas-id="${neighbor!.id}"]`,
     );
 
     await expect(fallback).toBeInViewport();
@@ -930,7 +709,7 @@ test("冲突刷新时首可见画布被另一标签页删除，保留最近相�
           const positions = await Promise.all(
             candidates.map(async (candidate) => {
               const restored = await page
-                .locator(`.canvas-list [data-canvas-id="${candidate.id}"]`)
+                .locator(`#directory-list [data-canvas-id="${candidate.id}"]`)
                 .boundingBox();
 
               return !!restored && Math.abs(restored.y - candidate.top) <= 1;
@@ -956,9 +735,7 @@ test("拖动靠近中部下边缘后静止指针继续滚动，拖动期间暂�
 }) => {
   const f = await directory(page, workspace, 95);
   const initialReads = f.reads.length;
-  const handle = (await canvasRow(page, 1)
-    .locator(".drag-handle")
-    .boundingBox())!;
+  const handle = (await canvasRow(page, 1).boundingBox())!;
   const bounds = (await scrollArea(page).boundingBox())!;
   const scrollTop = () =>
     scrollArea(page).evaluate((element) => element.scrollTop);
@@ -1020,11 +797,11 @@ test("侧栏关闭时迟到滚动不追加，重新打开复用已有页并恢�
     element.dispatchEvent(new Event("scroll"));
   });
   await renderFrames(page);
-  expect(f.reads).toHaveLength(1);
+  expect(f.reads.filter((read) => read.cursor !== null)).toHaveLength(0);
   await trigger.click();
   await expect(canvasRows(page)).toHaveCount(30);
-  expect(f.reads).toHaveLength(1);
+  expect(f.reads.filter((read) => read.cursor !== null)).toHaveLength(0);
   await scrollBottom(page);
   await expect(canvasRows(page)).toHaveCount(60);
-  expect(f.reads).toHaveLength(2);
+  expect(f.reads.filter((read) => read.cursor !== null)).toHaveLength(1);
 });

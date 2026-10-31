@@ -39,3 +39,6 @@ dist-ssr
 # Local regression artifacts
 test-results/
 playwright-report/
+.temp/
+.worktrees/
+.pnpm-store/

@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, useId } from "vue";
-import type { RecycleEntry } from "#shared/contracts";
-import { api } from "~/lib/api";
+import type { DirectoryRecycleEntry } from "#shared/directory-contracts";
+import { api, ApiError } from "~/lib/api";
+import MoveResourceDialog from "~/components/MoveResourceDialog.vue";
 import { confirmDialog } from "~/lib/dialogs";
 import QuietIcon from "~/components/QuietIcon.vue";
 
 const props = defineProps<{ refresh: () => Promise<void> }>();
 const emit = defineEmits<{ close: [] }>();
 const dialog = ref<HTMLDialogElement>();
-const entries = ref<RecycleEntry[]>([]);
+const entries = ref<DirectoryRecycleEntry[]>([]);
+const relocating = ref<DirectoryRecycleEntry>();
 const busy = ref(false);
 const loaded = ref(false);
 const error = ref("");
@@ -17,7 +19,7 @@ let returnFocus: HTMLElement | null = null;
 
 async function load() {
   entries.value = (
-    await api<{ entries: RecycleEntry[] }>("/api/recycle-bin")
+    await api<{ entries: DirectoryRecycleEntry[] }>("/api/recycle-bin")
   ).entries;
   loaded.value = true;
   await props.refresh();
@@ -41,31 +43,62 @@ function close() {
   if (!busy.value) emit("close");
 }
 
-async function change(entry: RecycleEntry, purge = false) {
+async function change(
+  entry: DirectoryRecycleEntry,
+  purge = false,
+  parentId?: string | null,
+) {
   if (busy.value) return;
   if (
     purge &&
     !(await confirmDialog({
       title: "彻底删除",
-      message: `彻底删除「${entry.name}」${entry.kind === "workspace" ? "及其中所有画布" : ""}？此操作无法恢复。`,
+      message: `彻底删除「${entry.name}」${entry.kind !== "canvas" ? "及其中所有文件夹和画布" : ""}？此操作无法恢复。`,
       confirmLabel: "彻底删除",
       danger: true,
     }))
   )
     return;
   await run(async () => {
-    await api(
-      `/api/recycle-bin/${entry.kind}/${encodeURIComponent(entry.id)}`,
-      {
-        method: purge ? "DELETE" : "POST",
-        body: JSON.stringify(purge ? { confirm: true } : {}),
-      },
-    );
+    try {
+      await api(
+        `/api/recycle-bin/${entry.kind}/${encodeURIComponent(entry.id)}`,
+        {
+          method: purge ? "DELETE" : "POST",
+          body: JSON.stringify(
+            purge
+              ? { confirm: true }
+              : parentId === undefined
+                ? {}
+                : { parentId },
+          ),
+        },
+      );
+    } catch (cause) {
+      if (
+        !purge &&
+        entry.kind !== "workspace" &&
+        cause instanceof ApiError &&
+        cause.code === "RESTORE_LOCATION_REQUIRED"
+      ) {
+        relocating.value = entry;
+        error.value = "原位置不可恢复，请选择新的位置。";
+
+        return;
+      }
+
+      // A response can be lost after the write. Read authoritative state before
+      // offering another action; never automatically re-send a destructive request.
+      await load();
+      throw cause;
+    }
+
+    relocating.value = undefined;
     await load();
   });
 }
 
-function remaining(entry: RecycleEntry) {
+function remaining(entry: DirectoryRecycleEntry) {
   return Math.max(
     0,
     Math.ceil((Date.parse(entry.expiresAt) - Date.now()) / 86400000),
@@ -102,7 +135,7 @@ onBeforeUnmount(() => {
         <header>
           <div>
             <h2 :id="`${id}-title`">回收站</h2>
-            <p>画布和工作空间保留 30 天，之后将彻底删除。</p>
+            <p>文件夹、画布和工作空间保留 30 天，之后将彻底删除。</p>
           </div>
           <button
             class="icon-button"
@@ -126,7 +159,7 @@ onBeforeUnmount(() => {
           <ul v-else aria-label="回收项目">
             <li v-for="entry in entries" :key="`${entry.kind}:${entry.id}`">
               <QuietIcon
-                :name="entry.kind === 'workspace' ? 'folder' : 'canvas'"
+                :name="entry.kind !== 'canvas' ? 'folder' : 'canvas'"
                 :size="20"
               />
               <div class="recycle-details">
@@ -134,8 +167,10 @@ onBeforeUnmount(() => {
                 ><small
                   >{{
                     entry.kind === "workspace"
-                      ? "工作空间 · 包含其中画布"
-                      : entry.workspaceName
+                      ? "工作空间 · 包含其中所有文件"
+                      : entry.kind === "folder"
+                        ? `${entry.workspaceName} · 文件夹及其中所有文件`
+                        : entry.workspaceName
                   }}
                   · {{ new Date(entry.deletedAt).toLocaleDateString() }} 删除 ·
                   剩余 {{ remaining(entry) }} 天</small
@@ -163,6 +198,22 @@ onBeforeUnmount(() => {
       </section>
     </dialog>
   </Teleport>
+  <MoveResourceDialog
+    v-if="
+      relocating && relocating.kind !== 'workspace' && relocating.workspaceId
+    "
+    :workspace-id="relocating.workspaceId"
+    :source="{ id: relocating.id, kind: relocating.kind }"
+    :name="relocating.name"
+    :subtree-depth="
+      relocating.kind === 'folder' ? relocating.subtreeDepth : undefined
+    "
+    restoring
+    :busy="busy"
+    :error="error"
+    @close="relocating = undefined"
+    @choose="change(relocating!, false, $event)"
+  />
 </template>
 
 <style scoped>

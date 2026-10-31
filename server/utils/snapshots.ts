@@ -6,8 +6,19 @@ import { blob } from "@nuxthub/blob";
 import { fail, validRevision } from "#server/utils/http";
 import { runBackground } from "#server/utils/request";
 
-export function meta<T extends { objectKey: string | null }>(row: T) {
-  const { objectKey: _, ...rest } = row;
+export function meta<
+  T extends {
+    objectKey: string | null;
+    parentId?: unknown;
+    deleteBatchId?: unknown;
+  },
+>(row: T) {
+  const {
+    objectKey: _objectKey,
+    parentId: _parentId,
+    deleteBatchId: _deleteBatchId,
+    ...rest
+  } = row;
 
   return rest;
 }

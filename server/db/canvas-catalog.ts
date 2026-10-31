@@ -24,7 +24,12 @@ interface CatalogCursor {
   id: string;
 }
 
-const { objectKey: _object, ...metadata } = getTableColumns(tables.canvases);
+const {
+  objectKey: _objectKey,
+  parentId: _parentId,
+  deleteBatchId: _deleteBatchId,
+  ...metadata
+} = getTableColumns(tables.canvases);
 const ownedCatalog = (workspace: string, user: string) =>
   and(
     eq(tables.workspaces.id, workspace),

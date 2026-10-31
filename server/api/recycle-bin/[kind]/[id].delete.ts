@@ -14,7 +14,7 @@ export default defineApiHandler(async (event) => {
 
   if (data.confirm !== true)
     return fail(400, "CONFIRM_REQUIRED", "请确认彻底删除，此操作不可恢复");
-  if (kind !== "canvas" && kind !== "workspace")
+  if (kind !== "canvas" && kind !== "workspace" && kind !== "folder")
     return fail(404, "NOT_FOUND", "回收项目不存在");
   if (!(await markRecyclePurge(kind, id, user.id)))
     return fail(404, "NOT_FOUND", "回收项目不存在");

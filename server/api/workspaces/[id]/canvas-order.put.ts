@@ -1,4 +1,5 @@
 import { canvasCatalog, reorderCanvases } from "#server/db/canvases";
+import { hasActiveFolders } from "#server/db/directory";
 import { defineApiHandler, resourceId } from "#server/utils/api";
 import { apiRequest } from "#server/utils/request";
 import { requireUser } from "#server/utils/auth";
@@ -16,6 +17,9 @@ export default defineApiHandler(async (event) => {
   const data = await body(req);
   const revision = validRevision(data.catalogRevision);
   const ids = data.canvasIds;
+
+  if (await hasActiveFolders(id))
+    return fail(409, "DIRECTORY_API_REQUIRED", "请使用目录排序接口");
   const catalog = await canvasCatalog(id, user.id);
 
   if (!catalog) return fail(404, "NOT_FOUND", "工作区不存在");

@@ -2,22 +2,30 @@ import { db } from "@nuxthub/db";
 import {
   and,
   eq,
+  exists,
   inArray,
   isNull,
   isNotNull,
   gt,
   lte,
+  not,
   or,
   sql,
 } from "drizzle-orm";
 import {
   canvases,
+  folders,
+  directoryFavorites,
   workspaces,
   userNavigation,
   workspaceNavigation,
   canvasSessions,
 } from "#server/db/schema";
 import type { RecycleEntry } from "#shared/contracts";
+import type {
+  DirectoryRecycleEntry,
+  FolderRecycleEntry,
+} from "#shared/directory-contracts";
 
 export const RECYCLE_RETENTION = 30 * 86400000;
 
@@ -28,8 +36,8 @@ const cutoff = (now: number) => new Date(now - RECYCLE_RETENTION).toISOString();
 export async function recycleEntries(
   userId: string,
   now = Date.now(),
-): Promise<RecycleEntry[]> {
-  const [spaces, files] = await db.batch([
+): Promise<DirectoryRecycleEntry[]> {
+  const [spaces, files, folderRoots] = await db.batch([
     db
       .select()
       .from(workspaces)
@@ -57,11 +65,88 @@ export async function recycleEntries(
           isNull(workspaces.deletedAt),
           eq(workspaces.deleting, 0),
           isNotNull(canvases.deletedAt),
+          isNull(canvases.deleteBatchId),
           eq(canvases.purging, 0),
           gt(canvases.deletedAt, cutoff(now)),
         ),
       ),
+    db
+      .select({
+        id: folders.id,
+        name: folders.name,
+        workspaceId: folders.workspaceId,
+        parentId: folders.parentId,
+        deleteBatchId: folders.deleteBatchId,
+        deletedAt: folders.deletedAt,
+        workspaceName: sql<string>`${workspaces.name}`.as("workspaceName"),
+      })
+      .from(folders)
+      .innerJoin(workspaces, eq(folders.workspaceId, workspaces.id))
+      .where(
+        and(
+          eq(workspaces.userId, userId),
+          isNull(workspaces.deletedAt),
+          eq(workspaces.deleting, 0),
+          isNotNull(folders.deletedAt),
+          isNotNull(folders.deleteBatchId),
+          eq(folders.purging, 0),
+          gt(folders.deletedAt, cutoff(now)),
+          sql`NOT EXISTS (SELECT 1 FROM folders parent WHERE parent.id = ${folders.parentId}
+        AND parent.delete_batch_id = ${folders.deleteBatchId})`,
+        ),
+      ),
   ]);
+  const recycledFolders: FolderRecycleEntry[] = [];
+
+  for (const root of folderRoots) {
+    if (!root.deleteBatchId || !root.deletedAt) continue;
+    const batch = await db
+      .select({ id: folders.id, parentId: folders.parentId })
+      .from(folders)
+      .where(
+        and(
+          eq(folders.workspaceId, root.workspaceId),
+          eq(folders.deleteBatchId, root.deleteBatchId),
+          eq(folders.purging, 0),
+          gt(folders.deletedAt, cutoff(now)),
+        ),
+      );
+    const levels = new Map([[root.id, 1]]);
+    let deepest = 1;
+
+    for (let pass = 0; pass < 5; pass += 1) {
+      let found = false;
+
+      for (const folder of batch) {
+        if (
+          !folder.parentId ||
+          !levels.has(folder.parentId) ||
+          levels.has(folder.id)
+        )
+          continue;
+        const depth = levels.get(folder.parentId)! + 1;
+
+        levels.set(folder.id, depth);
+        deepest = Math.max(deepest, depth);
+        found = true;
+      }
+
+      if (!found) break;
+    }
+
+    recycledFolders.push({
+      kind: "folder",
+      id: root.id,
+      name: root.name,
+      workspaceId: root.workspaceId,
+      workspaceName: root.workspaceName,
+      parentId: root.parentId,
+      deleteBatchId: root.deleteBatchId,
+      deletedAt: root.deletedAt,
+      expiresAt: recycleExpiry(root.deletedAt),
+      subtreeDepth: deepest,
+    });
+  }
 
   return [
     ...spaces.map((row): RecycleEntry => ({
@@ -80,6 +165,7 @@ export async function recycleEntries(
       deletedAt: row.deletedAt!,
       expiresAt: recycleExpiry(row.deletedAt!),
     })),
+    ...recycledFolders,
   ].sort(
     (a, b) =>
       b.deletedAt.localeCompare(a.deletedAt) || a.id.localeCompare(b.id),
@@ -309,6 +395,8 @@ export async function restoreRecycleEntry(
     ).length;
   }
 
+  if (kind !== "canvas") return 0;
+
   const owner = db
     .select({ id: workspaces.id })
     .from(workspaces)
@@ -376,7 +464,7 @@ export async function restoreRecycleEntry(
 
 /** Pin irreversible intent before contacting rooms, so restore cannot race a retry. */
 export async function markRecyclePurge(
-  kind: RecycleEntry["kind"],
+  kind: DirectoryRecycleEntry["kind"],
   id: string,
   userId?: string,
   now = Date.now(),
@@ -403,6 +491,63 @@ export async function markRecyclePurge(
       .returning({ id: workspaces.id });
 
     return rows.length;
+  }
+
+  if (kind === "folder") {
+    const root = (
+      await db
+        .select({
+          workspaceId: folders.workspaceId,
+          deleteBatchId: folders.deleteBatchId,
+        })
+        .from(folders)
+        .innerJoin(workspaces, eq(folders.workspaceId, workspaces.id))
+        .where(
+          and(
+            eq(folders.id, id),
+            isNotNull(folders.deletedAt),
+            isNotNull(folders.deleteBatchId),
+            eq(workspaces.deleting, 0),
+            isNull(workspaces.deletedAt),
+            owner,
+            sql`NOT EXISTS (SELECT 1 FROM folders parent WHERE parent.id = ${folders.parentId}
+        AND parent.delete_batch_id = ${folders.deleteBatchId})`,
+            userId
+              ? undefined
+              : or(eq(folders.purging, 1), lte(folders.deletedAt, cutoff(now))),
+          ),
+        )
+        .limit(1)
+    )[0];
+
+    if (!root?.deleteBatchId) return 0;
+    const foldersMarked = await db
+      .update(folders)
+      .set({ purging: 1 })
+      .where(
+        and(
+          eq(folders.workspaceId, root.workspaceId),
+          eq(folders.deleteBatchId, root.deleteBatchId),
+          isNotNull(folders.deletedAt),
+          userId
+            ? undefined
+            : or(eq(folders.purging, 1), lte(folders.deletedAt, cutoff(now))),
+        ),
+      )
+      .returning({ id: folders.id });
+
+    await db
+      .update(canvases)
+      .set({ purging: 1 })
+      .where(
+        and(
+          eq(canvases.workspaceId, root.workspaceId),
+          eq(canvases.deleteBatchId, root.deleteBatchId),
+          isNotNull(canvases.deletedAt),
+        ),
+      );
+
+    return foldersMarked.length;
   }
 
   const rows = await db

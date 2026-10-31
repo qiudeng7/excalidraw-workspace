@@ -68,6 +68,33 @@ export const workspaces = sqliteTable(
   ],
 );
 
+export const folders = sqliteTable(
+  "folders",
+  {
+    id: text().primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"),
+    name: text().notNull(),
+    position: integer().notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    deletedAt: text("deleted_at"),
+    deleteBatchId: text("delete_batch_id"),
+    purging: integer().notNull().default(0),
+  },
+  (table) => [
+    index("folder_workspace_parent").on(
+      table.workspaceId,
+      table.parentId,
+      table.position,
+      table.id,
+    ),
+    index("folder_deleted_at").on(table.deletedAt),
+  ],
+);
+
 export const canvases = sqliteTable(
   "canvases",
   {
@@ -75,6 +102,8 @@ export const canvases = sqliteTable(
     workspaceId: text("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
+    parentId: text("parent_id"),
+    deleteBatchId: text("delete_batch_id"),
     name: text().notNull(),
     revision: integer().notNull().default(0),
     objectKey: text("object_key"),
@@ -108,6 +137,27 @@ export const canvases = sqliteTable(
     index("canvas_object_key").on(table.objectKey),
     index("canvas_deleted_at").on(table.deletedAt),
     index("canvas_recycle_pending").on(table.recyclePending),
+  ],
+);
+
+export const directoryFavorites = sqliteTable(
+  "directory_favorites",
+  {
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    itemKind: text("item_kind", { enum: ["folder", "canvas"] }).notNull(),
+    itemId: text("item_id").notNull(),
+    position: integer().notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.workspaceId, table.itemKind, table.itemId] }),
+    index("directory_favorite_order").on(
+      table.workspaceId,
+      table.position,
+      table.itemKind,
+      table.itemId,
+    ),
   ],
 );
 

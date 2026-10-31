@@ -13,9 +13,12 @@ import {
 import * as tables from "#server/db/schema";
 import { ownedWorkspaceIds } from "#server/db/workspaces";
 
-const { objectKey: _object, ...canvasColumns } = getTableColumns(
-  tables.canvases,
-);
+const {
+  objectKey: _objectKey,
+  parentId: _parentId,
+  deleteBatchId: _deleteBatchId,
+  ...canvasColumns
+} = getTableColumns(tables.canvases);
 
 export async function canvas(id: string, user: string) {
   return (
@@ -43,7 +46,20 @@ export async function createCanvas(
   name: string,
   now: string,
   catalogRevision: number,
+  parentId: string | null = null,
 ) {
+  const siblingCanvasMatch =
+    parentId === null
+      ? isNull(tables.canvases.parentId)
+      : eq(tables.canvases.parentId, parentId);
+  const siblingFolderMatch =
+    parentId === null
+      ? isNull(tables.folders.parentId)
+      : eq(tables.folders.parentId, parentId);
+  const parentAvailable =
+    parentId === null
+      ? undefined
+      : sql`EXISTS (SELECT 1 FROM folders WHERE id = ${parentId} AND workspace_id = ${workspace} AND deleted_at IS NULL)`;
   const result = await db.batch([
     db
       .update(tables.canvases)
@@ -51,15 +67,34 @@ export async function createCanvas(
       .where(
         and(
           eq(tables.canvases.workspaceId, workspace),
+          siblingCanvasMatch,
           isNull(tables.canvases.deletedAt),
           catalogMatches(workspace, user, catalogRevision),
+          parentAvailable,
         ),
       ),
+    db
+      .update(tables.folders)
+      .set({
+        position: sql`${tables.folders.position}+1`,
+      })
+      .where(
+        and(
+          eq(tables.folders.workspaceId, workspace),
+          siblingFolderMatch,
+          isNull(tables.folders.deletedAt),
+          catalogMatches(workspace, user, catalogRevision),
+          parentAvailable,
+        ),
+      ),
+
     db.insert(tables.canvases).select(
       db
         .select({
           id: sql<string>`${id}`.as("id"),
           workspaceId: tables.workspaces.id,
+          parentId: sql<string | null>`${parentId}`.as("parentId"),
+          deleteBatchId: sql<string | null>`NULL`.as("deleteBatchId"),
           name: sql<string>`${name}`.as("name"),
           revision: sql<number>`0`.as("revision"),
           objectKey: sql<string | null>`NULL`.as("objectKey"),
@@ -83,6 +118,7 @@ export async function createCanvas(
             eq(tables.workspaces.deleting, 0),
             isNull(tables.workspaces.deletedAt),
             eq(tables.workspaces.catalogRevision, catalogRevision),
+            parentAvailable,
           ),
         ),
     ),
@@ -96,12 +132,13 @@ export async function createCanvas(
           eq(tables.workspaces.deleting, 0),
           isNull(tables.workspaces.deletedAt),
           eq(tables.workspaces.catalogRevision, catalogRevision),
+          parentAvailable,
         ),
       )
       .returning({ id: tables.workspaces.id }),
   ]);
 
-  return result[2].length;
+  return result[3].length;
 }
 
 export async function renameCanvas(
@@ -177,6 +214,52 @@ export async function setCanvasPinned(
       .update(tables.canvases)
       .set({ pinned })
       .where(and(available, catalogMatches(workspace, user, revision))),
+    pinned
+      ? db
+          .insert(tables.directoryFavorites)
+          .select(
+            db
+              .select({
+                workspaceId: tables.workspaces.id,
+                itemKind: sql<"canvas">`'canvas'`.as("itemKind"),
+                itemId: tables.canvases.id,
+                position:
+                  sql<number>`COALESCE((SELECT MAX(position) + 1 FROM directory_favorites WHERE workspace_id = ${workspace}), 0)`.as(
+                    "position",
+                  ),
+              })
+              .from(tables.canvases)
+              .innerJoin(
+                tables.workspaces,
+                eq(tables.workspaces.id, tables.canvases.workspaceId),
+              )
+              .where(
+                and(
+                  available,
+                  eq(tables.workspaces.userId, user),
+                  eq(tables.workspaces.catalogRevision, revision),
+                  eq(tables.workspaces.deleting, 0),
+                  isNull(tables.workspaces.deletedAt),
+                ),
+              ),
+          )
+          .onConflictDoNothing()
+      : db
+          .delete(tables.directoryFavorites)
+          .where(
+            and(
+              eq(tables.directoryFavorites.workspaceId, workspace),
+              eq(tables.directoryFavorites.itemKind, "canvas"),
+              eq(tables.directoryFavorites.itemId, id),
+              catalogMatches(workspace, user, revision),
+              exists(
+                db
+                  .select({ id: tables.canvases.id })
+                  .from(tables.canvases)
+                  .where(available),
+              ),
+            ),
+          ),
     db
       .update(tables.workspaces)
       .set({ catalogRevision: sql`${tables.workspaces.catalogRevision}+1` })
@@ -198,7 +281,7 @@ export async function setCanvasPinned(
       .returning({ id: tables.workspaces.id }),
   ]);
 
-  return result[1].length;
+  return result[2].length;
 }
 
 export async function reorderCanvases(

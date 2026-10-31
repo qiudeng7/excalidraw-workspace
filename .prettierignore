@@ -8,6 +8,9 @@ dist/
 coverage/
 test-results/
 playwright-report/
+
+# Local agent instructions are maintained outside source formatting.
+AGENTS.md
 **/dist-ssr/
 **/.cache/
 
