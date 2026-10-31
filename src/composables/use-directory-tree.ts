@@ -2,6 +2,12 @@ import { computed, onBeforeUnmount, ref, shallowReadonly, watch } from "vue";
 import type { Ref } from "vue";
 import type { CanvasMeta } from "#shared/contracts";
 import type {
+  BatchDeleteDirectoryResponse,
+  BatchMoveDirectoryRequest,
+  BatchMoveDirectoryResponse,
+  BatchUndoDirectoryResponse,
+  DeleteDirectoryUndoReceipt,
+  MoveDirectoryUndoReceipt,
   DirectoryNode,
   DirectoryPage,
   NodeRef,
@@ -30,6 +36,23 @@ export interface DirectoryTreeDependencies {
   knownCanvasIds(): string[];
 }
 
+export type DirectoryBatchOutcome =
+  | { kind: "applied"; view: "ready" | "stale"; changed: boolean }
+  | { kind: "rejected" | "unconfirmed" | "cancelled" };
+
+type BatchReceipt = MoveDirectoryUndoReceipt | DeleteDirectoryUndoReceipt;
+
+type BatchResponse =
+  | BatchMoveDirectoryResponse
+  | BatchDeleteDirectoryResponse
+  | BatchUndoDirectoryResponse;
+
+interface BatchScope {
+  workspace: string;
+  stamp: number;
+  current(): boolean;
+}
+
 /** 组织树仅拥有元数据和分页；编辑器、草稿与标签仍由原目录/画布资源拥有。 */
 export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
   const api = options.api ?? directoryApi;
@@ -47,6 +70,8 @@ export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
   const locateExpandRoot = ref(true);
   const undo = ref<DirectoryNode>();
   const moveUndo = ref<Omit<DirectoryMove, "catalogRevision">>();
+  const batchUndo = ref<BatchReceipt>();
+  const batchNotice = ref("");
   const restoreLocationRequired = ref(false);
   const ancestry = ref<DirectoryNode[]>([]);
   let generation = 0;
@@ -329,6 +354,8 @@ export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
       await refresh();
       if (stamp !== generation) return false;
       if (failure && !reconciled) throw failure;
+      batchUndo.value = undefined;
+      batchNotice.value = "";
 
       return true;
     } catch (cause) {
@@ -589,6 +616,7 @@ export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
 
     if (accepted) {
       if (reverse) moveUndo.value = reverse;
+      undo.value = undefined;
       await attempt(() => reveal(input.source));
     }
 
@@ -714,6 +742,7 @@ export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
         )
           return;
         undo.value = item;
+        moveUndo.value = undefined;
       },
       async () => {
         try {
@@ -735,6 +764,7 @@ export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
             return false;
           forgetSubtree(item);
           undo.value = item;
+          moveUndo.value = undefined;
 
           return true;
         }
@@ -776,6 +806,208 @@ export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
       await attempt(() => reveal(item, item.kind === "folder"));
     }
   };
+  const runBatch = async (
+    action: (scope: BatchScope) => Promise<DirectoryBatchOutcome>,
+  ): Promise<DirectoryBatchOutcome> => {
+    if (locked.value) return { kind: "cancelled" };
+    generation++;
+    abort.abort();
+    abort = new AbortController();
+    refreshFlight = undefined;
+    for (const branch of Object.values(branches.value)) branch.loading = false;
+    const stamp = generation;
+    const workspace = options.workspaceId.value;
+    const scope: BatchScope = {
+      workspace,
+      stamp,
+      current: () =>
+        stamp === generation && workspace === options.workspaceId.value,
+    };
+
+    busy.value = true;
+    error.value = "";
+    try {
+      return await action(scope);
+    } catch (cause) {
+      if (!scope.current()) return { kind: "cancelled" };
+      report(cause);
+
+      return { kind: "rejected" };
+    } finally {
+      if (scope.current()) busy.value = false;
+    }
+  };
+  const reconcileBatchFailure = async (
+    scope: BatchScope,
+    cause: unknown,
+  ): Promise<DirectoryBatchOutcome> => {
+    if (!scope.current()) return { kind: "cancelled" };
+    const rejected =
+      cause instanceof ApiError && cause.status >= 400 && cause.status < 500;
+    const message = cause instanceof Error ? cause.message : "目录操作失败";
+
+    try {
+      await refresh();
+    } catch (refreshCause) {
+      if (scope.current()) report(refreshCause);
+    }
+
+    if (!scope.current()) return { kind: "cancelled" };
+    error.value = rejected
+      ? message
+      : "操作结果尚未确认，请核对最新目录；请勿直接重复提交。";
+
+    return { kind: rejected ? "rejected" : "unconfirmed" };
+  };
+  const acceptBatch = async (
+    scope: BatchScope,
+    response: BatchResponse,
+    notice: string,
+  ): Promise<DirectoryBatchOutcome> => {
+    if (!scope.current()) return { kind: "cancelled" };
+    if ("changed" in response && !response.changed)
+      return { kind: "applied", view: "ready", changed: false };
+    revision.value = response.catalogRevision;
+    batchUndo.value =
+      "undo" in response
+        ? (response.undo ?? undefined)
+        : "receipt" in response
+          ? response.receipt
+          : undefined;
+    undo.value = undefined;
+    moveUndo.value = undefined;
+    batchNotice.value = notice;
+    let syncFailure: unknown;
+
+    if ("affectedCanvasIds" in response) {
+      forgetFolders(response.affectedFolderIds);
+      if (
+        pathSource?.kind === "canvas" &&
+        response.affectedCanvasIds.includes(pathSource.id)
+      ) {
+        pathSource = undefined;
+        ancestry.value = [];
+      }
+
+      try {
+        await options.removed(response.affectedCanvasIds);
+      } catch (cause) {
+        syncFailure = cause;
+      }
+    }
+
+    if (!scope.current()) return { kind: "cancelled" };
+    try {
+      await refresh();
+    } catch (cause) {
+      syncFailure ??= cause;
+    }
+
+    if (!scope.current()) return { kind: "cancelled" };
+    if (syncFailure) {
+      stale.value = true;
+      error.value = `${notice}，但本地目录同步失败，请重新加载。`;
+
+      return { kind: "applied", view: "stale", changed: true };
+    }
+
+    if (
+      batchUndo.value &&
+      batchUndo.value.expectedCatalogRevision !== revision.value
+    )
+      batchUndo.value = undefined;
+
+    return { kind: "applied", view: "ready", changed: true };
+  };
+  const writeBatch = async (
+    scope: BatchScope,
+    write: () => Promise<BatchResponse>,
+    notice: string,
+  ): Promise<DirectoryBatchOutcome> => {
+    let response: BatchResponse;
+
+    try {
+      response = await write();
+    } catch (cause) {
+      return reconcileBatchFailure(scope, cause);
+    }
+
+    return acceptBatch(scope, response, notice);
+  };
+  const moveMany = (input: BatchMoveDirectoryRequest) =>
+    runBatch(async (scope) => {
+      const outcome = await writeBatch(
+        scope,
+        () => api.batchMove(scope.workspace, input),
+        "已移动",
+      );
+
+      if (
+        scope.current() &&
+        outcome.kind === "applied" &&
+        outcome.view === "ready" &&
+        outcome.changed &&
+        input.sources[0]
+      ) {
+        await attempt(() => reveal(input.sources[0]!));
+      }
+
+      return outcome;
+    });
+  const removeMany = (sources: NodeRef[], catalogRevision = revision.value) =>
+    runBatch(async (scope) => {
+      const input = { sources, catalogRevision };
+      const summary = await api.batchSummary(scope.workspace, input);
+
+      if (!scope.current()) return { kind: "cancelled" };
+      const confirmed = await confirmDialog({
+        title: "移入回收站",
+        message: `将所选资源（共 ${summary.folderCount} 个文件夹、${summary.canvasCount} 张画布）移入回收站？包含文件夹内的资源，30 天内可以恢复。`,
+        confirmLabel: "移入回收站",
+        danger: true,
+      });
+
+      if (!confirmed || !scope.current()) return { kind: "cancelled" };
+      await options.flush();
+      if (!scope.current()) return { kind: "cancelled" };
+
+      return writeBatch(
+        scope,
+        () => api.batchDelete(scope.workspace, input),
+        "已移入回收站",
+      );
+    });
+  const undoBatch = () => {
+    const receipt = batchUndo.value;
+
+    if (!receipt)
+      return Promise.resolve<DirectoryBatchOutcome>({ kind: "cancelled" });
+
+    return runBatch(async (scope) => {
+      const outcome = await writeBatch(
+        scope,
+        () => api.batchUndo(scope.workspace, { receipt }),
+        receipt.kind === "move" ? "已撤销移动" : "已恢复所选资源",
+      );
+
+      if (
+        scope.current() &&
+        outcome.kind === "applied" &&
+        outcome.view === "ready" &&
+        receipt.kind === "delete" &&
+        receipt.roots[0]
+      ) {
+        await attempt(() =>
+          reveal(
+            receipt.roots[0]!.root,
+            receipt.roots[0]!.root.kind === "folder",
+          ),
+        );
+      }
+
+      return outcome;
+    });
+  };
   const reset = () => {
     generation++;
     revealRequest++;
@@ -792,6 +1024,8 @@ export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
     located.value = "";
     undo.value = undefined;
     moveUndo.value = undefined;
+    batchUndo.value = undefined;
+    batchNotice.value = "";
     restoreLocationRequired.value = false;
     busy.value = false;
     refreshing.value = false;
@@ -825,6 +1059,17 @@ export const useDirectoryTree = (options: DirectoryTreeDependencies) => {
     locateExpandRoot: shallowReadonly(locateExpandRoot),
     undo: shallowReadonly(undo),
     moveUndo: shallowReadonly(moveUndo),
+    batchUndo: shallowReadonly(batchUndo),
+    batchNotice: shallowReadonly(batchNotice),
+    batchUndoAvailable: computed(
+      () =>
+        !!batchUndo.value &&
+        batchUndo.value.expectedCatalogRevision === revision.value &&
+        !locked.value,
+    ),
+    moveMany,
+    removeMany,
+    undoBatch,
     restoreLocationRequired: shallowReadonly(restoreLocationRequired),
     locked,
     load,

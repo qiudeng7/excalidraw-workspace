@@ -12,6 +12,23 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-10-31-multiselect",
+    sequence: 13,
+    version: "0.11.0",
+    date: "2026-10-31",
+    title: "框选与多选，一次整理多个文件",
+    summary:
+      "在“我的文件”中框选或按住修饰键多选，一次移动、删除整组文件；单击画布仍然直接打开。",
+    changes: [
+      "从列表空白处拖动即可框选，靠近边缘时自动滚动；Ctrl/Cmd 点击切换选择，Shift 点击连续选择，只选择已展开、已加载的项目。",
+      "拖动已选行可移动整组，也可通过右键菜单或底部操作区批量移动、移入回收站；同时选中父文件夹和子项时只处理一次。",
+      "批量删除前确认文件夹及其中画布的总数，并先保存已打开画布的草稿；删除后只关闭受影响的标签，撤销恢复文件但不重新打开标签。",
+      "批量移动和删除支持快捷撤销；后续目录变化可能使撤销失效，已删除文件仍可通过回收站恢复。",
+      "手机可从行菜单进入“选择多个”，轻触切换选项，使用独立按钮展开文件夹；零选项时也能退出多选。",
+    ],
+    actions: ["已打开的页面请刷新后使用新版。"],
+  },
+  {
     id: "workspace-2026-10-31-folders-favorites",
     sequence: 12,
     version: "0.10.0",

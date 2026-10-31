@@ -1,5 +1,12 @@
 import type { CanvasMeta } from "#shared/contracts";
 import type {
+  BatchDirectoryRequest,
+  BatchDirectorySummaryResponse,
+  BatchMoveDirectoryRequest,
+  BatchMoveDirectoryResponse,
+  BatchDeleteDirectoryResponse,
+  BatchUndoDirectoryRequest,
+  BatchUndoDirectoryResponse,
   DirectoryNode,
   DirectoryPage,
   DirectoryPath,
@@ -61,6 +68,22 @@ export interface DirectoryApi {
     catalogRevision: number,
   ): Promise<{ affectedCanvasIds: string[]; affectedFolderIds?: string[] }>;
   restore(source: NodeRef, parentId?: string | null): Promise<void>;
+  batchSummary(
+    workspace: string,
+    input: BatchDirectoryRequest,
+  ): Promise<BatchDirectorySummaryResponse>;
+  batchMove(
+    workspace: string,
+    input: BatchMoveDirectoryRequest,
+  ): Promise<BatchMoveDirectoryResponse>;
+  batchDelete(
+    workspace: string,
+    input: BatchDirectoryRequest,
+  ): Promise<BatchDeleteDirectoryResponse>;
+  batchUndo(
+    workspace: string,
+    input: BatchUndoDirectoryRequest,
+  ): Promise<BatchUndoDirectoryResponse>;
 }
 
 export type DirectoryMove = MoveDirectoryRequest;
@@ -75,6 +98,14 @@ const json = (method: string, body: unknown): RequestInit => ({
 });
 
 export const directoryApi: DirectoryApi = {
+  batchSummary: (workspace, input) =>
+    api(`${base(workspace)}/directory/batch/summary`, json("POST", input)),
+  batchMove: (workspace, input) =>
+    api(`${base(workspace)}/directory/batch/move`, json("PUT", input)),
+  batchDelete: (workspace, input) =>
+    api(`${base(workspace)}/directory/batch/delete`, json("POST", input)),
+  batchUndo: (workspace, input) =>
+    api(`${base(workspace)}/directory/batch/undo`, json("POST", input)),
   children(workspace, parentId, cursor, signal) {
     const query = new URLSearchParams({ limit: "30" });
 

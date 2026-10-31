@@ -253,12 +253,470 @@ export const installDirectoryMock = async (
     return true;
   };
 
+  // 批量接口替身：服务端权威 normalize、每 folder root 独立批次、ordinal 撤销与 no-op 判定。
+  let batchSeq = 0;
+  let failBatch: { status: number; code: string; message: string } | undefined;
+  let dropNextBatchDelete = false;
+  let failDirectoryReads = false;
+  const events: { method: string; path: string; body: unknown }[] = [];
+  const bin: { node: MockNode; batchId: string | null }[] = [];
+  const ancestorKeys = (node: MockNode) => {
+    const keys: string[] = [];
+    let parent = node.parentId ? find(node.parentId) : undefined;
+
+    while (parent) {
+      keys.push(nodeKey(parent));
+      parent = parent.parentId ? find(parent.parentId) : undefined;
+    }
+
+    return keys;
+  };
+  const subtreeNodes = (node: MockNode): MockNode[] => {
+    if (node.kind === "canvas") return [node];
+    const result: MockNode[] = [node];
+
+    for (let index = 0; index < result.length; index++)
+      for (const child of nodes)
+        if (child.parentId === result[index]!.id) result.push(child);
+
+    return result;
+  };
+  const normalizeBatch = (sources: { kind: string; id: string }[]) => {
+    const refs = sources.filter(
+      (source, index, all) =>
+        all.findIndex(
+          (entry) => entry.kind === source.kind && entry.id === source.id,
+        ) === index,
+    );
+    const missing = refs.filter(
+      (source) => find(source.id)?.kind !== source.kind,
+    );
+
+    if (missing.length) return { missing, roots: [] as MockNode[] };
+    const wanted = new Set(refs.map((source) => nodeKey(source)));
+
+    return {
+      missing: [] as MockNode[],
+      roots: refs
+        .map((source) => find(source.id)!)
+        .filter((node) => !ancestorKeys(node).some((key) => wanted.has(key))),
+    };
+  };
+  const batchCounts = (roots: MockNode[]) => {
+    const folders = new Set<string>();
+    const canvases = new Set<string>();
+
+    for (const root of roots)
+      for (const node of subtreeNodes(root))
+        if (node.kind === "folder") folders.add(node.id);
+        else canvases.add(node.id);
+
+    return { folderCount: folders.size, canvasCount: canvases.size };
+  };
+  const mixOrder = (parentId: string | null) =>
+    children(parentId, "test-space")
+      .map((node) => nodeKey(node))
+      .join(",");
+  const ordinalOf = (node: MockNode) => children(node.parentId).indexOf(node);
+  const snapshotLayout = () =>
+    nodes.map((node) => ({
+      node,
+      parentId: node.parentId,
+      position: node.position,
+    }));
+  const restoreLayout = (
+    snapshot: { node: MockNode; parentId: string | null; position?: number }[],
+  ) => {
+    for (const entry of snapshot) {
+      entry.node.parentId = entry.parentId;
+      entry.node.position = entry.position;
+    }
+  };
+  const batchMove = (input: {
+    sources: { kind: string; id: string }[];
+    parentId: string | null;
+    target?: { kind: string; id: string };
+    placement: "before" | "after" | "end";
+  }) => {
+    const normalized = normalizeBatch(input.sources ?? []);
+
+    if (!normalized.roots.length)
+      return {
+        error: {
+          status: 400,
+          code: "INVALID_DIRECTORY_BATCH",
+          message: "批量来源无效",
+        },
+      };
+    if (normalized.missing.length)
+      return {
+        error: { status: 404, code: "NOT_FOUND", message: "目录项目不存在" },
+      };
+    const parent = input.parentId ? find(input.parentId) : undefined;
+
+    if (input.parentId && parent?.kind !== "folder")
+      return {
+        error: {
+          status: 400,
+          code: "INVALID_DIRECTORY_MOVE",
+          message: "目标父级不是文件夹",
+        },
+      };
+    const sourceKeys = new Set(normalized.roots.map((node) => nodeKey(node)));
+    const parentKeys = parent ? [nodeKey(parent), ...ancestorKeys(parent)] : [];
+
+    if (parentKeys.some((key) => sourceKeys.has(key)))
+      return {
+        error: {
+          status: 400,
+          code: "INVALID_DIRECTORY_MOVE",
+          message: "不能移动到自身或子文件夹",
+        },
+      };
+    const parentDepth = parent ? depth(parent) : 0;
+    const deepest = Math.max(
+      ...normalized.roots.map((root) => subtreeDepth(root)),
+    );
+
+    if (parentDepth + deepest > 5)
+      return {
+        error: {
+          status: 400,
+          code: "FOLDER_DEPTH_LIMIT",
+          message: "移动后文件夹将超过五层限制",
+        },
+      };
+    const siblings = children(input.parentId).filter(
+      (node) => !sourceKeys.has(nodeKey(node)),
+    );
+
+    if (input.placement !== "end" && !input.target)
+      return {
+        error: {
+          status: 400,
+          code: "INVALID_DIRECTORY_MOVE",
+          message: "缺少目标位置",
+        },
+      };
+    if (
+      input.target &&
+      !siblings.some((node) => nodeKey(node) === nodeKey(input.target!))
+    )
+      return {
+        error: {
+          status: 400,
+          code: "INVALID_DIRECTORY_MOVE",
+          message: "目标不是该目录的直接子项",
+        },
+      };
+    const watched = new Set<string | null>([input.parentId]);
+
+    for (const root of normalized.roots) watched.add(root.parentId);
+    const before = new Map<string | null, string>();
+
+    for (const key of watched) before.set(key, mixOrder(key));
+    const origins = normalized.roots.map((root) => ({
+      source: { kind: root.kind, id: root.id },
+      parentId: root.parentId,
+      index: ordinalOf(root),
+    }));
+    const targetIndex = input.target
+      ? siblings.findIndex((node) => nodeKey(node) === nodeKey(input.target!))
+      : siblings.length;
+    const ordered = [...siblings];
+    const insertAt =
+      input.placement === "end"
+        ? ordered.length
+        : targetIndex + (input.placement === "after" ? 1 : 0);
+
+    ordered.splice(insertAt, 0, ...normalized.roots);
+    const snapshot = snapshotLayout();
+
+    for (const root of normalized.roots) root.parentId = input.parentId;
+    ordered.forEach((node, index) => {
+      node.position = index;
+    });
+    for (const key of watched)
+      if (key !== input.parentId)
+        children(key).forEach((node, index) => {
+          node.position = index;
+        });
+    const changed = [...watched].some(
+      (key) => before.get(key) !== mixOrder(key),
+    );
+
+    if (!changed) {
+      restoreLayout(snapshot);
+
+      return {
+        changed: false,
+        normalizedSources: normalized.roots.map((root) => ({
+          kind: root.kind,
+          id: root.id,
+        })),
+        catalogRevision: revision,
+        undo: null,
+      };
+    }
+
+    revision++;
+
+    return {
+      changed: true,
+      normalizedSources: normalized.roots.map((root) => ({
+        kind: root.kind,
+        id: root.id,
+      })),
+      catalogRevision: revision,
+      undo: {
+        kind: "move" as const,
+        expectedCatalogRevision: revision,
+        destinationParentId: input.parentId,
+        origins,
+      },
+    };
+  };
+  const batchDelete = (sources: { kind: string; id: string }[]) => {
+    const normalized = normalizeBatch(sources ?? []);
+
+    if (!normalized.roots.length)
+      return {
+        error: {
+          status: 400,
+          code: "INVALID_DIRECTORY_BATCH",
+          message: "批量来源无效",
+        },
+      };
+    if (normalized.missing.length)
+      return {
+        error: { status: 404, code: "NOT_FOUND", message: "目录项目不存在" },
+      };
+    const roots = normalized.roots.map((root) => ({
+      root,
+      deleteBatchId: root.kind === "folder" ? `batch-${++batchSeq}` : null,
+    }));
+    const affectedFolderIds: string[] = [];
+    const affectedCanvasIds: string[] = [];
+
+    for (const entry of roots)
+      for (const node of subtreeNodes(entry.root)) {
+        const index = nodes.indexOf(node);
+
+        if (index >= 0) nodes.splice(index, 1);
+        bin.push({ node, batchId: entry.deleteBatchId });
+        if (node.kind === "folder") affectedFolderIds.push(node.id);
+        else affectedCanvasIds.push(node.id);
+      }
+
+    revision++;
+
+    return {
+      catalogRevision: revision,
+      normalizedSources: normalized.roots.map((root) => ({
+        kind: root.kind,
+        id: root.id,
+      })),
+      receipt: {
+        kind: "delete" as const,
+        expectedCatalogRevision: revision,
+        roots: roots.map((entry) => ({
+          root: { kind: entry.root.kind, id: entry.root.id },
+          deleteBatchId: entry.deleteBatchId,
+        })),
+      },
+      affectedFolderIds,
+      affectedCanvasIds,
+    };
+  };
+  const batchUndo = (receipt: any) => {
+    if (
+      !receipt ||
+      typeof receipt !== "object" ||
+      (receipt.kind !== "move" && receipt.kind !== "delete")
+    )
+      return {
+        status: 400,
+        code: "INVALID_DIRECTORY_BATCH",
+        message: "撤销回执结构无效",
+      };
+
+    if (typeof receipt.expectedCatalogRevision !== "number")
+      return {
+        status: 400,
+        code: "INVALID_DIRECTORY_BATCH",
+        message: "撤销回执缺少目录版本",
+      };
+    if (receipt.expectedCatalogRevision !== revision)
+      return {
+        status: 409,
+        code: "DIRECTORY_UNDO_CONFLICT",
+        message: "目录已更新，请在回收站中恢复",
+      };
+
+    if (receipt.kind === "delete") {
+      if (!Array.isArray(receipt.roots) || !receipt.roots.length)
+        return {
+          status: 400,
+          code: "INVALID_DIRECTORY_BATCH",
+          message: "撤销回执结构无效",
+        };
+      const restoredFolderIds: string[] = [];
+      const restoredCanvasIds: string[] = [];
+      const pending: { node: MockNode; batchId: string | null }[] = [];
+
+      for (const entry of receipt.roots) {
+        if (!entry?.root || typeof entry.root.id !== "string")
+          return {
+            status: 400,
+            code: "INVALID_DIRECTORY_BATCH",
+            message: "撤销回执结构无效",
+          };
+        const matches = bin.filter((row) =>
+          entry.root.kind === "folder"
+            ? row.batchId !== null && row.batchId === entry.deleteBatchId
+            : row.node.kind === "canvas" &&
+              row.node.id === entry.root.id &&
+              row.batchId === null,
+        );
+
+        if (!matches.length)
+          return {
+            status: 409,
+            code: "DIRECTORY_UNDO_CONFLICT",
+            message: "部分项目已恢复或已彻底删除",
+          };
+        pending.push(...matches);
+      }
+
+      for (const row of pending) {
+        bin.splice(bin.indexOf(row), 1);
+        nodes.push(row.node);
+        if (row.node.kind === "folder") restoredFolderIds.push(row.node.id);
+        else restoredCanvasIds.push(row.node.id);
+      }
+
+      revision++;
+
+      return {
+        kind: "delete" as const,
+        catalogRevision: revision,
+        restoredFolderIds,
+        restoredCanvasIds,
+      };
+    }
+
+    const origins: {
+      source: { kind: string; id: string };
+      parentId: string | null;
+      index: number;
+    }[] = Array.isArray(receipt.origins) ? receipt.origins : [];
+
+    if (!origins.length)
+      return {
+        status: 400,
+        code: "INVALID_DIRECTORY_BATCH",
+        message: "撤销回执结构无效",
+      };
+    if (
+      receipt.destinationParentId !== null &&
+      typeof receipt.destinationParentId !== "string"
+    )
+      return {
+        status: 400,
+        code: "INVALID_DIRECTORY_BATCH",
+        message: "撤销回执结构无效",
+      };
+    const seen = new Set<string>();
+
+    for (const origin of origins) {
+      if (
+        !origin?.source ||
+        !Number.isInteger(origin.index) ||
+        origin.index < 0
+      )
+        return {
+          status: 400,
+          code: "INVALID_DIRECTORY_BATCH",
+          message: "撤销回执结构无效",
+        };
+      const key = nodeKey(origin.source);
+
+      if (seen.has(key))
+        return {
+          status: 409,
+          code: "DIRECTORY_UNDO_CONFLICT",
+          message: "撤销回执重复",
+        };
+      seen.add(key);
+      const node = find(origin.source.id);
+
+      if (
+        !node ||
+        node.kind !== origin.source.kind ||
+        node.parentId !== receipt.destinationParentId
+      )
+        return {
+          status: 409,
+          code: "DIRECTORY_UNDO_CONFLICT",
+          message: "项目已不在预期位置",
+        };
+      if (origin.parentId && find(origin.parentId)?.kind !== "folder")
+        return {
+          status: 409,
+          code: "DIRECTORY_UNDO_CONFLICT",
+          message: "原位置已不可用",
+        };
+      if (origin.index > children(origin.parentId).length)
+        return {
+          status: 409,
+          code: "DIRECTORY_UNDO_CONFLICT",
+          message: "原序位不可用",
+        };
+    }
+
+    const buckets = new Map<
+      string | null,
+      { node: MockNode; index: number }[]
+    >();
+
+    for (const origin of origins) {
+      const node = find(origin.source.id)!;
+      const bucket = buckets.get(origin.parentId) ?? [];
+
+      bucket.push({ node, index: origin.index });
+      buckets.set(origin.parentId, bucket);
+    }
+
+    for (const [parentId, bucket] of buckets) {
+      const current = children(parentId).filter(
+        (node) => !bucket.some((entry) => entry.node === node),
+      );
+
+      for (const entry of [...bucket].sort((a, b) => a.index - b.index)) {
+        entry.node.parentId = parentId;
+        current.splice(Math.min(entry.index, current.length), 0, entry.node);
+      }
+
+      current.forEach((node, index) => {
+        node.position = index;
+      });
+    }
+
+    revision++;
+
+    return { kind: "move" as const, catalogRevision: revision };
+  };
+
   await page.context().route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
     const method = request.method();
     const body = method === "GET" ? undefined : request.postDataJSON();
+    const failWith = (status: number, code: string, message: string) =>
+      route.fulfill({ status, json: { error: { code, message } } });
+
+    events.push({ method, path, body });
 
     if (path === "/api/session") return route.fulfill({ json: { user } });
     if (path === "/api/logout") {
@@ -307,6 +765,15 @@ export const installDirectoryMock = async (
 
       if (request.frame().page() === page)
         reads.push({ space, parentId, limit: String(limit), cursor });
+      if (failDirectoryReads) {
+        return route.fulfill({
+          status: 503,
+          json: {
+            error: { code: "TEST_UNAVAILABLE", message: "目录暂不可用" },
+          },
+        });
+      }
+
       if (cursor) {
         if (appendGate) await appendGate;
         if (Number(cursor.split(":")[0]) !== revision) {
@@ -424,6 +891,98 @@ export const installDirectoryMock = async (
       revision++;
 
       return route.fulfill({ json: { catalogRevision: revision } });
+    }
+
+    const batchPath = path.match(
+      /^\/api\/workspaces\/[^/]+\/directory\/batch\/(summary|move|delete|undo)$/,
+    );
+
+    if (batchPath) {
+      const action = batchPath[1]!;
+
+      if (failBatch) {
+        const failure = failBatch;
+
+        failBatch = undefined;
+
+        return failWith(failure.status, failure.code, failure.message);
+      }
+
+      if ((body as any)?.catalogRevision !== revision && action !== "undo")
+        return failWith(409, "CATALOG_CONFLICT", "目录已更新，请重新加载");
+
+      if (action === "summary") {
+        const normalized = normalizeBatch((body as any)?.sources ?? []);
+
+        if (!Array.isArray((body as any)?.sources) || !normalized.roots.length)
+          return failWith(400, "INVALID_DIRECTORY_BATCH", "批量来源无效");
+        if (normalized.missing.length)
+          return failWith(404, "NOT_FOUND", "目录项目不存在");
+
+        return route.fulfill({
+          json: {
+            normalizedSources: normalized.roots.map((root) => ({
+              kind: root.kind,
+              id: root.id,
+            })),
+            ...batchCounts(normalized.roots),
+            catalogRevision: revision,
+          },
+        });
+      }
+
+      if (action === "move") {
+        const result = batchMove(body as any);
+
+        if ("error" in result) {
+          const error = result.error as {
+            status: number;
+            code: string;
+            message: string;
+          };
+
+          return failWith(error.status, error.code, error.message);
+        }
+
+        return route.fulfill({ json: result });
+      }
+
+      if (action === "delete") {
+        const result = batchDelete((body as any)?.sources ?? []);
+
+        if ("error" in result) {
+          const error = result.error as {
+            status: number;
+            code: string;
+            message: string;
+          };
+
+          return failWith(error.status, error.code, error.message);
+        }
+
+        if (dropNextBatchDelete) {
+          dropNextBatchDelete = false;
+
+          // 已提交但响应丢失：客户端只能标未确认并刷新核实。
+          return route.abort("failed");
+        }
+
+        return route.fulfill({ json: result });
+      }
+
+      const undone = batchUndo((body as any)?.receipt);
+
+      if ("status" in undone) {
+        const failure = undone as {
+          status: number;
+          code: string;
+          message: string;
+        };
+
+        return failWith(failure.status, failure.code, failure.message);
+      }
+
+      return route.fulfill({ json: undone });
     }
 
     if (/^\/api\/workspaces\/[^/]+\/directory\/move$/.test(path)) {
@@ -608,6 +1167,26 @@ export const installDirectoryMock = async (
     },
     changeUser: (id: string) => {
       user = { ...user, id };
+    },
+    /** 请求顺序记录，用于断言“先保存草稿再批删”等时序。 */
+    events,
+    batchWrites: () =>
+      events.filter((entry) => entry.path.includes("/directory/batch/")),
+    /** 仍在回收站（已移出活动目录）的节点 id。 */
+    recycled: () => bin.map((entry) => entry.node.id),
+    failNextBatch: (
+      status = 409,
+      code = "DIRECTORY_UNDO_CONFLICT",
+      message = "目录已更新，请在回收站中恢复",
+    ) => {
+      failBatch = { status, code, message };
+    },
+    dropNextBatchDelete: () => {
+      dropNextBatchDelete = true;
+    },
+    /** 粘性开关：让后续所有目录读取失败，直到显式恢复（避免被无关读提前消费）。 */
+    failDirectoryReads: (value = true) => {
+      failDirectoryReads = value;
     },
   };
 };
