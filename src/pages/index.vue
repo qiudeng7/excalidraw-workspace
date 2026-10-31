@@ -1249,7 +1249,7 @@ async function flushForShare() {
   place-items: center;
   flex: none;
   width: 18px;
-  height: 30px;
+  height: 27px;
   padding: 0 !important;
   color: var(--app-subtle);
   touch-action: none;
@@ -1304,7 +1304,7 @@ async function flushForShare() {
 }
 .shared-list {
   display: grid;
-  gap: 3px;
+  gap: 1px;
   padding: 4px 0 0 12px;
 }
 .shared-list a {
@@ -1312,7 +1312,7 @@ async function flushForShare() {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 9px 10px;
+  padding: 7px 10px;
   color: var(--app-muted);
   font-size: 11px;
   text-decoration: none;
@@ -1608,14 +1608,14 @@ async function flushForShare() {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 1px;
   min-height: 0;
 }
 .canvas-list li {
   display: flex;
   align-items: center;
   border-radius: 5px;
-  min-height: 37px;
+  min-height: 32px;
   padding-right: 3px;
   color: var(--app-muted);
 }
@@ -1633,7 +1633,7 @@ async function flushForShare() {
   flex: 1;
   min-width: 0;
   text-align: left;
-  padding: 10px 10px !important;
+  padding: 7px 10px !important;
   font-size: 13px !important;
   background: none !important;
 }
