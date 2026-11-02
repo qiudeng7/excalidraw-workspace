@@ -1,5 +1,6 @@
 // 真实 Chromium 运行侧栏批选与批量命令；目录 HTTP 全部是本目录 directory-mock 的有状态替身。
 // 保护：修饰键点击不打开画布、Shift 锚点稳定、空白框选（含缩框回退与不重读目录）、
+// 桌面/手机资源树左右零 padding 与逐级 14px 缩进、行间空白起框自动滚动且不分页、
 // 选中组拖动走批量接口而未选行走单项、批量菜单与确认计数、删除后精确关闭与一次撤销、
 // 拒绝/丢响应/刷新失败三态、触屏显式多选入口、收藏点击清树选择。
 // 替身不证明数据库、事务、权限或真实持久化；这些属于 tests/integration/directory-batch.test.ts。
@@ -125,39 +126,26 @@ const selectedKeys = async (page: Page): Promise<string[]> =>
         )
         .map((row) => row.getAttribute("data-directory-key")!),
     );
-/**
- * 行外侧边 gutter 起框点：必须命中 .resource-tree 自身（padding 区），
- * 而不是行、按钮或 .sidebar-scroll 的外侧留白。
- */
-const gutterPoint = async (page: Page, y: number) => {
+/** 行间 4px 空白起框：必须命中资源树内部，不能落到行或按钮上。 */
+const gapPoint = async (page: Page, y: number) => {
   const point = await page.evaluate((targetY) => {
-    const scroll = document.querySelector(".sidebar-scroll");
     const tree = document.querySelector(".resource-tree");
 
-    if (!(scroll instanceof HTMLElement) || !(tree instanceof HTMLElement))
-      return null;
+    if (!(tree instanceof HTMLElement)) return null;
     const box = tree.getBoundingClientRect();
+    const x = box.left + box.width / 2;
+    const hit = document.elementFromPoint(x, targetY);
 
-    for (let x = box.right - 2; x > box.right - 24; x -= 1) {
-      const hit = document.elementFromPoint(x, targetY);
-
-      if (
-        hit &&
-        hit.closest(".resource-tree") === tree &&
-        !hit.closest("[data-directory-key]") &&
-        !hit.closest("button") &&
-        !hit.closest('[role="menu"]')
-      )
-        return { x, y: targetY };
-    }
-
-    return null;
+    return hit &&
+      hit.closest(".resource-tree") === tree &&
+      !hit.closest("[data-directory-key]") &&
+      !hit.closest("button") &&
+      !hit.closest('[role="menu"]')
+      ? { x, y: targetY }
+      : null;
   }, y);
 
-  expect(
-    point,
-    "资源树没有可起框的侧边 gutter（长列表也要能起框，属产品缺口）",
-  ).not.toBeNull();
+  expect(point, "长列表仍需有可起框的行间空白").not.toBeNull();
 
   return point!;
 };
@@ -195,6 +183,48 @@ const drawRectangle = async (page: Page) => {
   await page.mouse.move(box.x + 380, box.y + 260, { steps: 6 });
   await page.mouse.up();
 };
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 390, height: 844 },
+]) {
+  test.describe(`文件区域间距 ${viewport.width}×${viewport.height}`, () => {
+    test.use({ viewport, hasTouch: viewport.width === 390 });
+
+    test("左右无额外 padding、层级每级缩进 14px，底部空白仍可起框", async ({
+      page,
+      workspace,
+    }, testInfo) => {
+      await installDirectoryMock(page, workspace, { nodes: nodes() });
+      await mountSidebar(page);
+      await openFolder(page, "f1", "资料");
+      await openFolder(page, "f2", "子目录");
+      const tree = page.locator(".resource-tree");
+
+      await expect(tree).toHaveCSS("padding-left", "0px");
+      await expect(tree).toHaveCSS("padding-right", "0px");
+      await expect(tree).toHaveCSS("padding-bottom", "28px");
+      await expect(row(page, "folder", "f1")).toHaveCSS("padding-left", "0px");
+      await expect(row(page, "canvas", "c3")).toHaveCSS("padding-left", "14px");
+      await expect(row(page, "canvas", "c4")).toHaveCSS("padding-left", "28px");
+      await page.screenshot({
+        path: testInfo.outputPath(
+          `sidebar-padding-${viewport.width}x${viewport.height}.png`,
+        ),
+      });
+
+      const openedBefore = await page.getByRole("tab").count();
+      const selection = await dragBox(page, {
+        to: rowName(page, "canvas", "c2"),
+      });
+
+      await expectSelected(row(page, "canvas", "c2"));
+      await expectSelected(row(page, "canvas", "c5"));
+      await selection.finish();
+      expect(await page.getByRole("tab").count()).toBe(openedBefore);
+    });
+  });
+}
 
 test("修饰键点击只改选择：不打开画布、不展开文件夹、Shift 锚点稳定", async ({
   page,
@@ -328,7 +358,7 @@ test("Ctrl 框选对起始快照异或、Shift 框选取并集", async ({
   await xor.finish();
 });
 
-test("侧边 gutter 起框后靠边自动滚动：命中按新坐标重算且不触发分页", async ({
+test("行间空白起框后靠边自动滚动：命中按新坐标重算且不触发分页", async ({
   page,
   workspace,
 }) => {
@@ -340,7 +370,7 @@ test("侧边 gutter 起框后靠边自动滚动：命中按新坐标重算且不
   const seeded = (await page
     .locator('#directory-list [data-directory-key="canvas:canvas-2"]')
     .boundingBox())!;
-  const start = await gutterPoint(page, seeded.y + seeded.height / 2);
+  const start = await gapPoint(page, seeded.y + seeded.height + 2);
   const scroll = page.locator(".sidebar-scroll");
   const box = (await scroll.boundingBox())!;
 
@@ -350,7 +380,7 @@ test("侧边 gutter 起框后靠边自动滚动：命中按新坐标重算且不
   await expect.poll(() => selectedKeys(page)).toEqual([]);
 
   // 指针停在滚动容器下边缘，触发靠边自动滚动。
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height - 6, {
+  await page.mouse.move(box.x + box.width / 3, box.y + box.height - 6, {
     steps: 8,
   });
   const firstBatchBottomVisible = () =>

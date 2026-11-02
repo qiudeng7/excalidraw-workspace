@@ -1411,7 +1411,7 @@ onBeforeUnmount(() => {
 .resource-tree {
   position: relative;
   flex: 1 0 auto;
-  padding: 0 10px 28px;
+  padding: 0 0 28px;
   color: var(--app-muted);
   outline: none;
 }
