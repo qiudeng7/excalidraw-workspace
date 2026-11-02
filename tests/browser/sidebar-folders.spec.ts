@@ -424,7 +424,8 @@ const directoryFixture = async (
         body.parentId ?? null,
       );
 
-      node.position = children(body.parentId ?? null).length;
+      for (const sibling of children(body.parentId ?? null)) sibling.position++;
+      node.position = 0;
       nodes.push(node);
       revision++;
 
@@ -950,6 +951,109 @@ test("浅色与深色侧栏使用中性灰，选中背景与普通行区分且�
     await testInfo.attach(`侧栏 ${theme} 中性配色`, {
       path: testInfo.outputPath(`sidebar-theme-${theme}.png`),
       contentType: "image/png",
+    });
+  }
+});
+
+test.describe("新建画布的日期和同级顶部顺序", () => {
+  test.use({ timezoneId: "America/Los_Angeles" });
+
+  for (const parentId of [null, "f1"]) {
+    test(`${parentId ? "文件夹" : "根目录"}新建默认本地日期、聚焦全选，保存及刷新保持顶部且不改变收藏`, async ({
+      page,
+      workspace: _workspace,
+    }) => {
+      // 时钟继续前进，避免冻结 Date.now 触发 Vue capture/bubble 事件时间保护。
+      await page.clock.install({ time: new Date("2026-02-04T03:00:00Z") });
+      const f = await directoryFixture(page);
+
+      f.addToFavorites("c2");
+      await page.reload();
+      await expect(page.locator(".excalidraw")).toBeVisible();
+      const create = page.locator(".resource-tree").getByRole("button", {
+        name: "新建画布",
+        exact: true,
+      });
+
+      await expect(create).toBeEnabled();
+      const before = f.children(parentId).map((node) => node.id);
+
+      if (parentId) {
+        await more(page, "文件夹 资料 的操作").click();
+        await menu(page, "文件夹 资料 的操作")
+          .getByRole("menuitem", { name: "新建画布", exact: true })
+          .click();
+      } else {
+        await create.click();
+      }
+
+      const input = page.getByRole("textbox", {
+        name: "新建画布名称",
+        exact: true,
+      });
+      const list = page.locator("#directory-list");
+
+      await expect(input).toHaveValue("2026年2月3日");
+      await expect(input).toBeFocused();
+      expect(
+        await input.evaluate((element: HTMLInputElement) => [
+          element.selectionStart,
+          element.selectionEnd,
+        ]),
+      ).toEqual([0, "2026年2月3日".length]);
+      if (parentId) {
+        await expect(
+          treeRow(page, "folder", parentId).locator("+ li"),
+        ).toHaveClass("new-name");
+      } else {
+        await expect(list.locator(":scope > li").first()).toHaveClass(
+          "new-name",
+        );
+      }
+
+      // 用键盘覆盖已全选的默认日期，而非 fill，验证用户可直接改名。
+      await input.pressSequentially("edited");
+      await expect(input).toHaveValue("edited");
+      await input.press("Enter");
+      await expect(input).toHaveCount(0);
+      const created = f.children(parentId)[0]!;
+
+      expect(created.name).toBe("edited");
+      expect(created.kind).toBe("canvas");
+      expect(f.children(parentId).map((node) => node.id)).toEqual([
+        created.id,
+        ...before,
+      ]);
+      const expectFirst = async () => {
+        const row = parentId
+          ? treeRow(page, "folder", parentId).locator("+ li")
+          : list.locator(":scope > li").first();
+
+        await expect(row).toHaveAttribute("data-node-id", created.id);
+        await expect(page.locator("[data-favorite-name]")).toHaveCount(1);
+        await expect(page.locator("[data-favorite-name]")).toHaveAttribute(
+          "data-favorite-name",
+          "canvas:c2",
+        );
+      };
+
+      await expectFirst();
+      await page.reload();
+      await expect(page.locator(".excalidraw")).toBeVisible();
+      if (parentId) {
+        const folder = treeRow(page, "folder", parentId).getByRole("button", {
+          name: "资料",
+          exact: true,
+        });
+
+        if ((await folder.getAttribute("aria-expanded")) === "false")
+          await folder.click();
+      }
+
+      await expectFirst();
+      expect(
+        f.writes.filter((write) => write.path.includes("favorite")),
+      ).toEqual([]);
     });
   }
 });

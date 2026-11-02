@@ -170,17 +170,21 @@ const rows = computed(() => {
   const visit = (parentId: string | null, level: number) => {
     const page = branch(parentId)?.page;
 
+    const creating =
+      editing.value &&
+      !editing.value.item &&
+      editing.value.parentId === parentId;
+
+    if (creating && editing.value?.kind === "canvas")
+      result.push({ type: "edit", parentId, level });
+
     for (const item of page?.items ?? []) {
       result.push({ type: "node", item, level });
       if (item.kind === "folder" && tree.expanded.value.includes(item.id))
         visit(item.id, level + 1);
     }
 
-    if (
-      editing.value &&
-      !editing.value.item &&
-      editing.value.parentId === parentId
-    )
+    if (creating && editing.value?.kind === "folder")
       result.push({ type: "edit", parentId, level });
     result.push({ type: "status", parentId, level });
   };
@@ -388,7 +392,16 @@ const beginCreate = async (
     return;
   if (parent && !tree.expanded.value.includes(parent.id))
     await tree.toggle(parent);
-  editing.value = { kind, parentId, name: "" };
+  const now = new Date();
+
+  editing.value = {
+    kind,
+    parentId,
+    name:
+      kind === "canvas"
+        ? `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`
+        : "",
+  };
   await focusInput();
 };
 const beginRename = async (item: DirectoryNode) => {

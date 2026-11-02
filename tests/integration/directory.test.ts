@@ -169,7 +169,12 @@ test("同父混排后新建画布只插入自身，不改变已有文件与其�
       rootBefore,
       "新建根画布不得改变已有根节点相对顺序",
     );
-    assert.equal(rootAfter.includes(createdRoot.id), true);
+    assert.deepEqual(rootAfter, [createdRoot.id, ...rootBefore]);
+    assert.deepEqual(
+      ids((await f.page()).items),
+      rootAfter,
+      "重新读取仍在根目录顶部",
+    );
     assert.deepEqual(
       ids((await f.page(other.id)).items),
       otherBefore,
@@ -180,7 +185,12 @@ test("同父混排后新建画布只插入自身，不改变已有文件与其�
     const createdChild = await f.createCanvas("P 新画布", p.id);
     const childAfter = ids((await f.page(p.id)).items);
 
-    assert.equal(childAfter.includes(createdChild.id), true);
+    assert.deepEqual(childAfter, [createdChild.id, ...childBefore]);
+    assert.deepEqual(
+      ids((await f.page(p.id)).items),
+      childAfter,
+      "重新读取仍在所属文件夹顶部",
+    );
     assert.deepEqual(
       childAfter.filter((id) => childBefore.includes(id)),
       childBefore,

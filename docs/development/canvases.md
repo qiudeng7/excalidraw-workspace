@@ -8,9 +8,11 @@
 
 ## 创建画布
 
-`createCanvas()` 等待当前编辑器保存，再通过 [POST /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.post.ts) 提交名称和目录版本 `catalogRevision`。后端验证空间归属，通过 [db/canvases.ts](../../server/db/canvases.ts) 原子插入画布到基础顺序顶部，并递增目录版本；新画布未置顶，显示在未置顶组顶部。
+侧栏在所属目录顶部显示新建画布输入行，根目录和文件夹内一致。名称默认为浏览器本地日期 `yyyy年m月d日`（月、日不补零），自动聚焦并全选，可直接改名；Enter 或确认按钮提交，Esc 取消。
 
-成功后前端重新读取已加载范围的 [GET /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.get.ts)，再读取新画布、后台记录最近位置，后两步见[切换画布](#切换画布)。新画布尚无快照，读取时返回空场景。
+[use-directory-tree.ts](../../src/composables/use-directory-tree.ts) 等待当前编辑器保存，再通过 [POST /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.post.ts) 提交名称、父目录和目录版本 `catalogRevision`。后端验证空间归属，通过 [db/canvases.ts](../../server/db/canvases.ts) 原子插入画布到所属目录混排顺序顶部，并递增目录版本；已有同级文件的相对顺序不变，收藏列表不受影响，刷新后仍保持该顺序。
+
+成功后前端重新读取目录并定位新画布，再读取新画布、后台记录最近位置，后两步见[切换画布](#切换画布)。新画布尚无快照，读取时返回空场景。
 
 创建失败时也重新确认目录，然后报告原错误。目录无法确认时锁定目录修改，避免继续使用旧版本操作。
 
