@@ -12,6 +12,19 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-11-02-canvas-create-top",
+    sequence: 14,
+    version: "0.11.1",
+    date: "2026-11-02",
+    title: "新建画布命名与位置更顺手",
+    summary: "新建画布默认以本地日期命名，可直接改名，保存后仍在所属目录顶部。",
+    changes: [
+      "默认名称使用浏览器本地日期（如 2026年11月2日），输入框自动聚焦并全选，方便直接输入新名称。",
+      "新建输入框位于所属目录最顶部，保存后画布仍在最顶部；文件夹内同样适用。",
+    ],
+    actions: [],
+  },
+  {
     id: "workspace-2026-10-31-multiselect",
     sequence: 13,
     version: "0.11.0",
