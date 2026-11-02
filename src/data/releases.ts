@@ -12,6 +12,18 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-11-02-sidebar-padding",
+    sequence: 15,
+    version: "0.11.2",
+    date: "2026-11-02",
+    title: "恢复侧栏文件列表对齐",
+    summary: "移除“我的文件”区域多余的左右留白，恢复标题与文件列表的原有位置。",
+    changes: [
+      "去掉文件管理区域额外的左右内边距，保留文件夹层级缩进与底部空白。",
+    ],
+    actions: ["已打开的页面请刷新后使用新版。"],
+  },
+  {
     id: "workspace-2026-11-02-canvas-create-top",
     sequence: 14,
     version: "0.11.1",
