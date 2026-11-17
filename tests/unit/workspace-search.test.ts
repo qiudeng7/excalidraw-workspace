@@ -86,25 +86,37 @@ test("英文不分大小写，片段保留原文大小写并只截取附近内�
   assert.ok(group);
   const [match] = group.matches;
 
-  assert.equal(match!.snippet.slice(match!.matchStart, match!.matchEnd), "Quarterly");
+  assert.equal(
+    match!.snippet.slice(match!.matchStart, match!.matchEnd),
+    "Quarterly",
+  );
   assert.equal(match!.snippet.length < body.length, true);
 });
 
 test("匹配是字面量：正则符号按字符处理，不会抛错也不会通配", () => {
-  const elements = [text("t-dot", "版本 a.b 发布"), text("t-star", "星号 * 用法")];
+  const elements = [
+    text("t-dot", "版本 a.b 发布"),
+    text("t-star", "星号 * 用法"),
+  ];
 
   assert.deepEqual(
-    searchCanvas(canvas, elements, "a.b")?.matches.map((match) => match.elementId),
+    searchCanvas(canvas, elements, "a.b")?.matches.map(
+      (match) => match.elementId,
+    ),
     ["t-dot"],
   );
   assert.equal(searchCanvas(canvas, elements, "a?b"), undefined);
   assert.equal(searchCanvas(canvas, elements, "a*"), undefined);
   assert.equal(
-    searchCanvas(canvas, elements, "[")?.matches.map((match) => match.elementId),
+    searchCanvas(canvas, elements, "[")?.matches.map(
+      (match) => match.elementId,
+    ),
     undefined,
   );
   assert.deepEqual(
-    searchCanvas(canvas, elements, "*")?.matches.map((match) => match.elementId),
+    searchCanvas(canvas, elements, "*")?.matches.map(
+      (match) => match.elementId,
+    ),
     ["t-star"],
   );
 });
@@ -112,7 +124,11 @@ test("匹配是字面量：正则符号按字符处理，不会抛错也不会�
 test("Frame 只匹配已存名称，未命名与默认名称不参与", () => {
   const group = searchCanvas(
     canvas,
-    [frame("f-named", { name: "阶段一" }), frame("f-empty", { name: "" }), frame("f-none")],
+    [
+      frame("f-named", { name: "阶段一" }),
+      frame("f-empty", { name: "" }),
+      frame("f-none"),
+    ],
     "阶段一",
   );
 
@@ -164,8 +180,22 @@ test("已删除、图片与其他元素不参与，富文本按可读投影而�
       "重点内容",
     )?.matches.some((match) => match.elementId === "t-rich"),
   );
-  assert.equal(searchCanvas(canvas, [text("t-deleted", "已删词条", { isDeleted: true })], "已删词条"), undefined);
-  assert.equal(searchCanvas(canvas, [text("t-image", "图片说明", { type: "image" })], "图片说明"), undefined);
+  assert.equal(
+    searchCanvas(
+      canvas,
+      [text("t-deleted", "已删词条", { isDeleted: true })],
+      "已删词条",
+    ),
+    undefined,
+  );
+  assert.equal(
+    searchCanvas(
+      canvas,
+      [text("t-image", "图片说明", { type: "image" })],
+      "图片说明",
+    ),
+    undefined,
+  );
   // 富文本结构里的键名与格式标记不是正文，不参与匹配。
   assert.equal(
     searchCanvas(

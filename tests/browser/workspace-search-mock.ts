@@ -39,7 +39,9 @@ export const installWorkspaceSearchMock = async (
     if (options.fail)
       return route.fulfill({
         status: options.fail.status,
-        json: { error: { code: options.fail.code, message: options.fail.message } },
+        json: {
+          error: { code: options.fail.code, message: options.fail.message },
+        },
       });
     const body = options.pages[Math.min(index, options.pages.length - 1)] ?? {
       groups: [],

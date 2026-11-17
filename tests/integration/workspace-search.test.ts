@@ -380,7 +380,10 @@ test("空命中页仍返回续游标，分页遍历不重不漏，目录变化�
       const result = await f.search("共同关键词", cursor);
 
       assert.equal(result.status, 200);
-      assert.equal(result.body.catalogRevision, (await f.catalog()).catalogRevision);
+      assert.equal(
+        result.body.catalogRevision,
+        (await f.catalog()).catalogRevision,
+      );
       for (const group of result.body.groups) seen.push(group.canvas.id);
       cursor = result.body.nextCursor ?? undefined;
       if (!cursor) break;
@@ -483,7 +486,15 @@ test("协作画布按房间正文命中旧快照之外的文字，读取不依�
     const view = await f.request(`/canvases/${canvasId}/collaboration/view`);
 
     assert.equal(view.status, 200);
-    const current = view.body as { epoch: string; seq: number };
+    const current = view.body as {
+      epoch: string;
+      seq: number;
+      scene: { elements: { id: string; version: number }[] };
+    };
+    // 房间播种会修复 fractional index 并抬高版本，覆盖时必须高于房间内现有版本。
+    const seeded = current.scene.elements.find(
+      (item) => item.id === "t-legacy",
+    )!;
     const update = await f.request(
       `/canvases/${canvasId}/collaboration/update`,
       "POST",
@@ -494,7 +505,12 @@ test("协作画布按房间正文命中旧快照之外的文字，读取不依�
         clientSeq: 1,
         opId: "op-search-room",
         baseSeq: current.seq,
-        elements: [text("t-legacy", "协作正文", { version: 2, versionNonce: 2 })],
+        elements: [
+          text("t-legacy", "协作正文", {
+            version: seeded.version + 1,
+            versionNonce: 1,
+          }),
+        ],
       },
     );
 
@@ -508,6 +524,7 @@ test("协作画布按房间正文命中旧快照之外的文字，读取不依�
         group.matches.map((item) => [group.canvas.id, item.elementId]),
       ),
       [[canvasId, "t-legacy"]],
+      JSON.stringify(fresh.body),
     );
     // 旧快照的同元素文字已被房间合并覆盖。
     assert.deepEqual((await f.search("旧快照文字")).body.groups, []);

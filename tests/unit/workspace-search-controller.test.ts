@@ -106,8 +106,7 @@ const harness = (
   },
 ) => {
   const context =
-    options.context ??
-    (() => ({ ownerId: "u1", workspaceId: "w1", canvas }));
+    options.context ?? (() => ({ ownerId: "u1", workspaceId: "w1", canvas }));
   const calls: SearchCall[] = [];
   const scope = effectScope(true);
   const controller = scope.run(() =>
