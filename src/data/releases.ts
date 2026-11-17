@@ -12,6 +12,22 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-11-17-search",
+    sequence: 16,
+    version: "0.12.0",
+    date: "2026-11-17",
+    title: "搜索工作空间里的文字与画布",
+    summary: "从侧栏输入或按 Ctrl/Cmd+P，搜索当前工作空间全部画布并定位文字。",
+    changes: [
+      "支持搜索画布标题、正文文字和 Frame 名称，包含所有子文件夹；结果显示画布与所在路径。",
+      "点击文字或 Frame 命中可打开画布并定位、短暂高亮，不改变画布内容或选中状态。",
+      "当前画布使用编辑器最新文字，支持中文输入和键盘选择；暂不可读的画布会单独提示，其余结果继续显示。",
+    ],
+    actions: [
+      "请刷新已打开的页面后使用新版。Ctrl/Cmd+P 在工作空间页面用于搜索，不再打开浏览器打印。",
+    ],
+  },
+  {
     id: "workspace-2026-11-02-sidebar-padding",
     sequence: 15,
     version: "0.11.2",

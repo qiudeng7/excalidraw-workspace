@@ -19,6 +19,7 @@ const SKIPPED_SCENE_CODES = new Set([
   "SEARCH_SCENE_NOT_READY",
   "SEARCH_SCENE_UNAVAILABLE",
   "ROOM_NOT_FOUND",
+  "ROOM_UNAVAILABLE",
   "RECYCLE_SYNC_PENDING",
   "ROOM_BUSY",
 ]);
@@ -97,6 +98,12 @@ export default defineApiHandler(async (event) => {
 
         if (group) groups[index] = group;
       } catch (cause) {
+        if (cause instanceof ApiError && cause.code === "CANVAS_DELETED")
+          return fail(
+            409,
+            "SEARCH_CATALOG_CHANGED",
+            "工作区目录已变化，请重新搜索",
+          );
         const code = skippedCode(cause);
 
         if (!code) throw cause;

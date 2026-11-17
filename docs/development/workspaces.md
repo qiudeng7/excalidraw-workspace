@@ -34,6 +34,18 @@
 
 成功后前端清空当前文档，重新加载工作空间和最近位置。删除的范围包含空间下所有画布；恢复空间不会恢复此前单独回收的画布。底层实现见 [db/recycle-bin.ts](../../server/db/recycle-bin.ts) 和 [schema.ts](../../server/db/schema.ts)，恢复、确认彻底删除及到期清理见[回收站与彻底删除](canvases.md#回收站与彻底删除)。
 
+## 搜索画布内容
+
+在侧栏「工作空间」上方输入，或按 Ctrl+P（macOS 为 Cmd+P），打开同一个搜索弹窗。范围是当前工作空间全部活动画布，包含未展开的文件夹。匹配画布标题、正文文本（含形状与箭头内文字）和 Frame 已命名标题；文件夹路径只作上下文，不参与匹配，不识别图片文字，也不搜回收站或历史版本。
+
+搜索按字面子串匹配，英文不区分大小写，查询最长 64 个字符。结果按画布分组；点击画布标题正常打开，点击正文或 Frame 命中会定位并临时高亮，不修改画布内容或选择。方向键与回车选择结果，Esc 关闭；中文组词期间不会转移焦点或执行选择。
+
+[搜索控制器](../../src/composables/use-workspace-search.ts) 防抖并自动逐页累积结果，只有末页完成后才显示无匹配。当前画布经服务端确认归属后，直接读取编辑器最新场景替换该组结果，不为搜索触发保存；其他画布读取已保存快照或协作房间当前场景。查询期间发生内容修改时，重新搜索可取得最新结果。
+
+[搜索 API](../../server/api/workspaces/[id]/search.get.ts) 验证账户和空间归属，按画布 ID 每批扫描 10 张，不加载图片。目录版本改变时清空旧结果并自动重搜一次；连续变化或页级故障提示重试。个别画布正在切换协作模式或暂不可读时跳过，显示暂不可搜索的数量，其余画布继续搜索。切空间、退出账户、修改查询或关闭弹窗都会取消旧查询，迟到响应不覆盖新结果。
+
+匹配契约在 [workspace-search.ts](../../shared/workspace-search.ts)，定位由 [editor-search.ts](../../src/lib/editor-search.ts) 复用编辑器视口能力；无需搜索索引或数据库迁移。对应验证见 [匹配单元测试](../../tests/unit/workspace-search.test.ts)、[控制器单元测试](../../tests/unit/workspace-search-controller.test.ts)、[API 集成测试](../../tests/integration/workspace-search.test.ts) 和 [浏览器测试](../../tests/browser/workspace-search.spec.ts)。
+
 ## 框选与批量整理
 
 「我的文件」保留单击打开画布、单击展开文件夹。Ctrl/Cmd 单击添加或取消选择，Shift 单击连续选择，Ctrl/Cmd + Shift 追加一段选择；这些修饰键点击不会打开画布。
