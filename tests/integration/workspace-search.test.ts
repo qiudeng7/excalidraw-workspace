@@ -206,7 +206,7 @@ test("legacy 画布按正文、Frame 已存名称与标题命中，文件夹名�
       {
         name: "补贴文件夹",
         parentId: null,
-        catalogRevision: before.catalogRevision,
+        catalogRevision: (await f.catalog()).catalogRevision,
       },
     );
 
@@ -276,7 +276,7 @@ test("只允许所有者搜索自己的空间，回收画布不参与且当前�
     const canvasId = (await f.catalog()).canvases[0]!.id;
 
     await f.saveScene(canvasId, [text("t-own", "自有词条")]);
-    const other = await f.request("/setup", "POST", {
+    const other = await f.request("/register", "POST", {
       email: "search-other@example.test",
       password: "WorkspaceSearchOther123!",
     });
@@ -330,7 +330,9 @@ test("只允许所有者搜索自己的空间，回收画布不参与且当前�
 
     await f.saveScene(recycled, [text("t-recycled", "回收词条")]);
     assert.equal((await f.search("回收词条")).body.groups.length, 1);
-    assert.equal((await f.request(`/canvases/${recycled}`, "DELETE", {})).status, 200);
+    const removal = await f.request(`/canvases/${recycled}`, "DELETE", {});
+
+    assert.equal(removal.status, 200, JSON.stringify(removal.body));
     assert.deepEqual((await f.search("回收词条")).body.groups, []);
   } finally {
     await f.close();
