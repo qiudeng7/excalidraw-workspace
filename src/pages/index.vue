@@ -36,6 +36,9 @@ import {
   type WorkspaceDirectoryController,
 } from "~/composables/useWorkspaceDirectory";
 import { useWorkspacePicker } from "~/composables/useWorkspacePicker";
+import { useWorkspaceSearch } from "~/composables/use-workspace-search";
+import { useWorkspaceSearchEntry } from "~/composables/use-workspace-search-entry";
+import WorkspaceSearchDialog from "~/components/WorkspaceSearchDialog.vue";
 
 const editor = ref<EditorHandle>();
 const saveBarrier = {
@@ -105,6 +108,8 @@ function toggleShared() {
 }
 
 const readyEditorKey = ref("");
+const readyCollaborationId = ref("");
+let search: ReturnType<typeof useWorkspaceSearch>;
 const sidebarOpen = ref(!window.matchMedia("(max-width: 760px)").matches);
 const saveShortcut = /Mac|iPhone|iPad/.test(navigator.platform)
   ? "⌘ S"
@@ -239,6 +244,7 @@ const {
     !loadingCanvas.value &&
     !settingsOpen.value &&
     !recycleOpen.value &&
+    !search?.open.value &&
     (!editorKey.value || editorKey.value === readyEditorKey.value),
 );
 
@@ -296,6 +302,54 @@ const resourceTree = useDirectoryTree({
     ]),
   ],
 });
+
+search = useWorkspaceSearch({
+  context: () => ({
+    ownerId: user.value?.id ?? "",
+    workspaceId: workspaceId.value,
+    canvas:
+      document.value?.workspaceId === workspaceId.value
+        ? {
+            id: document.value.id,
+            name: document.value.name,
+            workspaceId: document.value.workspaceId,
+            folderPath: resourceTree.ancestry.value
+              .map((folder) => folder.name)
+              .join(" / "),
+          }
+        : undefined,
+  }),
+  readScene: () => editor.value?.readSearchScene(),
+  search: (id, request) => workspaceApi.searchWorkspace(id, request),
+});
+const searchOpen = search.open;
+const searchEntry = useWorkspaceSearchEntry({
+  search,
+  ownerId: () => user.value?.id,
+  workspaceId: () => workspaceId.value,
+  editor: () => editor.value,
+  ready: () =>
+    !!document.value &&
+    (isCollaborative.value
+      ? readyCollaborationId.value === document.value.id
+      : readyEditorKey.value === editorKey.value),
+  blocked: () =>
+    interactionLocked.value ||
+    settingsOpen.value ||
+    recycleOpen.value ||
+    shareOpen.value ||
+    announcementOpen.value ||
+    (!searchOpen.value && !!window.document.querySelector("dialog[open]")),
+  selectCanvas,
+  report: operation.reportError,
+});
+const {
+  sidebarInput: searchInput,
+  sidebarText: searchText,
+  dialog: searchDialog,
+  selection: searchSelection,
+} = searchEntry;
+
 const revealFolder = async (id?: string) => {
   sidebarOpen.value = true;
   await resourceTree.attempt(async () => {
@@ -430,6 +484,7 @@ function protectDrafts(event: BeforeUnloadEvent) {
 watch(
   () => document.value?.id,
   (id) => {
+    readyCollaborationId.value = "";
     if (id && id !== shareCanvasId.value) shareOpen.value = false;
     collaborationStatus.value = "正在连接协作…";
     realtimeState.value = "实时协作 · 状态待确认";
@@ -515,6 +570,22 @@ async function flushForShare() {
         >
           <QuietIcon name="panel" :size="17" />
         </button>
+      </div>
+      <div class="workspace-search-entry">
+        <input
+          ref="searchInput"
+          :value="searchText"
+          type="text"
+          data-testid="workspace-search-entry"
+          placeholder="搜索当前工作空间"
+          aria-label="搜索当前工作空间"
+          aria-haspopup="dialog"
+          :aria-expanded="searchOpen"
+          autocomplete="off"
+          :disabled="!workspaceId || interactionLocked"
+          @input="searchEntry.sidebarChanged"
+        />
+        <kbd>{{ saveShortcut.startsWith("⌘") ? "⌘ P" : "Ctrl P" }}</kbd>
       </div>
       <div class="workspace-controls">
         <div class="section-label">
@@ -925,7 +996,9 @@ async function flushForShare() {
             :initial-document="document"
             :resources="resources"
             :user-settings="settingsResource.state.settings"
-            :settings-open="settingsOpen || announcementOpen || shareOpen"
+            :settings-open="
+              settingsOpen || announcementOpen || shareOpen || searchOpen
+            "
             @status="collaborationStatus = $event"
             @realtime="realtimeState = $event"
             @participants="
@@ -933,7 +1006,10 @@ async function flushForShare() {
                 onlineLabel = label;
               }
             "
-            @ready="readyEditorKey = editorKey"
+            @ready="
+              readyEditorKey = editorKey;
+              readyCollaborationId = document?.id ?? '';
+            "
           />
           <ExcalidrawCanvas
             v-else
@@ -945,7 +1021,9 @@ async function flushForShare() {
             :user-id="user.id"
             :user-settings="settingsResource.state.settings"
             :settings-status="settingsResource.state.status"
-            :settings-open="settingsOpen || announcementOpen"
+            :settings-open="
+              settingsOpen || announcementOpen || shareOpen || searchOpen
+            "
             @ready="readyEditorKey = $event"
             @retry-load="retryCurrentCanvas"
           />
@@ -1001,6 +1079,14 @@ async function flushForShare() {
         </div>
       </section>
     </div>
+    <WorkspaceSearchDialog
+      v-if="searchOpen"
+      ref="searchDialog"
+      :search="search"
+      :selection="searchSelection"
+      @close="searchEntry.close"
+      @select="searchEntry.select"
+    />
     <RecycleBinPanel
       v-if="recycleOpen && user"
       :key="user.id"
@@ -1350,6 +1436,33 @@ async function flushForShare() {
   background: var(--app-accent);
   color: var(--app-on-accent);
   border-radius: 6px;
+}
+.workspace-search-entry {
+  position: relative;
+  margin: 6px 0 8px;
+}
+.workspace-search-entry input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 58px 9px 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 7px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  font-size: 12px;
+}
+.workspace-search-entry input:focus {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 1px;
+}
+.workspace-search-entry kbd {
+  position: absolute;
+  right: 9px;
+  top: 11px;
+  color: var(--app-muted);
+  font-size: 10px;
+  pointer-events: none;
 }
 .workspace-controls {
   flex: none;

@@ -26,6 +26,7 @@ import type {
 import type { SaveResource } from "~/lib/persistence";
 import type { CanvasResource, CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
+import { createEditorSearch } from "~/lib/editor-search";
 import type { UserSettingsStatus } from "~/lib/userSettings";
 import { confirmDialog, isAppDialogOpen } from "~/lib/dialogs";
 import { defaultEditorTool } from "~/lib/editorTools";
@@ -452,7 +453,20 @@ async function prepareHandoff() {
   await sceneResource.checkpoint();
 }
 
-defineExpose<EditorHandle>({ capture, flush, saveManually, prepareHandoff });
+const search = createEditorSearch(
+  () => editorApi,
+  () => props.document.id,
+  () => container.value,
+);
+
+defineExpose<EditorHandle>({
+  capture,
+  flush,
+  saveManually,
+  prepareHandoff,
+  readSearchScene: search.readSearchScene,
+  locateElement: search.locateElement,
+});
 
 const container = useTemplateRef<HTMLDivElement>("container");
 const router = useRouter();
@@ -728,6 +742,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  search.dispose();
   capture();
   active = false;
   compositionEnd();

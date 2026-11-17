@@ -40,6 +40,7 @@ import type { Element } from "#shared/collaboration/types";
 import { collaborationSession } from "~/lib/collaboration/session";
 import type { CanvasResources } from "~/lib/canvasResources";
 import type { EditorHandle } from "~/lib/editor";
+import { createEditorSearch } from "~/lib/editor-search";
 import { defaultEditorTool } from "~/lib/editorTools";
 import { confirmDialog } from "~/lib/dialogs";
 import { getTabScope } from "~/lib/persistence";
@@ -524,7 +525,15 @@ function shortcut(event: KeyboardEvent) {
   }
 }
 
+const search = createEditorSearch(
+  () => editor,
+  () => props.canvasId,
+  () => host.value,
+);
+
 defineExpose<EditorHandle & { checkpoint(): Promise<void> }>({
+  readSearchScene: search.readSearchScene,
+  locateElement: search.locateElement,
   capture,
   flush,
   checkpoint,
@@ -709,6 +718,7 @@ onMounted(async () => {
   applySession();
 });
 onBeforeUnmount(() => {
+  search.dispose();
   const active = editor?.getAppState().editingTextElement;
 
   if (active && session.dirty) {

@@ -12,10 +12,22 @@ import type {
 } from "#shared/contracts";
 import { snapshotValidator, canvasValidator } from "#shared/snapshotValidator";
 import { api, conditionalApi } from "~/lib/api";
+import type { SearchPage } from "#shared/workspace-search";
+
+export interface WorkspaceSearchRequest {
+  query: string;
+  cursor?: string;
+  currentCanvasId?: string;
+  signal?: AbortSignal;
+}
 
 /** HTTP details belong here; controllers depend on this replaceable domain port. */
 export interface WorkspaceApi {
   listWorkspaces(): Promise<Workspace[]>;
+  searchWorkspace(
+    workspaceId: string,
+    request: WorkspaceSearchRequest,
+  ): Promise<SearchPage>;
   readCatalog(workspaceId: string): Promise<CanvasCatalog>;
   /** 按版本游标读取一页，失败不影响已加载内容。 */
   readCatalogPage(
@@ -83,6 +95,17 @@ const json = (method: string, payload: unknown): RequestInit => ({
 });
 
 export const workspaceApi: WorkspaceApi = {
+  searchWorkspace: (id, options) => {
+    const query = new URLSearchParams({ q: options.query });
+
+    if (options.cursor) query.set("cursor", options.cursor);
+    if (options.currentCanvasId)
+      query.set("currentCanvasId", options.currentCanvasId);
+
+    return api<SearchPage>(`/api/workspaces/${segment(id)}/search?${query}`, {
+      signal: options.signal,
+    });
+  },
   listWorkspaces: async () =>
     (await api<{ workspaces: Workspace[] }>("/api/workspaces")).workspaces,
   readCatalog: (id) =>
