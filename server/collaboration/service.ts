@@ -168,6 +168,71 @@ export async function ensureRoom(
   }
 }
 
+export async function readSearchScene(
+  event: H3Event,
+  id: string,
+  workspaceId: string,
+  userId: string,
+  actor: Principal,
+): Promise<{ name: string; elements: unknown[] }> {
+  const row = await canvasRow(id);
+
+  if (
+    !row ||
+    row.canvas.workspaceId !== workspaceId ||
+    row.ownerId !== userId ||
+    row.deleting ||
+    row.workspaceDeletedAt ||
+    row.canvas.deletedAt
+  )
+    return fail(409, "SEARCH_CATALOG_CHANGED", "工作区目录已变化，请重新搜索");
+  if (row.canvas.syncMode === "preparing")
+    return fail(
+      503,
+      "SEARCH_SCENE_NOT_READY",
+      "画布正在切换协作模式，请稍后重试",
+    );
+  if (row.canvas.recyclePending || row.canvas.purging)
+    return fail(503, "SEARCH_SCENE_NOT_READY", "画布暂不可搜索，请稍后重试");
+
+  if (row.canvas.syncMode === "legacy") {
+    let scene: CanvasScene;
+
+    try {
+      scene = (await readSnapshot(row.canvas.objectKey, {
+        elements: [],
+        appState: {},
+        files: {},
+      })) as CanvasScene;
+    } catch (cause) {
+      throw new ApiError(
+        503,
+        "SEARCH_SCENE_UNAVAILABLE",
+        "画布内容暂不可搜索",
+        {
+          cause,
+        },
+      );
+    }
+
+    if (!Array.isArray(scene.elements))
+      throw new ApiError(503, "SEARCH_SCENE_UNAVAILABLE", "画布内容暂不可搜索");
+
+    return { name: row.canvas.name, elements: scene.elements };
+  }
+
+  const view = await roomCommand<CanvasView>(event, id, actor, {
+    type: "view",
+  });
+
+  if (view.access.viewMode !== "live" || view.snapshot)
+    return fail(503, "SEARCH_SCENE_NOT_READY", "画布当前版本暂不可搜索");
+  if (!Array.isArray(view.scene.elements))
+    throw new ApiError(503, "SEARCH_SCENE_UNAVAILABLE", "画布内容暂不可搜索");
+
+  return { name: view.name, elements: view.scene.elements };
+}
+
 export async function canvasCommand<T>(
   event: H3Event,
   id: string,
