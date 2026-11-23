@@ -3,16 +3,36 @@ import { computed, ref, watch } from "vue";
 import QuietIcon from "~/components/QuietIcon.vue";
 import type { Bootstrap, User } from "#shared/contracts";
 import { ApiError } from "~/lib/api";
-import { accountApi } from "~/lib/accountApi";
+import { accountApi, oidcStartUrl } from "~/lib/accountApi";
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 const emit = defineEmits<{ authenticated: [user: User]; refresh: [] }>();
+// Older bootstrap payloads and test doubles omit authMethods: local-only.
+const localEnabled = computed(() => props.bootstrap.authMethods?.local ?? true);
+const oidcEnabled = computed(() => props.bootstrap.authMethods?.oidc ?? false);
+const authErrors: Record<string, string> = {
+  oidc_denied: "登录已被取消或拒绝。",
+  oidc_state: "登录会话已过期，请重试。",
+  oidc_token_failed: "无法完成 OIDC 登录，请稍后重试。",
+  oidc_invalid_token: "OIDC 身份校验未通过。",
+  oidc_unavailable: "OIDC 服务暂不可用。",
+  oidc_disabled: "OIDC 登录未启用。",
+};
 const registering = ref(false);
 const email = ref("");
 const password = ref("");
 const name = ref("");
 const busy = ref(false);
 const error = ref("");
+const authError = new URLSearchParams(
+  typeof location === "undefined" ? "" : location.search,
+).get("authError");
+
+if (authError) {
+  error.value = authErrors[authError] ?? "登录失败，请重试。";
+  history.replaceState(null, "", location.pathname);
+}
+
 const creating = computed(
   () => props.bootstrap.needsSetup || registering.value,
 );
@@ -184,7 +204,13 @@ async function submit() {
             普通用户
           </button>
         </div>
-        <div class="fields">
+        <a v-if="oidcEnabled" class="primary oidc-login" :href="oidcStartUrl()"
+          ><span>使用 OIDC 登录</span><QuietIcon name="arrow"
+        /></a>
+        <p v-if="!localEnabled && error" role="alert" class="error">
+          {{ error }}
+        </p>
+        <div v-if="localEnabled" class="fields">
           <label v-if="creating"
             >昵称<input
               v-model="name"
@@ -216,17 +242,19 @@ async function submit() {
               :disabled="busy"
           /></label>
         </div>
-        <small v-if="creating"
+        <small v-if="localEnabled && creating"
           >邮箱仅用于登录，无需邮件验证。密码至少 12 位。</small
         >
-        <p v-if="error" role="alert" class="error">{{ error }}</p>
-        <button class="primary" :disabled="busy">
+        <p v-if="localEnabled && error" role="alert" class="error">
+          {{ error }}
+        </p>
+        <button v-if="localEnabled" class="primary" :disabled="busy">
           <span>{{
             busy ? "请稍候…" : creating ? "创建并进入" : "进入我的空间"
           }}</span
           ><QuietIcon name="arrow" />
         </button>
-        <div class="form-bottom">
+        <div v-if="localEnabled" class="form-bottom">
           <template
             v-if="!bootstrap.needsSetup && bootstrap.registrationEnabled"
             ><span>{{ registering ? "已经有账户？" : "第一次来到这里？" }}</span
@@ -256,6 +284,14 @@ async function submit() {
   </section>
 </template>
 <style scoped>
+.oidc-login {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
 .account-gate {
   flex: 1;
   min-height: 0;

@@ -33,6 +33,27 @@ export async function registration() {
   );
 }
 
+/** Marker for accounts without a local password; it never parses as a PBKDF2 digest. */
+export const NO_PASSWORD = "!oidc";
+
+export async function userByIdentity(issuer: string, subject: string) {
+  return (
+    (
+      await db
+        .select(userColumns)
+        .from(tables.users)
+        .where(
+          and(
+            eq(tables.users.provider, "oidc"),
+            eq(tables.users.issuer, issuer),
+            eq(tables.users.subject, subject),
+          ),
+        )
+        .limit(1)
+    )[0] ?? null
+  );
+}
+
 export async function userByEmail(email: string) {
   return (
     (
@@ -54,6 +75,7 @@ export async function createAccount(
   canvas: string,
   now: string,
   registrationRequired = true,
+  identity?: { issuer: string; subject: string },
 ) {
   const result = await db.batch([
     db
@@ -67,6 +89,15 @@ export async function createAccount(
             role: sql<User["role"]>`${user.role}`.as("role"),
             passwordHash: sql<string>`${hash}`.as("passwordHash"),
             createdAt: sql<string>`${now}`.as("createdAt"),
+            provider: sql<"local" | "oidc">`${identity ? "oidc" : "local"}`.as(
+              "provider",
+            ),
+            issuer: sql<string | null>`${identity?.issuer ?? null}`.as(
+              "issuer",
+            ),
+            subject: sql<string | null>`${identity?.subject ?? null}`.as(
+              "subject",
+            ),
           })
           .from(tables.settings)
           .where(

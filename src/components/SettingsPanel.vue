@@ -23,13 +23,18 @@ import AccountPasswordForm from "~/components/AccountPasswordForm.vue";
 import ReleaseNotes from "~/components/ReleaseNotes.vue";
 import { currentRelease } from "~/data/releases";
 
-const props = defineProps<{
-  resource: UserSettingsResource;
-  user: User;
-  registrationEnabled: boolean;
-  registrationBusy: boolean;
-  systemError: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    resource: UserSettingsResource;
+    user: User;
+    /** False when local accounts are disabled; hides the password form. */
+    passwordEnabled?: boolean;
+    registrationEnabled: boolean;
+    registrationBusy: boolean;
+    systemError: string;
+  }>(),
+  { passwordEnabled: true },
+);
 const emit = defineEmits<{
   close: [];
   "registration-change": [event: Event];
@@ -401,7 +406,11 @@ onBeforeUnmount(() => {
                   ><span>{{ user.email }}</span>
                 </div>
               </div>
-              <AccountPasswordForm :key="user.id" :user-id="user.id" />
+              <AccountPasswordForm
+                v-if="passwordEnabled"
+                :key="user.id"
+                :user-id="user.id"
+              />
             </template>
           </section>
         </div>

@@ -73,11 +73,12 @@ export async function requireUser(event: H3Event): Promise<User> {
   return (await currentUser(event)) ?? fail(401, "UNAUTHENTICATED", "请先登录");
 }
 
-export async function createSession(
+/** Store a session guarded by the account's current password digest; returns the Set-Cookie value. */
+export async function startSession(
   event: H3Event,
   user: User,
   expectedPasswordHash: string,
-): Promise<Response> {
+): Promise<string | null> {
   const token = random();
 
   const created = await storeSession(
@@ -87,11 +88,19 @@ export async function createSession(
     expectedPasswordHash,
   );
 
-  if (!created) return fail(401, "INVALID_CREDENTIALS", "邮箱或密码不正确");
+  return created ? cookie(requestOrigin(event), token) : null;
+}
 
-  return json({ user }, 200, {
-    "Set-Cookie": cookie(requestOrigin(event), token),
-  });
+export async function createSession(
+  event: H3Event,
+  user: User,
+  expectedPasswordHash: string,
+): Promise<Response> {
+  const setCookie = await startSession(event, user, expectedPasswordHash);
+
+  if (!setCookie) return fail(401, "INVALID_CREDENTIALS", "邮箱或密码不正确");
+
+  return json({ user }, 200, { "Set-Cookie": setCookie });
 }
 
 export async function logout(event: H3Event): Promise<Response> {

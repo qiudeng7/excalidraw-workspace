@@ -27,9 +27,20 @@ export const users = sqliteTable(
     role: text({ enum: ["admin", "user"] }).notNull(),
     passwordHash: text("password_hash").notNull(),
     createdAt: text("created_at").notNull(),
+    // Keep appended in this order: createAccount() inserts positionally.
+    provider: text({ enum: ["local", "oidc"] })
+      .notNull()
+      .default("local"),
+    issuer: text(),
+    subject: text(),
   },
   (table) => [
     check("users_role", sql`${table.role} IN ('admin', 'user')`),
+    uniqueIndex("users_identity").on(
+      table.provider,
+      table.issuer,
+      table.subject,
+    ),
     uniqueIndex("one_administrator")
       .on(table.role)
       .where(sql`${table.role} = 'admin'`),

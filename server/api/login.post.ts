@@ -3,9 +3,11 @@ import { defineApiHandler } from "#server/utils/api";
 import { readAuthCredentials, createSession } from "#server/utils/auth";
 import { verifyPassword } from "#server/utils/passwords";
 import { fail } from "#server/utils/http";
+import { requireLocalAuth } from "#server/utils/auth-methods";
 
 export default defineApiHandler(
   async (event) => {
+    requireLocalAuth(event);
     const { email, password } = await readAuthCredentials(event);
 
     const row = await userByEmail(email);
