@@ -1,4 +1,6 @@
 import { getFontFamilyString } from "@excalidraw/common";
+import { codeHighlightVersion, highlightCode } from "./codeHighlight";
+import type { CodeTokenKind } from "./codeHighlight";
 import { isSupportedRichText } from "./richTextDocument";
 import type { RichTextV2Mark } from "./richTextDocument";
 import type { ExcalidrawTextElement } from "./types";
@@ -108,6 +110,8 @@ export interface RichTextRun {
   fontStyle: string;
   direction: "rtl" | "ltr";
   marks: RichTextMark[];
+  /** Syntax class of a code-block run; absent outside highlighted code. */
+  kind?: CodeTokenKind;
 }
 
 export interface RichTextDecoration {
@@ -133,7 +137,7 @@ const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 type LayoutNode = {
   type: string;
   text?: string;
-  attrs?: { level?: number; order?: number };
+  attrs?: { level?: number; order?: number; params?: string | null };
   marks?: { type: RichTextMark }[];
   content?: LayoutNode[];
 };
@@ -158,6 +162,8 @@ export const layoutRichText = (
     element.textAlign,
     width,
     document.fonts?.status,
+    // Grammars arrive on demand; a loaded grammar invalidates plain measurements.
+    codeHighlightVersion(),
   ]);
   const hit = cache.get(key);
 
@@ -166,7 +172,12 @@ export const layoutRichText = (
 
   block.setAttribute("data-rich-measure", "");
   const leaves: HTMLElement[] = [];
-  const nodes: { node: Text; marks: RichTextMark[]; leaf: HTMLElement }[] = [];
+  const nodes: {
+    node: Text;
+    marks: RichTextMark[];
+    leaf: HTMLElement;
+    kind?: CodeTokenKind;
+  }[] = [];
   const render = (
     item: LayoutNode,
     parent: HTMLElement,
@@ -211,6 +222,56 @@ export const layoutRichText = (
       return;
     }
 
+    if (item.type === "codeBlock") {
+      const container = document.createElement("pre");
+      const code = document.createElement("code");
+      const source = (item.content ?? [])
+        .map((child) => (child.type === "text" ? (child.text ?? "") : "\n"))
+        .join("");
+      const tokens = highlightCode(source, item.attrs?.params);
+
+      parent.append(container);
+      container.append(code);
+      leaves.push(container);
+
+      if (!tokens) {
+        const node = document.createTextNode(source);
+
+        code.append(node);
+        nodes.push({ node, marks: [], leaf: container });
+
+        return;
+      }
+
+      const plain = (text: string) => {
+        if (!text) return;
+
+        const node = document.createTextNode(text);
+
+        code.append(node);
+        nodes.push({ node, marks: [], leaf: container });
+      };
+      let cursor = 0;
+
+      for (const token of tokens) {
+        plain(source.slice(cursor, token.start));
+        const span = document.createElement("span");
+        const node = document.createTextNode(
+          source.slice(token.start, token.end),
+        );
+
+        span.setAttribute("data-tok", token.kind);
+        span.append(node);
+        code.append(span);
+        nodes.push({ node, marks: [], leaf: container, kind: token.kind });
+        cursor = token.end;
+      }
+
+      plain(source.slice(cursor));
+
+      return;
+    }
+
     const tag =
       item.type === "heading"
         ? `h${item.attrs?.level ?? 1}`
@@ -221,7 +282,6 @@ export const layoutRichText = (
               bulletList: "ul",
               orderedList: "ol",
               listItem: "li",
-              codeBlock: "pre",
             } as Record<string, string>
           )[item.type] || "div";
     const container = document.createElement(tag);
@@ -229,15 +289,10 @@ export const layoutRichText = (
     parent.append(container);
     if (item.type === "orderedList")
       container.setAttribute("start", String(item.attrs?.order ?? 1));
-    const isLeaf = ["paragraph", "heading", "codeBlock"].includes(item.type);
+    const isLeaf = ["paragraph", "heading"].includes(item.type);
 
     if (isLeaf) leaves.push(container);
-    let target = container;
-
-    if (item.type === "codeBlock") {
-      target = document.createElement("code");
-      container.append(target);
-    }
+    const target = container;
 
     for (const child of item.content ?? [])
       render(child, target, isLeaf ? container : leaf);
@@ -310,7 +365,7 @@ export const layoutRichText = (
     const leafIndices = new Map(leaves.map((leaf, index) => [leaf, index]));
     const range = document.createRange();
 
-    for (const { node, marks, leaf } of nodes) {
+    for (const { node, marks, leaf, kind } of nodes) {
       if (marks.includes("highlight")) {
         range.selectNodeContents(node);
         for (const rect of range.getClientRects()) {
@@ -378,6 +433,7 @@ export const layoutRichText = (
             fontStyle: style.fontStyle,
             direction: style.direction === "rtl" ? "rtl" : "ltr",
             marks,
+            ...(kind ? { kind } : {}),
           };
           runs.push(current);
           previousLine = line;

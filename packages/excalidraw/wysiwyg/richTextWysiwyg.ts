@@ -7,11 +7,12 @@ import {
 import { Slice, Fragment } from "prosemirror-model";
 import {
   EditorState,
+  Plugin,
   TextSelection,
   AllSelection,
   type Command,
 } from "prosemirror-state";
-import { EditorView } from "prosemirror-view";
+import { Decoration, DecorationSet, EditorView } from "prosemirror-view";
 import { history, undo, redo } from "prosemirror-history";
 import { undoInputRule } from "prosemirror-inputrules";
 import { keymap } from "prosemirror-keymap";
@@ -42,6 +43,11 @@ import {
   richTextFromPlainText,
   richTextPlainText,
 } from "../lib/element/src/richTextDocument";
+import {
+  codeTokenColor,
+  highlightCode,
+  onCodeHighlightReady,
+} from "../lib/element/src/codeHighlight";
 import { applyRichTextDocumentStyle } from "../lib/element/src/richTextLayout";
 import type { SupportedRichText } from "../lib/element/src/richTextDocument";
 import type {
@@ -85,6 +91,7 @@ export const richTextWysiwyg = (
     : richTextFromPlainText(element.originalText);
   let edited = false;
   let plainPaste = false;
+  let unsubscribeHighlight: (() => void) | undefined;
   let styling = false;
   // Opening and closing a legacy element never migrates its persisted document.
   const persisted = (richText: SupportedRichText) =>
@@ -117,6 +124,7 @@ export const richTextWysiwyg = (
     box.removeEventListener("scroll", followCaret);
     box.style.removeProperty("left");
     box.style.removeProperty("right");
+    unsubscribeHighlight?.();
     view.destroy();
     mount.remove();
     const latest = app.scene.getNonDeletedElement(element.id);
@@ -174,12 +182,41 @@ export const richTextWysiwyg = (
 
     return true;
   };
+  // Code blocks keep their text flat in the document; colors are decorations only.
+  const codeHighlightPlugin = new Plugin({
+    props: {
+      decorations(state) {
+        const decorations: Decoration[] = [];
+
+        state.doc.descendants((node, pos) => {
+          if (node.type !== richTextSchema.nodes.codeBlock) return true;
+          const tokens = highlightCode(node.textContent, node.attrs.params);
+
+          for (const token of tokens ?? []) {
+            decorations.push(
+              Decoration.inline(pos + 1 + token.start, pos + 1 + token.end, {
+                style: `color:${applyDarkModeFilter(
+                  codeTokenColor(token.kind),
+                  app.state.theme === THEME.DARK,
+                )}`,
+              }),
+            );
+          }
+
+          return false;
+        });
+
+        return DecorationSet.create(state.doc, decorations);
+      },
+    },
+  });
   const view = new EditorView(mount, {
     state: EditorState.create({
       schema: richTextSchema,
       doc: richTextSchema.nodeFromJSON(initial.doc),
       plugins: [
         richTextInputRules(),
+        codeHighlightPlugin,
         keymap({
           ...richTextKeymapCommands,
           "Shift-Enter": chainCommands(newlineInCode, hardBreak),
@@ -291,6 +328,11 @@ export const richTextWysiwyg = (
         return false;
       },
     },
+  });
+
+  // Grammars arrive on demand; a no-op transaction recomputes the code decorations.
+  unsubscribeHighlight = onCodeHighlightReady(() => {
+    if (!destroyed) view.dispatch(view.state.tr);
   });
   const updateStyle = () => {
     if (destroyed || styling) return;

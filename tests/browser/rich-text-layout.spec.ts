@@ -9,15 +9,16 @@ const editorRequire = createRequire(
 let script: string;
 
 test.beforeAll(async () => {
+  // Both modules share one bundle so the highlighter registry is the same instance.
   const result = await editorRequire("esbuild").build({
-    entryPoints: [
-      fileURLToPath(
-        new URL(
-          "../../packages/excalidraw/lib/element/src/richTextLayout.ts",
-          import.meta.url,
-        ),
-      ),
-    ],
+    stdin: {
+      contents: [
+        'export * from "./packages/excalidraw/lib/element/src/richTextLayout.ts";',
+        'export * from "./packages/excalidraw/lib/element/src/codeHighlight.ts";',
+      ].join("\n"),
+      resolveDir: fileURLToPath(new URL("../../", import.meta.url)),
+      loader: "ts",
+    },
     tsconfig: fileURLToPath(
       new URL("../../packages/excalidraw/tsconfig.json", import.meta.url),
     ),
@@ -277,4 +278,49 @@ test("host synthesis restrictions do not suppress rich-text bold and italic face
   expect(
     Math.abs(inks[0] - metrics.canvasInk) / metrics.canvasInk,
   ).toBeLessThan(0.12);
+});
+
+test("代码块 run 带语法类别，未知语言不着色", async ({ page }) => {
+  await page.addScriptTag({ content: script });
+  const result = await page.evaluate(async () => {
+    const api = (window as any).richLayout;
+
+    // 语法按需加载：先声明语言，加载完成后布局才会产出着色类别。
+    await api.loadCodeLanguage("ts");
+    const layout = (params?: string) =>
+      api.layoutRichText(
+        {
+          fontSize: 20,
+          fontFamily: 2,
+          lineHeight: 1.25,
+          textAlign: "left",
+          richText: {
+            version: 2,
+            doc: {
+              type: "doc",
+              content: [
+                {
+                  type: "codeBlock",
+                  ...(params ? { attrs: { params } } : {}),
+                  content: [{ type: "text", text: 'const value = "x";' }],
+                },
+              ],
+            },
+          },
+        },
+        400,
+      );
+
+    const kinds = (params?: string) =>
+      (layout(params)?.runs ?? [])
+        .filter((run: any) => run.kind)
+        .map((run: any) => `${run.kind}:${run.text}`);
+
+    return { typed: kinds("ts"), unknown: kinds("unknown-lang") };
+  });
+
+  expect(result.typed).toEqual(
+    expect.arrayContaining(["keyword:const", 'string:"x"']),
+  );
+  expect(result.unknown).toEqual([]);
 });

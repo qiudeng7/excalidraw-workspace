@@ -1,3 +1,4 @@
+import { codeTokenColor } from "../lib/element/src/codeHighlight";
 import { layoutRichText } from "../lib/element/src/richTextLayout";
 import {
   BOUND_TEXT_PADDING,
@@ -924,7 +925,7 @@ const renderElementToSvg = (
             text.setAttribute(
               "fill",
               applyDarkModeFilter(
-                element.strokeColor,
+                run.kind ? codeTokenColor(run.kind) : element.strokeColor,
                 renderConfig.theme === THEME.DARK,
               ),
             );

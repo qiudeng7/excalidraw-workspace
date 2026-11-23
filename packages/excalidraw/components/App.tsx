@@ -1,3 +1,4 @@
+import { onCodeHighlightReady } from "../lib/element/src/codeHighlight";
 import { isSupportedRichText } from "../lib/element/src/richTextDocument";
 import clsx from "clsx";
 import throttle from "lodash.throttle";
@@ -689,6 +690,7 @@ class App extends React.Component<AppProps, AppState> {
    * in-progress `newElement` and the edited text element) */
   private hasRenderableElements: boolean = false;
   private resizeObserver: ResizeObserver | undefined;
+  private unsubscribeCodeHighlight: (() => void) | undefined;
   public library: AppClassProperties["library"];
   public libraryItemsFromStorage: LibraryItems | undefined;
   public id: string;
@@ -4153,6 +4155,10 @@ class App extends React.Component<AppProps, AppState> {
 
     this.scene.onUpdate(this.triggerRender);
     this.addEventListeners();
+    // Grammars load on demand; repaint once the code-block colors are available.
+    this.unsubscribeCodeHighlight = onCodeHighlightReady(() =>
+      this.triggerRender(true),
+    );
 
     if (this.props.autoFocus && this.excalidrawContainerRef.current) {
       this.focusContainer();
@@ -4199,6 +4205,7 @@ class App extends React.Component<AppProps, AppState> {
 
   public componentWillUnmount() {
     this.unmounted = true;
+    this.unsubscribeCodeHighlight?.();
     this.textWysiwygSubmitHandler?.(true);
     // we're recreating the api object reference so that the
     // <ExcalidrawAPIContext.Provider/> picks up on it

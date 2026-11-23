@@ -1,3 +1,4 @@
+import { codeTokenColor } from "./codeHighlight";
 import { layoutRichText } from "./richTextLayout";
 import rough from "roughjs/bin/rough";
 
@@ -679,6 +680,15 @@ const drawElementOnCanvas = (
 
           for (const run of richLayout.runs) {
             context.font = run.font;
+            context.fillStyle = run.kind
+              ? applyDarkModeFilter(
+                  codeTokenColor(run.kind),
+                  renderConfig.theme === THEME.DARK,
+                )
+              : applyDarkModeFilter(
+                  element.strokeColor,
+                  renderConfig.theme === THEME.DARK,
+                );
             context.direction = run.direction;
             context.textAlign = run.direction === "rtl" ? "right" : "left";
             context.fillText(
