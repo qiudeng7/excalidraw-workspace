@@ -12,6 +12,20 @@ export interface ReleaseNote {
 // Newest first. sequence identifies a release batch even when version stays the same.
 export const releases: readonly ReleaseNote[] = [
   {
+    id: "workspace-2026-11-23-code-highlight",
+    sequence: 17,
+    version: "0.13.0",
+    date: "2026-11-23",
+    title: "代码块按语言语法高亮",
+    summary: "画布里的代码块按所用语言着色，编辑、画布与导出保持一致。",
+    changes: [
+      "输入三个反引号后接语言名（如 ts、python、sql）即可按该语言语法着色；未写语言或语言不在支持范围时按纯文本显示。",
+      "编辑态、画布和导出的 SVG/PNG 使用同一套颜色；颜色不写入文档，仍以纯文本代码和语言名保存。",
+      "语法按需加载，首次出现某种语言时先按纯文本显示，加载完成后自动着色。",
+    ],
+    actions: ["已打开的页面请刷新后使用新版。"],
+  },
+  {
     id: "workspace-2026-11-17-search",
     sequence: 16,
     version: "0.12.0",
