@@ -116,9 +116,9 @@ flowchart TD
 
 拖拽、键盘和右键菜单由 [useCanvasReorder.ts](../../src/composables/useCanvasReorder.ts) 转成局部移动，交给目录控制器的 `moveCanvas()`。新客户端通过 [PUT /api/canvases/:id/move](../../server/api/canvases/[id]/move.put.ts) 提交 `{ targetId, placement: "before" | "after", catalogRevision }`，成功返回 `{ catalogRevision }`，然后重新确认已加载范围。
 
-源与目标必须属于同一工作空间、同一置顶分组。服务端按目录版本原子移动，保持其他文件的相对顺序，以及取消置顶后基础槽位的语义。已加载末项还有下一页时，下移先取得下一页的真实相邻项；拖动靠近中部滚动容器边缘时自动滚动，拖动期间暂停自动分页，释放后恢复。
+源与目标必须属于同一工作空间、同一文件夹。服务端按目录版本原子移动，保持其他文件的相对顺序。已加载末项还有下一页时，下移先取得下一页的真实相邻项；拖动靠近中部滚动容器边缘时自动滚动，拖动期间暂停自动分页，释放后恢复。
 
-旧 [PUT /api/workspaces/:id/canvas-order](../../server/api/workspaces/[id]/canvas-order.put.ts) 继续接收完整 `{ canvasIds, catalogRevision }`，要求包含空间内全部画布、没有重复或遗漏、置顶组在前。版本不符返回 `409 CATALOG_CONFLICT`。
+旧 [PUT /api/workspaces/:id/canvas-order](../../server/api/workspaces/[id]/canvas-order.put.ts) 继续接收完整 `{ canvasIds, catalogRevision }`，要求包含空间内全部画布、没有重复或遗漏。版本不符返回 `409 CATALOG_CONFLICT`。
 
 排序失败后回读确认服务端结果，不自动重试旧操作。目录仍无法读取时保留原列表并锁定修改，用户重新加载成功后再开放操作。
 
@@ -137,9 +137,9 @@ flowchart TD
 }
 ```
 
-后续页将上一页返回的 `nextCursor` 作为请求参数 `cursor`。分页默认 30 条，允许 1–100 条；不带分页参数的旧请求仍返回完整 `CanvasCatalog`。数据库以 `pinned DESC, position ASC, id ASC` 做范围查询，页、总数和目录版本在同一原子读取中取得，不先读取完整列表再切片。追加的组合索引迁移只建索引，不重排已有数据。
+后续页将上一页返回的 `nextCursor` 作为请求参数 `cursor`。分页默认 30 条，允许 1–100 条；不带分页参数的旧请求仍返回完整 `CanvasCatalog`。数据库以 `position ASC, id ASC` 做范围查询，页、总数和目录版本在同一原子读取中取得，不先读取完整列表再切片。追加的组合索引迁移只建索引，不重排已有数据。
 
-游标绑定工作空间、目录版本和上一页末项排序位置，每次重新验证账号权限。新增、删除、恢复、置顶或移动改变目录版本后，旧游标返回 `409 CATALOG_CONFLICT`；客户端重新取得已加载范围，再整体替换，避免混合版本。刷新期间保留原列表，以首个可见画布为滚动锚点；锚点消失时使用最近仍存在的相邻项。刷新失败保留列表与编辑器，并禁止目录修改，直到用户重试成功。
+游标绑定工作空间、目录版本和上一页末项排序位置，每次重新验证账号权限。新增、删除、恢复、收藏或移动改变目录版本后，旧游标返回 `409 CATALOG_CONFLICT`；客户端重新取得已加载范围，再整体替换，避免混合版本。刷新期间保留原列表，以首个可见画布为滚动锚点；锚点消失时使用最近仍存在的相邻项。刷新失败保留列表与编辑器，并禁止目录修改，直到用户重试成功。
 
 距中部滚动区底部约 160px 时，`IntersectionObserver` 调用控制器的 `loadNextPage()`。同一空间只追加一个请求，内容不足一屏时继续补页；侧栏关闭、分组折叠、目录修改或拖拽时暂停。失败保留已有页，显示“加载失败，重试”并等待用户操作；最后一页显示“已显示全部 N 张画布”。标题计数来自服务端 `total`。
 
@@ -147,43 +147,19 @@ flowchart TD
 
 底部账号行向上打开账号菜单，完整名称和邮箱在菜单中显示；支持外部点击、Esc、键盘导航和焦点恢复。退出登录仍等待账号全部待保存内容。
 
-## 文件置顶与操作菜单契约
+## 收藏、文件夹与操作菜单
 
-### 置顶与基础顺序
+侧栏的文件夹（最多 5 层）、收藏、拖动排序、分页和右键菜单统一见[侧栏与文件组织](sidebar.md)。收藏是独立列表，不改变目录顺序；早期置顶入口和 `PUT /api/canvases/:id/pin` 仅保留兼容。
 
-置顶属于当前账号拥有的工作空间目录，不涉及“与我共享”。数据库画布行保存 `pinned`，旧数据和新画布默认为 `false`；客户端兼容未带此字段的旧响应，按未置顶处理。目录读取先显示置顶组，再显示未置顶组，两组内部均沿用 `position, id` 顺序。置顶和取消置顶不改变 `position`、内容版本、更新时间或最近打开位置。
-
-例如基础顺序为 `A B C D`，先置顶 C，再置顶 A，显示 `A C B D`；取消 C 后显示 `A B C D`。新建画布仍插入基础顺序顶部，但显示在未置顶组顶部，不超过已有置顶文件。
-
-拖拽、方向键和菜单上下移只能在同组内操作，组边界移动禁用，不能借移动取消置顶。旧完整排序接口仍接收完整显示顺序；置顶组不在前时返回 `400 INVALID_CANVAS_ORDER`。合法组内重排将该组的新顺序填回基础顺序中原属于该组的槽位，不将分组显示顺序直接保存为基础顺序。例如基础 `A B C D` 中 B、D 置顶，把显示 `B D A C` 改为 `D B A C`，基础顺序成为 `A D C B`，取消全部置顶后也显示这个顺序。恢复可能产生重复 `position`；重排按 `position, id` 确定基础槽位后规范化为连续位置，保持另一组的相对顺序。
-
-### 写入、失败与同步
-
-[WorkspaceApi](../../src/lib/workspaceApi.ts) 的 `setCanvasPinnedSummary()` 对应 `PUT /api/canvases/:id/pin?return=summary`，请求 `{ pinned: boolean, catalogRevision: number }`，返回 `{ canvas, catalogRevision }`。目录控制器收到结果后刷新已加载范围，不把精简响应当作完整目录。旧 `setCanvasPinned()` 和不带 `return=summary` 的请求仍返回完整 `{ canvases, catalogRevision }`。
-
-每次通过目录版本比较更新的请求均递增目录版本，包括设置为当前相同值；不使用反转状态的 toggle 请求。响应可能包含本次写入之后其他设备的更新，不保证恰好只增加一个版本。置顶不改变基础顺序、内容版本或最近位置。写入后空间被并发回收时返回 `404 NOT_FOUND`，前端仍按失败回读处理。
-
-接口只允许所有者。未登录返回 401；其他账号、仅有共享权限或已删除的文件/空间返回 `404 NOT_FOUND`。非布尔置顶值返回 `400 INVALID_PIN_STATE`，目录版本沿用现有非负安全整数校验；旧目录版本返回 `409 CATALOG_CONFLICT`，不修改数据。
-
-前端写入期间锁定目录，收到成功响应后重新确认已加载目录，不切换画布或标签，也不触发内容保存。任何写入错误都先重新读取已加载目录，必要时按 ID 读取目标：若目标状态已经达成，视为成功；否则采用服务端值并提示失败或冲突。重读也失败时保留先前列表并标记目录过期，禁止继续修改，直到重新加载成功。不得发送反向请求“回滚”，也不得自动重试覆盖其他设备；旧账号或旧空间的迟到响应不得覆盖当前目录。
-
-同账号跨浏览器设备共享服务端数据，刷新页面、重新进入工作空间或重新加载目录后可见最新置顶状态；不承诺已打开页面实时推送。软删除隐藏文件但保留置顶状态和基础位置，恢复后按当前目录顺序重新分组；删除期间的其他排序操作可能改变恢复后的绝对行号。恢复空间同理，彻底删除时清除对应行。
-
-### 菜单与标题
-
-文件行不再显示三个点，工作空间操作菜单保持不变。右键打开目标文件的菜单，不打开或切换画布；聚焦文件名后可用 `Shift+F10` 或 `ContextMenu` 键打开。菜单使用 `role="menu"`、名称“画布 {名称} 的操作”，操作项使用 `menuitem`：置顶/取消置顶、上移、下移、重命名、删除画布。方向键、Home、End 移动菜单焦点，Enter/Space 执行动作；Escape 关闭并返回触发行焦点。外部点击、滚动、切换空间、退出账号或目标文件消失时关闭。
-
-触屏在文件行非拖拽把手区域长按 500ms 打开菜单；移动超过 10px、取消指针或滚动时取消。长按成功后抑制后续点击，避免误打开画布。菜单应保持在视口内，矮屏允许菜单滚动，最后一项可访问。
-
-主侧栏“画布空间”标题旁显示根 [package.json](../../package.json) 的真实构建版本，格式为 `v{version}`，不使用编辑器包版本或另写版本常量。GitHub logo 链接到 <https://github.com/qiudeng7/excalidraw-workspace>，可访问名称为“GitHub 仓库”，以新标签页打开并带 `rel="noopener noreferrer"`。版本展示不改变版本号和更新公告。
+画布移动按目录版本并发校验：`PUT /api/canvases/:id/move` 提交 `{ targetId, placement, catalogRevision }`，版本不符返回 `409 CATALOG_CONFLICT`；旧完整排序接口继续接收全部画布顺序。
 
 ## 验证入口
 
-[目录分页集成测试](../../tests/integration/catalog-pagination.test.ts)通过真实 H3 与临时 SQLite 验证分页范围查询、原子读取、游标冲突、局部移动、精简置顶及旧接口兼容；[分页控制器测试](../../tests/unit/workspace-pagination.test.ts)验证单飞、请求取消、版本重读及页外标签保留；[空间资源测试](../../tests/unit/workspace-resource-invalidation.test.ts)验证页外资源和未完成读取清理。
+[目录分页集成测试](../../tests/integration/catalog-pagination.test.ts)通过真实 H3 与临时 SQLite 验证分页范围查询、原子读取、游标冲突、局部移动、精简收藏及旧接口兼容；[分页控制器测试](../../tests/unit/workspace-pagination.test.ts)验证单飞、请求取消、版本重读及页外标签保留；[空间资源测试](../../tests/unit/workspace-resource-invalidation.test.ts)验证页外资源和未完成读取清理。
 
 [侧栏分页浏览器测试](../../tests/browser/sidebar-pagination.spec.ts)使用 API 替身，检查深浅主题、多尺寸与数量下的固定布局、分页交互、账号菜单及截图。[真实 HTTP 分页套件](../../tests/http/catalog-pagination.mjs)已接入 `pnpm test:worker`，在隔离的本地 Worker/D1 验证相同接口、跨页移动和版本冲突；浏览器替身结果与真实后端结果分别报告。
 
-[canvas-pinning.test.ts](../../tests/integration/canvas-pinning.test.ts) 通过真实 H3 和临时 SQLite 验证迁移、置顶持久化、权限、目录竞争、槽位排序与回收恢复；[sidebar-menu.spec.ts](../../tests/browser/sidebar-menu.spec.ts) 通过真实 Chromium 和 API 替身验证菜单、长按、键盘、视口、版本及 GitHub 入口，不验证真实设备触摸或云端同步。
+[canvas-pinning.test.ts](../../tests/integration/canvas-pinning.test.ts) 通过真实 H3 和临时 SQLite 验证旧置顶接口的兼容、权限与目录竞争；[sidebar-menu.spec.ts](../../tests/browser/sidebar-menu.spec.ts) 通过真实 Chromium 和 API 替身验证菜单、长按、键盘、视口、版本及 GitHub 入口，不验证真实设备触摸或云端同步。
 
 [canvas-tabs.test.ts](../../tests/unit/canvas-tabs.test.ts) 检查标签去重、关闭草稿保护、工作空间恢复与账号重置；[canvas-tabs.spec.ts](../../tests/browser/canvas-tabs.spec.ts) 检查真实编辑器的工具/视角、内容撤销/重做、图片撤销、远端变化、后台保存、文件管理和窄屏布局。
 
