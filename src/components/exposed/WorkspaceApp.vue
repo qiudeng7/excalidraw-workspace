@@ -1,10 +1,18 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { APP_VERSION } from "#shared/app-version";
 import SidebarResourceTree from "~/components/SidebarResourceTree.vue";
 import { useDirectoryTree } from "~/composables/use-directory-tree";
 import SidebarAccountMenu from "~/components/SidebarAccountMenu.vue";
-import { onBeforeRouteLeave } from "vue-router";
+import "~/assets/workspace-tokens.css";
+import { configureApi } from "~/lib/runtime";
 import AccountGate from "~/components/AccountGate.vue";
 import QuietIcon from "~/components/QuietIcon.vue";
 import RecycleBinPanel from "~/components/RecycleBinPanel.vue";
@@ -39,6 +47,60 @@ import { useWorkspacePicker } from "~/composables/useWorkspacePicker";
 import { useWorkspaceSearch } from "~/composables/use-workspace-search";
 import { useWorkspaceSearchEntry } from "~/composables/use-workspace-search-entry";
 import WorkspaceSearchDialog from "~/components/WorkspaceSearchDialog.vue";
+
+const props = withDefaults(
+  defineProps<{
+    initialCanvasId?: string;
+    mode?: "embed" | "full";
+    theme?: "light" | "dark" | "inherit";
+    apiBase?: string;
+    realtimeBase?: string;
+  }>(),
+  { mode: "full", theme: "inherit" },
+);
+const emit = defineEmits<{
+  "title-change": [title: string];
+  "unsaved-change": [unsaved: boolean];
+}>();
+const embedded = computed(() => props.mode === "embed");
+
+if (props.apiBase !== undefined)
+  configureApi({ base: props.apiBase, realtimeBase: props.realtimeBase });
+
+// Embedded roots carry their own data-theme so tokens resolve inside the subtree.
+const hostTheme = ref<"light" | "dark">("light");
+const resolvedTheme = computed(() =>
+  props.theme === "inherit" ? hostTheme.value : props.theme,
+);
+let themeObserver: MutationObserver | undefined;
+let themeMedia: MediaQueryList | undefined;
+
+function readHostTheme() {
+  const value = window.document.documentElement.dataset.theme;
+
+  hostTheme.value =
+    value === "dark" || value === "light"
+      ? value
+      : window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+}
+
+onMounted(() => {
+  if (!embedded.value) return;
+  readHostTheme();
+  themeObserver = new MutationObserver(readHostTheme);
+  themeObserver.observe(window.document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+  themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+  themeMedia.addEventListener("change", readHostTheme);
+});
+onBeforeUnmount(() => {
+  themeObserver?.disconnect();
+  themeMedia?.removeEventListener("change", readHostTheme);
+});
 
 const editor = ref<EditorHandle>();
 const saveBarrier = {
@@ -107,6 +169,7 @@ function toggleShared() {
   if (sharedOpen.value && !sharedLoaded.value) void loadShared();
 }
 
+let pendingCanvasId = props.initialCanvasId ?? "";
 const readyEditorKey = ref("");
 const readyCollaborationId = ref("");
 let search: ReturnType<typeof useWorkspaceSearch>;
@@ -172,7 +235,22 @@ account = useAccountSession({
   api: accountApi,
   editor: saveBarrier,
   loadWorkspaces: async () => {
-    const query = new URLSearchParams(window.location.search);
+    const pending = pendingCanvasId;
+
+    pendingCanvasId = "";
+    if (pending) {
+      const target = await resolveCanvasTarget(pending);
+
+      if (target) {
+        await directory.loadWorkspaces(target);
+
+        return;
+      }
+    }
+
+    const query = embedded.value
+      ? new URLSearchParams()
+      : new URLSearchParams(window.location.search);
     const workspace = query.get("workspace");
     const canvas = query.get("canvas");
 
@@ -433,7 +511,8 @@ function closeActionMenu(event: MouseEvent) {
     button.closest("details")?.removeAttribute("open");
 }
 
-onBeforeRouteLeave(async () => {
+/** Route shells and embedding hosts call this before leaving; false means unsaved data remains. */
+async function flush() {
   if (!user.value) return true;
   try {
     await saveBarrier.flush();
@@ -447,7 +526,51 @@ onBeforeRouteLeave(async () => {
 
     return false;
   }
-});
+}
+
+async function resolveCanvasTarget(id: string) {
+  try {
+    const canvas = await workspaceApi.readCanvas(id);
+
+    return { workspaceId: canvas.workspaceId, canvasId: id };
+  } catch (cause) {
+    console.warn("无法定位目标画布，改用默认位置", cause);
+
+    return undefined;
+  }
+}
+
+async function openCanvas(id: string) {
+  if (!user.value) {
+    pendingCanvasId = id;
+
+    return;
+  }
+
+  const target = await resolveCanvasTarget(id);
+
+  if (!target) {
+    operation.reportError("目标画布不可访问");
+
+    return;
+  }
+
+  if (target.workspaceId === workspaceId.value) await selectCanvas(id);
+  else await directory.loadWorkspaces(target);
+}
+
+watch(
+  () => document.value?.name ?? "",
+  (name) => emit("title-change", name),
+);
+watch(
+  () =>
+    !!user.value &&
+    (saveState.value !== "已保存" || !!resources.value?.hasDirty()),
+  (unsaved) => emit("unsaved-change", unsaved),
+);
+
+defineExpose({ openCanvas, flush });
 
 function downloadResourceBackup(entry: CanvasResource) {
   const url = URL.createObjectURL(
@@ -512,619 +635,659 @@ async function flushForShare() {
 </script>
 
 <template>
-  <section v-if="starting" class="loading">
-    <span class="loading-mark" /><span>正在打开你的空间…</span>
-  </section>
-  <section v-else-if="!bootstrap" class="loading">
-    <p role="alert">{{ error }}</p>
-    <button @click="initialize">重试连接</button>
-  </section>
-  <AccountGate
-    v-else-if="!user"
-    :bootstrap="bootstrap"
-    @authenticated="authenticated"
-    @refresh="initialize"
-  />
-  <section v-else class="draw-page" aria-label="Excalidraw 画布">
-    <button
-      v-if="sidebarOpen"
-      class="sidebar-backdrop"
-      aria-label="关闭侧边栏"
-      @click="sidebarOpen = false"
+  <div
+    class="workspace-root"
+    :class="{ 'workspace-theme': embedded, embedded }"
+    :data-theme="embedded ? resolvedTheme : undefined"
+  >
+    <section v-if="starting" class="loading">
+      <span class="loading-mark" /><span>正在打开你的空间…</span>
+    </section>
+    <section v-else-if="!bootstrap" class="loading">
+      <p role="alert">{{ error }}</p>
+      <button @click="initialize">重试连接</button>
+    </section>
+    <AccountGate
+      v-else-if="!user"
+      :bootstrap="bootstrap"
+      @authenticated="authenticated"
+      @refresh="initialize"
     />
-    <aside
-      v-if="sidebarOpen"
-      id="workspace-sidebar"
-      class="workspace-sidebar"
-      aria-label="账户与工作空间"
-    >
-      <div class="sidebar-heading">
-        <span class="workspace-brand"
-          ><span class="brand-symbol"
-            ><QuietIcon name="canvas" :size="17" /></span
-          >画布空间</span
-        ><span class="app-version">v{{ APP_VERSION }}</span>
-        <a
-          class="github-link icon-button"
-          href="https://github.com/qiudeng7/excalidraw-workspace"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="GitHub 仓库"
-          title="GitHub 仓库"
-          ><svg
-            viewBox="0 0 24 24"
-            width="17"
-            height="17"
-            fill="currentColor"
-            aria-hidden="true"
-          >
-            <path
-              d="M12 .75a11.25 11.25 0 0 0-3.558 21.923c.563.104.768-.244.768-.542 0-.267-.01-.974-.015-1.912-3.13.68-3.79-1.51-3.79-1.51-.512-1.3-1.25-1.647-1.25-1.647-1.022-.7.078-.686.078-.686 1.13.08 1.724 1.16 1.724 1.16 1.005 1.722 2.637 1.225 3.279.937.102-.728.393-1.225.715-1.506-2.498-.284-5.124-1.25-5.124-5.56 0-1.228.44-2.233 1.16-3.02-.116-.285-.503-1.43.11-2.98 0 0 .945-.303 3.094 1.154A10.8 10.8 0 0 1 12 6.183c.956.005 1.918.13 2.817.378 2.148-1.457 3.092-1.154 3.092-1.154.615 1.55.228 2.695.113 2.98.72.787 1.157 1.792 1.157 3.02 0 4.322-2.63 5.273-5.136 5.55.404.35.765 1.044.765 2.105 0 1.52-.014 2.746-.014 3.119 0 .3.202.651.774.54A11.252 11.252 0 0 0 12 .75Z"
-            /></svg
-        ></a>
-        <button
-          class="icon-button"
-          title="收起侧边栏"
-          aria-label="收起侧边栏"
-          @click="sidebarOpen = false"
-        >
-          <QuietIcon name="panel" :size="17" />
-        </button>
-      </div>
-      <div class="workspace-search-entry">
-        <input
-          ref="searchInput"
-          :value="searchText"
-          type="text"
-          data-testid="workspace-search-entry"
-          placeholder="搜索当前工作空间"
-          aria-label="搜索当前工作空间"
-          aria-haspopup="dialog"
-          :aria-expanded="searchOpen"
-          autocomplete="off"
-          :disabled="!workspaceId || interactionLocked"
-          @input="searchEntry.sidebarChanged"
-        />
-        <kbd>{{ saveShortcut.startsWith("⌘") ? "⌘ P" : "Ctrl P" }}</kbd>
-      </div>
-      <div class="workspace-controls">
-        <div class="section-label">
-          <label id="workspace-picker-label" for="workspace-select"
-            >工作空间</label
-          >
-          <details class="action-menu">
-            <summary aria-label="工作空间操作" title="工作空间操作">
-              <QuietIcon name="more" :size="17" />
-            </summary>
-            <div class="menu-popover" @click="closeActionMenu">
-              <button :disabled="directoryLocked" @click="createWorkspace">
-                <QuietIcon name="plus" :size="15" />新建工作空间</button
-              ><button
-                :disabled="directoryLocked || !workspaceId"
-                @click="renameWorkspace"
-              >
-                <QuietIcon name="edit" :size="15" />重命名</button
-              ><button
-                class="danger"
-                :disabled="directoryLocked || !workspaceId"
-                @click="deleteWorkspace"
-              >
-                <QuietIcon name="trash" :size="15" />删除工作空间
-              </button>
-            </div>
-          </details>
-        </div>
-        <div
-          ref="workspacePicker"
-          class="workspace-picker"
-          @focusout="handleWorkspaceFocusOut"
-        >
-          <button
-            id="workspace-select"
-            ref="workspaceTrigger"
-            class="workspace-select-wrap"
-            :class="{ expanded: workspaceMenuOpen }"
-            :disabled="interactionLocked || !workspaces.length"
-            aria-haspopup="listbox"
-            :aria-expanded="workspaceMenuOpen"
-            aria-controls="workspace-options"
-            aria-labelledby="workspace-picker-label workspace-current-name"
-            @click="
-              workspaceMenuOpen ? closeWorkspaceMenu() : openWorkspaceMenu()
-            "
-            @keydown="handleWorkspaceTriggerKey"
-          >
-            <QuietIcon name="folder" :size="16" /><span
-              id="workspace-current-name"
-              :title="currentWorkspace?.name"
-              >{{ currentWorkspace?.name ?? "选择工作空间" }}</span
+    <section v-else class="draw-page" aria-label="Excalidraw 画布">
+      <button
+        v-if="sidebarOpen"
+        class="sidebar-backdrop"
+        aria-label="关闭侧边栏"
+        @click="sidebarOpen = false"
+      />
+      <aside
+        v-if="sidebarOpen"
+        id="workspace-sidebar"
+        class="workspace-sidebar"
+        aria-label="账户与工作空间"
+      >
+        <div class="sidebar-heading">
+          <span class="workspace-brand"
+            ><span class="brand-symbol"
+              ><QuietIcon name="canvas" :size="17" /></span
+            >画布空间</span
+          ><span class="app-version">v{{ APP_VERSION }}</span>
+          <a
+            class="github-link icon-button"
+            href="https://github.com/qiudeng7/excalidraw-workspace"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub 仓库"
+            title="GitHub 仓库"
             ><svg
-              class="workspace-chevron"
-              viewBox="0 0 12 12"
-              fill="none"
+              viewBox="0 0 24 24"
+              width="17"
+              height="17"
+              fill="currentColor"
               aria-hidden="true"
             >
               <path
-                d="m3 4.5 3 3 3-3"
-                stroke="currentColor"
-                stroke-width="1.4"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-          <ul
-            v-if="workspaceMenuOpen"
-            id="workspace-options"
-            ref="workspaceList"
-            class="workspace-options"
-            role="listbox"
-            tabindex="0"
-            aria-labelledby="workspace-picker-label"
-            :aria-activedescendant="`workspace-option-${activeWorkspaceIndex}`"
-            @keydown="handleWorkspaceListKey"
+                d="M12 .75a11.25 11.25 0 0 0-3.558 21.923c.563.104.768-.244.768-.542 0-.267-.01-.974-.015-1.912-3.13.68-3.79-1.51-3.79-1.51-.512-1.3-1.25-1.647-1.25-1.647-1.022-.7.078-.686.078-.686 1.13.08 1.724 1.16 1.724 1.16 1.005 1.722 2.637 1.225 3.279.937.102-.728.393-1.225.715-1.506-2.498-.284-5.124-1.25-5.124-5.56 0-1.228.44-2.233 1.16-3.02-.116-.285-.503-1.43.11-2.98 0 0 .945-.303 3.094 1.154A10.8 10.8 0 0 1 12 6.183c.956.005 1.918.13 2.817.378 2.148-1.457 3.092-1.154 3.092-1.154.615 1.55.228 2.695.113 2.98.72.787 1.157 1.792 1.157 3.02 0 4.322-2.63 5.273-5.136 5.55.404.35.765 1.044.765 2.105 0 1.52-.014 2.746-.014 3.119 0 .3.202.651.774.54A11.252 11.252 0 0 0 12 .75Z"
+              /></svg
+          ></a>
+          <button
+            class="icon-button"
+            title="收起侧边栏"
+            aria-label="收起侧边栏"
+            @click="sidebarOpen = false"
           >
-            <li
-              v-for="(workspace, index) in workspaces"
-              :id="`workspace-option-${index}`"
-              :key="workspace.id"
-              role="option"
-              :aria-selected="workspace.id === workspaceId"
-              :aria-disabled="interactionLocked"
-              :class="{
-                active: activeWorkspaceIndex === index,
-                chosen: workspace.id === workspaceId,
-              }"
-              :title="workspace.name"
-              @pointermove="setActiveWorkspace(index)"
-              @click="selectWorkspace(workspace.id)"
-            >
-              <QuietIcon name="folder" :size="15" /><span>{{
-                workspace.name
-              }}</span
-              ><QuietIcon
-                v-if="workspace.id === workspaceId"
-                name="check"
-                :size="15"
-              />
-            </li>
-          </ul>
+            <QuietIcon name="panel" :size="17" />
+          </button>
         </div>
-      </div>
-      <div class="sidebar-scroll">
-        <div
-          class="shared-canvases"
-          @click.capture="treeView?.clearSelection()"
-        >
-          <div class="shared-heading">
-            <button
-              class="shared-toggle"
-              type="button"
-              aria-label="与我共享"
-              :aria-expanded="sharedOpen"
-              aria-controls="shared-canvas-list"
-              @click="toggleShared"
+        <div class="workspace-search-entry">
+          <input
+            ref="searchInput"
+            :value="searchText"
+            type="text"
+            data-testid="workspace-search-entry"
+            placeholder="搜索当前工作空间"
+            aria-label="搜索当前工作空间"
+            aria-haspopup="dialog"
+            :aria-expanded="searchOpen"
+            autocomplete="off"
+            :disabled="!workspaceId || interactionLocked"
+            @input="searchEntry.sidebarChanged"
+          />
+          <kbd>{{ saveShortcut.startsWith("⌘") ? "⌘ P" : "Ctrl P" }}</kbd>
+        </div>
+        <div class="workspace-controls">
+          <div class="section-label">
+            <label id="workspace-picker-label" for="workspace-select"
+              >工作空间</label
             >
-              <QuietIcon name="users" :size="16" /><span>与我共享</span
-              ><span v-if="shared.length" class="count">{{
-                shared.length
-              }}</span
-              ><QuietIcon
-                class="shared-chevron"
-                :class="{ expanded: sharedOpen }"
-                name="chevron"
-                :size="13"
-              />
-            </button>
-            <button
-              v-if="sharedOpen"
-              class="icon-button"
-              type="button"
-              aria-label="刷新共享画布"
-              title="刷新共享画布"
-              :disabled="sharedLoading"
-              @click="loadShared"
-            >
-              <QuietIcon name="refresh" :size="14" />
-            </button>
+            <details class="action-menu">
+              <summary aria-label="工作空间操作" title="工作空间操作">
+                <QuietIcon name="more" :size="17" />
+              </summary>
+              <div class="menu-popover" @click="closeActionMenu">
+                <button :disabled="directoryLocked" @click="createWorkspace">
+                  <QuietIcon name="plus" :size="15" />新建工作空间</button
+                ><button
+                  :disabled="directoryLocked || !workspaceId"
+                  @click="renameWorkspace"
+                >
+                  <QuietIcon name="edit" :size="15" />重命名</button
+                ><button
+                  class="danger"
+                  :disabled="directoryLocked || !workspaceId"
+                  @click="deleteWorkspace"
+                >
+                  <QuietIcon name="trash" :size="15" />删除工作空间
+                </button>
+              </div>
+            </details>
           </div>
           <div
-            v-if="sharedOpen"
-            id="shared-canvas-list"
-            class="shared-list"
-            :aria-busy="sharedLoading"
+            ref="workspacePicker"
+            class="workspace-picker"
+            @focusout="handleWorkspaceFocusOut"
           >
-            <NuxtLink
-              v-for="item in shared"
-              :key="item.id"
-              :to="`/c/${item.id}`"
-              :title="item.name"
-              ><QuietIcon name="canvas" :size="15" /><span>{{ item.name }}</span
-              ><QuietIcon v-if="item.role === 'editor'" name="edit" :size="12"
-            /></NuxtLink>
-            <p v-if="!shared.length" class="sidebar-empty">
-              {{
-                sharedLoading
-                  ? "正在加载…"
-                  : sharedLoaded
-                    ? "他人邀请的画布会显示在这里"
-                    : "暂时无法加载，请重试"
-              }}
-            </p>
+            <button
+              id="workspace-select"
+              ref="workspaceTrigger"
+              class="workspace-select-wrap"
+              :class="{ expanded: workspaceMenuOpen }"
+              :disabled="interactionLocked || !workspaces.length"
+              aria-haspopup="listbox"
+              :aria-expanded="workspaceMenuOpen"
+              aria-controls="workspace-options"
+              aria-labelledby="workspace-picker-label workspace-current-name"
+              @click="
+                workspaceMenuOpen ? closeWorkspaceMenu() : openWorkspaceMenu()
+              "
+              @keydown="handleWorkspaceTriggerKey"
+            >
+              <QuietIcon name="folder" :size="16" /><span
+                id="workspace-current-name"
+                :title="currentWorkspace?.name"
+                >{{ currentWorkspace?.name ?? "选择工作空间" }}</span
+              ><svg
+                class="workspace-chevron"
+                viewBox="0 0 12 12"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="m3 4.5 3 3 3-3"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <ul
+              v-if="workspaceMenuOpen"
+              id="workspace-options"
+              ref="workspaceList"
+              class="workspace-options"
+              role="listbox"
+              tabindex="0"
+              aria-labelledby="workspace-picker-label"
+              :aria-activedescendant="`workspace-option-${activeWorkspaceIndex}`"
+              @keydown="handleWorkspaceListKey"
+            >
+              <li
+                v-for="(workspace, index) in workspaces"
+                :id="`workspace-option-${index}`"
+                :key="workspace.id"
+                role="option"
+                :aria-selected="workspace.id === workspaceId"
+                :aria-disabled="interactionLocked"
+                :class="{
+                  active: activeWorkspaceIndex === index,
+                  chosen: workspace.id === workspaceId,
+                }"
+                :title="workspace.name"
+                @pointermove="setActiveWorkspace(index)"
+                @click="selectWorkspace(workspace.id)"
+              >
+                <QuietIcon name="folder" :size="15" /><span>{{
+                  workspace.name
+                }}</span
+                ><QuietIcon
+                  v-if="workspace.id === workspaceId"
+                  name="check"
+                  :size="15"
+                />
+              </li>
+            </ul>
           </div>
         </div>
-        <SidebarResourceTree
-          ref="treeView"
-          :tree="resourceTree"
-          :workspace-id="workspaceId"
-          :owner-id="user.id"
-          :current-id="document?.id"
-          @dragging="directoryDragging = $event"
-          @recycle="recycleOpen = true"
-        />
-      </div>
-      <div id="directory-status" class="directory-status" />
-      <div
-        v-if="resourceTree.moveUndo.value"
-        class="sidebar-move-status"
-        role="status"
-      >
-        <span>已移动</span
-        ><button
-          type="button"
-          :disabled="resourceTree.locked.value"
-          @click="resourceTree.attempt(resourceTree.undoMove)"
-        >
-          撤销移动
-        </button>
-      </div>
-      <div class="sidebar-bottom">
-        <div class="sidebar-actions">
-          <button
-            type="button"
-            class="settings-entry recycle-entry"
-            aria-haspopup="dialog"
-            :aria-expanded="recycleOpen"
-            :disabled="interactionLocked"
-            @click="recycleOpen = true"
+        <div class="sidebar-scroll">
+          <div
+            class="shared-canvases"
+            @click.capture="treeView?.clearSelection()"
           >
-            <QuietIcon name="trash" :size="16" /><span>回收站</span>
-          </button>
-          <button
-            type="button"
-            class="settings-entry"
-            aria-haspopup="dialog"
-            :aria-expanded="settingsOpen"
-            :disabled="interactionLocked || !settingsResource"
-            @click="settingsOpen = true"
-          >
-            <QuietIcon name="settings" :size="16" /><span>设置</span>
-          </button>
+            <div class="shared-heading">
+              <button
+                class="shared-toggle"
+                type="button"
+                aria-label="与我共享"
+                :aria-expanded="sharedOpen"
+                aria-controls="shared-canvas-list"
+                @click="toggleShared"
+              >
+                <QuietIcon name="users" :size="16" /><span>与我共享</span
+                ><span v-if="shared.length" class="count">{{
+                  shared.length
+                }}</span
+                ><QuietIcon
+                  class="shared-chevron"
+                  :class="{ expanded: sharedOpen }"
+                  name="chevron"
+                  :size="13"
+                />
+              </button>
+              <button
+                v-if="sharedOpen"
+                class="icon-button"
+                type="button"
+                aria-label="刷新共享画布"
+                title="刷新共享画布"
+                :disabled="sharedLoading"
+                @click="loadShared"
+              >
+                <QuietIcon name="refresh" :size="14" />
+              </button>
+            </div>
+            <div
+              v-if="sharedOpen"
+              id="shared-canvas-list"
+              class="shared-list"
+              :aria-busy="sharedLoading"
+            >
+              <component
+                :is="embedded ? 'a' : 'NuxtLink'"
+                v-for="item in shared"
+                :key="item.id"
+                v-bind="
+                  embedded
+                    ? {
+                        href: '#',
+                        onClick: (e: Event) => {
+                          e.preventDefault();
+                          void openCanvas(item.id);
+                        },
+                      }
+                    : { to: `/c/${item.id}` }
+                "
+                :title="item.name"
+                ><QuietIcon name="canvas" :size="15" /><span>{{
+                  item.name
+                }}</span
+                ><QuietIcon
+                  v-if="item.role === 'editor'"
+                  name="edit"
+                  :size="12"
+              /></component>
+              <p v-if="!shared.length" class="sidebar-empty">
+                {{
+                  sharedLoading
+                    ? "正在加载…"
+                    : sharedLoaded
+                      ? "他人邀请的画布会显示在这里"
+                      : "暂时无法加载，请重试"
+                }}
+              </p>
+            </div>
+          </div>
+          <SidebarResourceTree
+            ref="treeView"
+            :tree="resourceTree"
+            :workspace-id="workspaceId"
+            :owner-id="user.id"
+            :current-id="document?.id"
+            @dragging="directoryDragging = $event"
+            @recycle="recycleOpen = true"
+          />
         </div>
-        <SidebarAccountMenu
-          :name="user.name"
-          :email="user.email"
-          :locked="interactionLocked"
-          @logout="logout"
-        />
-      </div>
-    </aside>
-    <div class="draw-content">
-      <div
-        v-for="entry in [...(resources?.canvases.values() ?? [])].filter(
-          (item) =>
-            item.message &&
-            item.resource.dirty &&
-            item.document.id !== document?.id,
-        )"
-        :key="entry.document.id"
-        class="operation-error"
-        role="alert"
-      >
-        <span>{{ entry.document.name }}：{{ entry.message }}</span>
-        <button @click="openResourceCanvas(entry)">查看画布</button>
-        <button @click="downloadResourceBackup(entry)">下载本地备份</button>
-        <button
-          v-if="!entry.resource.conflict"
-          @click="run(() => entry.resource.flush())"
-        >
-          重试保存
-        </button>
-      </div>
-      <header class="canvas-header">
-        <button
-          class="sidebar-toggle icon-button"
-          :aria-expanded="sidebarOpen"
-          aria-controls="workspace-sidebar"
-          aria-label="切换工作空间侧边栏"
-          title="工作空间"
-          @click="sidebarOpen = !sidebarOpen"
-        >
-          <QuietIcon name="panel" :size="18" />
-        </button>
-        <CanvasTabs
-          :tabs="canvasTabs"
-          :active-id="document?.id"
-          :locked="interactionLocked"
-          :closing-locked="directoryLocked"
-          @select="selectCanvas"
-          @close="closeCanvasTab"
-        />
-        <div class="header-right">
-          <span
-            v-if="document"
-            class="save-state presence-state"
-            aria-live="polite"
-            :aria-label="`实时协作状态：${isCollaborative ? realtimeState : legacyRealtimeState}`"
-            :title="`${isCollaborative ? realtimeState : legacyRealtimeState}${onlineLabel ? ' · ' + onlineLabel : ''}`"
-            ><QuietIcon name="users" :size="13" /><span class="realtime-full">{{
-              isCollaborative ? realtimeState : legacyRealtimeState
-            }}</span
-            ><span class="realtime-compact">{{
-              compactRealtimeStatus(
-                isCollaborative ? realtimeState : legacyRealtimeState,
-              )
-            }}</span></span
-          >
-          <span
-            class="save-state"
-            :class="{ saved: displayedSaveState === '已保存' && !busy }"
-            :title="
-              current?.status === 'checking'
-                ? '正在确认最新版本，暂时只读，可平移和缩放。'
-                : undefined
-            "
-            role="status"
-            ><span class="status-dot" />{{
-              busy && current?.status !== "checking"
-                ? "处理中…"
-                : displayedSaveState
-            }}</span
-          ><button
-            v-if="document"
-            ref="shareButton"
-            class="save-button"
-            @click="openShare"
-          >
-            <QuietIcon name="link" :size="14" />分享</button
-          ><button
-            class="save-button"
-            :disabled="interactionLocked || !document"
-            title="保存画布 · Ctrl / ⌘ S"
-            @click="editor?.saveManually()"
-          >
-            <QuietIcon name="cloud" :size="15" /><span>保存</span
-            ><kbd>{{ saveShortcut }}</kbd>
-          </button>
-        </div>
-      </header>
-      <nav v-if="document" class="canvas-path" aria-label="画布路径">
-        <button type="button" @click="revealFolder()">
-          {{ currentWorkspace?.name ?? "我的文件" }}
-        </button>
-        <template
-          v-for="folder in resourceTree.ancestry.value"
-          :key="folder.id"
-        >
-          <span>/</span
-          ><button type="button" @click="revealFolder(folder.id)">
-            {{ folder.name }}
-          </button>
-        </template>
-        <span>/</span><span :title="document.name">{{ document.name }}</span>
-      </nav>
-      <div v-if="navigationNotice" class="navigation-notice" role="status">
-        <span>{{ navigationNotice }}</span
-        ><button
-          class="icon-button"
-          aria-label="关闭最近位置提示"
-          @click="clearNotice"
-        >
-          <QuietIcon name="close" :size="16" />
-        </button>
-      </div>
-      <div v-if="directoryStale" class="operation-error" role="alert">
-        <span>画布列表尚未确认，目录操作已暂停。</span
-        ><button :disabled="busy" @click="run(refreshDirectory)">
-          重新加载列表
-        </button>
-      </div>
-      <div v-if="error" class="operation-error" role="alert">
-        <span>{{ error }}</span
-        ><button
-          v-if="!document"
-          :disabled="directoryLocked"
-          @click="run(loadWorkspaces)"
-        >
-          重新加载</button
-        ><button
-          class="icon-button"
-          aria-label="关闭提示"
-          @click="operation.reportError('')"
-        >
-          <QuietIcon name="close" :size="16" />
-        </button>
-      </div>
-      <div
-        v-if="
-          settingsResource &&
-          ['unavailable', 'error', 'conflict'].includes(
-            settingsResource.state.status,
-          )
-        "
-        class="settings-notice"
-        role="alert"
-      >
-        <span>{{ settingsResource.state.error }}</span
-        ><button
-          v-if="!settingsResource.state.cloudConflict"
-          @click="settingsResource.retry()"
-        >
-          {{
-            settingsResource.state.ready ? "重试同步设置" : "重新读取设置"
-          }}</button
-        ><template v-else
-          ><button @click="settingsResource.useCloud()">采用云端设置</button
-          ><button @click="settingsResource.keepLocal()">
-            保存当前设置
-          </button></template
-        >
-      </div>
-      <div v-if="announcementNotice" class="settings-notice" role="status">
-        <span>{{ announcementNotice }}</span>
-        <button type="button" @click="retryAnnouncement">重试公告</button>
-        <button type="button" @click="announcementNotice = ''">关闭提示</button>
-      </div>
-      <section
-        id="canvas-tab-panel"
-        role="tabpanel"
-        :aria-labelledby="document ? `canvas-tab-${document.id}` : undefined"
-        class="canvas-panel"
-      >
+        <div id="directory-status" class="directory-status" />
         <div
-          v-if="document && current && resources && settingsResource"
-          class="draw-editor"
-          :inert="busy || treeBusy"
+          v-if="resourceTree.moveUndo.value"
+          class="sidebar-move-status"
+          role="status"
         >
-          <CollaborationCanvas
-            v-if="isCollaborative"
-            :key="`collaboration:${user.id}:${document.id}`"
-            ref="editor"
-            :canvas-id="document.id"
-            :user-id="user.id"
-            scope="account"
-            :initial-document="document"
-            :resources="resources"
-            :user-settings="settingsResource.state.settings"
-            :settings-open="
-              settingsOpen || announcementOpen || shareOpen || searchOpen
-            "
-            @status="collaborationStatus = $event"
-            @realtime="realtimeState = $event"
-            @participants="
-              (count, label) => {
-                onlineLabel = label;
-              }
-            "
-            @ready="
-              readyEditorKey = editorKey;
-              readyCollaborationId = document?.id ?? '';
-            "
-          />
-          <ExcalidrawCanvas
-            v-else
-            :key="editorKey"
-            ref="editor"
-            :document="document"
-            :entry="current"
-            :resources="resources"
-            :user-id="user.id"
-            :user-settings="settingsResource.state.settings"
-            :settings-status="settingsResource.state.status"
-            :settings-open="
-              settingsOpen || announcementOpen || shareOpen || searchOpen
-            "
-            @ready="readyEditorKey = $event"
-            @retry-load="retryCurrentCanvas"
-          />
+          <span>已移动</span
+          ><button
+            type="button"
+            :disabled="resourceTree.locked.value"
+            @click="resourceTree.attempt(resourceTree.undoMove)"
+          >
+            撤销移动
+          </button>
         </div>
-        <div v-else class="loading">
-          <template v-if="busy">正在加载画布…</template
-          ><template v-else-if="!workspaces.length"
-            ><p>创建工作空间，开始整理你的画布。</p>
+        <div class="sidebar-bottom">
+          <div class="sidebar-actions">
             <button
-              class="empty-create"
+              type="button"
+              class="settings-entry recycle-entry"
+              aria-haspopup="dialog"
+              :aria-expanded="recycleOpen"
               :disabled="interactionLocked"
-              @click="createWorkspace"
+              @click="recycleOpen = true"
             >
-              新建工作空间
-            </button></template
-          ><template
-            v-else-if="
-              directory.total.value === 0 &&
-              !Object.values(resourceTree.known.value).some(
-                (item) => item.kind === 'canvas',
-              )
-            "
-            ><p>这个工作空间还没有画布。</p>
-            <button
-              class="empty-create"
-              :disabled="directoryLocked"
-              @click="createCanvas"
-            >
-              新建画布
-            </button></template
-          ><template v-else-if="!canvasTabs.length"
-            ><p>从侧边栏打开画布，或新建一张画布。</p>
-            <button
-              id="open-canvas-sidebar"
-              class="empty-create"
-              @click="sidebarOpen = true"
-            >
-              打开侧边栏
+              <QuietIcon name="trash" :size="16" /><span>回收站</span>
             </button>
             <button
-              class="empty-create"
-              :disabled="directoryLocked"
-              @click="createCanvas"
+              type="button"
+              class="settings-entry"
+              aria-haspopup="dialog"
+              :aria-expanded="settingsOpen"
+              :disabled="interactionLocked || !settingsResource"
+              @click="settingsOpen = true"
             >
-              新建画布
-            </button> </template
+              <QuietIcon name="settings" :size="16" /><span>设置</span>
+            </button>
+          </div>
+          <SidebarAccountMenu
+            :name="user.name"
+            :email="user.email"
+            :locked="interactionLocked"
+            @logout="logout"
+          />
+        </div>
+      </aside>
+      <div class="draw-content">
+        <div
+          v-for="entry in [...(resources?.canvases.values() ?? [])].filter(
+            (item) =>
+              item.message &&
+              item.resource.dirty &&
+              item.document.id !== document?.id,
+          )"
+          :key="entry.document.id"
+          class="operation-error"
+          role="alert"
+        >
+          <span>{{ entry.document.name }}：{{ entry.message }}</span>
+          <button @click="openResourceCanvas(entry)">查看画布</button>
+          <button @click="downloadResourceBackup(entry)">下载本地备份</button>
+          <button
+            v-if="!entry.resource.conflict"
+            @click="run(() => entry.resource.flush())"
+          >
+            重试保存
+          </button>
+        </div>
+        <header class="canvas-header">
+          <button
+            class="sidebar-toggle icon-button"
+            :aria-expanded="sidebarOpen"
+            aria-controls="workspace-sidebar"
+            aria-label="切换工作空间侧边栏"
+            title="工作空间"
+            @click="sidebarOpen = !sidebarOpen"
+          >
+            <QuietIcon name="panel" :size="18" />
+          </button>
+          <CanvasTabs
+            :tabs="canvasTabs"
+            :active-id="document?.id"
+            :locked="interactionLocked"
+            :closing-locked="directoryLocked"
+            @select="selectCanvas"
+            @close="closeCanvasTab"
+          />
+          <div class="header-right">
+            <span
+              v-if="document"
+              class="save-state presence-state"
+              aria-live="polite"
+              :aria-label="`实时协作状态：${isCollaborative ? realtimeState : legacyRealtimeState}`"
+              :title="`${isCollaborative ? realtimeState : legacyRealtimeState}${onlineLabel ? ' · ' + onlineLabel : ''}`"
+              ><QuietIcon name="users" :size="13" /><span
+                class="realtime-full"
+                >{{
+                  isCollaborative ? realtimeState : legacyRealtimeState
+                }}</span
+              ><span class="realtime-compact">{{
+                compactRealtimeStatus(
+                  isCollaborative ? realtimeState : legacyRealtimeState,
+                )
+              }}</span></span
+            >
+            <span
+              class="save-state"
+              :class="{ saved: displayedSaveState === '已保存' && !busy }"
+              :title="
+                current?.status === 'checking'
+                  ? '正在确认最新版本，暂时只读，可平移和缩放。'
+                  : undefined
+              "
+              role="status"
+              ><span class="status-dot" />{{
+                busy && current?.status !== "checking"
+                  ? "处理中…"
+                  : displayedSaveState
+              }}</span
+            ><button
+              v-if="document"
+              ref="shareButton"
+              class="save-button"
+              @click="openShare"
+            >
+              <QuietIcon name="link" :size="14" />分享</button
+            ><button
+              class="save-button"
+              :disabled="interactionLocked || !document"
+              title="保存画布 · Ctrl / ⌘ S"
+              @click="editor?.saveManually()"
+            >
+              <QuietIcon name="cloud" :size="15" /><span>保存</span
+              ><kbd>{{ saveShortcut }}</kbd>
+            </button>
+          </div>
+        </header>
+        <nav v-if="document" class="canvas-path" aria-label="画布路径">
+          <button type="button" @click="revealFolder()">
+            {{ currentWorkspace?.name ?? "我的文件" }}
+          </button>
+          <template
+            v-for="folder in resourceTree.ancestry.value"
+            :key="folder.id"
+          >
+            <span>/</span
+            ><button type="button" @click="revealFolder(folder.id)">
+              {{ folder.name }}
+            </button>
+          </template>
+          <span>/</span><span :title="document.name">{{ document.name }}</span>
+        </nav>
+        <div v-if="navigationNotice" class="navigation-notice" role="status">
+          <span>{{ navigationNotice }}</span
+          ><button
+            class="icon-button"
+            aria-label="关闭最近位置提示"
+            @click="clearNotice"
+          >
+            <QuietIcon name="close" :size="16" />
+          </button>
+        </div>
+        <div v-if="directoryStale" class="operation-error" role="alert">
+          <span>画布列表尚未确认，目录操作已暂停。</span
+          ><button :disabled="busy" @click="run(refreshDirectory)">
+            重新加载列表
+          </button>
+        </div>
+        <div v-if="error" class="operation-error" role="alert">
+          <span>{{ error }}</span
+          ><button
+            v-if="!document"
+            :disabled="directoryLocked"
+            @click="run(loadWorkspaces)"
+          >
+            重新加载</button
+          ><button
+            class="icon-button"
+            aria-label="关闭提示"
+            @click="operation.reportError('')"
+          >
+            <QuietIcon name="close" :size="16" />
+          </button>
+        </div>
+        <div
+          v-if="
+            settingsResource &&
+            ['unavailable', 'error', 'conflict'].includes(
+              settingsResource.state.status,
+            )
+          "
+          class="settings-notice"
+          role="alert"
+        >
+          <span>{{ settingsResource.state.error }}</span
+          ><button
+            v-if="!settingsResource.state.cloudConflict"
+            @click="settingsResource.retry()"
+          >
+            {{
+              settingsResource.state.ready ? "重试同步设置" : "重新读取设置"
+            }}</button
           ><template v-else
-            ><p>暂时无法加载画布，请重试。</p>
-            <button :disabled="directoryLocked" @click="run(loadWorkspaces)">
-              重新加载
+            ><button @click="settingsResource.useCloud()">采用云端设置</button
+            ><button @click="settingsResource.keepLocal()">
+              保存当前设置
             </button></template
           >
         </div>
-      </section>
-    </div>
-    <WorkspaceSearchDialog
-      v-if="searchOpen"
-      ref="searchDialog"
-      :search="search"
-      :selection="searchSelection"
-      @close="searchEntry.close"
-      @select="searchEntry.select"
-    />
-    <RecycleBinPanel
-      v-if="recycleOpen && user"
-      :key="user.id"
-      :refresh="refreshAfterRestore"
-      @close="recycleOpen = false"
-    />
-    <SettingsPanel
-      v-if="settingsOpen && settingsResource"
-      :resource="settingsResource"
-      :user="user"
-      :registration-enabled="bootstrap.registrationEnabled"
-      :registration-busy="settingsBusy"
-      :system-error="error"
-      @registration-change="toggleRegistration"
-      @release-shown="releaseShown"
-      @close="settingsOpen = false"
-    />
-    <ReleaseAnnouncement
-      v-if="announcementOpen && announcementOwner"
-      :key="announcementOwner"
-      :owner="announcementOwner"
-      @close="closeAnnouncement"
-      @shown="releaseShown"
-      @failed="announcementFailed"
-    />
-    <CanvasSharePanel
-      v-if="shareOpen && shareCanvasId"
-      :canvas-id="shareCanvasId"
-      :user-id="user.id"
-      :before-publish="flushForShare"
-      @activated="retryCurrentCanvas"
-      :return-focus="shareButton"
-      @close="shareOpen = false"
-    />
-  </section>
+        <div v-if="announcementNotice" class="settings-notice" role="status">
+          <span>{{ announcementNotice }}</span>
+          <button type="button" @click="retryAnnouncement">重试公告</button>
+          <button type="button" @click="announcementNotice = ''">
+            关闭提示
+          </button>
+        </div>
+        <section
+          id="canvas-tab-panel"
+          role="tabpanel"
+          :aria-labelledby="document ? `canvas-tab-${document.id}` : undefined"
+          class="canvas-panel"
+        >
+          <div
+            v-if="document && current && resources && settingsResource"
+            class="draw-editor"
+            :inert="busy || treeBusy"
+          >
+            <CollaborationCanvas
+              v-if="isCollaborative"
+              :key="`collaboration:${user.id}:${document.id}`"
+              ref="editor"
+              :canvas-id="document.id"
+              :user-id="user.id"
+              scope="account"
+              :initial-document="document"
+              :resources="resources"
+              :user-settings="settingsResource.state.settings"
+              :settings-open="
+                settingsOpen || announcementOpen || shareOpen || searchOpen
+              "
+              @status="collaborationStatus = $event"
+              @realtime="realtimeState = $event"
+              @participants="
+                (count, label) => {
+                  onlineLabel = label;
+                }
+              "
+              @ready="
+                readyEditorKey = editorKey;
+                readyCollaborationId = document?.id ?? '';
+              "
+            />
+            <ExcalidrawCanvas
+              v-else
+              :embedded="embedded"
+              :key="editorKey"
+              ref="editor"
+              :document="document"
+              :entry="current"
+              :resources="resources"
+              :user-id="user.id"
+              :user-settings="settingsResource.state.settings"
+              :settings-status="settingsResource.state.status"
+              :settings-open="
+                settingsOpen || announcementOpen || shareOpen || searchOpen
+              "
+              @ready="readyEditorKey = $event"
+              @retry-load="retryCurrentCanvas"
+            />
+          </div>
+          <div v-else class="loading">
+            <template v-if="busy">正在加载画布…</template
+            ><template v-else-if="!workspaces.length"
+              ><p>创建工作空间，开始整理你的画布。</p>
+              <button
+                class="empty-create"
+                :disabled="interactionLocked"
+                @click="createWorkspace"
+              >
+                新建工作空间
+              </button></template
+            ><template
+              v-else-if="
+                directory.total.value === 0 &&
+                !Object.values(resourceTree.known.value).some(
+                  (item) => item.kind === 'canvas',
+                )
+              "
+              ><p>这个工作空间还没有画布。</p>
+              <button
+                class="empty-create"
+                :disabled="directoryLocked"
+                @click="createCanvas"
+              >
+                新建画布
+              </button></template
+            ><template v-else-if="!canvasTabs.length"
+              ><p>从侧边栏打开画布，或新建一张画布。</p>
+              <button
+                id="open-canvas-sidebar"
+                class="empty-create"
+                @click="sidebarOpen = true"
+              >
+                打开侧边栏
+              </button>
+              <button
+                class="empty-create"
+                :disabled="directoryLocked"
+                @click="createCanvas"
+              >
+                新建画布
+              </button> </template
+            ><template v-else
+              ><p>暂时无法加载画布，请重试。</p>
+              <button :disabled="directoryLocked" @click="run(loadWorkspaces)">
+                重新加载
+              </button></template
+            >
+          </div>
+        </section>
+      </div>
+      <WorkspaceSearchDialog
+        v-if="searchOpen"
+        ref="searchDialog"
+        :search="search"
+        :selection="searchSelection"
+        @close="searchEntry.close"
+        @select="searchEntry.select"
+      />
+      <RecycleBinPanel
+        v-if="recycleOpen && user"
+        :key="user.id"
+        :refresh="refreshAfterRestore"
+        @close="recycleOpen = false"
+      />
+      <SettingsPanel
+        v-if="settingsOpen && settingsResource"
+        :resource="settingsResource"
+        :user="user"
+        :registration-enabled="bootstrap.registrationEnabled"
+        :password-enabled="bootstrap.authMethods?.local ?? true"
+        :registration-busy="settingsBusy"
+        :system-error="error"
+        @registration-change="toggleRegistration"
+        @release-shown="releaseShown"
+        @close="settingsOpen = false"
+      />
+      <ReleaseAnnouncement
+        v-if="announcementOpen && announcementOwner"
+        :key="announcementOwner"
+        :owner="announcementOwner"
+        @close="closeAnnouncement"
+        @shown="releaseShown"
+        @failed="announcementFailed"
+      />
+      <CanvasSharePanel
+        v-if="shareOpen && shareCanvasId"
+        :canvas-id="shareCanvasId"
+        :user-id="user.id"
+        :before-publish="flushForShare"
+        @activated="retryCurrentCanvas"
+        :return-focus="shareButton"
+        @close="shareOpen = false"
+      />
+    </section>
+  </div>
 </template>
 
 <style scoped>
+.workspace-root {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workspace-root.embedded {
+  height: 100%;
+  background: var(--app-surface);
+  color: var(--app-text);
+}
 .canvas-path {
   display: flex;
   align-items: center;
