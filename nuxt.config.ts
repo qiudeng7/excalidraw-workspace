@@ -171,7 +171,11 @@ export default defineNuxtConfig({
             new URL("./server/collaboration/node-plugin.ts", import.meta.url),
           ),
         ],
-    experimental: { tasks: true, websocket: true },
+    experimental: { tasks: true, websocket: true, openAPI: true },
+    openAPI: {
+      production: "prerender",
+      ui: { scalar: false, swagger: false },
+    },
     scheduledTasks: { "0 * * * *": ["snapshots:cleanup"] },
     cloudflare: {
       deployConfig: false,
