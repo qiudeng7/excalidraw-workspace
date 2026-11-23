@@ -43,6 +43,8 @@ const props = defineProps<{
   userSettings: UserSettings;
   settingsStatus: UserSettingsStatus;
   settingsOpen: boolean;
+  /** Hosted inside another app: no jumps to this app's own routes. */
+  embedded?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -622,26 +624,27 @@ function CanvasEditor() {
         theme: preference.value,
       }),
       createElement(MainMenu.DefaultItems.ChangeCanvasBackground),
-      createElement(MainMenu.Group, {
-        title: "跳转",
-        className: "canvas-menu-group",
-        children: createElement(
-          Fragment,
-          null,
-          createElement(MainMenu.Item, {
-            children: "首页",
-            onSelect: () => {
-              void router.push("/home");
-            },
-          }),
-          createElement(MainMenu.Item, {
-            children: "关于",
-            onSelect: () => {
-              void router.push("/about");
-            },
-          }),
-        ),
-      }),
+      !props.embedded &&
+        createElement(MainMenu.Group, {
+          title: "跳转",
+          className: "canvas-menu-group",
+          children: createElement(
+            Fragment,
+            null,
+            createElement(MainMenu.Item, {
+              children: "首页",
+              onSelect: () => {
+                void router.push("/home");
+              },
+            }),
+            createElement(MainMenu.Item, {
+              children: "关于",
+              onSelect: () => {
+                void router.push("/about");
+              },
+            }),
+          ),
+        }),
     ),
     initialData: {
       ...sceneResource.value,

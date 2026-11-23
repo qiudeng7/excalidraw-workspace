@@ -4,9 +4,11 @@ import type { User } from "#shared/contracts";
 import { readAuthCredentials, createSession } from "#server/utils/auth";
 import { ApiError, fail, name } from "#server/utils/http";
 import { hashPassword } from "#server/utils/passwords";
+import { requireLocalAuth } from "#server/utils/auth-methods";
 
 /** Initial setup and registration share account creation and uniqueness rules. */
 export async function registerAccount(event: H3Event, role: User["role"]) {
+  requireLocalAuth(event);
   const { data, email, password } = await readAuthCredentials(event);
   const user: User = {
     id: crypto.randomUUID(),

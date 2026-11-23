@@ -12,6 +12,7 @@ export interface Bootstrap {
   needsSetup: boolean;
   registrationEnabled: boolean;
   emailVerification: false;
+  authMethods: { local: boolean; oidc: boolean };
 }
 
 export interface Workspace {

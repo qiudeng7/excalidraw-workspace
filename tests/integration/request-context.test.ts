@@ -166,7 +166,7 @@ test("SQLite constraints reject invalid stored roles", async () => {
   try {
     await assert.rejects(
       storage.database.run(
-        sql`INSERT INTO users VALUES('invalid','invalid@example.com','Invalid','superuser','hash','2020')`,
+        sql`INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES('invalid','invalid@example.com','Invalid','superuser','hash','2020')`,
       ),
       (error: unknown) =>
         error instanceof Error &&

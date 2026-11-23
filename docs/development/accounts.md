@@ -2,7 +2,7 @@
 
 [返回目录](../../README.md#目录)
 
-用户通过邮箱和密码建立会话；管理员额外控制注册开放状态。账户表单在 [AccountGate.vue](../../src/components/AccountGate.vue)，登录后的生命周期由 [useAccountSession.ts](../../src/composables/useAccountSession.ts) 编排，HTTP 适配在 [accountApi.ts](../../src/lib/accountApi.ts)。
+用户通过邮箱和密码（本地账号）或外部 OIDC 身份提供方建立会话，两种方式按部署开关启用；管理员额外控制注册开放状态。账户表单在 [AccountGate.vue](../../src/components/AccountGate.vue)，登录后的生命周期由 [useAccountSession.ts](../../src/composables/useAccountSession.ts) 编排，HTTP 适配在 [accountApi.ts](../../src/lib/accountApi.ts)。
 
 ## 初始化管理员
 
@@ -48,6 +48,34 @@
 
 后端还提供 [GET /api/admin/settings](../../server/api/admin/settings.get.ts) 供管理员读取；当前页面从 [GET /api/bootstrap](../../server/api/bootstrap.get.ts) 取得初始开关值。
 
+## 账号方式开关
+
+本地账号与 OIDC 账号由部署环境变量控制，Node 读取进程环境，Cloudflare 读取 Worker vars，规则在 [auth-config.ts](../../server/utils/auth-config.ts) 的纯函数 `parseAuthConfig()` 中：
+
+| 变量                                                  | 默认                                        | 说明                                 |
+| ----------------------------------------------------- | ------------------------------------------- | ------------------------------------ |
+| `AUTH_LOCAL`                                          | `true`                                      | 本地注册、登录、初始化与修改密码     |
+| `AUTH_OIDC`                                           | `false`                                     | OIDC 登录                            |
+| `OIDC_ISSUER`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET` | —                                           | 开启 OIDC 时必填                     |
+| `OIDC_SCOPES`                                         | `openid profile email`                      |                                      |
+| `OIDC_REDIRECT_URI`                                   | `PUBLIC_ORIGIN` + `/api/auth/oidc/callback` | 经代理前缀访问时填写完整公开回调地址 |
+| `OIDC_POST_LOGIN_PATH`                                | `/`                                         | 登录成功或失败后返回的同源路径       |
+
+两项至少开启一项，开启 OIDC 时三项凭据必填，布尔值只接受 `true/false/1/0`。配置无效时不降级：Node 由 [auth-config 插件](../../server/plugins/auth-config.ts)在启动时退出，Workers 由 [defineApiHandler()](../../server/utils/api.ts) 在每个 API 请求返回 `500 CONFIGURATION_INVALID`。
+
+[GET /api/bootstrap](../../server/api/bootstrap.get.ts) 返回 `authMethods: { local, oidc }`。[AccountGate.vue](../../src/components/AccountGate.vue) 据此显示 OIDC 登录入口或隐藏密码表单与注册入口，设置面板在本地账号关闭时隐藏修改密码。本地账号关闭时，登录、注册、初始化与修改密码接口返回 `403 AUTH_METHOD_DISABLED`。
+
+## OIDC 登录
+
+应用作为 OIDC 依赖方，使用授权码与 PKCE（S256），实现在 [oidc.ts](../../server/utils/oidc.ts)：
+
+1. 登录入口跳转 [GET /api/auth/oidc/start](../../server/api/auth/oidc/start.get.ts)。服务端读取 discovery（缓存 1 小时），生成 state、nonce 与 code verifier，写入 10 分钟有效的 HttpOnly 流程 Cookie 后重定向到身份提供方。流程 Cookie 使用 `SameSite=Lax`，路径取公开回调地址所在目录，因此代理前缀下仍能带回。
+2. 身份提供方回到 [GET /api/auth/oidc/callback](../../server/api/auth/oidc/callback.get.ts)。服务端校验 state，用授权码换取令牌，以 JWKS 验证 `id_token`（RS256/ES256，校验 iss、aud、exp 与 nonce），流程 Cookie 无论成功与否都立即作废。
+3. [findOrCreateOidcUser()](../../server/utils/oidc-accounts.ts) 按 `(issuer, sub)` 查找账户，首次登录时创建账户和与注册相同的一组个人资源；邮箱与已有账户冲突时追加稳定后缀。系统尚无管理员时，首个 OIDC 账户成为管理员，并发时由唯一管理员约束决定。
+4. 成功后通过 [startSession()](../../server/utils/auth.ts) 写入与本地登录相同的会话 Cookie，并重定向到 `OIDC_POST_LOGIN_PATH`。失败时重定向到同一路径并附带 `authError` 代码，详细原因只写服务端日志。
+
+OIDC 账户在 `users` 表记录 `provider='oidc'`、`issuer` 与 `subject`，唯一约束为 `(provider, issuer, subject)`；业务数据仍以本地 `users.id` 归属，与本地账户一致。OIDC 账户的密码摘要为不可验证的占位值，不能用密码登录或修改密码。同一邮箱的本地账户与 OIDC 账户是两个独立账户，不自动合并。
+
 ## 验证入口
 
-[node-storage.test.ts](../../tests/integration/node-storage.test.ts) 覆盖账户初始化、注册、会话及持久化，[request-context.test.ts](../../tests/integration/request-context.test.ts) 检查请求身份隔离，[user-settings-resource.test.ts](../../tests/unit/user-settings-resource.test.ts) 检查设置资源销毁与旧请求取消。浏览器中检查首次初始化、注册关闭、登录失败、刷新恢复，以及保存失败时退出是否被阻止。
+[node-storage.test.ts](../../tests/integration/node-storage.test.ts) 覆盖账户初始化、注册、会话及持久化，[request-context.test.ts](../../tests/integration/request-context.test.ts) 检查请求身份隔离，[user-settings-resource.test.ts](../../tests/unit/user-settings-resource.test.ts) 检查设置资源销毁与旧请求取消。[auth-config.test.ts](../../tests/unit/auth-config.test.ts) 与 [oidc-flow.test.ts](../../tests/unit/oidc-flow.test.ts) 覆盖开关校验、回调路径与重定向，[oidc-auth.test.ts](../../tests/integration/oidc-auth.test.ts) 以本地密钥模拟身份提供方，覆盖授权码、PKCE、验签、state/aud/nonce 错误、账户映射与本地账号关闭。浏览器中检查首次初始化、注册关闭、登录失败、刷新恢复，以及保存失败时退出是否被阻止。

@@ -1,5 +1,6 @@
 import type { Bootstrap, User } from "#shared/contracts";
 import { api } from "~/lib/api";
+import { apiUrl } from "~/lib/runtime";
 
 export interface Credentials {
   email: string;
@@ -24,6 +25,10 @@ export interface AccountApi {
   ): Promise<void>;
   setRegistration(enabled: boolean): Promise<boolean>;
 }
+
+/** Browser navigation target for OIDC sign-in (a redirect flow, not a fetch). */
+/** Navigated to directly (not via api()), so the runtime base is applied at call time. */
+export const oidcStartUrl = () => apiUrl("/api/auth/oidc/start");
 
 export const accountApi: AccountApi = {
   bootstrap: () => api<Bootstrap>("/api/bootstrap"),

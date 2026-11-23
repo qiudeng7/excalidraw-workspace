@@ -3,9 +3,15 @@ import { requireUser, rateLimit, currentSessionHash } from "#server/utils/auth";
 import { apiRequest } from "#server/utils/request";
 import { body, fail, json, assertOwner } from "#server/utils/http";
 import { hashPassword, verifyPassword } from "#server/utils/passwords";
-import { changeAccountPassword, userByEmail } from "#server/db/accounts";
+import {
+  changeAccountPassword,
+  userByEmail,
+  NO_PASSWORD,
+} from "#server/db/accounts";
+import { requireLocalAuth } from "#server/utils/auth-methods";
 
 export default defineApiHandler(async (event) => {
+  requireLocalAuth(event);
   const user = await requireUser(event);
   const req = apiRequest(event);
 
@@ -28,6 +34,13 @@ export default defineApiHandler(async (event) => {
   if (data.currentPassword === data.newPassword)
     return fail(400, "PASSWORD_UNCHANGED", "新密码不能与原密码相同");
   const account = await userByEmail(user.email);
+
+  if (account?.passwordHash === NO_PASSWORD)
+    return fail(
+      403,
+      "AUTH_METHOD_DISABLED",
+      "此账号通过 OIDC 登录，没有本地密码",
+    );
 
   if (
     !account ||

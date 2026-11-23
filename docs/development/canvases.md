@@ -124,7 +124,7 @@ flowchart TD
 
 ## 分页目录与侧栏
 
-侧栏布局在 [index.vue](../../src/pages/index.vue)，触底观察与滚动锚点在 [use-sidebar-pagination.ts](../../src/composables/use-sidebar-pagination.ts)，账号菜单在 [SidebarAccountMenu.vue](../../src/components/SidebarAccountMenu.vue)。顶部品牌与空间选择、底部回收站/设置与账号入口固定；“与我共享”和“画布”共用中部一个滚动容器。画布折叠状态按账号与工作空间保存在当前浏览器，默认展开；折叠只隐藏列表，不关闭编辑器、标签或后台保存。共享区继续沿用原有展开与加载方式。
+侧栏布局在 [WorkspaceApp.vue](../../src/components/exposed/WorkspaceApp.vue)，触底观察与滚动锚点在 [use-sidebar-pagination.ts](../../src/composables/use-sidebar-pagination.ts)，账号菜单在 [SidebarAccountMenu.vue](../../src/components/SidebarAccountMenu.vue)。顶部品牌与空间选择、底部回收站/设置与账号入口固定；“与我共享”和“画布”共用中部一个滚动容器。画布折叠状态按账号与工作空间保存在当前浏览器，默认展开；折叠只隐藏列表，不关闭编辑器、标签或后台保存。共享区继续沿用原有展开与加载方式。
 
 新客户端首次调用 [GET /api/workspaces/:id/canvases](../../server/api/workspaces/[id]/canvases.get.ts) 时传 `limit=30`，返回 `CanvasCatalogPage`：
 

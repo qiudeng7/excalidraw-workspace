@@ -1,0 +1,2134 @@
+<script setup lang="ts">
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
+import { APP_VERSION } from "#shared/app-version";
+import SidebarResourceTree from "~/components/SidebarResourceTree.vue";
+import { useDirectoryTree } from "~/composables/use-directory-tree";
+import SidebarAccountMenu from "~/components/SidebarAccountMenu.vue";
+import "~/assets/workspace-tokens.css";
+import { configureApi } from "~/lib/runtime";
+import AccountGate from "~/components/AccountGate.vue";
+import QuietIcon from "~/components/QuietIcon.vue";
+import RecycleBinPanel from "~/components/RecycleBinPanel.vue";
+import CanvasTabs from "~/components/CanvasTabs.vue";
+import ReleaseAnnouncement from "~/components/ReleaseAnnouncement.vue";
+import { useReleaseAnnouncement } from "~/composables/useReleaseAnnouncement";
+import {
+  flushCollaboration,
+  closeCollaboration,
+  hasUnsyncedCollaboration,
+} from "~/lib/collaboration/session";
+import { api } from "~/lib/api";
+import { compactRealtimeStatus } from "~/lib/collaboration/status";
+import { accountApi } from "~/lib/accountApi";
+import type { CanvasResource } from "~/lib/canvasResources";
+import { workspaceApi } from "~/lib/workspaceApi";
+import { cancelAppDialog, confirmDialog, promptDialog } from "~/lib/dialogs";
+import type { EditorHandle } from "~/lib/editor";
+import { useOperation } from "~/composables/useOperation";
+import {
+  useAccountSession,
+  type AccountSessionController,
+} from "~/composables/useAccountSession";
+import { useCanvasPresence } from "~/composables/useCanvasPresence";
+import { useCanvasDocument } from "~/composables/useCanvasDocument";
+import { useWorkspaceNavigation } from "~/composables/useWorkspaceNavigation";
+import {
+  useWorkspaceDirectory,
+  type WorkspaceDirectoryController,
+} from "~/composables/useWorkspaceDirectory";
+import { useWorkspacePicker } from "~/composables/useWorkspacePicker";
+import { useWorkspaceSearch } from "~/composables/use-workspace-search";
+import { useWorkspaceSearchEntry } from "~/composables/use-workspace-search-entry";
+import WorkspaceSearchDialog from "~/components/WorkspaceSearchDialog.vue";
+
+const props = withDefaults(
+  defineProps<{
+    initialCanvasId?: string;
+    mode?: "embed" | "full";
+    theme?: "light" | "dark" | "inherit";
+    apiBase?: string;
+    realtimeBase?: string;
+  }>(),
+  { mode: "full", theme: "inherit" },
+);
+const emit = defineEmits<{
+  "title-change": [title: string];
+  "unsaved-change": [unsaved: boolean];
+}>();
+const embedded = computed(() => props.mode === "embed");
+
+if (props.apiBase !== undefined)
+  configureApi({ base: props.apiBase, realtimeBase: props.realtimeBase });
+
+// Embedded roots carry their own data-theme so tokens resolve inside the subtree.
+const hostTheme = ref<"light" | "dark">("light");
+const resolvedTheme = computed(() =>
+  props.theme === "inherit" ? hostTheme.value : props.theme,
+);
+let themeObserver: MutationObserver | undefined;
+let themeMedia: MediaQueryList | undefined;
+
+function readHostTheme() {
+  const value = window.document.documentElement.dataset.theme;
+
+  hostTheme.value =
+    value === "dark" || value === "light"
+      ? value
+      : window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
+}
+
+onMounted(() => {
+  if (!embedded.value) return;
+  readHostTheme();
+  themeObserver = new MutationObserver(readHostTheme);
+  themeObserver.observe(window.document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-theme"],
+  });
+  themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+  themeMedia.addEventListener("change", readHostTheme);
+});
+onBeforeUnmount(() => {
+  themeObserver?.disconnect();
+  themeMedia?.removeEventListener("change", readHostTheme);
+});
+
+const editor = ref<EditorHandle>();
+const saveBarrier = {
+  checkpoint: async () => {
+    editor.value?.capture();
+    await editor.value?.checkpoint?.();
+    await canvasDocument.checkpoint();
+  },
+  flush: async () => {
+    editor.value?.capture();
+    await editor.value?.flush();
+    if (account?.user.value) await flushCollaboration(account.user.value.id);
+    await canvasDocument.flushAll();
+  },
+};
+const settingsOpen = ref(false);
+const recycleOpen = ref(false);
+const shareOpen = ref(false);
+const shareCanvasId = ref("");
+const shareButton = ref<HTMLButtonElement>();
+const onlineLabel = ref("");
+const realtimeState = ref("实时协作 · 状态待确认");
+const collaborationStatus = ref("正在连接协作…");
+const sharedOpen = ref(false);
+const sharedLoading = ref(false);
+const sharedLoaded = ref(false);
+let sharedRequest = 0;
+const shared = ref<
+  { id: string; name: string; role: string; viewMode: string }[]
+>([]);
+const isCollaborative = computed(
+  () =>
+    document.value?.syncMode === "collaborative" &&
+    !current.value?.resource.dirty &&
+    current.value?.status !== "conflict",
+);
+const displayedSaveState = computed(() =>
+  isCollaborative.value ? collaborationStatus.value : saveState.value,
+);
+
+async function loadShared() {
+  if (sharedLoading.value || !user.value?.id) return;
+  const requestId = ++sharedRequest;
+
+  sharedLoading.value = true;
+  try {
+    const result = await api<{ canvases: typeof shared.value }>(
+      "/api/shared-canvases",
+    );
+
+    if (requestId !== sharedRequest) return;
+    shared.value = result.canvases;
+    sharedLoaded.value = true;
+  } catch (cause) {
+    if (requestId !== sharedRequest) return;
+    operation.reportError(
+      cause instanceof Error ? cause.message : "共享画布加载失败",
+    );
+  } finally {
+    if (requestId === sharedRequest) sharedLoading.value = false;
+  }
+}
+
+function toggleShared() {
+  sharedOpen.value = !sharedOpen.value;
+  if (sharedOpen.value && !sharedLoaded.value) void loadShared();
+}
+
+let pendingCanvasId = props.initialCanvasId ?? "";
+const readyEditorKey = ref("");
+const readyCollaborationId = ref("");
+let search: ReturnType<typeof useWorkspaceSearch>;
+const sidebarOpen = ref(!window.matchMedia("(max-width: 760px)").matches);
+const saveShortcut = /Mac|iPhone|iPad/.test(navigator.platform)
+  ? "⌘ S"
+  : "Ctrl S";
+// Owner and account callbacks run on mount/actions, after these ports are bound.
+let account: AccountSessionController;
+let directory: WorkspaceDirectoryController;
+const navigationController = useWorkspaceNavigation(
+  workspaceApi,
+  () => account?.user.value?.id,
+);
+const canvasDocument = useCanvasDocument({
+  api: workspaceApi,
+  ownerId: () => {
+    if (!account.user.value) throw new Error("请先登录");
+
+    return account.user.value.id;
+  },
+  prepareHandoff: async (id) => {
+    if (canvasDocument.document.value?.id === id)
+      await editor.value?.prepareHandoff?.();
+  },
+  onLoaded: () => {
+    if (window.matchMedia("(max-width: 760px)").matches)
+      sidebarOpen.value = false;
+  },
+});
+const directoryDragging = ref(false);
+const treeBusy = ref(false);
+const operation = useOperation(() => directoryDragging.value);
+const { busy, error, run } = operation;
+
+async function retryCurrentCanvas() {
+  const id = canvasDocument.document.value?.id;
+
+  if (!id) return;
+  try {
+    await canvasDocument.loadCanvas(id);
+  } catch (error) {
+    operation.reportError(
+      error instanceof Error ? error.message : "画布校验失败",
+    );
+  }
+}
+
+const interactionLocked = computed(
+  () => busy.value || directoryDragging.value || treeBusy.value,
+);
+
+directory = useWorkspaceDirectory({
+  api: workspaceApi,
+  navigationController,
+  canvasDocument,
+  editor: saveBarrier,
+  interactionLocked,
+  run,
+  dialogs: { prompt: promptDialog, confirm: confirmDialog },
+});
+account = useAccountSession({
+  api: accountApi,
+  editor: saveBarrier,
+  loadWorkspaces: async () => {
+    const pending = pendingCanvasId;
+
+    pendingCanvasId = "";
+    if (pending) {
+      const target = await resolveCanvasTarget(pending);
+
+      if (target) {
+        await directory.loadWorkspaces(target);
+
+        return;
+      }
+    }
+
+    const query = embedded.value
+      ? new URLSearchParams()
+      : new URLSearchParams(window.location.search);
+    const workspace = query.get("workspace");
+    const canvas = query.get("canvas");
+
+    await directory.loadWorkspaces(
+      workspace && canvas
+        ? { workspaceId: workspace, canvasId: canvas }
+        : undefined,
+    );
+  },
+  run,
+  reportError: operation.reportError,
+  clearWorkspace: () => {
+    readyEditorKey.value = "";
+    canvasDocument.reset();
+    directory.reset();
+    navigationController.reset();
+  },
+});
+const {
+  bootstrap,
+  user,
+  settingsResource,
+  starting,
+  settingsBusy,
+  initialize,
+  authenticated,
+  logout,
+  toggleRegistration,
+  flushSettings,
+} = account;
+const { document, current, resources, saveState, loadingCanvas } =
+  canvasDocument;
+
+const legacyRealtimeState = useCanvasPresence(
+  () =>
+    user.value && document.value
+      ? {
+          id: document.value.id,
+          owner: user.value.id,
+          mode: document.value.syncMode,
+        }
+      : undefined,
+  async (id) => {
+    editor.value?.capture();
+    await canvasDocument.loadCanvas(id);
+  },
+  operation.reportError,
+);
+const editorKey = computed(() =>
+  user.value && document.value && current.value
+    ? `${user.value.id}:${document.value.id}:${current.value.version}`
+    : "",
+);
+const {
+  open: announcementOpen,
+  owner: announcementOwner,
+  notice: announcementNotice,
+  shown: releaseShown,
+  close: closeAnnouncement,
+  failed: announcementFailed,
+  retry: retryAnnouncement,
+} = useReleaseAnnouncement(
+  () => user.value?.id,
+  () =>
+    !starting.value &&
+    !!bootstrap.value &&
+    !!settingsResource.value &&
+    !interactionLocked.value &&
+    !loadingCanvas.value &&
+    !settingsOpen.value &&
+    !recycleOpen.value &&
+    !search?.open.value &&
+    (!editorKey.value || editorKey.value === readyEditorKey.value),
+);
+
+watch(
+  () => user.value?.id,
+  (id, previous) => {
+    if (previous) closeCollaboration(previous);
+
+    sharedRequest++;
+    sharedLoading.value = false;
+
+    shared.value = [];
+    sharedOpen.value = false;
+    sharedLoaded.value = false;
+    shareOpen.value = false;
+    settingsOpen.value = false;
+    recycleOpen.value = false;
+    if (id) void loadShared();
+  },
+  { immediate: true },
+);
+const {
+  workspaces,
+  workspaceId,
+  currentWorkspace,
+  directoryStale,
+  directoryLocked,
+  canvasTabs,
+  closeCanvasTab,
+  refreshDirectory,
+  loadWorkspaces,
+  selectCanvas,
+  createWorkspace,
+  renameWorkspace,
+  deleteWorkspace,
+} = directory;
+const resourceTree = useDirectoryTree({
+  workspaceId,
+  owner: () => user.value?.id,
+  locked: directoryLocked,
+  flush: saveBarrier.flush,
+  remember: directory.rememberCanvas,
+  open: async (canvas) => {
+    directory.rememberCanvas(canvas);
+    await directory.selectCanvas(canvas.id);
+  },
+  renamed: directory.renameCanvasMetadata,
+  removed: directory.removeCanvases,
+  knownCanvasIds: () => [
+    ...new Set([
+      ...directory.knownCanvasIds(),
+      ...[...(resources.value?.canvases.values() ?? [])]
+        .filter((entry) => entry.document.workspaceId === workspaceId.value)
+        .map((entry) => entry.document.id),
+    ]),
+  ],
+});
+
+search = useWorkspaceSearch({
+  context: () => ({
+    ownerId: user.value?.id ?? "",
+    workspaceId: workspaceId.value,
+    canvas:
+      document.value?.workspaceId === workspaceId.value
+        ? {
+            id: document.value.id,
+            name: document.value.name,
+            workspaceId: document.value.workspaceId,
+            folderPath: resourceTree.ancestry.value
+              .map((folder) => folder.name)
+              .join(" / "),
+          }
+        : undefined,
+  }),
+  readScene: () => editor.value?.readSearchScene(),
+  search: (id, request) => workspaceApi.searchWorkspace(id, request),
+});
+const searchOpen = search.open;
+const searchEntry = useWorkspaceSearchEntry({
+  search,
+  ownerId: () => user.value?.id,
+  workspaceId: () => workspaceId.value,
+  editor: () => editor.value,
+  ready: () =>
+    !!document.value &&
+    (isCollaborative.value
+      ? readyCollaborationId.value === document.value.id
+      : readyEditorKey.value === editorKey.value),
+  blocked: () =>
+    interactionLocked.value ||
+    settingsOpen.value ||
+    recycleOpen.value ||
+    shareOpen.value ||
+    announcementOpen.value ||
+    (!searchOpen.value && !!window.document.querySelector("dialog[open]")),
+  selectCanvas,
+  report: operation.reportError,
+});
+const {
+  sidebarInput: searchInput,
+  sidebarText: searchText,
+  dialog: searchDialog,
+  selection: searchSelection,
+} = searchEntry;
+
+const revealFolder = async (id?: string) => {
+  sidebarOpen.value = true;
+  await resourceTree.attempt(async () => {
+    if (id) await resourceTree.reveal({ kind: "folder", id });
+    else await resourceTree.load(null);
+  });
+};
+
+watch(
+  () => [document.value?.id, workspaceId.value],
+  ([id, workspace]) => {
+    if (document.value && document.value.workspaceId !== workspace) return;
+    void resourceTree.attempt(async () => {
+      if (id && workspace) {
+        await Promise.all([
+          resourceTree.readPath({ kind: "canvas", id }),
+          resourceTree.reveal({ kind: "canvas", id }, false, false),
+        ]);
+      } else await resourceTree.readPath();
+    });
+  },
+);
+watch(
+  resourceTree.busy,
+  (value) => {
+    treeBusy.value = value;
+  },
+  { flush: "sync" },
+);
+const treeView = ref<InstanceType<typeof SidebarResourceTree>>();
+const createCanvas = async () => {
+  sidebarOpen.value = true;
+  await nextTick();
+  await treeView.value?.beginCreate("canvas");
+};
+const refreshAfterRestore = async () => {
+  await directory.refreshAfterRestore();
+  await resourceTree.refresh();
+};
+const { navigationNotice, clearNotice } = navigationController;
+const picker = useWorkspacePicker({
+  workspaces,
+  workspaceId,
+  locked: interactionLocked,
+  sidebarOpen,
+  select: (id) => selectWorkspace(id),
+});
+const {
+  workspacePicker,
+  workspaceTrigger,
+  workspaceList,
+  workspaceMenuOpen,
+  activeWorkspaceIndex,
+  closeWorkspaceMenu,
+  openWorkspaceMenu,
+  handleWorkspaceTriggerKey,
+  handleWorkspaceListKey,
+  handleWorkspaceFocusOut,
+  setActiveWorkspace,
+} = picker;
+
+async function selectWorkspace(id: string) {
+  if (interactionLocked.value) return;
+  closeWorkspaceMenu(true);
+  await directory.selectWorkspace(id);
+}
+
+async function openResourceCanvas(entry: CanvasResource) {
+  const targetWorkspace = entry.document.workspaceId;
+
+  if (workspaceId.value !== targetWorkspace)
+    await selectWorkspace(targetWorkspace);
+  if (workspaceId.value === targetWorkspace)
+    await selectCanvas(entry.document.id);
+}
+
+function closeActionMenu(event: MouseEvent) {
+  const button = (event.target as HTMLElement).closest("button");
+
+  if (button && !button.disabled)
+    button.closest("details")?.removeAttribute("open");
+}
+
+/** Route shells and embedding hosts call this before leaving; false means unsaved data remains. */
+async function flush() {
+  if (!user.value) return true;
+  try {
+    await saveBarrier.flush();
+    await flushSettings();
+
+    return true;
+  } catch (cause) {
+    operation.reportError(
+      cause instanceof Error ? cause.message : "尚未保存，暂时无法跳转。",
+    );
+
+    return false;
+  }
+}
+
+async function resolveCanvasTarget(id: string) {
+  try {
+    const canvas = await workspaceApi.readCanvas(id);
+
+    return { workspaceId: canvas.workspaceId, canvasId: id };
+  } catch (cause) {
+    console.warn("无法定位目标画布，改用默认位置", cause);
+
+    return undefined;
+  }
+}
+
+async function openCanvas(id: string) {
+  if (!user.value) {
+    pendingCanvasId = id;
+
+    return;
+  }
+
+  const target = await resolveCanvasTarget(id);
+
+  if (!target) {
+    operation.reportError("目标画布不可访问");
+
+    return;
+  }
+
+  if (target.workspaceId === workspaceId.value) await selectCanvas(id);
+  else await directory.loadWorkspaces(target);
+}
+
+watch(
+  () => document.value?.name ?? "",
+  (name) => emit("title-change", name),
+);
+watch(
+  () =>
+    !!user.value &&
+    (saveState.value !== "已保存" || !!resources.value?.hasDirty()),
+  (unsaved) => emit("unsaved-change", unsaved),
+);
+
+defineExpose({ openCanvas, flush });
+
+function downloadResourceBackup(entry: CanvasResource) {
+  const url = URL.createObjectURL(
+    new Blob(
+      [
+        JSON.stringify({
+          type: "excalidraw",
+          version: 2,
+          source: location.origin,
+          ...entry.resource.value,
+        }),
+      ],
+      { type: "application/json" },
+    ),
+  );
+  const link = window.document.createElement("a");
+
+  link.href = url;
+  link.download = `${entry.document.name}-本地草稿.excalidraw`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function protectDrafts(event: BeforeUnloadEvent) {
+  if (
+    resources.value?.hasDirty() ||
+    (user.value && hasUnsyncedCollaboration(user.value.id))
+  ) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+}
+
+watch(
+  () => document.value?.id,
+  (id) => {
+    readyCollaborationId.value = "";
+    if (id && id !== shareCanvasId.value) shareOpen.value = false;
+    collaborationStatus.value = "正在连接协作…";
+    realtimeState.value = "实时协作 · 状态待确认";
+    onlineLabel.value = "";
+  },
+);
+
+window.addEventListener("beforeunload", protectDrafts);
+onBeforeUnmount(() => {
+  cancelAppDialog();
+  window.removeEventListener("beforeunload", protectDrafts);
+  closeCollaboration();
+  canvasDocument.reset();
+});
+
+async function openShare() {
+  if (!document.value || !user.value) return;
+  shareCanvasId.value = document.value.id;
+  shareOpen.value = true;
+}
+
+async function flushForShare() {
+  await saveBarrier.flush();
+}
+</script>
+
+<template>
+  <div
+    class="workspace-root"
+    :class="{ 'workspace-theme': embedded, embedded }"
+    :data-theme="embedded ? resolvedTheme : undefined"
+  >
+    <section v-if="starting" class="loading">
+      <span class="loading-mark" /><span>正在打开你的空间…</span>
+    </section>
+    <section v-else-if="!bootstrap" class="loading">
+      <p role="alert">{{ error }}</p>
+      <button @click="initialize">重试连接</button>
+    </section>
+    <AccountGate
+      v-else-if="!user"
+      :bootstrap="bootstrap"
+      @authenticated="authenticated"
+      @refresh="initialize"
+    />
+    <section v-else class="draw-page" aria-label="Excalidraw 画布">
+      <button
+        v-if="sidebarOpen"
+        class="sidebar-backdrop"
+        aria-label="关闭侧边栏"
+        @click="sidebarOpen = false"
+      />
+      <aside
+        v-if="sidebarOpen"
+        id="workspace-sidebar"
+        class="workspace-sidebar"
+        aria-label="账户与工作空间"
+      >
+        <div class="sidebar-heading">
+          <span class="workspace-brand"
+            ><span class="brand-symbol"
+              ><QuietIcon name="canvas" :size="17" /></span
+            >画布空间</span
+          ><span class="app-version">v{{ APP_VERSION }}</span>
+          <a
+            class="github-link icon-button"
+            href="https://github.com/qiudeng7/excalidraw-workspace"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub 仓库"
+            title="GitHub 仓库"
+            ><svg
+              viewBox="0 0 24 24"
+              width="17"
+              height="17"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                d="M12 .75a11.25 11.25 0 0 0-3.558 21.923c.563.104.768-.244.768-.542 0-.267-.01-.974-.015-1.912-3.13.68-3.79-1.51-3.79-1.51-.512-1.3-1.25-1.647-1.25-1.647-1.022-.7.078-.686.078-.686 1.13.08 1.724 1.16 1.724 1.16 1.005 1.722 2.637 1.225 3.279.937.102-.728.393-1.225.715-1.506-2.498-.284-5.124-1.25-5.124-5.56 0-1.228.44-2.233 1.16-3.02-.116-.285-.503-1.43.11-2.98 0 0 .945-.303 3.094 1.154A10.8 10.8 0 0 1 12 6.183c.956.005 1.918.13 2.817.378 2.148-1.457 3.092-1.154 3.092-1.154.615 1.55.228 2.695.113 2.98.72.787 1.157 1.792 1.157 3.02 0 4.322-2.63 5.273-5.136 5.55.404.35.765 1.044.765 2.105 0 1.52-.014 2.746-.014 3.119 0 .3.202.651.774.54A11.252 11.252 0 0 0 12 .75Z"
+              /></svg
+          ></a>
+          <button
+            class="icon-button"
+            title="收起侧边栏"
+            aria-label="收起侧边栏"
+            @click="sidebarOpen = false"
+          >
+            <QuietIcon name="panel" :size="17" />
+          </button>
+        </div>
+        <div class="workspace-search-entry">
+          <input
+            ref="searchInput"
+            :value="searchText"
+            type="text"
+            data-testid="workspace-search-entry"
+            placeholder="搜索当前工作空间"
+            aria-label="搜索当前工作空间"
+            aria-haspopup="dialog"
+            :aria-expanded="searchOpen"
+            autocomplete="off"
+            :disabled="!workspaceId || interactionLocked"
+            @input="searchEntry.sidebarChanged"
+          />
+          <kbd>{{ saveShortcut.startsWith("⌘") ? "⌘ P" : "Ctrl P" }}</kbd>
+        </div>
+        <div class="workspace-controls">
+          <div class="section-label">
+            <label id="workspace-picker-label" for="workspace-select"
+              >工作空间</label
+            >
+            <details class="action-menu">
+              <summary aria-label="工作空间操作" title="工作空间操作">
+                <QuietIcon name="more" :size="17" />
+              </summary>
+              <div class="menu-popover" @click="closeActionMenu">
+                <button :disabled="directoryLocked" @click="createWorkspace">
+                  <QuietIcon name="plus" :size="15" />新建工作空间</button
+                ><button
+                  :disabled="directoryLocked || !workspaceId"
+                  @click="renameWorkspace"
+                >
+                  <QuietIcon name="edit" :size="15" />重命名</button
+                ><button
+                  class="danger"
+                  :disabled="directoryLocked || !workspaceId"
+                  @click="deleteWorkspace"
+                >
+                  <QuietIcon name="trash" :size="15" />删除工作空间
+                </button>
+              </div>
+            </details>
+          </div>
+          <div
+            ref="workspacePicker"
+            class="workspace-picker"
+            @focusout="handleWorkspaceFocusOut"
+          >
+            <button
+              id="workspace-select"
+              ref="workspaceTrigger"
+              class="workspace-select-wrap"
+              :class="{ expanded: workspaceMenuOpen }"
+              :disabled="interactionLocked || !workspaces.length"
+              aria-haspopup="listbox"
+              :aria-expanded="workspaceMenuOpen"
+              aria-controls="workspace-options"
+              aria-labelledby="workspace-picker-label workspace-current-name"
+              @click="
+                workspaceMenuOpen ? closeWorkspaceMenu() : openWorkspaceMenu()
+              "
+              @keydown="handleWorkspaceTriggerKey"
+            >
+              <QuietIcon name="folder" :size="16" /><span
+                id="workspace-current-name"
+                :title="currentWorkspace?.name"
+                >{{ currentWorkspace?.name ?? "选择工作空间" }}</span
+              ><svg
+                class="workspace-chevron"
+                viewBox="0 0 12 12"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="m3 4.5 3 3 3-3"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </button>
+            <ul
+              v-if="workspaceMenuOpen"
+              id="workspace-options"
+              ref="workspaceList"
+              class="workspace-options"
+              role="listbox"
+              tabindex="0"
+              aria-labelledby="workspace-picker-label"
+              :aria-activedescendant="`workspace-option-${activeWorkspaceIndex}`"
+              @keydown="handleWorkspaceListKey"
+            >
+              <li
+                v-for="(workspace, index) in workspaces"
+                :id="`workspace-option-${index}`"
+                :key="workspace.id"
+                role="option"
+                :aria-selected="workspace.id === workspaceId"
+                :aria-disabled="interactionLocked"
+                :class="{
+                  active: activeWorkspaceIndex === index,
+                  chosen: workspace.id === workspaceId,
+                }"
+                :title="workspace.name"
+                @pointermove="setActiveWorkspace(index)"
+                @click="selectWorkspace(workspace.id)"
+              >
+                <QuietIcon name="folder" :size="15" /><span>{{
+                  workspace.name
+                }}</span
+                ><QuietIcon
+                  v-if="workspace.id === workspaceId"
+                  name="check"
+                  :size="15"
+                />
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div class="sidebar-scroll">
+          <div
+            class="shared-canvases"
+            @click.capture="treeView?.clearSelection()"
+          >
+            <div class="shared-heading">
+              <button
+                class="shared-toggle"
+                type="button"
+                aria-label="与我共享"
+                :aria-expanded="sharedOpen"
+                aria-controls="shared-canvas-list"
+                @click="toggleShared"
+              >
+                <QuietIcon name="users" :size="16" /><span>与我共享</span
+                ><span v-if="shared.length" class="count">{{
+                  shared.length
+                }}</span
+                ><QuietIcon
+                  class="shared-chevron"
+                  :class="{ expanded: sharedOpen }"
+                  name="chevron"
+                  :size="13"
+                />
+              </button>
+              <button
+                v-if="sharedOpen"
+                class="icon-button"
+                type="button"
+                aria-label="刷新共享画布"
+                title="刷新共享画布"
+                :disabled="sharedLoading"
+                @click="loadShared"
+              >
+                <QuietIcon name="refresh" :size="14" />
+              </button>
+            </div>
+            <div
+              v-if="sharedOpen"
+              id="shared-canvas-list"
+              class="shared-list"
+              :aria-busy="sharedLoading"
+            >
+              <component
+                :is="embedded ? 'a' : 'NuxtLink'"
+                v-for="item in shared"
+                :key="item.id"
+                v-bind="
+                  embedded
+                    ? {
+                        href: '#',
+                        onClick: (e: Event) => {
+                          e.preventDefault();
+                          void openCanvas(item.id);
+                        },
+                      }
+                    : { to: `/c/${item.id}` }
+                "
+                :title="item.name"
+                ><QuietIcon name="canvas" :size="15" /><span>{{
+                  item.name
+                }}</span
+                ><QuietIcon
+                  v-if="item.role === 'editor'"
+                  name="edit"
+                  :size="12"
+              /></component>
+              <p v-if="!shared.length" class="sidebar-empty">
+                {{
+                  sharedLoading
+                    ? "正在加载…"
+                    : sharedLoaded
+                      ? "他人邀请的画布会显示在这里"
+                      : "暂时无法加载，请重试"
+                }}
+              </p>
+            </div>
+          </div>
+          <SidebarResourceTree
+            ref="treeView"
+            :tree="resourceTree"
+            :workspace-id="workspaceId"
+            :owner-id="user.id"
+            :current-id="document?.id"
+            @dragging="directoryDragging = $event"
+            @recycle="recycleOpen = true"
+          />
+        </div>
+        <div id="directory-status" class="directory-status" />
+        <div
+          v-if="resourceTree.moveUndo.value"
+          class="sidebar-move-status"
+          role="status"
+        >
+          <span>已移动</span
+          ><button
+            type="button"
+            :disabled="resourceTree.locked.value"
+            @click="resourceTree.attempt(resourceTree.undoMove)"
+          >
+            撤销移动
+          </button>
+        </div>
+        <div class="sidebar-bottom">
+          <div class="sidebar-actions">
+            <button
+              type="button"
+              class="settings-entry recycle-entry"
+              aria-haspopup="dialog"
+              :aria-expanded="recycleOpen"
+              :disabled="interactionLocked"
+              @click="recycleOpen = true"
+            >
+              <QuietIcon name="trash" :size="16" /><span>回收站</span>
+            </button>
+            <button
+              type="button"
+              class="settings-entry"
+              aria-haspopup="dialog"
+              :aria-expanded="settingsOpen"
+              :disabled="interactionLocked || !settingsResource"
+              @click="settingsOpen = true"
+            >
+              <QuietIcon name="settings" :size="16" /><span>设置</span>
+            </button>
+          </div>
+          <SidebarAccountMenu
+            :name="user.name"
+            :email="user.email"
+            :locked="interactionLocked"
+            @logout="logout"
+          />
+        </div>
+      </aside>
+      <div class="draw-content">
+        <div
+          v-for="entry in [...(resources?.canvases.values() ?? [])].filter(
+            (item) =>
+              item.message &&
+              item.resource.dirty &&
+              item.document.id !== document?.id,
+          )"
+          :key="entry.document.id"
+          class="operation-error"
+          role="alert"
+        >
+          <span>{{ entry.document.name }}：{{ entry.message }}</span>
+          <button @click="openResourceCanvas(entry)">查看画布</button>
+          <button @click="downloadResourceBackup(entry)">下载本地备份</button>
+          <button
+            v-if="!entry.resource.conflict"
+            @click="run(() => entry.resource.flush())"
+          >
+            重试保存
+          </button>
+        </div>
+        <header class="canvas-header">
+          <button
+            class="sidebar-toggle icon-button"
+            :aria-expanded="sidebarOpen"
+            aria-controls="workspace-sidebar"
+            aria-label="切换工作空间侧边栏"
+            title="工作空间"
+            @click="sidebarOpen = !sidebarOpen"
+          >
+            <QuietIcon name="panel" :size="18" />
+          </button>
+          <CanvasTabs
+            :tabs="canvasTabs"
+            :active-id="document?.id"
+            :locked="interactionLocked"
+            :closing-locked="directoryLocked"
+            @select="selectCanvas"
+            @close="closeCanvasTab"
+          />
+          <div class="header-right">
+            <span
+              v-if="document"
+              class="save-state presence-state"
+              aria-live="polite"
+              :aria-label="`实时协作状态：${isCollaborative ? realtimeState : legacyRealtimeState}`"
+              :title="`${isCollaborative ? realtimeState : legacyRealtimeState}${onlineLabel ? ' · ' + onlineLabel : ''}`"
+              ><QuietIcon name="users" :size="13" /><span
+                class="realtime-full"
+                >{{
+                  isCollaborative ? realtimeState : legacyRealtimeState
+                }}</span
+              ><span class="realtime-compact">{{
+                compactRealtimeStatus(
+                  isCollaborative ? realtimeState : legacyRealtimeState,
+                )
+              }}</span></span
+            >
+            <span
+              class="save-state"
+              :class="{ saved: displayedSaveState === '已保存' && !busy }"
+              :title="
+                current?.status === 'checking'
+                  ? '正在确认最新版本，暂时只读，可平移和缩放。'
+                  : undefined
+              "
+              role="status"
+              ><span class="status-dot" />{{
+                busy && current?.status !== "checking"
+                  ? "处理中…"
+                  : displayedSaveState
+              }}</span
+            ><button
+              v-if="document"
+              ref="shareButton"
+              class="save-button"
+              @click="openShare"
+            >
+              <QuietIcon name="link" :size="14" />分享</button
+            ><button
+              class="save-button"
+              :disabled="interactionLocked || !document"
+              title="保存画布 · Ctrl / ⌘ S"
+              @click="editor?.saveManually()"
+            >
+              <QuietIcon name="cloud" :size="15" /><span>保存</span
+              ><kbd>{{ saveShortcut }}</kbd>
+            </button>
+          </div>
+        </header>
+        <nav v-if="document" class="canvas-path" aria-label="画布路径">
+          <button type="button" @click="revealFolder()">
+            {{ currentWorkspace?.name ?? "我的文件" }}
+          </button>
+          <template
+            v-for="folder in resourceTree.ancestry.value"
+            :key="folder.id"
+          >
+            <span>/</span
+            ><button type="button" @click="revealFolder(folder.id)">
+              {{ folder.name }}
+            </button>
+          </template>
+          <span>/</span><span :title="document.name">{{ document.name }}</span>
+        </nav>
+        <div v-if="navigationNotice" class="navigation-notice" role="status">
+          <span>{{ navigationNotice }}</span
+          ><button
+            class="icon-button"
+            aria-label="关闭最近位置提示"
+            @click="clearNotice"
+          >
+            <QuietIcon name="close" :size="16" />
+          </button>
+        </div>
+        <div v-if="directoryStale" class="operation-error" role="alert">
+          <span>画布列表尚未确认，目录操作已暂停。</span
+          ><button :disabled="busy" @click="run(refreshDirectory)">
+            重新加载列表
+          </button>
+        </div>
+        <div v-if="error" class="operation-error" role="alert">
+          <span>{{ error }}</span
+          ><button
+            v-if="!document"
+            :disabled="directoryLocked"
+            @click="run(loadWorkspaces)"
+          >
+            重新加载</button
+          ><button
+            class="icon-button"
+            aria-label="关闭提示"
+            @click="operation.reportError('')"
+          >
+            <QuietIcon name="close" :size="16" />
+          </button>
+        </div>
+        <div
+          v-if="
+            settingsResource &&
+            ['unavailable', 'error', 'conflict'].includes(
+              settingsResource.state.status,
+            )
+          "
+          class="settings-notice"
+          role="alert"
+        >
+          <span>{{ settingsResource.state.error }}</span
+          ><button
+            v-if="!settingsResource.state.cloudConflict"
+            @click="settingsResource.retry()"
+          >
+            {{
+              settingsResource.state.ready ? "重试同步设置" : "重新读取设置"
+            }}</button
+          ><template v-else
+            ><button @click="settingsResource.useCloud()">采用云端设置</button
+            ><button @click="settingsResource.keepLocal()">
+              保存当前设置
+            </button></template
+          >
+        </div>
+        <div v-if="announcementNotice" class="settings-notice" role="status">
+          <span>{{ announcementNotice }}</span>
+          <button type="button" @click="retryAnnouncement">重试公告</button>
+          <button type="button" @click="announcementNotice = ''">
+            关闭提示
+          </button>
+        </div>
+        <section
+          id="canvas-tab-panel"
+          role="tabpanel"
+          :aria-labelledby="document ? `canvas-tab-${document.id}` : undefined"
+          class="canvas-panel"
+        >
+          <div
+            v-if="document && current && resources && settingsResource"
+            class="draw-editor"
+            :inert="busy || treeBusy"
+          >
+            <CollaborationCanvas
+              v-if="isCollaborative"
+              :key="`collaboration:${user.id}:${document.id}`"
+              ref="editor"
+              :canvas-id="document.id"
+              :user-id="user.id"
+              scope="account"
+              :initial-document="document"
+              :resources="resources"
+              :user-settings="settingsResource.state.settings"
+              :settings-open="
+                settingsOpen || announcementOpen || shareOpen || searchOpen
+              "
+              @status="collaborationStatus = $event"
+              @realtime="realtimeState = $event"
+              @participants="
+                (count, label) => {
+                  onlineLabel = label;
+                }
+              "
+              @ready="
+                readyEditorKey = editorKey;
+                readyCollaborationId = document?.id ?? '';
+              "
+            />
+            <ExcalidrawCanvas
+              v-else
+              :embedded="embedded"
+              :key="editorKey"
+              ref="editor"
+              :document="document"
+              :entry="current"
+              :resources="resources"
+              :user-id="user.id"
+              :user-settings="settingsResource.state.settings"
+              :settings-status="settingsResource.state.status"
+              :settings-open="
+                settingsOpen || announcementOpen || shareOpen || searchOpen
+              "
+              @ready="readyEditorKey = $event"
+              @retry-load="retryCurrentCanvas"
+            />
+          </div>
+          <div v-else class="loading">
+            <template v-if="busy">正在加载画布…</template
+            ><template v-else-if="!workspaces.length"
+              ><p>创建工作空间，开始整理你的画布。</p>
+              <button
+                class="empty-create"
+                :disabled="interactionLocked"
+                @click="createWorkspace"
+              >
+                新建工作空间
+              </button></template
+            ><template
+              v-else-if="
+                directory.total.value === 0 &&
+                !Object.values(resourceTree.known.value).some(
+                  (item) => item.kind === 'canvas',
+                )
+              "
+              ><p>这个工作空间还没有画布。</p>
+              <button
+                class="empty-create"
+                :disabled="directoryLocked"
+                @click="createCanvas"
+              >
+                新建画布
+              </button></template
+            ><template v-else-if="!canvasTabs.length"
+              ><p>从侧边栏打开画布，或新建一张画布。</p>
+              <button
+                id="open-canvas-sidebar"
+                class="empty-create"
+                @click="sidebarOpen = true"
+              >
+                打开侧边栏
+              </button>
+              <button
+                class="empty-create"
+                :disabled="directoryLocked"
+                @click="createCanvas"
+              >
+                新建画布
+              </button> </template
+            ><template v-else
+              ><p>暂时无法加载画布，请重试。</p>
+              <button :disabled="directoryLocked" @click="run(loadWorkspaces)">
+                重新加载
+              </button></template
+            >
+          </div>
+        </section>
+      </div>
+      <WorkspaceSearchDialog
+        v-if="searchOpen"
+        ref="searchDialog"
+        :search="search"
+        :selection="searchSelection"
+        @close="searchEntry.close"
+        @select="searchEntry.select"
+      />
+      <RecycleBinPanel
+        v-if="recycleOpen && user"
+        :key="user.id"
+        :refresh="refreshAfterRestore"
+        @close="recycleOpen = false"
+      />
+      <SettingsPanel
+        v-if="settingsOpen && settingsResource"
+        :resource="settingsResource"
+        :user="user"
+        :registration-enabled="bootstrap.registrationEnabled"
+        :password-enabled="bootstrap.authMethods?.local ?? true"
+        :registration-busy="settingsBusy"
+        :system-error="error"
+        @registration-change="toggleRegistration"
+        @release-shown="releaseShown"
+        @close="settingsOpen = false"
+      />
+      <ReleaseAnnouncement
+        v-if="announcementOpen && announcementOwner"
+        :key="announcementOwner"
+        :owner="announcementOwner"
+        @close="closeAnnouncement"
+        @shown="releaseShown"
+        @failed="announcementFailed"
+      />
+      <CanvasSharePanel
+        v-if="shareOpen && shareCanvasId"
+        :canvas-id="shareCanvasId"
+        :user-id="user.id"
+        :before-publish="flushForShare"
+        @activated="retryCurrentCanvas"
+        :return-focus="shareButton"
+        @close="shareOpen = false"
+      />
+    </section>
+  </div>
+</template>
+
+<style scoped>
+.workspace-root {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.workspace-root.embedded {
+  height: 100%;
+  background: var(--app-surface);
+  color: var(--app-text);
+}
+.canvas-path {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 16px;
+  border-bottom: 1px solid var(--app-border);
+  font-size: 11px;
+  color: var(--app-muted);
+}
+.canvas-path button {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 3px 5px;
+  cursor: pointer;
+  border-radius: 4px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canvas-path button:hover {
+  background: var(--app-hover);
+}
+.canvas-path > span:last-child {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presence-state {
+  border: 1px solid var(--color-border, #d5d5db);
+  border-radius: 5px;
+  padding: 3px 6px;
+}
+.realtime-compact {
+  display: none;
+}
+@media (max-width: 760px) {
+  .presence-state.save-state {
+    max-width: none;
+    overflow: visible;
+    font-size: 10px;
+  }
+  .realtime-full {
+    display: none;
+  }
+  .realtime-compact {
+    display: inline;
+  }
+}
+.settings-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--app-warning-bg);
+  color: var(--app-warning);
+  font-size: 12px;
+}
+.settings-notice span {
+  flex: 1;
+}
+.settings-notice button {
+  border: 1px solid var(--app-warning-border);
+  background: var(--app-surface);
+}
+
+.drag-handle {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 27px;
+  padding: 0 !important;
+  color: var(--app-subtle);
+  touch-action: none;
+  cursor: grab;
+}
+.drag-handle svg {
+  width: 12px;
+  height: 16px;
+}
+.drag-handle:active {
+  cursor: grabbing;
+}
+.canvas-list li.dragging {
+  opacity: 0.5;
+}
+.canvas-list li.drop-target {
+  box-shadow: inset 0 -2px var(--app-focus);
+}
+.canvas-name {
+  padding-left: 5px !important;
+}
+.shared-canvases {
+  margin: 0 0 8px;
+}
+.shared-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.shared-toggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  font-size: 12px;
+  color: var(--app-muted);
+  text-align: left;
+}
+.shared-toggle:hover,
+.shared-list a:hover {
+  background: var(--app-hover);
+  border-radius: 6px;
+}
+.shared-chevron {
+  margin-left: auto;
+  transition: transform 0.15s;
+}
+.shared-chevron.expanded {
+  transform: rotate(90deg);
+}
+.shared-list {
+  display: grid;
+  gap: 1px;
+  padding: 4px 0 0 12px;
+}
+.shared-list a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 10px;
+  color: var(--app-muted);
+  font-size: 11px;
+  text-decoration: none;
+}
+.shared-list a > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shared-list svg {
+  flex-shrink: 0;
+}
+.shared-toggle:focus-visible,
+.shared-list a:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+}
+.sidebar-empty {
+  padding: 0 8px;
+  color: var(--app-subtle);
+  font-size: 11px;
+}
+.navigation-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--app-hover);
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--app-muted);
+}
+.navigation-notice span {
+  flex: 1;
+}
+.empty-create {
+  padding: 10px 18px;
+  background: var(--app-accent);
+  color: var(--app-on-accent);
+}
+.empty-create:hover {
+  background: var(--app-accent-hover);
+}
+
+.draw-page {
+  --text: var(--app-text);
+  --muted: var(--app-subtle);
+  --line: var(--app-border);
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--app-surface);
+  color: var(--text);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+.draw-content {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.draw-editor {
+  flex: 1;
+  min-height: 0;
+}
+.loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--app-muted);
+}
+.loading-mark {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--app-border);
+  border-top-color: var(--app-focus);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.workspace-sidebar {
+  box-sizing: border-box;
+  flex: none;
+  width: 248px;
+  display: flex;
+  flex-direction: column;
+  padding: 0 14px;
+  background: var(--app-sidebar);
+  border-right: 1px solid var(--line);
+  z-index: 20;
+  min-height: 0;
+  overflow: hidden;
+}
+.sidebar-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  scrollbar-width: thin;
+}
+.shared-canvases {
+  flex: none;
+}
+.directory-status {
+  flex: none;
+  max-height: 35dvh;
+  overflow-y: auto;
+}
+.sidebar-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 68px;
+  flex: none;
+  padding: 0 4px;
+}
+.app-version {
+  color: var(--app-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.github-link {
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+.pin-mark {
+  flex: none;
+  color: var(--app-accent);
+}
+.workspace-brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+.brand-symbol {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: var(--app-accent);
+  color: var(--app-on-accent);
+  border-radius: 6px;
+}
+.workspace-search-entry {
+  position: relative;
+  margin: 6px 0 8px;
+}
+.workspace-search-entry input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 58px 9px 10px;
+  border: 1px solid var(--app-border);
+  border-radius: 7px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  font-size: 12px;
+}
+.workspace-search-entry input:focus {
+  outline: 2px solid var(--app-accent);
+  outline-offset: 1px;
+}
+.workspace-search-entry kbd {
+  position: absolute;
+  right: 9px;
+  top: 11px;
+  color: var(--app-muted);
+  font-size: 10px;
+  pointer-events: none;
+}
+.workspace-controls {
+  flex: none;
+  margin-top: 8px;
+  margin-bottom: 14px;
+}
+.section-label,
+.canvas-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--app-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.section-label {
+  padding: 0 8px;
+  margin-bottom: 8px;
+}
+.section-label strong {
+  font-weight: 500;
+}
+.workspace-picker {
+  position: relative;
+}
+.workspace-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 11px;
+  height: 38px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-surface);
+  color: var(--app-muted);
+  text-align: left;
+}
+.workspace-select-wrap > svg {
+  flex: none;
+}
+.workspace-select-wrap > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--app-text);
+}
+.workspace-select-wrap:hover {
+  background: var(--app-hover);
+  border-color: var(--app-border-strong);
+}
+.workspace-select-wrap.expanded {
+  border-color: var(--app-focus);
+  box-shadow: 0 0 0 2px var(--app-focus-ring);
+}
+.workspace-chevron {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.15s;
+}
+.expanded .workspace-chevron {
+  transform: rotate(180deg);
+}
+.workspace-options {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 37;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  border-radius: 7px;
+  box-shadow: 0 6px 24px var(--app-shadow);
+  max-height: min(280px, calc(100dvh - 180px));
+  overflow-y: auto;
+  outline: none;
+  overscroll-behavior: contain;
+}
+.workspace-options li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border-radius: 4px;
+  color: var(--app-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.workspace-options li > svg {
+  flex: none;
+}
+.workspace-options li > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--app-muted);
+}
+.workspace-options li.active {
+  background: var(--app-hover);
+}
+.workspace-options li.chosen > span {
+  font-weight: 500;
+  color: var(--app-selected-text);
+}
+.workspace-options:focus-visible li.active {
+  box-shadow: inset 0 0 0 1px var(--app-border-strong);
+}
+.workspace-options li[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: wait;
+}
+.canvas-heading {
+  padding: 0 8px;
+  margin-bottom: 7px;
+}
+.count {
+  margin-left: 5px;
+  color: var(--app-subtle);
+  font-size: 10px;
+}
+.canvas-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-height: 0;
+}
+.canvas-list li {
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+  min-height: 32px;
+  padding-right: 3px;
+  color: var(--app-muted);
+}
+.canvas-list li:hover {
+  background: var(--app-hover);
+}
+.canvas-list .selected {
+  background: var(--app-selected);
+  color: var(--app-selected-text);
+}
+.canvas-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  padding: 7px 10px !important;
+  font-size: 13px !important;
+  background: none !important;
+}
+.canvas-name svg {
+  flex: none;
+}
+.canvas-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.canvas-menu {
+  flex: none;
+  color: var(--app-subtle);
+}
+.action-menu {
+  position: relative;
+}
+.action-menu summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  outline: none;
+}
+.action-menu summary::-webkit-details-marker {
+  display: none;
+}
+.action-menu summary:hover,
+.action-menu[open] summary {
+  background: var(--app-hover);
+  color: var(--app-muted);
+}
+.action-menu summary:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 1px;
+}
+.action-menu[open] {
+  z-index: 35;
+}
+.menu-popover {
+  position: absolute;
+  right: 0;
+  top: 30px;
+  min-width: 158px;
+  padding: 4px;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  box-shadow: 0 6px 24px var(--app-shadow);
+  border-radius: 7px;
+  z-index: 36;
+}
+.menu-popover button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.menu-popover .danger {
+  color: var(--app-danger);
+}
+.sidebar-move-status {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+.sidebar-move-status button {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--app-text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sidebar-move-status button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sidebar-move-status button:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 1px;
+}
+.sidebar-bottom {
+  flex: none;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+}
+.sidebar-actions {
+  display: flex;
+  gap: 4px;
+}
+.settings-entry {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--app-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-entry:hover,
+.settings-entry:focus-visible {
+  background: var(--app-hover);
+  color: var(--app-text);
+}
+.settings-entry:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: -2px;
+}
+.canvas-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 0;
+  text-align: left;
+  color: inherit;
+  font-size: 12px;
+}
+.canvas-toggle .shared-chevron {
+  margin-left: 6px;
+}
+.canvas-toggle:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: -2px;
+}
+.current-canvas-shortcut {
+  padding: 4px 6px 9px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+.current-canvas-shortcut button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 4px;
+  padding: 8px;
+  background: var(--app-selected);
+  border-radius: 5px;
+  color: var(--app-selected-text);
+}
+.current-canvas-shortcut button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.current-canvas-shortcut svg {
+  flex: none;
+}
+.pagination-status {
+  padding: 10px 6px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--app-subtle);
+}
+.pagination-status button {
+  padding: 6px 8px;
+  color: var(--app-muted);
+  border: 1px solid var(--app-border);
+  border-radius: 5px;
+}
+.pagination-sentinel {
+  height: 1px;
+}
+.canvas-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.canvas-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  height: 51px;
+  box-sizing: border-box;
+  padding: 0 20px 0 13px;
+  border-bottom: 1px solid var(--line);
+  color: var(--app-muted);
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex: none;
+}
+.save-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--app-muted);
+}
+.status-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--app-warning);
+}
+.saved .status-dot {
+  background: var(--app-switch-active);
+}
+.save-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px !important;
+  color: var(--app-muted) !important;
+}
+.save-button kbd {
+  font-family: inherit;
+  font-size: 9px;
+  color: var(--app-subtle);
+  padding-left: 5px;
+}
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  flex: none;
+  padding: 0 !important;
+  color: var(--app-subtle) !important;
+}
+.sidebar-toggle {
+  color: var(--app-muted) !important;
+}
+button {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  border-radius: 4px;
+  padding: 6px 9px;
+  font: inherit;
+  color: inherit;
+}
+button:hover {
+  background: var(--app-hover);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: wait;
+}
+button:focus-visible {
+  outline: 2px solid var(--app-focus);
+  outline-offset: 2px;
+}
+.operation-error {
+  padding: 10px 16px;
+  background: var(--app-danger-bg);
+  color: var(--app-danger);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.operation-error span {
+  flex: 1;
+}
+.sidebar-backdrop {
+  display: none;
+}
+@media (max-width: 1000px) {
+  .header-right {
+    gap: 10px;
+  }
+  .save-button kbd {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .workspace-sidebar {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: min(280px, 85vw);
+    box-shadow: 8px 0 24px #0002;
+    z-index: 40;
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--app-backdrop);
+    z-index: 39;
+  }
+  .canvas-header {
+    padding-inline: 10px;
+    height: 47px;
+    gap: 8px;
+  }
+  .header-right {
+    gap: 6px;
+  }
+  .save-state {
+    max-width: 90px;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 9px;
+  }
+  .save-button {
+    padding: 5px;
+  }
+  .save-button span {
+    display: none;
+  }
+  .menu-popover {
+    max-width: 200px;
+  }
+  .sidebar-bottom {
+    padding-bottom: calc(5px + env(safe-area-inset-bottom));
+  }
+  .settings-entry {
+    min-height: 44px;
+  }
+}
+</style>

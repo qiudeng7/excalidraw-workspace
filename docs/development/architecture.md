@@ -6,7 +6,7 @@
 
 ## 页面与状态边界
 
-[src/pages/index.vue](../../src/pages/index.vue) 组装依赖、绑定模板和路由离开保护。根路径 `/` 是画布，`/home` 为首页，`/about` 为关于页；[nuxt.config.ts](../../nuxt.config.ts) 将旧地址 `/draw` 重定向到 `/`。控制器拥有自己的状态，对外暴露动作与只读 ref；需要其他控制器能力时通过接口传入，避免直接修改另一个控制器的状态。
+[WorkspaceApp.vue](../../src/components/exposed/WorkspaceApp.vue) 组装依赖并绑定模板，整站页面 [src/pages/index.vue](../../src/pages/index.vue) 只渲染它并在路由离开前等待 `flush()`；同一组件也作为 Module Federation 暴露给宿主，见[被宿主集成](integration.md)。根路径 `/` 是画布，`/home` 为首页，`/about` 为关于页；[nuxt.config.ts](../../nuxt.config.ts) 将旧地址 `/draw` 重定向到 `/`。控制器拥有自己的状态，对外暴露动作与只读 ref；需要其他控制器能力时通过接口传入，避免直接修改另一个控制器的状态。
 
 | 职责                               | 实现                                                                                                                                   |
 | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -19,13 +19,13 @@
 | 账号级资源、后台队列与素材库懒加载 | [canvasResources.ts](../../src/lib/canvasResources.ts)、[persistence.ts](../../src/lib/persistence.ts)                                 |
 | 账户设置保存与冲突选择             | [userSettings.ts](../../src/lib/userSettings.ts)                                                                                       |
 
-新增 HTTP 调用放到相应 API 适配器，目录与账户控制器分别依赖 [WorkspaceApi](../../src/lib/workspaceApi.ts) 和 [AccountApi](../../src/lib/accountApi.ts)。通用 [api.ts](../../src/lib/api.ts) 统一请求头和错误解析，成功状态下的无效 JSON 也按错误处理。
+新增 HTTP 调用放到相应 API 适配器，目录与账户控制器分别依赖 [WorkspaceApi](../../src/lib/workspaceApi.ts) 和 [AccountApi](../../src/lib/accountApi.ts)。通用 [api.ts](../../src/lib/api.ts) 统一请求头和错误解析，成功状态下的无效 JSON 也按错误处理。API、WebSocket 与编辑器资源地址一律经 [runtime.ts](../../src/lib/runtime.ts) 派生，默认基址为空即同源根路径；不要在其他位置拼接 `/api` 或 `location.origin`。
 
 跨画布使用 [SaveBarrier](../../src/lib/editor.ts) 的本地草稿 checkpoint，云端写入由账号级资源继续执行；退出和离开页面等待所有未同步资源。账户设置另有保存屏障。新增窗口事件监听须同时处理注销，拖拽取消和卸载须释放指针捕获。
 
 ## 请求与权限边界
 
-[server/api/](../../server/api/) 负责请求校验、业务编排和响应；[server/db/](../../server/db/) 按资源组织查询。[defineApiHandler()](../../server/utils/api.ts) 统一来源校验、默认登录校验和 JSON 错误。公开账户与分享接口显式使用 `{ public: true }`，仍执行来源校验。
+[server/api/](../../server/api/) 负责请求校验、业务编排和响应；[server/db/](../../server/db/) 按资源组织查询。[defineApiHandler()](../../server/utils/api.ts) 统一来源校验、默认登录校验和 JSON 错误。公开账户与分享接口显式使用 `{ public: true }`，仍执行来源校验。账号方式配置也在这里校验，见[账号方式开关](accounts.md#账号方式开关)。
 
 非 GET/HEAD 请求要求 `Origin` 等于配置的公开 origin，且 `X-Requested-With: excalidraw-demo`。来源和反向代理配置见[部署说明](../deployment.md#docker)。[http.ts](../../server/utils/http.ts) 解析 JSON 请求体并限制在 20 MB；[apiRequest()](../../server/utils/request.ts) 保留 Workers 的 DELETE 请求体。
 
