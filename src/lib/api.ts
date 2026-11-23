@@ -1,3 +1,5 @@
+import { apiUrl } from "~/lib/runtime";
+
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -36,7 +38,7 @@ async function request<T>(
     headers.set("X-Requested-With", "excalidraw-demo");
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...options,
     credentials: "same-origin",
     headers,

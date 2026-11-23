@@ -8,6 +8,7 @@ import type {
 } from "#shared/collaboration/types";
 import { orderElements, wins } from "#shared/collaboration/merge";
 import { api, ApiError } from "~/lib/api";
+import { realtimeUrl } from "~/lib/runtime";
 import { ConfirmedCache } from "~/lib/confirmedCache";
 import { enqueueCanvasPresence } from "~/lib/canvasPresence";
 import { getTabScope } from "~/lib/persistence";
@@ -1078,11 +1079,11 @@ export class CollaborationSession {
     this.realtimeStatus = "connecting";
     this.changed();
     const url = new URL(
-      `/api/canvases/${encodeURIComponent(this.options.canvasId)}/realtime`,
-      location.origin,
+      realtimeUrl(
+        `/api/canvases/${encodeURIComponent(this.options.canvasId)}/realtime`,
+      ),
     );
 
-    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     let ticket = "";
     let attempt = 0;
     const socketGeneration = ++this.socketGeneration;
