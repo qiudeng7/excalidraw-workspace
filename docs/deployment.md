@@ -125,6 +125,10 @@ PUBLIC_ORIGIN=http://localhost:3000 pnpm start:node
 
 Node 协作广播仅支持一个应用进程，不支持多副本或 cluster；数据库 CAS 不能替代跨进程广播。数据位于工作目录的 `.data/db/sqlite.db` 和 `.data/blob/`。启动入口 `.output/server/start.mjs` 会先应用迁移；迁移失败时退出并停止启动。分发 `.output/` 后，在安装 Node.js 24 及以上版本的主机上，于其父目录执行 `PUBLIC_ORIGIN=http://localhost:3000 node .output/server/start.mjs`，不需要安装 Nuxt CLI。
 
+## 账号方式与集成
+
+本地账号与 OIDC 账号在两种部署中都通过环境变量开关，至少保留一种，变量与校验规则见[账号方式开关](development/accounts.md#账号方式开关)；Cloudflare 将 `OIDC_CLIENT_SECRET` 设为 secret。需要被 workbench 等宿主运行时加载时，以 `MF_ENABLED=true` 构建并经宿主同源反向代理发布，见[被宿主集成](development/integration.md)。可选变量汇总在仓库根目录的 `.env.example`。
+
 ## OpenAPI 文档
 
 `pnpm build` 和 `pnpm build:node` 会由 Nitro 在构建期预渲染 `.output/public/_openapi.json`，再经 `scripts/openapi.mjs` 生成 `dist/openapi.json`。产物只保留 `/api/**` 路径和 HTTP 方法，`info.version` 取自 `package.json`，不含请求/响应 schema、鉴权方案或密钥。构建后改动接口时，可单独执行 `pnpm openapi` 重新生成（需要现有 `.output/public/_openapi.json`）。
