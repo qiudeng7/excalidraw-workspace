@@ -1,0 +1,22 @@
+<script setup lang="ts">
+withDefaults(defineProps<{ size?: number }>(), { size: 24 });
+</script>
+<template>
+  <svg
+    :width="size"
+    :height="size"
+    viewBox="0 0 64 64"
+    aria-hidden="true"
+    class="brand-mark"
+  >
+    <rect width="64" height="64" rx="14" fill="#2e2e33" />
+    <path
+      d="M16 44 C 24 20, 34 48, 48 26"
+      fill="none"
+      stroke="#f5f5f4"
+      stroke-width="7"
+      stroke-linecap="round"
+    />
+    <circle cx="48" cy="26" r="5.5" fill="#9a9aa0" />
+  </svg>
+</template>

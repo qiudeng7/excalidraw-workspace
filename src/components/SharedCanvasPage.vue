@@ -177,7 +177,7 @@ async function flushForShare() {
             class="home-link"
             aria-label="返回画布空间"
             title="返回画布空间"
-            ><QuietIcon name="canvas" :size="18" /><span
+            ><BrandMark :size="18" /><span
               >画布空间</span
             ></NuxtLink
           ><span class="header-divider">/</span

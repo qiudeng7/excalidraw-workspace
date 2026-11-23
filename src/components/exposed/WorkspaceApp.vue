@@ -15,6 +15,7 @@ import "~/assets/workspace-tokens.css";
 import { configureApi } from "~/lib/runtime";
 import AccountGate from "~/components/AccountGate.vue";
 import QuietIcon from "~/components/QuietIcon.vue";
+import BrandMark from "~/components/BrandMark.vue";
 import RecycleBinPanel from "~/components/RecycleBinPanel.vue";
 import CanvasTabs from "~/components/CanvasTabs.vue";
 import ReleaseAnnouncement from "~/components/ReleaseAnnouncement.vue";
@@ -668,9 +669,7 @@ async function flushForShare() {
       >
         <div class="sidebar-heading">
           <span class="workspace-brand"
-            ><span class="brand-symbol"
-              ><QuietIcon name="canvas" :size="17" /></span
-            >画布空间</span
+            ><BrandMark :size="24" />画布空间</span
           ><span class="app-version">v{{ APP_VERSION }}</span>
           <a
             class="github-link icon-button"
@@ -1591,14 +1590,9 @@ async function flushForShare() {
   font-weight: 600;
   letter-spacing: 0.03em;
 }
-.brand-symbol {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  background: var(--app-accent);
-  color: var(--app-on-accent);
-  border-radius: 6px;
+.brand-mark {
+  border-radius: 5px;
+  flex: none;
 }
 .workspace-search-entry {
   position: relative;

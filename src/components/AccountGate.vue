@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import QuietIcon from "~/components/QuietIcon.vue";
+import BrandMark from "~/components/BrandMark.vue";
 import type { Bootstrap, User } from "#shared/contracts";
 import { ApiError } from "~/lib/api";
 import { accountApi, oidcStartUrl } from "~/lib/accountApi";
@@ -95,7 +96,7 @@ async function submit() {
   <section class="account-gate">
     <div class="welcome-panel">
       <a class="wordmark" href="/">
-        <span class="brand-symbol"><QuietIcon name="canvas" :size="19" /></span>
+        <BrandMark :size="26" />
         画布空间 <span class="wordmark-detail">EXCALIDRAW</span></a
       >
       <div class="welcome-copy">
@@ -325,14 +326,9 @@ async function submit() {
   font-weight: 600;
   letter-spacing: 0.04em;
 }
-.brand-symbol {
-  display: grid;
-  place-items: center;
-  background: var(--app-accent);
-  color: var(--app-on-accent);
-  width: 31px;
-  height: 31px;
-  border-radius: 7px;
+.brand-mark {
+  flex: none;
+  border-radius: 6px;
 }
 .wordmark-detail {
   margin-left: auto;
