@@ -170,10 +170,15 @@ try {
   const oldData = await volume("upgrade");
   app = await launch("old", oldData, oldMigrations);
   await listening(app);
-  assert.equal(
-    (await sql(app, "SELECT name FROM _hub_migrations", true)).length,
-    files.length - 1,
-  );
+  let applied = [];
+  for (let attempt = 0; attempt < 60; attempt++) {
+    applied = await sql(app, "SELECT name FROM _hub_migrations", true).catch(
+      () => [],
+    );
+    if (applied.length === files.length - 1) break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  assert.equal(applied.length, files.length - 1);
   await sql(
     app,
     "INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES('fixture-user','fixture@example.com','Saved user','admin','fixture','2026-01-01'); INSERT INTO workspaces(id,user_id,name,created_at,updated_at) VALUES('fixture-workspace','fixture-user','Saved workspace','2026-01-01','2026-01-01')",
