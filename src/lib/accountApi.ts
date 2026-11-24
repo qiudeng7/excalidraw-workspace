@@ -26,9 +26,10 @@ export interface AccountApi {
   setRegistration(enabled: boolean): Promise<boolean>;
 }
 
-/** Browser navigation target for OIDC sign-in (a redirect flow, not a fetch). */
+/** Browser navigation target for one identity provider (a redirect flow, not a fetch). */
 /** Navigated to directly (not via api()), so the runtime base is applied at call time. */
-export const oidcStartUrl = () => apiUrl("/api/auth/oidc/start");
+export const oidcStartUrl = (providerId: string) =>
+  apiUrl(`/api/auth/oidc/${encodeURIComponent(providerId)}/start`);
 
 export const accountApi: AccountApi = {
   bootstrap: () => api<Bootstrap>("/api/bootstrap"),

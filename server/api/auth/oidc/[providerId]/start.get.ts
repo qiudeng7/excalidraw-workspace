@@ -1,28 +1,36 @@
 import { defineApiHandler } from "#server/utils/api";
-import { authConfig } from "#server/utils/auth-methods";
-import { oidcRedirectUri } from "#server/utils/auth-config";
 import { requestOrigin } from "#server/utils/request";
 import { random } from "#server/utils/passwords";
+import { oidcProvider } from "#server/db/oidc-providers";
 import { authorizationUrl, discover } from "#server/utils/oidc";
 import {
   flowCookie,
-  loginRedirect,
+  flowValue,
   failureRedirect,
+  loginRedirect,
   OIDC_FLOW_SECONDS,
 } from "#server/utils/oidc-flow";
+import { oidcCallbackUrl, oidcProviderId } from "#server/utils/oidc-providers";
 
 export default defineApiHandler(
   async (event) => {
-    const { oidc } = authConfig(event);
+    const provider = await oidcProvider(oidcProviderId(event));
 
-    if (!oidc) return loginRedirect("oidc_disabled");
+    // 未启用或不存在都按同一错误返回，避免泄露身份源配置。
+    if (!provider?.enabled) return loginRedirect("oidc_disabled");
+
     try {
       const origin = requestOrigin(event);
-      const flow = { state: random(), nonce: random(), verifier: random() };
-      const { authorization_endpoint } = await discover(oidc);
-      const redirectUri = oidcRedirectUri(oidc, origin);
+      const flow = {
+        providerId: provider.id,
+        state: random(),
+        nonce: random(),
+        verifier: random(),
+      };
+      const { authorization_endpoint } = await discover(provider);
+      const redirectUri = oidcCallbackUrl(origin, provider.id);
       const location = await authorizationUrl(
-        oidc,
+        provider,
         authorization_endpoint,
         redirectUri,
         flow,
@@ -35,14 +43,14 @@ export default defineApiHandler(
           "Cache-Control": "no-store",
           "Set-Cookie": flowCookie(
             origin,
-            `${flow.state}.${flow.verifier}.${flow.nonce}`,
+            flowValue(flow),
             OIDC_FLOW_SECONDS,
             redirectUri,
           ),
         },
       });
     } catch (error) {
-      return failureRedirect(error, {}, oidc.postLoginPath);
+      return failureRedirect(error);
     }
   },
   { public: true },

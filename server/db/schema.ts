@@ -59,6 +59,42 @@ export const sessions = sqliteTable(
   (table) => [index("sessions_expiry").on(table.expiresAt)],
 );
 
+// 管理员可动态增删的身份源；client_secret 按用户确认的约定明文保存。
+export const oidcProviders = sqliteTable(
+  "oidc_providers",
+  {
+    id: text().primaryKey(),
+    type: text({
+      enum: ["microsoft", "gitlab", "google", "custom"],
+    }).notNull(),
+    name: text().notNull(),
+    issuer: text().notNull(),
+    clientId: text("client_id").notNull(),
+    clientSecret: text("client_secret").notNull(),
+    scopes: text().notNull().default("openid profile email"),
+    /** 上传图标的对象键；预设类型为空，改用前端内置图标。 */
+    icon: text(),
+    enabled: integer({ mode: "boolean" }).notNull().default(true),
+    autoRegister: integer("auto_register", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    check(
+      "oidc_provider_type",
+      sql`${table.type} IN ('microsoft', 'gitlab', 'google', 'custom')`,
+    ),
+    // 微软多行都可能填 common，唯一性不能只看 issuer。
+    uniqueIndex("oidc_provider_identity").on(
+      table.type,
+      table.issuer,
+      table.clientId,
+    ),
+  ],
+);
+
 export const workspaces = sqliteTable(
   "workspaces",
   {

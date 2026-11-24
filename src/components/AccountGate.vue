@@ -5,12 +5,14 @@ import BrandMark from "~/components/BrandMark.vue";
 import type { Bootstrap, User } from "#shared/contracts";
 import { ApiError } from "~/lib/api";
 import { accountApi, oidcStartUrl } from "~/lib/accountApi";
+import { assetUrl } from "~/lib/runtime";
 
 const props = defineProps<{ bootstrap: Bootstrap }>();
 const emit = defineEmits<{ authenticated: [user: User]; refresh: [] }>();
 // Older bootstrap payloads and test doubles omit authMethods: local-only.
 const localEnabled = computed(() => props.bootstrap.authMethods?.local ?? true);
-const oidcEnabled = computed(() => props.bootstrap.authMethods?.oidc ?? false);
+// 每个已启用的身份源一个入口；旧 bootstrap 载荷缺省时视为没有 OIDC。
+const providers = computed(() => props.bootstrap.authMethods?.oidc ?? []);
 const authErrors: Record<string, string> = {
   oidc_denied: "登录已被取消或拒绝。",
   oidc_state: "登录会话已过期，请重试。",
@@ -18,6 +20,7 @@ const authErrors: Record<string, string> = {
   oidc_invalid_token: "OIDC 身份校验未通过。",
   oidc_unavailable: "OIDC 服务暂不可用。",
   oidc_disabled: "OIDC 登录未启用。",
+  oidc_not_registered: "该身份尚未在系统中注册，请联系管理员。",
 };
 const registering = ref(false);
 const email = ref("");
@@ -205,9 +208,28 @@ async function submit() {
             普通用户
           </button>
         </div>
-        <a v-if="oidcEnabled" class="primary oidc-login" :href="oidcStartUrl()"
-          ><span>使用 OIDC 登录</span><QuietIcon name="arrow"
-        /></a>
+        <div v-if="providers.length" class="oidc-providers">
+          <a
+            v-for="provider in providers"
+            :key="provider.id"
+            class="oidc-login"
+            :href="oidcStartUrl(provider.id)"
+          >
+            <img
+              v-if="provider.iconUrl"
+              class="oidc-icon"
+              :src="assetUrl(provider.iconUrl)"
+              alt=""
+              width="18"
+              height="18"
+            />
+            <span>使用 {{ provider.name }} 登录</span>
+            <QuietIcon name="arrow" :size="16" />
+          </a>
+        </div>
+        <div v-if="providers.length && localEnabled" class="auth-divider">
+          <span>或使用邮箱登录</span>
+        </div>
         <p v-if="!localEnabled && error" role="alert" class="error">
           {{ error }}
         </p>
@@ -285,12 +307,51 @@ async function submit() {
   </section>
 </template>
 <style scoped>
+.oidc-providers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
 .oidc-login {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--app-border);
+  border-radius: 6px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font-size: 13px;
   text-decoration: none;
+}
+.oidc-login:hover {
+  background: var(--app-hover);
+}
+.oidc-login span {
+  flex: 1;
+}
+.oidc-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -4px 0 18px;
+  color: var(--app-subtle);
+  font-size: 11px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--app-border);
 }
 
 .account-gate {

@@ -3,16 +3,18 @@ import {
   NO_PASSWORD,
   userByEmail,
   userByIdentity,
-  administrator,
 } from "#server/db/accounts";
 import type { User } from "#shared/contracts";
 import { digest } from "#server/utils/passwords";
 
 export interface OidcClaims {
+  /** 实际签发方；微软多租户会带租户 id，账号映射按此值保存。 */
+  iss?: unknown;
   sub: string;
   email?: unknown;
   name?: unknown;
   preferred_username?: unknown;
+  tid?: unknown;
 }
 
 const asText = (value: unknown) =>
@@ -38,16 +40,13 @@ async function availableEmail(claims: OidcClaims, issuer: string) {
 }
 
 /**
- * Map an (issuer, sub) identity to a local user, creating it on first login.
- * The first account on an uninitialised system becomes the administrator.
+ * Map an (issuer, sub) identity to a new local user on first login.
+ * OIDC accounts are always ordinary users: the administrator comes from local setup.
  */
-export async function findOrCreateOidcUser(
+export async function createOidcUser(
   issuer: string,
   claims: OidcClaims,
 ): Promise<User> {
-  const existing = await userByIdentity(issuer, claims.sub);
-
-  if (existing) return existing;
   const identity = { issuer, subject: claims.sub };
   const fallbackName = asText(claims.email)?.split("@")[0] ?? "OIDC 用户";
   const name = (
@@ -62,7 +61,7 @@ export async function findOrCreateOidcUser(
       id: crypto.randomUUID(),
       email: await availableEmail(claims, issuer),
       name,
-      role: (await administrator()) ? "user" : "admin",
+      role: "user",
     };
 
     try {

@@ -73,6 +73,16 @@ export async function requireUser(event: H3Event): Promise<User> {
   return (await currentUser(event)) ?? fail(401, "UNAUTHENTICATED", "请先登录");
 }
 
+/** 仅管理员可管理登录方式等服务级设置。 */
+export async function requireAdministrator(event: H3Event): Promise<User> {
+  const user = await requireUser(event);
+
+  if (user.role !== "admin")
+    return fail(403, "FORBIDDEN", "仅管理员可以修改登录方式");
+
+  return user;
+}
+
 /** Store a session guarded by the account's current password digest; returns the Set-Cookie value. */
 export async function startSession(
   event: H3Event,

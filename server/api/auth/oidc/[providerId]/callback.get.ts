@@ -1,28 +1,34 @@
 import { getCookie, getQuery } from "h3";
 import { defineApiHandler } from "#server/utils/api";
-import { authConfig } from "#server/utils/auth-methods";
-import { oidcRedirectUri } from "#server/utils/auth-config";
+import { oidcProvider } from "#server/db/oidc-providers";
 import { rateLimit, startSession } from "#server/utils/auth";
 import { requestClientIp, requestOrigin } from "#server/utils/request";
 import { digest } from "#server/utils/passwords";
-import { NO_PASSWORD } from "#server/db/accounts";
+import { NO_PASSWORD, userByIdentity } from "#server/db/accounts";
 import { exchangeCode, OidcError } from "#server/utils/oidc";
-import { findOrCreateOidcUser } from "#server/utils/oidc-accounts";
+import { createOidcUser } from "#server/utils/oidc-accounts";
 import {
   OIDC_FLOW_COOKIE,
   failureRedirect,
   flowCookie,
   loginRedirect,
+  parseFlow,
 } from "#server/utils/oidc-flow";
+import { oidcCallbackUrl, oidcProviderId } from "#server/utils/oidc-providers";
 
 export default defineApiHandler(
   async (event) => {
-    const { oidc } = authConfig(event);
+    const provider = await oidcProvider(oidcProviderId(event));
 
-    if (!oidc) return loginRedirect("oidc_disabled");
+    if (!provider?.enabled) return loginRedirect("oidc_disabled");
     const origin = requestOrigin(event);
     // One-shot: whatever happens next, the flow cookie is spent.
-    const clear = flowCookie(origin, "", 0, oidcRedirectUri(oidc, origin));
+    const clear = flowCookie(
+      origin,
+      "",
+      0,
+      oidcCallbackUrl(origin, provider.id),
+    );
 
     try {
       await rateLimit(
@@ -31,33 +37,42 @@ export default defineApiHandler(
         40,
       );
       const query = getQuery(event);
-      const [state, verifier, nonce] = (
-        getCookie(event, OIDC_FLOW_COOKIE) ?? ""
-      ).split(".");
+      const flow = parseFlow(getCookie(event, OIDC_FLOW_COOKIE) ?? "");
 
       if (typeof query.error === "string")
         throw new OidcError("oidc_denied", "IdP returned an error");
+      // 流程 Cookie 必须属于发起登录的同一个身份源。
       if (
-        !state ||
-        !verifier ||
-        !nonce ||
-        query.state !== state ||
+        !flow ||
+        flow.providerId !== provider.id ||
+        query.state !== flow.state ||
         typeof query.code !== "string"
       )
         throw new OidcError("oidc_state", "state mismatch");
       const claims = await exchangeCode(
-        oidc,
-        oidcRedirectUri(oidc, origin),
+        provider,
+        oidcCallbackUrl(origin, provider.id),
         query.code,
-        verifier,
-        nonce,
+        flow.verifier,
+        flow.nonce,
       );
-      const user = await findOrCreateOidcUser(oidc.issuer, claims);
+      const issuer = typeof claims.iss === "string" ? claims.iss : "";
+
+      if (!issuer)
+        throw new OidcError("oidc_invalid_token", "Missing issuer claim");
+      const mapped = await userByIdentity(issuer, claims.sub);
+
+      if (!mapped && !provider.autoRegister)
+        throw new OidcError(
+          "oidc_not_registered",
+          "No mapped account and auto registration is off",
+        );
+      const user = mapped ?? (await createOidcUser(issuer, claims));
       const session = await startSession(event, user, NO_PASSWORD);
 
       if (!session) throw new OidcError("oidc_failed", "session rejected");
       const headers = new Headers({
-        Location: oidc.postLoginPath,
+        Location: "/",
         "Cache-Control": "no-store",
       });
 
@@ -66,11 +81,7 @@ export default defineApiHandler(
 
       return new Response(null, { status: 302, headers });
     } catch (error) {
-      return failureRedirect(
-        error,
-        { "Set-Cookie": clear },
-        oidc.postLoginPath,
-      );
+      return failureRedirect(error, { "Set-Cookie": clear });
     }
   },
   { public: true },

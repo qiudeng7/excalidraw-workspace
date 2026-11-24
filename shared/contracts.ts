@@ -1,4 +1,5 @@
 import type { DevelopmentAccount } from "#shared/development";
+import type { AuthMethods } from "#shared/oidc";
 
 export interface User {
   id: string;
@@ -12,7 +13,7 @@ export interface Bootstrap {
   needsSetup: boolean;
   registrationEnabled: boolean;
   emailVerification: false;
-  authMethods: { local: boolean; oidc: boolean };
+  authMethods: AuthMethods;
 }
 
 export interface Workspace {

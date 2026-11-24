@@ -1,28 +1,31 @@
+// 本文件以本地密钥模拟多个 OIDC 身份源，覆盖按身份源的授权码登录：
+// discovery 按 issuer 区分、providerId 与流程 Cookie 核对、微软多租户 iss 展开、
+// auto_register=false、未启用身份源拒绝与 bootstrap 只返回启用项。
+// 未覆盖：真实 IdP 网络行为、图标上传与管理接口权限（见 oidc-providers.test.ts）。
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { eq } from "drizzle-orm";
 import { nodeStorage } from "./support/storage";
 import { handleApi } from "./support/api";
 import { withDatabase } from "../lib/database";
 import * as tables from "../../server/db/schema";
-import { findOrCreateOidcUser } from "../../server/utils/oidc-accounts";
 
-const issuer = "https://idp.test";
 const savedEnv = { ...process.env };
 const savedFetch = globalThis.fetch;
+const microsoftIssuer = "https://login.microsoftonline.com/common/v2.0";
+const microsoftDiscoveryIssuer =
+  "https://login.microsoftonline.com/{tenantid}/v2.0";
+const microsoftTenant = "8eaef023-2b34-4be6-b8ac-7e1e7f6b9d21";
+const tenantIssuer = `https://login.microsoftonline.com/${microsoftTenant}/v2.0`;
+// 同一进程里 discovery 与 JWKS 按 URL 缓存，跨用例共享一套密钥才能复用缓存。
+const keyPair = generateKeyPair("ES256");
+let sequence = 0;
 
 beforeEach(() => {
-  Object.assign(process.env, {
-    AUTH_LOCAL: "true",
-    AUTH_OIDC: "true",
-    OIDC_ISSUER: issuer,
-    OIDC_CLIENT_ID: "client",
-    OIDC_CLIENT_SECRET: "secret",
-  });
+  process.env.AUTH_LOCAL = "true";
 });
 
 afterEach(() => {
@@ -31,6 +34,37 @@ afterEach(() => {
   Object.assign(process.env, savedEnv);
   globalThis.fetch = savedFetch;
 });
+
+function uniqueIssuer() {
+  sequence += 1;
+
+  return `https://idp-${sequence}.test`;
+}
+
+type ProviderRow = typeof tables.oidcProviders.$inferInsert & { id: string };
+
+function providerRow(
+  issuer: string,
+  overrides: Partial<ProviderRow> = {},
+): ProviderRow {
+  const now = new Date().toISOString();
+
+  return {
+    id: crypto.randomUUID(),
+    type: "gitlab",
+    name: "GitLab",
+    issuer,
+    clientId: "client",
+    clientSecret: "secret",
+    scopes: "openid profile email",
+    icon: null,
+    enabled: true,
+    autoRegister: true,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
 
 async function fixture() {
   const directory = await mkdtemp(resolve(tmpdir(), "oidc-auth-"));
@@ -62,14 +96,18 @@ async function fixture() {
 
     return response;
   };
+  const run = <T>(work: () => Promise<T>) =>
+    withDatabase(storage.database, work);
+  const seed = (row: ProviderRow) =>
+    run(() => storage.database.insert(tables.oidcProviders).values(row));
+  const users = () => run(() => storage.database.select().from(tables.users));
 
   return {
     storage,
     request,
-    users: () =>
-      withDatabase(storage.database, () =>
-        storage.database.select().from(tables.users),
-      ),
+    run,
+    seed,
+    users,
     async close() {
       storage.close();
       await rm(directory, { recursive: true, force: true });
@@ -77,136 +115,74 @@ async function fixture() {
   };
 }
 
-test("claims map to users by (issuer, sub); first becomes admin; email clashes get a suffix", async () => {
-  const f = await fixture();
+interface IdpEntry {
+  issuer: string;
+  audience: string;
+  discoveryIssuer?: string;
+}
 
-  try {
-    const run = <T>(work: () => Promise<T>) =>
-      withDatabase(f.storage.database, work);
-    const first = await run(() =>
-      findOrCreateOidcUser(issuer, {
-        sub: "a",
-        email: "Ann@Example.com",
-        name: "Ann",
-      }),
-    );
-    const again = await run(() =>
-      findOrCreateOidcUser(issuer, { sub: "a", email: "other@example.com" }),
-    );
-    const second = await run(() =>
-      findOrCreateOidcUser(issuer, { sub: "b", email: "ann@example.com" }),
-    );
-    const otherIdp = await run(() =>
-      findOrCreateOidcUser("https://other.test", { sub: "a" }),
-    );
-
-    assert.equal(first.role, "admin");
-    assert.equal(first.email, "ann@example.com");
-    assert.equal(again.id, first.id);
-    assert.equal(second.role, "user");
-    assert.match(second.email, /^ann\+oidc-[0-9a-f]{8}@example\.com$/);
-    assert.notEqual(
-      otherIdp.id,
-      first.id,
-      "same sub at another issuer is a different user",
-    );
-    assert.match(otherIdp.email, /@oidc\.invalid$/);
-    const rows = await f.users();
-
-    assert.equal(rows.length, 3);
-    assert.ok(
-      rows.every(
-        (row) => row.provider === "oidc" && row.passwordHash === "!oidc",
-      ),
-    );
-  } finally {
-    await f.close();
-  }
-});
-
-test("AUTH_LOCAL=false rejects local account endpoints and bootstrap reports methods", async () => {
-  process.env.AUTH_LOCAL = "false";
-  const f = await fixture();
-
-  try {
-    const credentials = { email: "a@b.co", password: "long-enough-password" };
-
-    for (const [path, method] of [
-      ["/login", "POST"],
-      ["/register", "POST"],
-      ["/setup", "POST"],
-    ] as const) {
-      const response = await f.request(path, {
-        method,
-        body: JSON.stringify(credentials),
-      });
-
-      assert.equal(response.status, 403, path);
-      assert.equal((await response.json()).error.code, "AUTH_METHOD_DISABLED");
-    }
-
-    const bootstrap = await (await f.request("/bootstrap")).json();
-
-    assert.deepEqual(bootstrap.authMethods, { local: false, oidc: true });
-    assert.equal((await f.users()).length, 0);
-  } finally {
-    await f.close();
-  }
-});
-
-test("invalid configuration returns CONFIGURATION_INVALID instead of degrading", async () => {
-  process.env.AUTH_LOCAL = "false";
-  process.env.AUTH_OIDC = "false";
-  const f = await fixture();
-
-  try {
-    const response = await f.request("/bootstrap");
-
-    assert.equal(response.status, 500);
-    assert.equal((await response.json()).error.code, "CONFIGURATION_INVALID");
-  } finally {
-    await f.close();
-  }
-});
-
-async function idp() {
-  const { publicKey, privateKey } = await generateKeyPair("ES256");
+async function mockIdp() {
+  const { publicKey, privateKey } = await keyPair;
   const jwk = {
     ...(await exportJWK(publicKey)),
     kid: "k1",
     alg: "ES256",
     use: "sig",
   };
-  const sign = (claims: Record<string, unknown>, audience = "client") =>
-    new SignJWT(claims)
-      .setProtectedHeader({ alg: "ES256", kid: "k1" })
-      .setIssuer(issuer)
-      .setAudience(audience)
-      .setExpirationTime("5m")
-      .sign(privateKey);
-  let idToken = "";
+  const entries = new Map<string, IdpEntry>();
+  const tokens = new Map<string, string>();
 
   globalThis.fetch = (async (input: RequestInfo | URL) => {
     const url = String(input);
 
-    if (url.endsWith("/.well-known/openid-configuration"))
-      return Response.json({
-        issuer,
-        authorization_endpoint: `${issuer}/authorize`,
-        token_endpoint: `${issuer}/token`,
-        jwks_uri: `${issuer}/jwks`,
-      });
-    if (url === `${issuer}/token`) return Response.json({ id_token: idToken });
-    if (url === `${issuer}/jwks`) return Response.json({ keys: [jwk] });
+    for (const entry of entries.values()) {
+      if (url === `${entry.issuer}/.well-known/openid-configuration`)
+        return Response.json({
+          issuer: entry.discoveryIssuer ?? entry.issuer,
+          authorization_endpoint: `${entry.issuer}/authorize`,
+          token_endpoint: `${entry.issuer}/token`,
+          jwks_uri: `${entry.issuer}/jwks`,
+        });
+      if (url === `${entry.issuer}/token`)
+        return Response.json({ id_token: tokens.get(entry.issuer) ?? "" });
+      if (url === `${entry.issuer}/jwks`) return Response.json({ keys: [jwk] });
+    }
 
     return new Response("not found", { status: 404 });
   }) as typeof fetch;
 
-  return { sign, setToken: (token: string) => (idToken = token) };
+  return {
+    register(entry: IdpEntry) {
+      entries.set(entry.issuer, entry);
+    },
+    async sign(
+      issuer: string,
+      claims: Record<string, unknown>,
+      options: { issuer?: string; audience?: string } = {},
+    ) {
+      const entry = entries.get(issuer);
+
+      if (!entry) throw new Error(`未注册的身份源 ${issuer}`);
+      const token = await new SignJWT(claims)
+        .setProtectedHeader({ alg: "ES256", kid: "k1" })
+        .setIssuer(options.issuer ?? entry.issuer)
+        .setAudience(options.audience ?? entry.audience)
+        .setExpirationTime("5m")
+        .sign(privateKey);
+
+      tokens.set(issuer, token);
+
+      return token;
+    },
+  };
 }
 
-async function begin(f: Awaited<ReturnType<typeof fixture>>) {
-  const response = await f.request("/auth/oidc/start");
+type Fixture = Awaited<ReturnType<typeof fixture>>;
+
+type Idp = Awaited<ReturnType<typeof mockIdp>>;
+
+async function begin(f: Fixture, providerId: string) {
+  const response = await f.request(`/auth/oidc/${providerId}/start`);
   const location = new URL(response.headers.get("location")!);
   const cookie = response.headers.get("set-cookie")!.split(";")[0]!;
 
@@ -218,147 +194,317 @@ async function begin(f: Awaited<ReturnType<typeof fixture>>) {
   };
 }
 
-test("authorization code flow with PKCE creates a cookie session", async () => {
-  const provider = await idp();
+async function complete(
+  f: Fixture,
+  idp: Idp,
+  provider: ProviderRow,
+  claims: Record<string, unknown>,
+  options: { issuer?: string; audience?: string } = {},
+) {
+  const flow = await begin(f, provider.id);
+
+  await idp.sign(
+    provider.issuer,
+    {
+      sub: "user-1",
+      ...claims,
+      nonce: flow.location.searchParams.get("nonce"),
+    },
+    options,
+  );
+  const callback = await f.request(
+    `/auth/oidc/${provider.id}/callback?code=abc&state=${flow.state}`,
+    { headers: { Cookie: flow.cookie } },
+  );
+
+  return { flow, callback };
+}
+
+function sessionCookie(response: Response) {
+  return response.headers
+    .getSetCookie()
+    .find((value) => value.startsWith("excalidraw_session="))
+    ?.split(";")[0];
+}
+
+async function currentUser(f: Fixture, session: string) {
+  return (
+    await (await f.request("/session", { headers: { Cookie: session } })).json()
+  ).user as { id: string; email: string; role: string };
+}
+
+test("两个身份源可以分别登录，账户按实际 issuer 映射且一律是普通用户", async () => {
+  const idp = await mockIdp();
   const f = await fixture();
+  const gitlabIssuer = uniqueIssuer();
 
   try {
-    const { response, location, cookie, state } = await begin(f);
+    const gitlab = providerRow(gitlabIssuer, { name: "公司 GitLab" });
+    const microsoft = providerRow(microsoftIssuer, {
+      type: "microsoft",
+      name: "Microsoft",
+    });
 
-    assert.equal(response.status, 302);
-    assert.equal(location.origin + location.pathname, `${issuer}/authorize`);
-    assert.equal(location.searchParams.get("code_challenge_method"), "S256");
+    await f.seed(gitlab);
+    await f.seed(microsoft);
+    idp.register({ issuer: gitlabIssuer, audience: "client" });
+    idp.register({
+      issuer: microsoftIssuer,
+      audience: "client",
+      discoveryIssuer: microsoftDiscoveryIssuer,
+    });
+
+    const first = await complete(f, idp, gitlab, {
+      sub: "gitlab-user",
+      email: "GitLab.User@Example.com",
+      name: "GitLab 用户",
+    });
+
+    assert.equal(first.callback.status, 302);
+    assert.equal(first.callback.headers.get("location"), "/");
+    const firstSession = sessionCookie(first.callback);
+
+    assert.ok(firstSession, "身份源登录后写入会话 Cookie");
+    const firstUser = await currentUser(f, firstSession);
+
+    assert.equal(firstUser.email, "gitlab.user@example.com");
+    assert.equal(firstUser.role, "user");
+
+    const second = await complete(
+      f,
+      idp,
+      microsoft,
+      { sub: "microsoft-user", email: "ms@example.com", tid: microsoftTenant },
+      { issuer: tenantIssuer },
+    );
+
+    assert.equal(second.callback.headers.get("location"), "/");
+    const secondSession = sessionCookie(second.callback);
+
+    assert.ok(secondSession);
+    const secondUser = await currentUser(f, secondSession);
+
+    assert.equal(secondUser.email, "ms@example.com");
+    assert.equal(secondUser.role, "user");
+    const rows = await f.users();
+
+    assert.equal(rows.length, 2);
+    assert.deepEqual(
+      rows.map((row) => [row.provider, row.issuer, row.role]),
+      [
+        ["oidc", gitlabIssuer, "user"],
+        // 微软账户记录 id_token 的实际租户 issuer，而不是配置的 common。
+        ["oidc", tenantIssuer, "user"],
+      ],
+    );
+    assert.ok(rows.every((row) => row.passwordHash === "!oidc"));
+    // 没有任何 OIDC 账户会自动成为管理员。
     assert.equal(
-      location.searchParams.get("redirect_uri"),
-      "https://demo.test/api/auth/oidc/callback",
-    );
-    assert.match(response.headers.get("set-cookie")!, /HttpOnly/);
-    provider.setToken(
-      await provider.sign({
-        sub: "u1",
-        email: "u1@example.com",
-        nonce: location.searchParams.get("nonce"),
-      }),
-    );
-    const callback = await f.request(
-      `/auth/oidc/callback?code=abc&state=${state}`,
-      {
-        headers: { Cookie: cookie },
-      },
-    );
-
-    assert.equal(callback.status, 302);
-    assert.equal(callback.headers.get("location"), "/");
-    const cookies = callback.headers.getSetCookie();
-    const session = cookies.find((value) =>
-      value.startsWith("excalidraw_session="),
-    )!;
-
-    assert.ok(session, "session cookie issued");
-    const current = await (
-      await f.request("/session", {
-        headers: { Cookie: session.split(";")[0]! },
-      })
-    ).json();
-
-    assert.equal(current.user.email, "u1@example.com");
-    assert.equal(current.user.role, "admin");
-    const needsSetup = (await (await f.request("/bootstrap")).json())
-      .needsSetup;
-
-    assert.equal(needsSetup, false);
-    // Password change is refused once local accounts are disabled.
-    process.env.AUTH_LOCAL = "false";
-    const change = await f.request("/account/password", {
-      method: "PUT",
-      headers: { Cookie: session.split(";")[0]! },
-      body: JSON.stringify({
-        currentPassword: "x",
-        newPassword: "long-enough-password",
-      }),
-    });
-
-    assert.equal(change.status, 403);
-    assert.equal((await change.json()).error.code, "AUTH_METHOD_DISABLED");
-    process.env.AUTH_LOCAL = "true";
-    // An OIDC account has no local password to change.
-    const noPassword = await f.request("/account/password", {
-      method: "PUT",
-      headers: { Cookie: session.split(";")[0]! },
-      body: JSON.stringify({
-        currentPassword: "x",
-        newPassword: "long-enough-password",
-      }),
-    });
-
-    assert.equal(noPassword.status, 403);
-    // The OIDC account has no usable local password.
-    const login = await f.request("/login", {
-      method: "POST",
-      body: JSON.stringify({
-        email: "u1@example.com",
-        password: "anything-long-enough",
-      }),
-    });
-
-    assert.equal(login.status, 401);
-    assert.equal(
-      (await f.users()).filter((row) => eq(tables.users.provider, "oidc"))
-        .length,
-      1,
+      (await (await f.request("/bootstrap")).json()).needsSetup,
+      true,
     );
   } finally {
     await f.close();
   }
 });
 
-test("callback rejects wrong state, wrong audience and wrong nonce with /?authError", async () => {
-  const provider = await idp();
+test("未启用或不存在的身份源拒绝发起登录", async () => {
   const f = await fixture();
 
   try {
-    const flow = await begin(f);
-    const nonce = flow.location.searchParams.get("nonce");
-    const attempt = async (state: string, token: string) => {
-      provider.setToken(token);
-      const response = await f.request(
-        `/auth/oidc/callback?code=abc&state=${state}`,
-        {
-          headers: { Cookie: flow.cookie },
-        },
-      );
+    const disabled = providerRow(uniqueIssuer(), { enabled: false });
 
-      assert.equal(response.status, 302);
+    await f.seed(disabled);
+    for (const id of [disabled.id, crypto.randomUUID()]) {
+      const start = await f.request(`/auth/oidc/${id}/start`);
+
+      assert.equal(start.status, 302);
+      assert.equal(start.headers.get("location"), "/?authError=oidc_disabled");
+      assert.equal(sessionCookie(start), undefined);
+      const callback = await f.request(`/auth/oidc/${id}/callback?code=1`);
+
       assert.equal(
-        response.headers
-          .getSetCookie()
-          .some((value) => value.startsWith("excalidraw_session=")),
-        false,
+        callback.headers.get("location"),
+        "/?authError=oidc_disabled",
       );
+    }
 
-      return response.headers.get("location");
+    assert.equal((await f.users()).length, 0);
+  } finally {
+    await f.close();
+  }
+});
+
+test("auto_register=false 且无映射账户时回到登录页，已映射账户仍可登录", async () => {
+  const idp = await mockIdp();
+  const f = await fixture();
+  const issuer = uniqueIssuer();
+
+  try {
+    const provider = providerRow(issuer, { autoRegister: false });
+
+    await f.seed(provider);
+    idp.register({ issuer, audience: "client" });
+    const denied = await complete(f, idp, provider, {
+      sub: "stranger",
+      email: "stranger@example.com",
+    });
+
+    assert.equal(denied.callback.status, 302);
+    assert.equal(
+      denied.callback.headers.get("location"),
+      "/?authError=oidc_not_registered",
+    );
+    assert.equal(sessionCookie(denied.callback), undefined);
+    assert.equal((await f.users()).length, 0);
+
+    const mapped = {
+      id: crypto.randomUUID(),
+      email: "mapped@example.com",
+      name: "已映射用户",
+      role: "user" as const,
+      passwordHash: "!oidc",
+      createdAt: new Date().toISOString(),
+      provider: "oidc" as const,
+      issuer,
+      subject: "member",
     };
 
-    assert.equal(await attempt("bad", ""), "/?authError=oidc_state");
+    await f.run(() => f.storage.database.insert(tables.users).values(mapped));
+    const allowed = await complete(f, idp, provider, {
+      sub: "member",
+      email: "ignored@example.com",
+    });
+
+    assert.equal(allowed.callback.headers.get("location"), "/");
+    const session = sessionCookie(allowed.callback);
+
+    assert.ok(session);
+    assert.equal((await currentUser(f, session)).id, mapped.id);
+    assert.equal((await f.users()).length, 1);
+  } finally {
+    await f.close();
+  }
+});
+
+test("流程 Cookie 与回调的 providerId 不一致时按 state 错误拒绝", async () => {
+  const idp = await mockIdp();
+  const f = await fixture();
+  const firstIssuer = uniqueIssuer();
+  const secondIssuer = uniqueIssuer();
+
+  try {
+    const first = providerRow(firstIssuer, { name: "第一个" });
+    const second = providerRow(secondIssuer, { name: "第二个" });
+
+    await f.seed(first);
+    await f.seed(second);
+    idp.register({ issuer: firstIssuer, audience: "client" });
+    idp.register({ issuer: secondIssuer, audience: "client" });
+    const flow = await begin(f, first.id);
+
+    await idp.sign(firstIssuer, {
+      sub: "user-1",
+      nonce: flow.location.searchParams.get("nonce"),
+    });
+    const callback = await f.request(
+      `/auth/oidc/${second.id}/callback?code=abc&state=${flow.state}`,
+      { headers: { Cookie: flow.cookie } },
+    );
+
+    assert.equal(callback.status, 302);
+    assert.equal(callback.headers.get("location"), "/?authError=oidc_state");
+    assert.equal(sessionCookie(callback), undefined);
+    assert.equal((await f.users()).length, 0);
+  } finally {
+    await f.close();
+  }
+});
+
+test("微软多租户 iss 必须等于 tid 展开值，严格类型按配置 issuer 校验", async () => {
+  const idp = await mockIdp();
+  const f = await fixture();
+  const strictIssuer = uniqueIssuer();
+
+  try {
+    const microsoft = providerRow(microsoftIssuer, { type: "microsoft" });
+    const strict = providerRow(strictIssuer, {
+      type: "google",
+      name: "Google",
+    });
+
+    await f.seed(microsoft);
+    await f.seed(strict);
+    idp.register({
+      issuer: microsoftIssuer,
+      audience: "client",
+      discoveryIssuer: microsoftDiscoveryIssuer,
+    });
+    idp.register({ issuer: strictIssuer, audience: "client" });
+
+    const wrongTenant = await complete(
+      f,
+      idp,
+      microsoft,
+      { sub: "x", tid: microsoftTenant },
+      { issuer: "https://login.microsoftonline.com/other-tenant/v2.0" },
+    );
+
     assert.equal(
-      await attempt(
-        flow.state,
-        await provider.sign({ sub: "x", nonce }, "someone-else"),
-      ),
+      wrongTenant.callback.headers.get("location"),
       "/?authError=oidc_invalid_token",
     );
+    const missingTenant = await complete(
+      f,
+      idp,
+      microsoft,
+      { sub: "x" },
+      { issuer: tenantIssuer },
+    );
+
     assert.equal(
-      await attempt(
-        flow.state,
-        await provider.sign({ sub: "x", nonce: "wrong" }),
-      ),
+      missingTenant.callback.headers.get("location"),
       "/?authError=oidc_invalid_token",
     );
+    const otherIssuer = await complete(
+      f,
+      idp,
+      strict,
+      { sub: "x" },
+      { issuer: "https://evil.test" },
+    );
+
     assert.equal(
-      (
-        await f.request("/auth/oidc/callback?error=access_denied&state=x")
-      ).headers.get("location"),
-      "/?authError=oidc_denied",
+      otherIssuer.callback.headers.get("location"),
+      "/?authError=oidc_invalid_token",
+    );
+    const wrongAudience = await complete(
+      f,
+      idp,
+      strict,
+      { sub: "x" },
+      { audience: "someone-else" },
+    );
+
+    assert.equal(
+      wrongAudience.callback.headers.get("location"),
+      "/?authError=oidc_invalid_token",
+    );
+
+    const flow = await begin(f, strict.id);
+
+    await idp.sign(strictIssuer, {
+      sub: "x",
+      nonce: "wrong-nonce",
+    });
+    const wrongNonce = await f.request(
+      `/auth/oidc/${strict.id}/callback?code=abc&state=${flow.state}`,
+      { headers: { Cookie: flow.cookie } },
+    );
+
+    assert.equal(
+      wrongNonce.headers.get("location"),
+      "/?authError=oidc_invalid_token",
     );
     assert.equal((await f.users()).length, 0);
   } finally {
@@ -366,18 +512,64 @@ test("callback rejects wrong state, wrong audience and wrong nonce with /?authEr
   }
 });
 
-test("OIDC endpoints redirect with oidc_disabled when OIDC is off", async () => {
-  process.env.AUTH_OIDC = "false";
+test("关闭本地账号后仍可用启用身份源登录，bootstrap 只返回启用项", async () => {
+  const idp = await mockIdp();
   const f = await fixture();
+  const enabledIssuer = uniqueIssuer();
+  const disabledIssuer = uniqueIssuer();
+
+  process.env.AUTH_LOCAL = "false";
 
   try {
-    const response = await f.request("/auth/oidc/start");
+    const enabled = providerRow(enabledIssuer, {
+      type: "gitlab",
+      name: "团队 GitLab",
+    });
+    const disabled = providerRow(disabledIssuer, {
+      type: "google",
+      name: "停用的 Google",
+      enabled: false,
+    });
 
-    assert.equal(response.headers.get("location"), "/?authError=oidc_disabled");
+    await f.seed(enabled);
+    await f.seed(disabled);
+    idp.register({ issuer: enabledIssuer, audience: "client" });
+    const bootstrap = await (await f.request("/bootstrap")).json();
+
+    assert.deepEqual(bootstrap.authMethods, {
+      local: false,
+      oidc: [
+        {
+          id: enabled.id,
+          type: "gitlab",
+          name: "团队 GitLab",
+          // 预设类型使用前端内置图标路径。
+          iconUrl: "/oidc/gitlab.svg",
+        },
+      ],
+    });
     assert.equal(
-      (await f.request("/auth/oidc/start", { method: "POST" })).status,
-      405,
+      (
+        await f.request("/login", {
+          method: "POST",
+          body: JSON.stringify({
+            email: "a@b.co",
+            password: "long-enough-password",
+          }),
+        })
+      ).status,
+      403,
     );
+    const { callback } = await complete(f, idp, enabled, {
+      sub: "member",
+      email: "member@example.com",
+    });
+
+    assert.equal(callback.headers.get("location"), "/");
+    const session = sessionCookie(callback);
+
+    assert.ok(session);
+    assert.equal((await currentUser(f, session)).email, "member@example.com");
   } finally {
     await f.close();
   }

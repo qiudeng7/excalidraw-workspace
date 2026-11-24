@@ -142,7 +142,7 @@ test("ordinary bootstrap and first setup have no development credentials or impl
       needsSetup: true,
       registrationEnabled: true,
       emailVerification: false,
-      authMethods: { local: true, oidc: false },
+      authMethods: { local: true, oidc: [] },
     });
     assert.equal((await f.database.select().from(tables.users)).length, 0);
     const prepare = await handleApi(
