@@ -10,7 +10,16 @@ export default {
     );
 
     if (match && request.headers.get("upgrade") === "websocket") {
-      if (request.headers.get("origin") !== env.PUBLIC_ORIGIN)
+      const origin = request.headers.get("origin");
+      const allowlisted = (env.CORS_ORIGINS ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      if (
+        origin !== env.PUBLIC_ORIGIN &&
+        !(origin && allowlisted.includes(origin))
+      )
         return new Response("Forbidden", { status: 403 });
 
       const id = decodeURIComponent(match[1]);

@@ -14,6 +14,14 @@ import {
   runBackground,
 } from "#server/utils/request";
 import { body, fail, json } from "#server/utils/http";
+import {
+  bearerUser,
+  EXCALIDRAW_READ_SCOPE,
+  EXCALIDRAW_WRITE_SCOPE,
+} from "#server/utils/bearer";
+
+/** Bearer callers must hold the scope matching the operation they invoke. */
+export type BearerScope = "read" | "write";
 import { digest, random } from "#server/utils/passwords";
 
 const SESSION_SECONDS = 60 * 60 * 24 * 14;
@@ -21,6 +29,7 @@ const SESSION_SECONDS = 60 * 60 * 24 * 14;
 declare module "h3" {
   interface H3EventContext {
     currentUser?: Promise<User | null>;
+    bearerAuthenticated?: boolean;
   }
 }
 
@@ -59,8 +68,22 @@ export async function currentSessionHash(event: H3Event): Promise<string> {
 }
 
 /** Cache the identity on Nitro's request event, never in module-global state. */
-export function currentUser(event: H3Event): Promise<User | null> {
+export function currentUser(
+  event: H3Event,
+  scope: BearerScope = "read",
+): Promise<User | null> {
   return (event.context.currentUser ??= (async () => {
+    if (event.headers.get("authorization")) {
+      const user = await bearerUser(
+        event,
+        scope === "write" ? EXCALIDRAW_WRITE_SCOPE : EXCALIDRAW_READ_SCOPE,
+      );
+
+      event.context.bearerAuthenticated = user !== null;
+
+      return user;
+    }
+
     const token = sessionToken(event);
 
     if (!token) return null;
@@ -69,8 +92,14 @@ export function currentUser(event: H3Event): Promise<User | null> {
   })());
 }
 
-export async function requireUser(event: H3Event): Promise<User> {
-  return (await currentUser(event)) ?? fail(401, "UNAUTHENTICATED", "请先登录");
+export async function requireUser(
+  event: H3Event,
+  scope: BearerScope = "read",
+): Promise<User> {
+  return (
+    (await currentUser(event, scope)) ??
+    fail(401, "UNAUTHENTICATED", "请先登录")
+  );
 }
 
 /** 仅管理员可管理登录方式等服务级设置。 */

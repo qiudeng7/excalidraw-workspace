@@ -1,4 +1,4 @@
-import { apiUrl } from "~/lib/runtime";
+import { accessToken, apiUrl, hasAccessTokenProvider } from "~/lib/runtime";
 
 export class ApiError extends Error {
   status: number;
@@ -38,11 +38,19 @@ async function request<T>(
     headers.set("X-Requested-With", "excalidraw-demo");
   }
 
-  const response = await fetch(apiUrl(path), {
-    ...options,
-    credentials: "same-origin",
-    headers,
-  });
+  const send = (token: string | undefined) => {
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+
+    return fetch(apiUrl(path), {
+      ...options,
+      credentials: token ? "omit" : "same-origin",
+      headers,
+    });
+  };
+  // A federated host supplies Identity tokens; otherwise the same-origin Cookie session applies.
+  const response = await (hasAccessTokenProvider()
+    ? accessToken().then(send)
+    : send(undefined));
 
   if (conditional && response.status === 304) return undefined;
   const body = await response.json().catch((error: unknown) => {

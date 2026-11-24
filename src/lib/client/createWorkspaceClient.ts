@@ -16,6 +16,8 @@ export interface WorkspaceClientOptions {
   apiBase?: string;
   /** Defaults to apiBase; set when the realtime endpoint lives elsewhere. */
   realtimeBase?: string;
+  /** Supplies a short-lived Identity access token when running inside another host. */
+  accessToken?: () => Promise<string | undefined>;
   initialCanvasId?: string;
 }
 
@@ -53,6 +55,7 @@ export function createWorkspaceClient(
   configureApi({
     base: options.apiBase ?? "",
     realtimeBase: options.realtimeBase ?? options.apiBase,
+    accessToken: options.accessToken,
   });
 
   const state = shallowRef<ClientSession>({

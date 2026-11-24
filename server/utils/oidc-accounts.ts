@@ -15,6 +15,7 @@ export interface OidcClaims {
   name?: unknown;
   preferred_username?: unknown;
   tid?: unknown;
+  picture?: unknown;
 }
 
 const asText = (value: unknown) =>

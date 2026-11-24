@@ -28,14 +28,17 @@ export async function principal(event: H3Event): Promise<Principal> {
 
   if (token && (token.length !== 64 || !/^[a-f0-9]+$/.test(token)))
     return fail(403, "INVALID_ACCESS", "访问凭证无效");
-  if (user) assertOwner(apiRequest(event), user.id, "x-account-owner");
+  if (user && !event.context.bearerAuthenticated)
+    assertOwner(apiRequest(event), user.id, "x-account-owner");
 
   return {
     ...(user
       ? {
           userId: user.id,
           name: user.name,
-          sessionHash: await currentSessionHash(event),
+          ...(event.context.bearerAuthenticated
+            ? { bearer: true }
+            : { sessionHash: await currentSessionHash(event) }),
         }
       : { name: "访客" }),
     ...(token ? { capabilityHash: await digest(token) } : {}),

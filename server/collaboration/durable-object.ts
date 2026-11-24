@@ -19,6 +19,8 @@ interface Environment {
   BLOB: R2Bucket;
   CANVAS_ROOMS: DurableObjectNamespace;
   PUBLIC_ORIGIN: string;
+  /** Comma-separated extra browser origins allowed to open a room socket. */
+  CORS_ORIGINS?: string;
 }
 
 interface Attachment {
@@ -116,6 +118,17 @@ export class CanvasRoom extends Server<Environment> {
 
   private async validSession(principal: Principal) {
     if (!principal.userId) return true;
+    // Identity principals were verified before the ticket was issued; keep the mapped account alive.
+    if (principal.bearer) {
+      const account = await this.env.DB.prepare(
+        "SELECT id FROM users WHERE id = ?",
+      )
+        .bind(principal.userId)
+        .first<{ id: string }>();
+
+      return account?.id === principal.userId;
+    }
+
     if (!principal.sessionHash) return false;
     const session = await this.env.DB.prepare(
       "SELECT user_id FROM sessions WHERE token_hash = ? AND expires_at > ?",
@@ -128,7 +141,16 @@ export class CanvasRoom extends Server<Environment> {
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
-      if (request.headers.get("origin") !== this.env.PUBLIC_ORIGIN)
+      const origin = request.headers.get("origin");
+      const allowlisted = (this.env.CORS_ORIGINS ?? "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      if (
+        origin !== this.env.PUBLIC_ORIGIN &&
+        !(origin && allowlisted.includes(origin))
+      )
         return new Response("Forbidden", { status: 403 });
       if ([...this.getConnections<SocketState>()].length >= 50)
         return new Response("Room is full", { status: 429 });

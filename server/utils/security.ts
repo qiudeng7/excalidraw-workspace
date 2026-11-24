@@ -27,6 +27,32 @@ export function publicOrigin(
   throw new Error("PUBLIC_ORIGIN is required");
 }
 
+/** Extra browser origins allowed to call the API cross-origin (e.g. a Module Federation host). */
+export function allowedOrigins(configured: string | undefined): string[] {
+  const origins = new Set<string>();
+
+  for (const entry of (configured || "").split(",")) {
+    const value = entry.trim();
+
+    if (!value) continue;
+    const url = new URL(value);
+
+    if (
+      !["http:", "https:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash
+    )
+      throw new Error("CORS_ORIGINS entries must be single HTTP(S) origins");
+
+    origins.add(url.origin);
+  }
+
+  return [...origins];
+}
+
 export function clientIp(
   remote: string | undefined,
   forwarded: string | null,

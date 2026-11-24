@@ -38,6 +38,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "PUBLIC_ORIGIN": "https://excalidraw-workspace.qiudeng.workers.dev",
+    "CORS_ORIGINS": "",
   },
   "env": {
     "preview": {
@@ -47,6 +48,7 @@
       "routes": [],
       "vars": {
         "PUBLIC_ORIGIN": "https://excalidraw-workspace-preview.qiudeng.workers.dev",
+        "CORS_ORIGINS": "",
       },
       "d1_databases": [
         {

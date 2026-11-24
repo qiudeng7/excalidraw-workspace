@@ -35,6 +35,8 @@ export interface Principal {
   name: string;
   sessionHash?: string;
   capabilityHash?: string;
+  /** True when the identity came from an Identity access token rather than a local session cookie. */
+  bearer?: boolean;
 }
 
 export interface Access {

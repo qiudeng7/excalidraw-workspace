@@ -36,6 +36,18 @@ export async function registration() {
 /** Marker for accounts without a local password; it never parses as a PBKDF2 digest. */
 export const NO_PASSWORD = "!oidc";
 
+export async function userById(id: string) {
+  return (
+    (
+      await db
+        .select(userColumns)
+        .from(tables.users)
+        .where(eq(tables.users.id, id))
+        .limit(1)
+    )[0] ?? null
+  );
+}
+
 export async function userByIdentity(issuer: string, subject: string) {
   return (
     (

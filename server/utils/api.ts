@@ -4,24 +4,40 @@ import {
   sendWebResponse,
   type H3Event,
 } from "h3";
-import { apiRequest, requestOrigin } from "#server/utils/request";
-import { requireUser } from "#server/utils/auth";
+import {
+  apiRequest,
+  requestCorsOrigins,
+  requestOrigin,
+} from "#server/utils/request";
+import { requireUser, type BearerScope } from "#server/utils/auth";
 import { authConfig } from "#server/utils/auth-methods";
 import { ApiError, assertOrigin, fail, json } from "#server/utils/http";
+
+/** Read-only methods only need the read scope; anything else mutates state. */
+function scopeFor(method: string, override?: BearerScope): BearerScope {
+  if (override) return override;
+
+  return method === "GET" || method === "HEAD" ? "read" : "write";
+}
 
 /** Retain the existing JSON error contract and default authentication for API routes. */
 export function defineApiHandler(
   handler: (event: H3Event) => Promise<Response>,
-  options: { public?: boolean } = {},
+  options: { public?: boolean; scope?: BearerScope } = {},
 ) {
   return defineEventHandler(async (event) => {
     let response: Response;
 
     try {
-      assertOrigin(apiRequest(event), requestOrigin(event));
+      assertOrigin(
+        apiRequest(event),
+        requestOrigin(event),
+        requestCorsOrigins(event),
+      );
       // Misconfiguration must fail loudly on Workers, where env arrives per request.
       authConfig(event);
-      if (!options.public) await requireUser(event);
+      if (!options.public)
+        await requireUser(event, scopeFor(event.method, options.scope));
       response = await handler(event);
     } catch (error) {
       if (error instanceof ApiError) {

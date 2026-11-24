@@ -25,6 +25,24 @@ export async function enabledOidcProviders() {
     .orderBy(...ordered);
 }
 
+/** Bearer tokens select a trusted, enabled issuer without trusting unverified claims as authority. */
+export async function oidcProviderByIssuer(issuer: string) {
+  return (
+    (
+      await db
+        .select()
+        .from(tables.oidcProviders)
+        .where(
+          and(
+            eq(tables.oidcProviders.issuer, issuer),
+            eq(tables.oidcProviders.enabled, true),
+          ),
+        )
+        .limit(1)
+    )[0] ?? null
+  );
+}
+
 export async function oidcProvider(id: string) {
   if (!id) return null;
 

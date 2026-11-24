@@ -82,3 +82,24 @@ moduleFederation: {
 ## 接口描述
 
 其他服务调用 HTTP API 时，可从任一部署实例读取构建期生成的 `/_openapi.json` 生成 SDK，见[部署说明](../deployment.md#openapi-文档)。
+
+## 跨域直连后端（Identity access token）
+
+宿主不复用应用的同源 Cookie，而是把 Identity 签发、`aud` 指向本应用 origin 的 access token 交给模块。应用据此把用户解析成按 `(iss, sub)` 映射的本地账号：
+
+1. `WorkspaceApp` 或 `createWorkspaceClient()` 传入 `accessToken: () => Promise<string | undefined>`；它每次请求都会被调用，因此宿主可以返回缓存后即将过期的短期令牌。
+2. 前端调用 API 时带 `Authorization: Bearer <token>`，并改用 `credentials: "omit"`；未配置 `accessToken` 时仍是原来的同源 Cookie 会话，行为不变。
+3. 服务端只信任「已启用身份源」里登记的 issuer：先按 `iss` 找到身份源，取它的 discovery 与 JWKS 验签（RS256），再校验 `aud` 含本部署 origin、`scope` 含接口所需权限，最后按 `(iss, sub)` 映射账户（首次访问自动建号）。
+4. `GET`/`HEAD` 需要 `excalidraw:canvas.read`，其余方法需要 `excalidraw:canvas.write`；权限不足按未登录处理，返回 401。
+
+应用在 `/.well-known/oauth-protected-resource` 发布 [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728) 元数据（`resource` 为 `PUBLIC_ORIGIN`、`authorization_servers` 指向裕昇 Identity、`scopes_supported` 为上面两个 scope）。Identity 管理员同步该地址后，再给宿主客户端授予相应 scope，token 才会带上 `aud` 与 `scope`。
+
+跨域需要在部署环境变量里登记宿主 origin：
+
+```dotenv
+CORS_ORIGINS=https://workbench.example.com
+```
+
+只有登记过的 origin 会拿到 CORS 响应头与预检结果；`CORS_ORIGINS` 只决定浏览器能否发起请求，不构成认证依据。Cookie 仍是 `SameSite=Strict`，跨域请求不带 Cookie，因此跨域一律走 Bearer。
+
+协作实时房间不额外传递访问令牌：模块先用 Bearer 调用 `POST /api/canvases/{id}/collaboration/ticket` 换取一次性票据，再用票据完成 WebSocket 的 `AUTH`。WebSocket 的 Origin 同样按 `PUBLIC_ORIGIN` 与 `CORS_ORIGINS` 校验。

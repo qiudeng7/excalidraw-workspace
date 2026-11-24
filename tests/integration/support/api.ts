@@ -9,6 +9,8 @@ export interface ApiFixture {
   database: TestDatabase;
   blob: TestBlob;
   publicOrigin: string;
+  /** Extra browser origins allowed by CORS, mirroring the CORS_ORIGINS setting. */
+  corsOrigins?: string;
   waitUntil(promise: Promise<unknown>): void;
 }
 
@@ -39,6 +41,25 @@ const routes = await Promise.all(
     }),
 );
 
+// Load the real Nitro middleware (e.g. CORS) so route behaviour matches production.
+const middlewareFiles = await readdir(
+  new URL("../../../server/middleware/", import.meta.url),
+).catch(() => [] as string[]);
+const middlewares = await Promise.all(
+  middlewareFiles
+    .filter((file) => file.endsWith(".ts"))
+    .map(
+      async (file) =>
+        (
+          await import(
+            fileURLToPath(
+              new URL(`../../../server/middleware/${file}`, import.meta.url),
+            )
+          )
+        ).default,
+    ),
+);
+
 export async function handleApi(
   request: Request,
   fixture: ApiFixture,
@@ -52,11 +73,13 @@ export async function handleApi(
         runtimeConfig: {
           publicOrigin: fixture.publicOrigin,
           trustedProxyIps: "",
+          corsOrigins: fixture.corsOrigins ?? "",
         },
       };
       event.waitUntil = fixture.waitUntil;
     }),
   );
+  for (const middleware of middlewares) app.use(middleware);
   for (const entry of routes)
     router.add(entry.route, entry.handler, entry.method);
   app.use(router);

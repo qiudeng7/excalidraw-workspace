@@ -114,6 +114,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     publicOrigin: "",
     trustedProxyIps: "",
+    corsOrigins: "",
   },
   css: ["~/style.css"],
   devtools: { enabled: false },

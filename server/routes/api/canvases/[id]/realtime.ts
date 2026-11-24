@@ -1,7 +1,9 @@
 import { defineWebSocketHandler } from "h3";
 import { nodeCommand, roomListeners } from "#server/collaboration/node";
 import { session } from "#server/db/sessions";
+import { userById } from "#server/db/accounts";
 import { digest } from "#server/utils/passwords";
+import { allowedOrigins } from "#server/utils/security";
 import { sanitizePresence } from "#server/collaboration/presence";
 import type { Access, Principal } from "#shared/collaboration/types";
 import type { Command } from "#shared/collaboration/room";
@@ -19,17 +21,25 @@ interface Connection {
 
 const connections = new Set<Connection>();
 
+/**
+ * Cookie principals are bound to a live session row; Identity principals were already
+ * verified when the ticket was issued, so only the mapped account must still exist.
+ */
+async function identityStillValid(principal: Principal) {
+  if (principal.bearer) return (await userById(principal.userId!)) !== null;
+
+  return (
+    !!principal.sessionHash &&
+    (await session(principal.sessionHash, Date.now()))?.id === principal.userId
+  );
+}
+
 async function authorize(connection: Connection) {
   if (!connection.principal || !connection.access) return false;
   try {
     const principal = connection.principal;
 
-    if (
-      principal.userId &&
-      (!principal.sessionHash ||
-        (await session(principal.sessionHash, Date.now()))?.id !==
-          principal.userId)
-    )
+    if (principal.userId && !(await identityStillValid(principal)))
       throw new Error("登录已失效，请重新登录");
     const access = (await nodeCommand(connection.room, principal, {
       type: "access",
@@ -66,9 +76,16 @@ export default defineWebSocketHandler({
       process.env.PUBLIC_ORIGIN ||
       process.env.NUXT_PUBLIC_ORIGIN ||
       new URL(request.url).origin;
+    const origin = request.headers.get("origin");
+    // Browsers always send Origin; a federated host is only accepted when allowlisted.
+    const allowed =
+      origin === expected ||
+      (!!origin &&
+        allowedOrigins(
+          useRuntimeConfig().corsOrigins || process.env.CORS_ORIGINS,
+        ).includes(origin));
 
-    if (request.headers.get("origin") !== expected)
-      return new Response("Forbidden", { status: 403 });
+    if (!allowed) return new Response("Forbidden", { status: 403 });
     const room = decodeURIComponent(
       new URL(request.url).pathname.split("/")[3]!,
     );

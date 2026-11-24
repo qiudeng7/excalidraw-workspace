@@ -92,12 +92,18 @@ export function validRevision(value: unknown): number {
   return value;
 }
 
-export function assertOrigin(req: Request, publicOrigin: string): void {
-  if (
-    !["GET", "HEAD"].includes(req.method) &&
-    (req.headers.get("origin") !== publicOrigin ||
-      req.headers.get("x-requested-with") !== "excalidraw-demo")
-  )
+export function assertOrigin(
+  req: Request,
+  publicOrigin: string,
+  extraOrigins: string[] = [],
+): void {
+  if (["GET", "HEAD"].includes(req.method)) return;
+  const origin = req.headers.get("origin");
+  // A cross-origin host still has to echo the X-Requested-With marker; the marker alone proves nothing.
+  const allowed =
+    origin === publicOrigin || (!!origin && extraOrigins.includes(origin));
+
+  if (!allowed || req.headers.get("x-requested-with") !== "excalidraw-demo")
     fail(403, "CSRF_REJECTED", "请求来源无效");
 }
 

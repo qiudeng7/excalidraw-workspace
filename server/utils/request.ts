@@ -1,5 +1,5 @@
 import { getRequestURL, toWebRequest, type H3Event } from "h3";
-import { clientIp, publicOrigin } from "#server/utils/security";
+import { allowedOrigins, clientIp, publicOrigin } from "#server/utils/security";
 
 declare module "h3" {
   interface H3EventContext {
@@ -25,6 +25,15 @@ export function requestOrigin(event: H3Event): string {
       process.env.PUBLIC_ORIGIN,
     getRequestURL(event).href,
     import.meta.dev,
+  );
+}
+
+/** Explicitly configured cross-origin hosts; they get CORS but no Cookie-credentialed trust. */
+export function requestCorsOrigins(event: H3Event): string[] {
+  return allowedOrigins(
+    useRuntimeConfig(event).corsOrigins ||
+      event.context.cloudflare?.env?.CORS_ORIGINS ||
+      process.env.CORS_ORIGINS,
   );
 }
 

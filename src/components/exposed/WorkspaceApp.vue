@@ -56,6 +56,7 @@ const props = withDefaults(
     theme?: "light" | "dark" | "inherit";
     apiBase?: string;
     realtimeBase?: string;
+    accessToken?: () => Promise<string | undefined>;
   }>(),
   { mode: "full", theme: "inherit" },
 );
@@ -66,7 +67,11 @@ const emit = defineEmits<{
 const embedded = computed(() => props.mode === "embed");
 
 if (props.apiBase !== undefined)
-  configureApi({ base: props.apiBase, realtimeBase: props.realtimeBase });
+  configureApi({
+    base: props.apiBase,
+    realtimeBase: props.realtimeBase,
+    accessToken: props.accessToken,
+  });
 
 // Embedded roots carry their own data-theme so tokens resolve inside the subtree.
 const hostTheme = ref<"light" | "dark">("light");
@@ -668,8 +673,7 @@ async function flushForShare() {
         aria-label="账户与工作空间"
       >
         <div class="sidebar-heading">
-          <span class="workspace-brand"
-            ><BrandMark :size="24" />画布空间</span
+          <span class="workspace-brand"><BrandMark :size="24" />画布空间</span
           ><span class="app-version">v{{ APP_VERSION }}</span>
           <a
             class="github-link icon-button"
