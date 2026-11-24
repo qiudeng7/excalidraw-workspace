@@ -1,4 +1,4 @@
-/** 身份源类型；预设类型由界面自动带出名称与 issuer，custom 由管理员填写并上传图标。 */
+/** 身份源类型；预设类型自动带出名称与 issuer，custom 由管理员填写，图标可选。 */
 export const oidcProviderTypes = [
   "microsoft",
   "gitlab",

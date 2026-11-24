@@ -21,6 +21,7 @@ const error = ref("");
 const busy = ref(false);
 const dialog = ref<HTMLDialogElement>();
 const callback = ref<HTMLInputElement>();
+const iconInput = ref<HTMLInputElement>();
 const editingId = ref<string | null>(null);
 const pendingIcon = ref("");
 const showSecret = ref(false);
@@ -61,7 +62,6 @@ const iconSrc = computed(() => {
 
   return editing.value?.iconUrl ? assetUrl(editing.value.iconUrl) : "";
 });
-const hasIcon = computed(() => !!iconSrc.value);
 /** 服务端按 PUBLIC_ORIGIN 拼回调地址，这里用当前 origin 展示同一个值。 */
 const callbackUrl = computed(() =>
   form.id && typeof location !== "undefined"
@@ -180,11 +180,6 @@ async function chooseIcon(event: Event) {
 
 async function save() {
   if (busy.value) return;
-  if (isCustom.value && !hasIcon.value) {
-    formError.value = "自定义身份源需要上传图标";
-
-    return;
-  }
 
   busy.value = true;
   formError.value = "";
@@ -430,16 +425,22 @@ onMounted(load);
               <QuietIcon v-else name="canvas" :size="20" />
             </span>
             <span class="oidc-copy">
-              <strong>图标</strong>
+              <strong>图标（可选）</strong>
               <small>png、svg 或 webp，不超过 256 KB。</small>
-              <span class="oidc-file">
-                <input
-                  type="file"
-                  accept="image/png,image/svg+xml,image/webp"
-                  @change="chooseIcon"
-                />
-                <span>{{ iconSrc ? "更换图片" : "选择图片" }}</span>
-              </span>
+              <input
+                ref="iconInput"
+                type="file"
+                accept="image/png,image/svg+xml,image/webp"
+                hidden
+                @change="chooseIcon"
+              />
+              <button
+                type="button"
+                class="oidc-file"
+                @click="iconInput?.click()"
+              >
+                {{ iconSrc ? "更换图片" : "选择图片" }}
+              </button>
             </span>
           </div>
           <div class="oidc-toggles">
@@ -806,26 +807,17 @@ onMounted(load);
   object-fit: contain;
 }
 .oidc-file {
-  display: inline-flex;
-  margin-top: 7px;
-}
-.oidc-file input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  clip-path: inset(50%);
-}
-.oidc-file span {
+  align-self: flex-start;
   padding: 6px 10px;
   border: 1px solid var(--app-border);
   border-radius: 6px;
+  background: var(--app-surface);
   color: var(--app-text);
+  font: inherit;
   font-size: 11px;
-  font-weight: 400;
   cursor: pointer;
 }
-.oidc-file span:hover {
+.oidc-file:hover {
   background: var(--app-hover);
 }
 .oidc-toggles {
