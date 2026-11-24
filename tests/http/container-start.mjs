@@ -76,6 +76,24 @@ async function ready(container, needsSetup) {
   }
 }
 
+// The withheld-migration stage runs current code against an older schema, so
+// endpoints that read the newest tables may fail; wait for the listener only.
+async function listening(container) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const running = await docker(
+      "inspect",
+      "--format",
+      "{{.State.Running}}",
+      container,
+    );
+    assert.equal(running, "true", `${container} exited before listening`);
+    const { stdout, stderr } = await execute("docker", ["logs", container]);
+    if (`${stdout}${stderr}`.includes("Listening on")) return;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`${container} did not start listening`);
+}
+
 async function stop(container) {
   await docker("stop", container);
   await docker("rm", container);
@@ -151,7 +169,7 @@ try {
   await chmod(oldSql, 0o755);
   const oldData = await volume("upgrade");
   app = await launch("old", oldData, oldMigrations);
-  await ready(app, true);
+  await listening(app);
   assert.equal(
     (await sql(app, "SELECT name FROM _hub_migrations", true)).length,
     files.length - 1,

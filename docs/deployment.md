@@ -20,6 +20,8 @@ docker compose -f compose.ghcr.yaml logs app
 
 如需固定版本，可在 `.env` 设置 `WORKSPACE_VERSION=0.5.1`（以[包页面](https://github.com/qiudeng7/excalidraw-workspace/pkgs/container/excalidraw-workspace)的实际标签为准）；自建 fork 可设置 `WORKSPACE_IMAGE=ghcr.io/你的账号/仓库名`。`latest` 和 `main` 跟随主分支，`v<版本>` tag 生成不带 `v` 的版本标签，预发行版保留完整版本号，同时提供完整 SHA 标签。
 
+日常开发推送到维护者自建的 Gitea 仓库，Gitea 通过 push mirror 在提交后自动同步到 GitHub 开源仓库 `qiudeng7/excalidraw-workspace`，镜像在 GitHub 侧构建；Gitea 不运行 Actions。因此推送 Gitea 的 `main` 后需等待同步与 GitHub 构建完成，`latest` 才会更新。
+
 镜像由 [Container images 工作流](../.github/workflows/containers.yml) 构建。首次发布需先将工作流合入 `main` 并等待成功，再将 GitHub 仓库 Packages 中的 `excalidraw-workspace` 设为 Public；公开仓库不会自动使包公开，已存在的包还需允许本仓库 Actions 写入。需要重试时，在 Actions → Container images → Run workflow 选择 `main`；手动运行其他分支会跳过构建与发布。
 
 ### 源码构建
