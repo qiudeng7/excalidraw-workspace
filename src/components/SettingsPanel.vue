@@ -20,6 +20,7 @@ import {
 import QuietIcon from "~/components/QuietIcon.vue";
 import ThemeSwitcher from "~/components/ThemeSwitcher.vue";
 import AccountPasswordForm from "~/components/AccountPasswordForm.vue";
+import OidcProvidersPanel from "~/components/OidcProvidersPanel.vue";
 import ReleaseNotes from "~/components/ReleaseNotes.vue";
 import { currentRelease } from "~/data/releases";
 
@@ -75,7 +76,7 @@ const sectionDefinitions = [
     key: "system",
     label: "系统设置",
     icon: "server",
-    description: "管理服务设置。",
+    description: "管理注册与登录方式。",
   },
 ] as const;
 
@@ -392,6 +393,7 @@ onBeforeUnmount(() => {
                   class="settings-switch"
                   aria-hidden="true"
               /></label>
+              <OidcProvidersPanel />
               <p v-if="systemError" class="settings-error" role="alert">
                 {{ systemError }}
               </p>
