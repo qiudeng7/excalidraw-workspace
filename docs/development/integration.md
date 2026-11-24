@@ -2,7 +2,7 @@
 
 [返回目录](../../README.md#目录)
 
-应用除了独立部署，还可以作为 Module Federation remote，被宿主应用（如 workbench）在运行时加载。Node 和 Cloudflare 两种部署都支持，不是第三种部署方式；是否发布 remote 由构建开关决定，账号方式由[账号方式开关](accounts.md#账号方式开关)决定。默认构建不产出任何 federation 文件，行为与独立部署相同。
+应用除了独立部署，还可以作为 Module Federation remote，被宿主应用（如 workbench）在运行时加载。Node 和 Cloudflare 两种部署都支持，不是第三种部署方式；是否发布 remote 由构建开关决定，登录方式由[账号方式开关](accounts.md#账号方式开关)与[管理登录方式](accounts.md#管理登录方式)决定。默认构建不产出任何 federation 文件，行为与独立部署相同。
 
 ## 选择暴露层次
 
@@ -66,12 +66,12 @@ moduleFederation: {
 
 推荐宿主网关把 `/apps/excalidraw/*` 转发到应用，并**去掉前缀**再转发；应用的服务端路由保持不变。浏览器侧的地址由前缀派生：
 
-| 配置                                        | 作用                                                                                              |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 构建期 `WORKSPACE_BASE`                     | federation `publicPath` 与编辑器资源路径 `EXCALIDRAW_ASSET_PATH`，如 `/apps/excalidraw`           |
-| `apiBase` / `realtimeBase`                  | 组件 prop 或 `createWorkspaceClient()` 参数，决定 API 与 WebSocket 地址；默认空字符串即同源根路径 |
-| `PUBLIC_ORIGIN`                             | 宿主对外 origin，用于来源校验与 Secure Cookie                                                     |
-| `OIDC_REDIRECT_URI`、`OIDC_POST_LOGIN_PATH` | 带前缀的回调地址与登录后返回的宿主页面，见[OIDC 登录](accounts.md#oidc-登录)                      |
+| 配置                       | 作用                                                                                                              |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 构建期 `WORKSPACE_BASE`    | federation `publicPath` 与编辑器资源路径 `EXCALIDRAW_ASSET_PATH`，如 `/apps/excalidraw`                           |
+| `apiBase` / `realtimeBase` | 组件 prop 或 `createWorkspaceClient()` 参数，决定 API 与 WebSocket 地址；默认空字符串即同源根路径                 |
+| `PUBLIC_ORIGIN`            | 宿主对外 origin，用于来源校验与 Secure Cookie                                                                     |
+| 身份源回调地址             | 按 `PUBLIC_ORIGIN` 派生，见[OIDC 登录](accounts.md#oidc-登录)；带前缀时宿主需额外把 `/api/auth/oidc/*` 转发到应用 |
 
 网关须保留 Cookie、Origin 与 `X-Requested-With` 请求头，不缓存 `/api/*`，并支持 `/api/canvases/{id}/realtime` 的 WebSocket Upgrade。
 

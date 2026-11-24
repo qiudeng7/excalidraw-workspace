@@ -127,7 +127,7 @@ Node 协作广播仅支持一个应用进程，不支持多副本或 cluster；�
 
 ## 账号方式与集成
 
-本地账号与 OIDC 账号在两种部署中都通过环境变量开关，至少保留一种，变量与校验规则见[账号方式开关](development/accounts.md#账号方式开关)；Cloudflare 将 `OIDC_CLIENT_SECRET` 设为 secret。需要被 workbench 等宿主运行时加载时，以 `MF_ENABLED=true` 构建并经宿主同源反向代理发布，见[被宿主集成](development/integration.md)。可选变量汇总在仓库根目录的 `.env.example`。
+本地账号由 `AUTH_LOCAL` 控制（默认开启）；OIDC 身份源不再使用环境变量或 Worker secret，而是由管理员在“设置 → 系统设置 → 登录方式”里维护并保存在数据库，规则见[账号方式开关](development/accounts.md#账号方式开关)。首次部署须保留本地账号来创建管理员。需要被 workbench 等宿主运行时加载时，以 `MF_ENABLED=true` 构建并经宿主同源反向代理发布，见[被宿主集成](development/integration.md)。可选变量汇总在仓库根目录的 `.env.example`。
 
 ## OpenAPI 文档
 

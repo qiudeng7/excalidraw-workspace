@@ -2,7 +2,7 @@
 
 [返回目录](../../README.md#目录)
 
-用户通过邮箱和密码（本地账号）或外部 OIDC 身份提供方建立会话，两种方式按部署开关启用；管理员额外控制注册开放状态。账户表单在 [AccountGate.vue](../../src/components/AccountGate.vue)，登录后的生命周期由 [useAccountSession.ts](../../src/composables/useAccountSession.ts) 编排，HTTP 适配在 [accountApi.ts](../../src/lib/accountApi.ts)。
+用户通过邮箱和密码（本地账号）或外部 OIDC 身份提供方建立会话，前者由 `AUTH_LOCAL` 开关控制，后者由管理员在数据库中维护的身份源决定；管理员额外控制注册开放状态。账户表单在 [AccountGate.vue](../../src/components/AccountGate.vue)，登录后的生命周期由 [useAccountSession.ts](../../src/composables/useAccountSession.ts) 编排，HTTP 适配在 [accountApi.ts](../../src/lib/accountApi.ts)。
 
 ## 初始化管理员
 
@@ -50,32 +50,57 @@
 
 ## 账号方式开关
 
-本地账号与 OIDC 账号由部署环境变量控制，Node 读取进程环境，Cloudflare 读取 Worker vars，规则在 [auth-config.ts](../../server/utils/auth-config.ts) 的纯函数 `parseAuthConfig()` 中：
+本地账号由部署环境变量 `AUTH_LOCAL` 控制，规则集中在 [auth-config.ts](../../server/utils/auth-config.ts) 的纯函数 `parseAuthConfig()`；OIDC 身份源不再读取环境变量，由管理员在界面里维护并保存在数据库 `oidc_providers` 表（结构见 [schema.ts](../../server/db/schema.ts)）。
 
-| 变量                                                  | 默认                                        | 说明                                 |
-| ----------------------------------------------------- | ------------------------------------------- | ------------------------------------ |
-| `AUTH_LOCAL`                                          | `true`                                      | 本地注册、登录、初始化与修改密码     |
-| `AUTH_OIDC`                                           | `false`                                     | OIDC 登录                            |
-| `OIDC_ISSUER`、`OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET` | —                                           | 开启 OIDC 时必填                     |
-| `OIDC_SCOPES`                                         | `openid profile email`                      |                                      |
-| `OIDC_REDIRECT_URI`                                   | `PUBLIC_ORIGIN` + `/api/auth/oidc/callback` | 经代理前缀访问时填写完整公开回调地址 |
-| `OIDC_POST_LOGIN_PATH`                                | `/`                                         | 登录成功或失败后返回的同源路径       |
+| 变量         | 默认   | 说明                             |
+| ------------ | ------ | -------------------------------- |
+| `AUTH_LOCAL` | `true` | 本地注册、登录、初始化与修改密码 |
 
-两项至少开启一项，开启 OIDC 时三项凭据必填，布尔值只接受 `true/false/1/0`。配置无效时不降级：Node 由 [auth-config 插件](../../server/plugins/auth-config.ts)在启动时退出，Workers 由 [defineApiHandler()](../../server/utils/api.ts) 在每个 API 请求返回 `500 CONFIGURATION_INVALID`。
+布尔值只接受 `true/false/1/0`；配置无效时不降级：Node 由 [auth-config 插件](../../server/plugins/auth-config.ts) 在启动时退出，Workers 由 [defineApiHandler()](../../server/utils/api.ts) 在每个 API 请求返回 `500 CONFIGURATION_INVALID`。`AUTH_LOCAL=false` 时登录、注册、初始化与修改密码接口返回 `403 AUTH_METHOD_DISABLED`，能否进入完全取决于表中是否有已启用的身份源。
 
-[GET /api/bootstrap](../../server/api/bootstrap.get.ts) 返回 `authMethods: { local, oidc }`。[AccountGate.vue](../../src/components/AccountGate.vue) 据此显示 OIDC 登录入口或隐藏密码表单与注册入口，设置面板在本地账号关闭时隐藏修改密码。本地账号关闭时，登录、注册、初始化与修改密码接口返回 `403 AUTH_METHOD_DISABLED`。
+[GET /api/bootstrap](../../server/api/bootstrap.get.ts) 返回 `authMethods: { local: boolean, oidc: Array<{ id, type, name, iconUrl }> }`，`oidc` 只包含已启用的身份源；没有任何身份源时是空数组，登录页不出现 OIDC 入口，也不会报配置错误。[AccountGate.vue](../../src/components/AccountGate.vue) 按数组为每个身份源渲染一个“使用 {name} 登录”按钮，设置面板在本地账号关闭时隐藏修改密码。
+
+**首次部署必须保持本地账号开启**，通过初始化表单创建管理员；之后才可以关闭本地账号。`AUTH_LOCAL=false` 且尚无管理员时，bootstrap 仍返回 `needsSetup=true`，但初始化接口返回 `403 AUTH_METHOD_DISABLED`，需要临时恢复 `AUTH_LOCAL=true`。
+
+## 管理登录方式
+
+管理员在“设置 → 系统设置 → 登录方式”维护身份源，表格列出图标、名称、类型、issuer 与启用开关，新建/编辑对话框负责其余字段。接口都要求管理员会话，实现在 [server/api/admin/oidc-providers/](../../server/api/admin/oidc-providers/)：
+
+| 接口                                      | 说明                                                     |
+| ----------------------------------------- | -------------------------------------------------------- |
+| `GET /api/admin/oidc-providers`           | 列表；按约定以明文返回 `clientSecret`                    |
+| `POST /api/admin/oidc-providers`          | 新建；`id` 由前端生成（`crypto.randomUUID()`）后提交     |
+| `PATCH /api/admin/oidc-providers/{id}`    | 修改；`type` 创建后不可改                                |
+| `DELETE /api/admin/oidc-providers/{id}`   | 删除；已映射账户保留                                     |
+| `PUT /api/admin/oidc-providers/{id}/icon` | 上传 custom 图标，接受 png/svg/webp 的 data URL，≤256 KB |
+| `GET /api/auth/oidc/{providerId}/icon`    | 公开读取上传的图标                                       |
+
+身份源字段保存在 `oidc_providers`：`id`、`type`、`name`、`issuer`、`client_id`、`client_secret`（**明文存储**，换取令牌需要原始值）、`scopes`（默认 `openid profile email`）、`icon`（上传图标的对象键，预设为空）、`enabled`、`auto_register`、`created_at`、`updated_at`。唯一约束是 `(type, issuer, client_id)`，因此微软多租户可以让多行都填 `common`。图标复用现有对象存储（Node 写 `.data/blob`，Workers 写 R2），键为 `oidc-providers/{id}/icon.{png|svg|webp}`；读取时带 `sandbox` CSP，直接打开上传的 SVG 也不会执行脚本。
+
+| `type`      | 默认名称   | 默认 issuer（可改）                             | 图标       |
+| ----------- | ---------- | ----------------------------------------------- | ---------- |
+| `microsoft` | Microsoft  | `https://login.microsoftonline.com/common/v2.0` | 内置       |
+| `gitlab`    | GitLab     | `https://gitlab.com`，自建实例填实例根地址      | 内置       |
+| `google`    | Google     | `https://accounts.google.com`                   | 内置       |
+| `custom`    | 管理员填写 | 管理员填写                                      | 管理员上传 |
+
+预设类型的图标是前端内置资源（`public/oidc/*.svg`），bootstrap 的 `iconUrl` 直接返回该路径；custom 上传后返回 `/api/auth/oidc/{id}/icon`。GitHub 不是 OIDC，不在预设里。
 
 ## OIDC 登录
 
 应用作为 OIDC 依赖方，使用授权码与 PKCE（S256），实现在 [oidc.ts](../../server/utils/oidc.ts)：
 
-1. 登录入口跳转 [GET /api/auth/oidc/start](../../server/api/auth/oidc/start.get.ts)。服务端读取 discovery（缓存 1 小时），生成 state、nonce 与 code verifier，写入 10 分钟有效的 HttpOnly 流程 Cookie 后重定向到身份提供方。流程 Cookie 使用 `SameSite=Lax`，路径取公开回调地址所在目录，因此代理前缀下仍能带回。
-2. 身份提供方回到 [GET /api/auth/oidc/callback](../../server/api/auth/oidc/callback.get.ts)。服务端校验 state，用授权码换取令牌，以 JWKS 验证 `id_token`（RS256/ES256，校验 iss、aud、exp 与 nonce），流程 Cookie 无论成功与否都立即作废。
-3. [findOrCreateOidcUser()](../../server/utils/oidc-accounts.ts) 按 `(issuer, sub)` 查找账户，首次登录时创建账户和与注册相同的一组个人资源；邮箱与已有账户冲突时追加稳定后缀。系统尚无管理员时，首个 OIDC 账户成为管理员，并发时由唯一管理员约束决定。
-4. 成功后通过 [startSession()](../../server/utils/auth.ts) 写入与本地登录相同的会话 Cookie，并重定向到 `OIDC_POST_LOGIN_PATH`。失败时重定向到同一路径并附带 `authError` 代码，详细原因只写服务端日志。
+1. 登录入口是 [GET /api/auth/oidc/{providerId}/start](../../server/api/auth/oidc/[providerId]/start.get.ts)。身份源不存在或未启用时直接回到 `/?authError=oidc_disabled`，不暴露配置差异；启用时服务端读取该 issuer 的 discovery（按 issuer 缓存 1 小时），生成 state、nonce 与 code verifier，写入 10 分钟有效的 HttpOnly 流程 Cookie 后重定向到身份提供方。流程 Cookie 的值是 `providerId.state.verifier.nonce`，路径取公开回调地址所在目录（`/api/auth/oidc/{id}`），不同身份源的流程互不影响。
+2. 身份提供方回到 [GET /api/auth/oidc/{providerId}/callback](../../server/api/auth/oidc/[providerId]/callback.get.ts)。服务端核对流程 Cookie 的 `providerId` 与路由参数一致、state 匹配，用授权码换取令牌，以 JWKS 验证 `id_token`（RS256/ES256，校验 iss、aud、exp 与 nonce），流程 Cookie 无论成功与否都立即作废。
+3. [oidc-accounts.ts](../../server/utils/oidc-accounts.ts) 用 `id_token` 的**实际 issuer** 与 `sub` 查 `(provider, issuer, subject)` 唯一索引，首次登录时创建普通用户和与注册相同的一组个人资源；邮箱与已有账户冲突时追加稳定后缀。`auto_register=false` 且没有映射账户时回到 `/?authError=oidc_not_registered`，不创建账户。
+4. 成功后通过 [startSession()](../../server/utils/auth.ts) 写入与本地登录相同的会话 Cookie，并固定重定向到 `/`。失败时同样回到 `/` 并附带 `authError` 代码，详细原因只写服务端日志。
 
-OIDC 账户在 `users` 表记录 `provider='oidc'`、`issuer` 与 `subject`，唯一约束为 `(provider, issuer, subject)`；业务数据仍以本地 `users.id` 归属，与本地账户一致。OIDC 账户的密码摘要为不可验证的占位值，不能用密码登录或修改密码。同一邮箱的本地账户与 OIDC 账户是两个独立账户，不自动合并。
+微软多租户端点的 discovery issuer 是 `https://login.microsoftonline.com/{tenantid}/v2.0` 模板，`id_token` 的 `iss` 带实际租户。身份源 `type=microsoft` 且配置的 issuer 是 `common`、`organizations`、`consumers` 或 `{tenantid}` 模板时，校验要求 `iss` 等于 `https://login.microsoftonline.com/{tid}/v2.0`，`tid` 取自 `id_token` 的 `tid` 声明，账户映射保存这个带租户的 `iss`；配置成具体租户 issuer 或其它类型时，`iss` 必须与配置完全一致。
+
+**OIDC 账户一律是普通用户**：管理员只能由本地账号初始化产生，不再有“系统尚无管理员时首个 OIDC 账户成为管理员”的规则。OIDC 账户的密码摘要为不可验证的占位值，不能用密码登录或修改密码；同一邮箱的本地账户与 OIDC 账户是两个独立账户，不自动合并。删除身份源不会删除已映射账户，但这些账户之后只能通过重新创建同 issuer 的身份源登录。
+
+回调地址是 `PUBLIC_ORIGIN` 加 `/api/auth/oidc/{providerId}/callback`。新建对话框在打开时就生成 `id` 并显示该地址，可直接复制到身份提供方登记。经代理前缀部署时回调地址不含前端前缀，宿主需要额外把 `/api/auth/oidc/*` 转发到应用。
 
 ## 验证入口
 
-[node-storage.test.ts](../../tests/integration/node-storage.test.ts) 覆盖账户初始化、注册、会话及持久化，[request-context.test.ts](../../tests/integration/request-context.test.ts) 检查请求身份隔离，[user-settings-resource.test.ts](../../tests/unit/user-settings-resource.test.ts) 检查设置资源销毁与旧请求取消。[auth-config.test.ts](../../tests/unit/auth-config.test.ts) 与 [oidc-flow.test.ts](../../tests/unit/oidc-flow.test.ts) 覆盖开关校验、回调路径与重定向，[oidc-auth.test.ts](../../tests/integration/oidc-auth.test.ts) 以本地密钥模拟身份提供方，覆盖授权码、PKCE、验签、state/aud/nonce 错误、账户映射与本地账号关闭。浏览器中检查首次初始化、注册关闭、登录失败、刷新恢复，以及保存失败时退出是否被阻止。
+[node-storage.test.ts](../../tests/integration/node-storage.test.ts) 覆盖账户初始化、注册、会话及持久化，[request-context.test.ts](../../tests/integration/request-context.test.ts) 检查请求身份隔离，[user-settings-resource.test.ts](../../tests/unit/user-settings-resource.test.ts) 检查设置资源销毁与旧请求取消。[auth-config.test.ts](../../tests/unit/auth-config.test.ts)、[oidc-flow.test.ts](../../tests/unit/oidc-flow.test.ts) 与 [oidc-issuer.test.ts](../../tests/unit/oidc-issuer.test.ts) 覆盖环境开关、流程 Cookie 与 issuer 判定；[oidc-auth.test.ts](../../tests/integration/oidc-auth.test.ts) 以本地密钥模拟多个身份提供方，覆盖分别登录、微软租户 iss、未启用拒绝、`auto_register=false` 与流程 Cookie 不匹配；[oidc-providers.test.ts](../../tests/integration/oidc-providers.test.ts) 覆盖管理接口权限、唯一冲突、图标上传与读取，以及 bootstrap 只返回启用项。浏览器中检查首次初始化、注册关闭、登录失败、刷新恢复，以及保存失败时退出是否被阻止。
