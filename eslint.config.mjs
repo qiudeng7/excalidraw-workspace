@@ -144,6 +144,20 @@ export default [
     },
   },
   {
+    // Module Federation's SSR-expose resolver rewrites alias-resolved `.vue` imports reachable
+    // from exposed modules into `?__mf_ssr_expose` variants, which drops their scoped styles
+    // from the client build. Relative imports are left alone, so these files must use them.
+    files: [
+      "src/components/*.vue",
+      "src/components/exposed/{WorkspaceApp,WorkspaceSidebar}.vue",
+      "src/lib/dialogs.ts",
+    ],
+    rules: {
+      "no-restricted-imports": "off",
+      "no-restricted-modules": "off",
+    },
+  },
+  {
     files: ["server/worker.mjs"],
     rules: {
       // Nitro's generated entry is a build artifact, not an application alias.

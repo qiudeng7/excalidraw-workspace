@@ -8,17 +8,17 @@ import {
   watch,
 } from "vue";
 import { APP_VERSION } from "#shared/app-version";
-import SidebarResourceTree from "~/components/SidebarResourceTree.vue";
+import SidebarResourceTree from "../SidebarResourceTree.vue";
 import { useDirectoryTree } from "~/composables/use-directory-tree";
-import SidebarAccountMenu from "~/components/SidebarAccountMenu.vue";
-import "~/assets/workspace-tokens.css";
+import SidebarAccountMenu from "../SidebarAccountMenu.vue";
+import "../../assets/workspace-tokens.css";
 import { configureApi } from "~/lib/runtime";
-import AccountGate from "~/components/AccountGate.vue";
-import QuietIcon from "~/components/QuietIcon.vue";
-import BrandMark from "~/components/BrandMark.vue";
-import RecycleBinPanel from "~/components/RecycleBinPanel.vue";
-import CanvasTabs from "~/components/CanvasTabs.vue";
-import ReleaseAnnouncement from "~/components/ReleaseAnnouncement.vue";
+import AccountGate from "../AccountGate.vue";
+import QuietIcon from "../QuietIcon.vue";
+import BrandMark from "../BrandMark.vue";
+import RecycleBinPanel from "../RecycleBinPanel.vue";
+import CanvasTabs from "../CanvasTabs.vue";
+import ReleaseAnnouncement from "../ReleaseAnnouncement.vue";
 import { useReleaseAnnouncement } from "~/composables/useReleaseAnnouncement";
 import {
   flushCollaboration,
@@ -47,7 +47,7 @@ import {
 import { useWorkspacePicker } from "~/composables/useWorkspacePicker";
 import { useWorkspaceSearch } from "~/composables/use-workspace-search";
 import { useWorkspaceSearchEntry } from "~/composables/use-workspace-search-entry";
-import WorkspaceSearchDialog from "~/components/WorkspaceSearchDialog.vue";
+import WorkspaceSearchDialog from "../WorkspaceSearchDialog.vue";
 
 const props = withDefaults(
   defineProps<{

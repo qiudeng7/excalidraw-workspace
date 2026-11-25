@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import QuietIcon from "~/components/QuietIcon.vue";
-import BrandMark from "~/components/BrandMark.vue";
+import QuietIcon from "./QuietIcon.vue";
+import BrandMark from "./BrandMark.vue";
 import type { Bootstrap, User } from "#shared/contracts";
 import { ApiError } from "~/lib/api";
 import { accountApi, oidcStartUrl } from "~/lib/accountApi";

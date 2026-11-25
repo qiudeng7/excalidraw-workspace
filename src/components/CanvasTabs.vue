@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
 import type { CanvasMeta } from "#shared/contracts";
-import QuietIcon from "~/components/QuietIcon.vue";
+import QuietIcon from "./QuietIcon.vue";
 
 const props = defineProps<{
   tabs: readonly CanvasMeta[];

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // L2 resource tree for one workspace; owns its directory controller, no global store.
 import { computed, toRef, watch } from "vue";
-import SidebarResourceTree from "~/components/SidebarResourceTree.vue";
+import SidebarResourceTree from "../SidebarResourceTree.vue";
 import { useDirectoryTree } from "~/composables/use-directory-tree";
-import "~/assets/workspace-tokens.css";
+import "../../assets/workspace-tokens.css";
 
 const props = defineProps<{
   workspaceId: string;

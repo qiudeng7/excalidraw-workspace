@@ -2,9 +2,9 @@
 import { onBeforeUnmount, onMounted, ref, useId } from "vue";
 import type { DirectoryRecycleEntry } from "#shared/directory-contracts";
 import { api, ApiError } from "~/lib/api";
-import MoveResourceDialog from "~/components/MoveResourceDialog.vue";
+import MoveResourceDialog from "./MoveResourceDialog.vue";
 import { confirmDialog } from "~/lib/dialogs";
-import QuietIcon from "~/components/QuietIcon.vue";
+import QuietIcon from "./QuietIcon.vue";
 
 const props = defineProps<{ refresh: () => Promise<void> }>();
 const emit = defineEmits<{ close: [] }>();

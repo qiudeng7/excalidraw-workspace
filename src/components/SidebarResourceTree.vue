@@ -13,9 +13,9 @@ import type { DirectoryTreeController } from "~/composables/use-directory-tree";
 import { useDirectoryDrag } from "~/composables/use-directory-drag";
 import { useDirectorySelection } from "~/composables/use-directory-selection";
 import { nodeKey } from "~/lib/directory-api";
-import QuietIcon from "~/components/QuietIcon.vue";
-import DirectoryContextMenu from "~/components/DirectoryContextMenu.vue";
-import MoveResourceDialog from "~/components/MoveResourceDialog.vue";
+import QuietIcon from "./QuietIcon.vue";
+import DirectoryContextMenu from "./DirectoryContextMenu.vue";
+import MoveResourceDialog from "./MoveResourceDialog.vue";
 
 const props = defineProps<{
   tree: DirectoryTreeController;

@@ -17,11 +17,11 @@ import {
   readLegacySampling,
   readLegacyRenderingOptions,
 } from "~/lib/settingsControls";
-import QuietIcon from "~/components/QuietIcon.vue";
-import ThemeSwitcher from "~/components/ThemeSwitcher.vue";
-import AccountPasswordForm from "~/components/AccountPasswordForm.vue";
-import OidcProvidersPanel from "~/components/OidcProvidersPanel.vue";
-import ReleaseNotes from "~/components/ReleaseNotes.vue";
+import QuietIcon from "./QuietIcon.vue";
+import ThemeSwitcher from "./ThemeSwitcher.vue";
+import AccountPasswordForm from "./AccountPasswordForm.vue";
+import OidcProvidersPanel from "./OidcProvidersPanel.vue";
+import ReleaseNotes from "./ReleaseNotes.vue";
 import { currentRelease } from "~/data/releases";
 
 const props = withDefaults(

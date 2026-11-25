@@ -6,7 +6,7 @@ import type {
   NodeRef,
 } from "#shared/directory-contracts";
 import { directoryApi } from "~/lib/directory-api";
-import QuietIcon from "~/components/QuietIcon.vue";
+import QuietIcon from "./QuietIcon.vue";
 
 const props = defineProps<{
   workspaceId: string;

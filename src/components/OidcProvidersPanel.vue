@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import type { OidcProviderRecord, OidcProviderType } from "#shared/oidc";
 import { oidcProviderPresets, oidcProviderTypes } from "#shared/oidc";
-import QuietIcon from "~/components/QuietIcon.vue";
+import QuietIcon from "./QuietIcon.vue";
 import { confirmDialog } from "~/lib/dialogs";
 import {
   oidcProvidersApi,

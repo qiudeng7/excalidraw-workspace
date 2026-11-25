@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import QuietIcon from "~/components/QuietIcon.vue";
+import QuietIcon from "./QuietIcon.vue";
 
 const props = defineProps<{ name: string; email: string; locked: boolean }>();
 const emit = defineEmits<{ logout: [] }>();
