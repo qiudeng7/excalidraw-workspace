@@ -235,6 +235,7 @@ defineExpose({ focusInput });
 
 <style scoped>
 .workspace-search-dialog {
+  margin: auto;
   width: min(680px, calc(100vw - 28px));
   max-height: min(720px, calc(100dvh - 48px));
   padding: 0;

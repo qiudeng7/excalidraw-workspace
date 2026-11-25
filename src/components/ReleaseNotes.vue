@@ -101,6 +101,7 @@ p {
 ul {
   margin: 16px 0;
   padding-left: 22px;
+  list-style: disc;
 }
 li + li {
   margin-top: 10px;

@@ -8,11 +8,12 @@ import {
   watch,
 } from "vue";
 import { APP_VERSION } from "#shared/app-version";
+import { setThemeOverride } from "~/composables/useTheme";
 import SidebarResourceTree from "../SidebarResourceTree.vue";
 import { useDirectoryTree } from "~/composables/use-directory-tree";
 import SidebarAccountMenu from "../SidebarAccountMenu.vue";
 import "../../assets/workspace-tokens.css";
-import { configureApi } from "~/lib/runtime";
+import { configureApi, hasAccessTokenProvider } from "~/lib/runtime";
 import AccountGate from "../AccountGate.vue";
 import QuietIcon from "../QuietIcon.vue";
 import BrandMark from "../BrandMark.vue";
@@ -78,6 +79,8 @@ const hostTheme = ref<"light" | "dark">("light");
 const resolvedTheme = computed(() =>
   props.theme === "inherit" ? hostTheme.value : props.theme,
 );
+
+if (embedded.value) setThemeOverride(resolvedTheme);
 let themeObserver: MutationObserver | undefined;
 let themeMedia: MediaQueryList | undefined;
 
@@ -104,6 +107,7 @@ onMounted(() => {
   themeMedia.addEventListener("change", readHostTheme);
 });
 onBeforeUnmount(() => {
+  if (embedded.value) setThemeOverride(undefined);
   themeObserver?.disconnect();
   themeMedia?.removeEventListener("change", readHostTheme);
 });
@@ -652,6 +656,10 @@ async function flushForShare() {
     <section v-else-if="!bootstrap" class="loading">
       <p role="alert">{{ error }}</p>
       <button @click="initialize">重试连接</button>
+    </section>
+    <section v-else-if="!user && hasAccessTokenProvider()" class="loading">
+      <p role="alert">登录状态无效或已过期，请重新登录宿主应用后重试。</p>
+      <button @click="initialize">重试</button>
     </section>
     <AccountGate
       v-else-if="!user"
@@ -1518,6 +1526,20 @@ async function flushForShare() {
   gap: 16px;
   font-size: 13px;
   color: var(--app-muted);
+  padding: 0 24px;
+  text-align: center;
+}
+.loading button {
+  font: inherit;
+  color: var(--app-text);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border-strong);
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+.loading button:hover {
+  background: var(--app-hover);
 }
 .loading-mark {
   width: 18px;

@@ -42,6 +42,11 @@ export function apiUrl(path: string) {
   return `${config.base}${path}`;
 }
 
+/** Origin that serves the app itself: the page origin standalone, the backend origin when hosted. */
+export function appOrigin() {
+  return new URL(apiUrl("/"), location.origin).origin;
+}
+
 export function assetUrl(path: string) {
   return `${config.base}${path}`;
 }

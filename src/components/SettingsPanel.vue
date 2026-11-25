@@ -23,6 +23,7 @@ import AccountPasswordForm from "./AccountPasswordForm.vue";
 import OidcProvidersPanel from "./OidcProvidersPanel.vue";
 import ReleaseNotes from "./ReleaseNotes.vue";
 import { currentRelease } from "~/data/releases";
+import { assetUrl } from "~/lib/runtime";
 
 const props = withDefaults(
   defineProps<{
@@ -366,7 +367,7 @@ onBeforeUnmount(() => {
                   ></span
                 >
                 <a
-                  href="/licenses.html"
+                  :href="assetUrl('/licenses.html')"
                   target="_blank"
                   rel="noopener noreferrer"
                   >查看声明</a

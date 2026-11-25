@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { api } from "~/lib/api";
+import { appOrigin } from "~/lib/runtime";
 import { confirmDialog } from "~/lib/dialogs";
 import type {
   Member,
@@ -138,7 +139,7 @@ async function createLink() {
   });
 
   emit("activated");
-  createdLink.value = new URL(data.path, location.origin).href;
+  createdLink.value = new URL(data.path, appOrigin()).href;
   copyFeedback.value = "";
 }
 
@@ -511,6 +512,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .share-dialog {
   box-sizing: border-box;
+  margin: auto;
   padding: 0;
   width: min(560px, calc(100vw - 32px));
   max-height: min(760px, calc(100dvh - 40px));

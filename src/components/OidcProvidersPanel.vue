@@ -8,7 +8,7 @@ import {
   oidcProvidersApi,
   type OidcProviderInput,
 } from "~/lib/oidcProvidersApi";
-import { assetUrl } from "~/lib/runtime";
+import { appOrigin, assetUrl } from "~/lib/runtime";
 
 const MAX_ICON_BYTES = 256 * 1024;
 const ICON_TYPES = ["image/png", "image/svg+xml", "image/webp"];
@@ -65,7 +65,7 @@ const iconSrc = computed(() => {
 /** 服务端按 PUBLIC_ORIGIN 拼回调地址，这里用当前 origin 展示同一个值。 */
 const callbackUrl = computed(() =>
   form.id && typeof location !== "undefined"
-    ? `${location.origin}/api/auth/oidc/${form.id}/callback`
+    ? `${appOrigin()}/api/auth/oidc/${form.id}/callback`
     : "",
 );
 
