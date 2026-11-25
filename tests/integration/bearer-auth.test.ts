@@ -288,6 +288,19 @@ test("白名单来源获得 CORS 预检响应，其他来源不获得", async ()
       preflight.headers.get("access-control-allow-headers") ?? "",
       /Authorization/,
     );
+    const echoed = await f.request("/session", {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://workbench.test",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "if-none-match, x-brand-new",
+      },
+    });
+
+    assert.equal(
+      echoed.headers.get("access-control-allow-headers"),
+      "if-none-match, x-brand-new",
+    );
     const blocked = await f.request("/session", {
       method: "OPTIONS",
       headers: {
