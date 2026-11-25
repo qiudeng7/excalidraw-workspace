@@ -6,13 +6,17 @@ import {
 } from "h3";
 import { requestCorsOrigins } from "#server/utils/request";
 
-const ALLOWED_HEADERS = [
+/** Every custom request header the frontend sends; tests/unit/cors-headers keeps this in sync. */
+export const ALLOWED_REQUEST_HEADERS = [
   "Authorization",
   "Content-Type",
   "X-Requested-With",
   "X-Canvas-Access",
   "X-Account-Owner",
-].join(", ");
+  "X-Resource-Owner",
+  "X-Settings-Owner",
+];
+const ALLOWED_HEADERS = ALLOWED_REQUEST_HEADERS.join(", ");
 
 /**
  * Cross-origin hosts (a Module Federation shell) get explicit CORS on /api only.
