@@ -3,6 +3,9 @@ WORKDIR /app
 RUN npm install --global pnpm@11.24.0
 COPY . .
 RUN pnpm install --frozen-lockfile
+# Publish the Module Federation remote so hosts such as workbench can load it.
+ARG MF_ENABLED=true
+ENV MF_ENABLED=$MF_ENABLED
 RUN pnpm build:node
 
 FROM node:24-bookworm-slim AS runtime

@@ -144,6 +144,21 @@ export default defineNuxtConfig({
     "/c/**": { ssr: false },
     "/share/**": { ssr: false },
     "/api/**": { headers: { "cache-control": "no-store" } },
+    // A federated host loads these cross-origin as ES modules, which requires CORS. They are
+    // public static files without credentials, so a wildcard is enough.
+    ...(federationEnabled
+      ? Object.fromEntries(
+          [
+            "/mf-manifest.json",
+            "/remoteEntry.js",
+            "/_nuxt/**",
+            "/editor-assets/**",
+          ].map((path) => [
+            path,
+            { headers: { "access-control-allow-origin": "*" } },
+          ]),
+        )
+      : {}),
   },
   nitro: {
     externals: process.env.NITRO_PRESET?.startsWith("cloudflare")
